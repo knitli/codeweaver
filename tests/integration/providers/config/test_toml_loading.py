@@ -87,7 +87,12 @@ def load_provider_settings_from_toml(toml_file: Path) -> ProviderSettings:
         toml_data = tomllib.load(f)
 
     provider_data = toml_data.get("provider", {})
-    return ProviderSettings(**provider_data)
+
+    # The settings class expects 'reranking' and 'embedding' as tuples/lists
+    # If the TOML uses the list-of-tables syntax [[provider.embedding]],
+    # it will already be a list.
+
+    return ProviderSettings.model_validate(provider_data)
 
 
 # ===========================================================================
@@ -236,6 +241,7 @@ class TestSymmetricModeBackwardCompatibility:
         """
         toml_content = """
 [[provider.embedding]]
+config_type = "symmetric"
 provider = "voyage"
 model_name = "voyage-code-3"
 """
@@ -261,10 +267,12 @@ model_name = "voyage-code-3"
         """
         toml_content = """
 [[provider.embedding]]
+config_type = "symmetric"
 provider = "voyage"
 model_name = "voyage-code-3"
 
 [[provider.embedding]]
+config_type = "symmetric"
 provider = "fastembed"
 model_name = "BAAI/bge-small-en-v1.5"
 """
@@ -317,6 +325,7 @@ class TestMutualExclusionValidation:
         """
         toml_content = """
 [[provider.embedding]]
+config_type = "symmetric"
 provider = "voyage"
 model_name = "voyage-code-3"
 
@@ -352,6 +361,7 @@ model_name = "voyage-4-nano"
         """
         toml_content = """
 [[provider.embedding]]
+config_type = "symmetric"
 provider = "fastembed"
 model_name = "BAAI/bge-small-en-v1.5"
 
@@ -389,6 +399,7 @@ model_name = "BAAI/bge-small-en-v1.5"
         """
         toml_content = """
 [[provider.embedding]]
+config_type = "symmetric"
 provider = "voyage"
 model_name = "voyage-code-3"
 
@@ -781,7 +792,7 @@ model_name = "voyage:rerank-2.5"
 [[provider.vector_store]]
 provider = "qdrant"
 
-[provider.vector_store.0.client_options]
+[provider.vector_store.client_options]
 host = "127.0.0.1"
 """
         toml_file, _ = create_toml_file(tmp_path, toml_content)
@@ -816,7 +827,7 @@ model_name = "voyage-4-nano"
 [[provider.vector_store]]
 provider = "qdrant"
 
-[provider.vector_store.0.client_options]
+[provider.vector_store.client_options]
 host = "127.0.0.1"
 port = 6333
 """

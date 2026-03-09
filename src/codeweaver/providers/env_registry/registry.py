@@ -224,7 +224,8 @@ class ProviderEnvRegistry:
             from codeweaver.providers.env_registry import definitions
 
             # Discover all uppercase attributes that are configs
-            for name in dir(definitions):
+            # Use __all__ to ensure late-loaded attributes are discovered
+            for name in definitions.__all__:
                 if name.startswith("_") or not name.isupper():
                     continue
 

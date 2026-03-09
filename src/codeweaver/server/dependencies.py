@@ -14,6 +14,7 @@ import time
 
 from typing import TYPE_CHECKING, Annotated
 
+from codeweaver import EmbeddingProvidersDep, VectorStoreProvidersDep
 from codeweaver.core.dependencies import (
     ResolvedProjectNameDep,
     ResolvedProjectPathDep,
@@ -23,7 +24,7 @@ from codeweaver.core.dependencies import (
 )
 from codeweaver.core.di import INJECTED, dependency_provider, depends
 from codeweaver.engine.dependencies import FailoverServiceDep, IndexingServiceDep
-from codeweaver.providers import ProviderSettingsDep
+from codeweaver.providers import RerankingProvidersDep, SparseEmbeddingProvidersDep
 
 # Runtime imports needed for dependency_provider decorators
 from codeweaver.server.health.health_service import HealthService
@@ -42,17 +43,23 @@ if TYPE_CHECKING:
 
 @dependency_provider(HealthService, scope="singleton")
 def _create_health_service(
+    embedding_providers: EmbeddingProvidersDep = INJECTED,
+    sparse_embedding_providers: SparseEmbeddingProvidersDep = INJECTED,
+    vector_store_providers: VectorStoreProvidersDep = INJECTED,
+    reranking_providers: RerankingProvidersDep = INJECTED,
     statistics: StatisticsDep = INJECTED,
     indexer: IndexingServiceDep = INJECTED,
     failover_manager: FailoverServiceDep = INJECTED,
-    providers: ProviderSettingsDep = INJECTED,
 ) -> HealthService:
     """Factory for health service."""
     return HealthService(
         statistics=statistics,
         indexer=indexer,
         failover_manager=failover_manager,
-        providers=providers,
+        embedding_providers=embedding_providers,
+        sparse_embedding_providers=sparse_embedding_providers,
+        vector_store_providers=vector_store_providers,
+        reranking_providers=reranking_providers,
         startup_stopwatch=time.monotonic(),
     )
 

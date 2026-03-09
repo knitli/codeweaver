@@ -137,7 +137,7 @@ def mock_confirm(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.ask.return_value = True
 
     # Patch the module-level import in init.py (imported at line 27)
-    monkeypatch.setattr("codeweaver.cliConfirm", mock)
+    monkeypatch.setattr("codeweaver.cli.commands.init.Confirm", mock)
     # Also patch the base location to catch any other imports
     monkeypatch.setattr("rich.prompt.Confirm", mock)
 
@@ -467,7 +467,7 @@ def configured_providers(
         # Return monotonically increasing time values (start from a baseline)
         return 1000000.0 + call_count[0] * 0.001
 
-    with patch("codeweaver.agent_api", side_effect=mock_time):
+    with patch("time.time", side_effect=mock_time):
         yield
         container.clear_overrides()
 
@@ -957,7 +957,7 @@ def real_providers(
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
 
-    with patch("codeweaver.agent_api", side_effect=mock_time):
+    with patch("time.time", side_effect=mock_time):
         yield
         container.clear_overrides()
 
@@ -1059,7 +1059,7 @@ async def indexed_test_project(known_test_codebase, clean_container):
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
 
-    with patch("codeweaver.agent_api", side_effect=mock_time):
+    with patch("time.time", side_effect=mock_time):
         # Resolve indexer from container
         indexer = await clean_container.resolve(IndexingService)
 

@@ -191,6 +191,11 @@ def _create_chunking_service(
     return ChunkingService(governor=governor, tokenizer=tokenizer, settings=settings)
 
 
+type ChunkingServiceDep = Annotated[
+    "ChunkingService", depends(_create_chunking_service, scope="singleton")
+]
+
+
 @dependency_provider(IndexingService, scope="singleton")
 def _create_indexing_service(
     chunking_service: ChunkingServiceDep = INJECTED,

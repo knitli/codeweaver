@@ -436,7 +436,7 @@ class TestRegistryIntegration:
         await cache_manager.register_embeddings(chunk_id, dense_info, chunk)
 
         # Register second embedding (sparse)
-        from codeweaver.core.types.embeddings import SparseEmbedding
+        from codeweaver.core.types.embeddings import CodeWeaverSparseEmbedding
 
         sparse_batch_id = uuid7()
         sparse_info = EmbeddingBatchInfo.create_sparse(
@@ -444,7 +444,7 @@ class TestRegistryIntegration:
             batch_index=0,
             chunk_id=chunk_id,
             model="sparse-model",
-            embeddings=SparseEmbedding(indices=[1, 2, 3], values=[0.5, 0.6, 0.7]),
+            embeddings=CodeWeaverSparseEmbedding(indices=[1, 2, 3], values=[0.5, 0.6, 0.7]),
             intent="backup",
         )
         await cache_manager.register_embeddings(chunk_id, sparse_info, chunk)

@@ -424,7 +424,7 @@ class TestErrorMessageStructure:
                 assert any([
                     stripped.startswith(("Option", "To ", "Run:", "Check", "Or ")),
                     ":" in stripped[:60],  # Has structure like "Step 1: ..."
-                    stripped[:4].rstrip(". ").isdigit(),  # Starts with a number like "1." or "2."
+                    re.match(r"^\d+\.", stripped),  # Starts with a number like "1." or "2."
                 ]), f"Suggestion not actionable: {suggestion}"
 
     def test_all_errors_have_details(self) -> None:
@@ -743,7 +743,12 @@ class TestRealErrorScenarios:
 
         # Should raise ConfigurationLockError
         with pytest.raises(ConfigurationLockError) as exc_info:
-            strict_metadata.validate_change(changed_metadata)
+            strict_metadata.validate_config_change(
+                new_dense_model=changed_metadata.dense_model,
+                new_query_model=changed_metadata.query_model,
+                new_sparse_model=changed_metadata.sparse_model,
+                new_provider=changed_metadata.provider,
+            )
 
         error = exc_info.value
 

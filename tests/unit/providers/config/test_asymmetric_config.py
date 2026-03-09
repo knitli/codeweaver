@@ -115,7 +115,7 @@ class TestAsymmetricConfigCreation:
     ):
         """Test creating valid asymmetric config with same-family models."""
         try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         config = AsymmetricEmbeddingProviderSettings(
@@ -155,7 +155,7 @@ class TestSameFamilyValidation:
     ):
         """Test validation passes for same family across different providers."""
         try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         config = AsymmetricEmbeddingProviderSettings(
@@ -171,7 +171,7 @@ class TestSameFamilyValidation:
     ):
         """Test that validation actually checks model family compatibility."""
         try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         config = AsymmetricEmbeddingProviderSettings(
@@ -191,7 +191,7 @@ class TestValidationBypass:
     ):
         """Test that validation can be disabled via skip_validation parameter."""
         try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         config = AsymmetricEmbeddingProviderSettings(
@@ -219,7 +219,7 @@ class TestIncompatibleFamilyModels:
         this test should be updated to test actual different-family scenarios.
         """
         try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         with pytest.raises(ConfigurationError, match="does not belong to a model family"):
@@ -234,7 +234,7 @@ class TestIncompatibleFamilyModels:
     ):
         """Test that incompatible cross-provider models are rejected."""
         try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         with pytest.raises(ConfigurationError, match="does not belong to a model family"):
@@ -331,7 +331,7 @@ class TestErrorMessageQuality:
         self, voyage_4_large_settings, voyage_code_3_settings
     ):
         try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         with pytest.raises(ConfigurationError) as exc_info:
@@ -347,7 +347,7 @@ class TestErrorMessageQuality:
     ):
         """Test that error messages suggest alternative models."""
         try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         with pytest.raises(ConfigurationError) as exc_info:
@@ -368,7 +368,7 @@ class TestErrorMessageQuality:
     ):
         """Test that validation error includes structured details for debugging."""
         try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         with pytest.raises(ConfigurationError) as exc_info:
@@ -389,7 +389,7 @@ class TestCrossProviderFamilies:
     ):
         """Test VOYAGE API model paired with SENTENCE_TRANSFORMERS local model."""
         try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         config = AsymmetricEmbeddingProviderSettings(
@@ -405,7 +405,7 @@ class TestCrossProviderFamilies:
     ):
         """Test that family linking is validated across providers."""
         try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         config = AsymmetricEmbeddingProviderSettings(
@@ -421,7 +421,7 @@ class TestEdgeCases:
     def test_identical_settings(self, voyage_4_large_settings: EmbeddingProviderSettings):
         """Test config with identical embed and query settings."""
         try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         config = AsymmetricEmbeddingProviderSettings(
@@ -436,7 +436,7 @@ class TestEdgeCases:
     ):
         """Test that config can be serialized and deserialized."""
         try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         config = AsymmetricEmbeddingProviderSettings(
@@ -479,7 +479,7 @@ class TestIntegrationReadiness:
     ):
         """Helper to validate AsymmetricEmbeddingProviderSettings attributes."""
         try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         config = AsymmetricEmbeddingProviderSettings(

@@ -14,6 +14,8 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from codeweaver.core.constants import ONE_MINUTE
+from codeweaver.engine.services.reconciliation_service import VectorReconciliationService
+from codeweaver.engine.services.snapshot_service import QdrantSnapshotBackupService
 from codeweaver.providers import CircuitBreakerState
 
 
@@ -58,6 +60,10 @@ class FailoverService:
         self._failover_active = False
         self._monitor_task: asyncio.Task | None = None
         self._failover_time: datetime | None = None
+
+        # Cycle counters for periodic maintenance (Phase 2/3)
+        self._maintenance_cycle_count = 0
+        self._snapshot_cycle_count = 0
 
     async def start_monitoring(self) -> None:
         """Start health monitoring and automatic failover.
@@ -108,10 +114,6 @@ class FailoverService:
         logger.info("Starting vector reconciliation")
 
         try:
-            from codeweaver.engine.services.reconciliation_service import (
-                VectorReconciliationService,
-            )
-
             # Create reconciliation service
             reconciliation_service = VectorReconciliationService(
                 vector_store=self.primary_store,
@@ -159,8 +161,6 @@ class FailoverService:
         logger.info("Starting snapshot maintenance")
 
         try:
-            from codeweaver.engine.services.snapshot_service import QdrantSnapshotBackupService
-
             # Create snapshot service
             snapshot_service = QdrantSnapshotBackupService(
                 vector_store=self.primary_store,

@@ -33,7 +33,7 @@ from codeweaver.core.di import INJECTED
 from codeweaver.core.telemetry._project import CODEWEAVER_POSTHOG_PROJECT_KEY
 
 
-NO_HOG = not has_package("posthog")
+NO_HOG = not has_package("posthog") or sys.modules.get("posthog") is None
 SESSION_ID: UUID7HexT = uuid7().hex  # ty:ignore[invalid-assignment]
 if NO_HOG:
 
@@ -117,7 +117,7 @@ class TelemetryService:
             )
             if isinstance(api_key, SecretStr):
                 api_key = api_key.get_secret_value()
-        if not has_package("posthog"):
+        if NO_HOG:
             enabled = False
         self.enabled = bool(enabled and api_key)
         self.logger = logging.getLogger(__name__)

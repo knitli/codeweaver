@@ -335,22 +335,25 @@ async def find_code(
     telemetry_settings: TelemetrySettingsDep = INJECTED,
     telemetry: TelemetryServiceDep = INJECTED,
 ) -> FindCodeResponseSummary:
-    """Find relevant code based on semantic search with intent-driven ranking.
+    """Find relevant code based on semantic search with intent-driven ranking."""
+    # Resolve dependencies if not provided (supports direct calls in tests)
+    from codeweaver.core.di import get_container
+    from codeweaver.core.di.depends import is_depends_marker
 
-    This is the main entry point for the CodeWeaver search pipeline.
+    if is_depends_marker(search_package):
+        container = get_container()
+        search_package = await container.resolve(SearchPackage)
+    if is_depends_marker(telemetry_settings):
+        container = get_container()
+        from codeweaver.core.config.telemetry import TelemetrySettings
 
-    Args:
-        query: Natural language query
-        intent: Optional IntentType to override detection
-        token_limit: Maximum tokens to return (default: 15000)
-        focus_languages: Optional language filter
-        max_results: Maximum number of results to return (default: 30)
-        context: Optional FastMCP Context for client communication
-        search_package: dependency injected SearchPackage
+        telemetry_settings = await container.resolve(TelemetrySettings)
+    if is_depends_marker(telemetry):
+        container = get_container()
+        from codeweaver.core.telemetry.client import TelemetryService
 
-    Returns:
-        FindCodeResponseSummary with ranked matches and metadata
-    """
+        telemetry = await container.resolve(TelemetryService)
+
     start_time = time.monotonic()
     strategies_used: list[SearchStrategy] = []
 

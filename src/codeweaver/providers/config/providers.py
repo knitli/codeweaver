@@ -827,8 +827,6 @@ class ProviderSettings(BasedModel):
 
 def _get_all_default_provider_settings() -> ProviderSettingsDict:
     """Get all default provider settings (delayed initialization)."""
-    from codeweaver.providers.config.profiles import ProviderSettingsDict
-
     return ProviderSettingsDict(
         data=_create_default_data_provider_settings(),
         embedding=DefaultEmbeddingProviderSettings,

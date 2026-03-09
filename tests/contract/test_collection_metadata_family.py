@@ -70,7 +70,7 @@ class TestCreateCollectionWithFamilyMetadata:
         assert metadata.dense_model == "voyage-4-large"
         assert metadata.dense_model_family == "voyage-4"
         assert metadata.query_model == "voyage-4-nano"
-        assert metadata.version == "1.3.0"
+        assert metadata.version == "1.5.0"
 
     def test_create_without_family_fields(self, base_metadata_kwargs: dict):
         """Verify metadata can be created without family fields for backward compatibility.

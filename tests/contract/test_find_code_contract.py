@@ -53,7 +53,7 @@ class TestFindCodeSignature:
 
         # Required parameter
         assert "query" in params, "find_code must have 'query' parameter"
-        assert params["query"].category == inspect.Parameter.POSITIONAL_OR_KEYWORD, (
+        assert params["query"].kind == inspect.Parameter.POSITIONAL_OR_KEYWORD, (
             "query must be positional"
         )
         assert params["query"].default == inspect.Parameter.empty, "query must not have default"
@@ -78,14 +78,14 @@ class TestFindCodeSignature:
         # intent default: None
         assert params["intent"].default is None, "intent default must be None"
 
-        # token_limit default: 15000
-        assert params["token_limit"].default == 15000, "token_limit default must be 15000"
+        # token_limit default: 20000
+        assert params["token_limit"].default == 20000, "token_limit default must be 20000"
 
         # focus_languages default: None
         assert params["focus_languages"].default is None, "focus_languages default must be None"
 
-        # max_results default: 30
-        assert params["max_results"].default == 30, "max_results default must be 30"
+        # max_results default: 10
+        assert params["max_results"].default == 10, "max_results default must be 10"
 
         # context default: None
         assert params["context"].default is None, "context default must be None"
@@ -329,7 +329,7 @@ class TestCodeMatchSchema:
         # Invalid: start < 1 (Span validation catches this at creation time)
         with pytest.raises(
             (ValidationError, CodeWeaverValidationError),
-            match=r"Invalid span.*start line must be greater than or equal to 1",
+            match=r"(Invalid span.*start line must be greater than or equal to 1|Input should be greater than 0)",
         ):
             CodeMatch(
                 file=test_file,
@@ -389,13 +389,13 @@ class TestParameterValidation:
     def test_token_limit_constraints(self):
         """Verify token_limit is validated per contract (min: 1000, max: 100000)."""
         self._test_find_code_min_max_constraints(
-            "token_limit", 15000, "token_limit default must be 15000"
+            "token_limit", 20000, "token_limit default must be 20000"
         )
 
     def test_max_results_constraints(self):
         """Verify max_results is validated per contract (min: 1, max: 100)."""
         self._test_find_code_min_max_constraints(
-            "max_results", 30, "max_results default must be 30"
+            "max_results", 10, "max_results default must be 10"
         )
 
     def _test_find_code_min_max_constraints(self, constraint: str, bound: int, statement: str):

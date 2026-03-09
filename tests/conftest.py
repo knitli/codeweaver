@@ -593,10 +593,10 @@ def create_test_chunk_with_embeddings(
         chunk = chunk.set_batch_keys(dense_batch_key)
 
     if sparse_embedding:
-        # Convert sparse dict format to SparseEmbedding object
-        from codeweaver.providers import SparseEmbedding
+        # Convert sparse dict format to CodeWeaverSparseEmbedding object
+        from codeweaver.providers import CodeWeaverSparseEmbedding
 
-        sparse_emb = SparseEmbedding(
+        sparse_emb = CodeWeaverSparseEmbedding(
             indices=sparse_embedding.get("indices", []), values=sparse_embedding.get("values", [])
         )
         sparse_info = EmbeddingBatchInfo.create_sparse(

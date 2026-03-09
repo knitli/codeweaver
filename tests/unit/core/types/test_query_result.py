@@ -6,7 +6,7 @@
 
 import pytest
 
-from codeweaver.core import SparseEmbedding
+from codeweaver.core import CodeWeaverSparseEmbedding
 from codeweaver.core.types import QueryResult
 
 
@@ -25,7 +25,7 @@ class TestQueryResult:
 
     def test_create_with_sparse(self):
         """Test creating QueryResult with sparse embedding."""
-        sparse = SparseEmbedding(indices=[1, 2, 3], values=[0.8, 0.7, 0.6])
+        sparse = CodeWeaverSparseEmbedding(indices=[1, 2, 3], values=[0.8, 0.7, 0.6])
         result = QueryResult(vectors={"sparse": sparse})
 
         assert "sparse" in result.intents
@@ -35,7 +35,7 @@ class TestQueryResult:
     def test_create_with_multiple_intents(self):
         """Test creating QueryResult with multiple embedding intents."""
         dense_vector = [0.1, 0.2, 0.3]
-        sparse = SparseEmbedding(indices=[1, 2], values=[0.9, 0.8])
+        sparse = CodeWeaverSparseEmbedding(indices=[1, 2], values=[0.9, 0.8])
 
         result = QueryResult(vectors={"primary": dense_vector, "sparse": sparse})
 
@@ -65,7 +65,7 @@ class TestQueryResult:
         result = QueryResult(
             vectors={
                 "primary": [0.1, 0.2],
-                "sparse": SparseEmbedding(indices=[1], values=[0.9]),
+                "sparse": CodeWeaverSparseEmbedding(indices=[1], values=[0.9]),
                 "backup": [0.3, 0.4],
             }
         )
@@ -86,7 +86,7 @@ class TestQueryResult:
     def test_dict_access_pattern(self):
         """Test that QueryResult supports dict-like access patterns."""
         result = QueryResult(
-            vectors={"primary": [0.1, 0.2], "sparse": SparseEmbedding(indices=[1], values=[0.9])}
+            vectors={"primary": [0.1, 0.2], "sparse": CodeWeaverSparseEmbedding(indices=[1], values=[0.9])}
         )
 
         # Test iteration over intents

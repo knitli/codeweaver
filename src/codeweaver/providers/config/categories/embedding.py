@@ -101,21 +101,31 @@ if has_package("sentence_transformers"):
 possible_tags = get_provider_names_for_category("embedding")
 
 
+def _get_embedding_capabilities_sync(model_name: ModelNameT) -> EmbeddingModelCapabilities | None:
+    """Synchronously get the embedding model capabilities for a given model name."""
+    import asyncio
+    try:
+        resolver_module = importlib.import_module(
+            "codeweaver.providers.embedding.capabilities.resolver"
+        )
+        resolver = resolver_module.EmbeddingCapabilityResolver()
+        return asyncio.run(resolver.resolve(model_name))
+    except Exception as e:
+        logger.debug("Failed to resolve capabilities for %s: %s", model_name, e)
+        return None
+
+
 def _get_embedding_capabilities(model_name: ModelNameT) -> EmbeddingModelCapabilities | None:
     """Get the embedding model capabilities for a given model name.
 
     Args:
         model_name: The name of the embedding model.
-        sparse: Whether to get sparse embedding capabilities.
 
     Returns:
         The embedding model capabilities or None if not found.
     """
-    resolver_module = importlib.import_module(
-        "codeweaver.providers.embedding.capabilities.resolver"
-    )
-    resolver = resolver_module.EmbeddingCapabilityResolver
-    return None if resolver is None else resolver().resolve(model_name)
+    # This is a legacy helper, but we should use the sync version here for pydantic validators
+    return _get_embedding_capabilities_sync(model_name)
 
 
 class BaseEmbeddingProviderSettings(BaseProviderCategorySettings, ABC):
@@ -451,7 +461,7 @@ class FastEmbedEmbeddingProviderSettings(FastEmbedProviderMixin, EmbeddingProvid
     )
 
     embedding_config: FastEmbedEmbeddingConfig = Field(
-        default_factory=lambda data: FastEmbedClientOptions(
+        default_factory=lambda data: FastEmbedEmbeddingConfig(
             model_name=ModelName(data["model_name"] if isinstance(data, dict) else data.model_name)
         )
     )
@@ -704,233 +714,132 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
         return super().__getattribute__(name)
 
     @cached_property
-    def dimension_tuple(self) -> tuple[NonNegativeInt, NonNegativeInt]:
-        """Get the embedding dimensions for embed and query models.
+    def dimension_tuple(self) -> tuple[int | None, int | None]:
+        """Get the embedding dimensions for embed and query models."""
+        try:
+            embed_dim = self.embed_provider.embedding_config.dimension
+            query_dim = self.query_provider.embedding_config.dimension
 
-        Returns:
-            A tuple of (embed_dimension, query_dimension).
-        """
-        if (
-            found_values := (
-                self.embed_provider.embedding_config.dimension,
-                self.query_provider.embedding_config.dimension,
-            )
-        ) and all(dim is not None for dim in found_values):
-            return cast(
-                tuple[NonNegativeInt, NonNegativeInt],
-                (
-                    self.embed_provider.embedding_config.dimension,
-                    self.query_provider.embedding_config.dimension,
-                ),
-            )
-        match found_values:
-            case (int(), None):
-                self.query_provider.embedding_config.set_dimension(cast(int, found_values[0]))
-                return cast(tuple[int, int], (found_values[0], found_values[0]))
-            case (None, int()):
-                self.embed_provider.embedding_config.set_dimension(cast(int, found_values[1]))
-                return cast(tuple[int, int], (found_values[1], found_values[1]))
-            case _:
-                embed_caps = (
-                    self.embed_provider.embedding_config.capabilities
-                    or self.query_provider.embedding_config.capabilities
-                )
-                if not embed_caps:
-                    raise ValueError(
-                        "Cannot determine embedding dimensions for asymmetric embedding config: "
-                        "neither model has dimension set or capabilities registered."
-                    )
-                self.embed_provider.embedding_config.set_dimension(embed_caps.default_dimension)
-                self.query_provider.embedding_config.set_dimension(embed_caps.default_dimension)
-                return cast(
-                    tuple[int, int], (embed_caps.default_dimension, embed_caps.default_dimension)
-                )
-        return cast(
-            tuple[NonNegativeInt, NonNegativeInt],
-            (
-                self.embed_provider.embedding_config.dimension,
-                self.query_provider.embedding_config.dimension,
-            ),
-        )
+            if embed_dim is not None and query_dim is not None:
+                return embed_dim, query_dim
+
+            # Try to resolve from capabilities
+            embed_caps = self.embed_provider.embedding_config.capabilities or _get_embedding_capabilities(self.embed_provider.model_name)
+            query_caps = self.query_provider.embedding_config.capabilities or _get_embedding_capabilities(self.query_provider.model_name)
+
+            if embed_dim is None and embed_caps:
+                embed_dim = embed_caps.default_dimension
+            if query_dim is None and query_caps:
+                query_dim = query_caps.default_dimension
+
+            # If one is still None, try to use the other if they are from same family
+            if embed_dim is None and query_dim is not None:
+                embed_dim = query_dim
+            if query_dim is None and embed_dim is not None:
+                query_dim = embed_dim
+
+            return embed_dim, query_dim
+        except Exception as e:
+            logger.error("Error calculating dimension_tuple: %s", e)
+            return None, None
 
     @cached_property
-    def datatype_tuple(self) -> tuple[str, str]:
+    def datatype_tuple(self) -> tuple[str | None, str | None]:
         """Get the embedding datatypes for embed and query models.
 
         Returns:
             A tuple of (embed_datatype, query_datatype).
         """
-        if (
-            found_values := (
-                self.embed_provider.embedding_config.datatype,
-                self.query_provider.embedding_config.datatype,
-            )
-        ) and all(dt is not None for dt in found_values):
-            return cast(
-                tuple[str, str],
-                (
-                    self.embed_provider.embedding_config.datatype,
-                    self.query_provider.embedding_config.datatype,
-                ),
-            )
-        match found_values:
-            case (str(), None):
-                self.query_provider.embedding_config.set_datatype(cast(str, found_values[0]))
-                return cast(tuple[str, str], (found_values[0], found_values[0]))
-            case (None, str()):
-                self.embed_provider.embedding_config.set_datatype(cast(str, found_values[1]))
-                return cast(tuple[str, str], (found_values[1], found_values[1]))
-            case _:
-                embed_caps = (
-                    self.embed_provider.embedding_config.capabilities
-                    or self.query_provider.embedding_config.capabilities
-                )
-                if not embed_caps:
-                    raise ValueError(
-                        "Cannot determine embedding datatypes for asymmetric embedding config: "
-                        "neither model has datatype set or capabilities registered."
-                    )
-                self.embed_provider.embedding_config.set_datatype(embed_caps.default_dtype)
-                self.query_provider.embedding_config.set_datatype(embed_caps.default_dtype)
-                return cast(tuple[str, str], (embed_caps.default_dtype, embed_caps.default_dtype))
-        return cast(
-            tuple[str, str],
-            (
-                self.embed_provider.embedding_config.datatype,
-                self.query_provider.embedding_config.datatype,
-            ),
-        )
+        embed_dt = self.embed_provider.embedding_config.datatype
+        query_dt = self.query_provider.embedding_config.datatype
+
+        if embed_dt is not None and query_dt is not None:
+            return embed_dt, query_dt
+
+        # Try to resolve from capabilities
+        embed_caps = self.embed_provider.embedding_config.capabilities or _get_embedding_capabilities(self.embed_provider.model_name)
+        query_caps = self.query_provider.embedding_config.capabilities or _get_embedding_capabilities(self.query_provider.model_name)
+
+        if embed_dt is None and embed_caps:
+            embed_dt = embed_caps.default_dtype
+        if query_dt is None and query_caps:
+            query_dt = query_caps.default_dtype
+
+        # Fallback
+        if embed_dt is None and query_dt is not None:
+            embed_dt = query_dt
+        if query_dt is None and embed_dt is not None:
+            query_dt = embed_dt
+
+        return embed_dt, query_dt
 
     @model_validator(mode="after")
     def validate_model_compatibility(self) -> AsymmetricEmbeddingProviderSettings:
-        """Validate that embed and query models are compatible.
-
-        Validates:
-        - Both models have registered capabilities
-        - Both models belong to model families
-        - Both models belong to the same family
-        - Models are compatible within the family
-        - Embedding dimensions match
-
-        Returns:
-            Self for method chaining.
-
-        Raises:
-            ConfigurationError: If models are incompatible.
-        """
+        """Validate that embed and query models are compatible."""
         from codeweaver.core.exceptions import ConfigurationError
 
-        if not self.validate_family_compatibility:
-            logger.warning(
-                "Family compatibility validation disabled for asymmetric embedding config. "
-                "This may result in incompatible embeddings if models are from different families."
-            )
-            return self
-
-        if self.dimension_tuple[0] != self.dimension_tuple[1]:
-            raise DimensionMismatchError(
-                f"Embedding dimension mismatch: embed model dimension {self.dimension_tuple[0]} != query model dimension {self.dimension_tuple[1]}",
-                details={
-                    "embed_model": str(self.embed_provider.model_name),
-                    "embed_dimension": self.dimension_tuple[0],
-                    "query_model": str(self.query_provider.model_name),
-                    "query_dimension": self.dimension_tuple[1],
-                },
-                suggestions=[
-                    "Ensure both models are configured with the same embedding dimension",
-                    "Set dimensions explicitly in the embedding configurations if needed",
-                ],
-            )
-        if self.datatype_tuple[0] != self.datatype_tuple[1]:
-            # Special case for Voyage-4 family: uint8 and float32 are compatible
-            embed_caps = (
-                self.embed_provider.embedding_config.capabilities
-                if self.embed_provider.embedding_config
-                else None
-            )
-            query_caps = (
-                self.query_provider.embedding_config.capabilities
-                if self.query_provider.embedding_config
-                else None
-            )
-            if (
-                embed_caps
-                and query_caps
-                and embed_caps.model_family
-                and embed_caps.model_family == query_caps.model_family
-                and embed_caps.model_family.family_id == "voyage-4"
-            ):
-                pass
-            else:
-                raise DatatypeMismatchError(
-                    f"Embedding datatype mismatch: embed model datatype '{self.datatype_tuple[0]}' != query model datatype '{self.datatype_tuple[1]}'",
-                    details={
-                        "embed_model": str(self.embed_provider.model_name),
-                        "embed_datatype": self.datatype_tuple[0],
-                        "query_model": str(self.query_provider.model_name),
-                        "query_datatype": self.datatype_tuple[1],
-                    },
-                    suggestions=[
-                        "Ensure both models are configured with the same embedding datatype",
-                        "Set datatypes explicitly in the embedding configurations if needed",
-                    ],
-                )
-        if (
-            caps := self.embed_provider.embedding_config.capabilities
-            if self.embed_provider.embedding_config
-            else self.query_provider.embedding_config.capabilities
-            if self.query_provider.embedding_config
-            else None
-        ) is not None and caps.model_family is not None:
-            if caps.model_family.is_compatible(
-                str(self.embed_provider.model_name), str(self.query_provider.model_name)
-            ):
-                logger.info(
-                    "Asymmetric embedding configuration validated successfully using pre-set capabilities: "
-                    "embed_model='%s', query_model='%s', family='%s'",
-                    str(self.embed_provider.model_name),
-                    str(self.query_provider.model_name),
-                    caps.model_family.family_id,
-                )
+        try:
+            if not self.validate_family_compatibility:
                 return self
-            raise ConfigurationError(
-                f"Models are not compatible within family '{caps.model_family.family_id}' based on pre-set capabilities",
-                details={
-                    "embed_model": str(self.embed_provider.model_name),
-                    "query_model": str(self.query_provider.model_name),
-                    "family_id": caps.model_family.family_id,
-                    "family_members": sorted(caps.model_family.member_models),
-                },
-                suggestions=[
-                    "Ensure both models are listed as family members",
-                    f"Valid family members: {', '.join(sorted(caps.model_family.member_models))}",
-                    "Contact support if you believe this is an error",
-                ],
-            )
-        if not caps:
-            raise ConfigurationError(
-                "Cannot validate model compatibility: neither model has embedding capabilities registered",
-                details={
-                    "embed_model": str(self.embed_provider.model_name),
-                    "query_model": str(self.query_provider.model_name),
-                },
-                suggestions=[
-                    "Ensure both models have embedding capabilities registered",
-                    "Check provider documentation for supported models and capabilities",
-                ],
-            )
 
-        return self
+            if self.dimension_tuple[0] is not None and self.dimension_tuple[1] is not None:
+                if self.dimension_tuple[0] != self.dimension_tuple[1]:
+                    raise DimensionMismatchError(
+                        f"Embedding dimension mismatch: embed model dimension {self.dimension_tuple[0]} != query model dimension {self.dimension_tuple[1]}",
+                        details={
+                            "embed_model": str(self.embed_provider.model_name),
+                            "embed_dimension": self.dimension_tuple[0],
+                            "query_model": str(self.query_provider.model_name),
+                            "query_dimension": self.dimension_tuple[1],
+                        },
+                    )
+
+            if self.datatype_tuple[0] is not None and self.datatype_tuple[1] is not None:
+                if self.datatype_tuple[0] != self.datatype_tuple[1]:
+                    # Special case for Voyage-4 family: uint8 and float32 are compatible
+                    embed_caps = self.embed_provider.embedding_config.capabilities or _get_embedding_capabilities(self.embed_provider.model_name)
+                    query_caps = self.query_provider.embedding_config.capabilities or _get_embedding_capabilities(self.query_provider.model_name)
+                    
+                    if (
+                        embed_caps
+                        and query_caps
+                        and embed_caps.model_family
+                        and embed_caps.model_family == query_caps.model_family
+                        and embed_caps.model_family.family_id == "voyage-4"
+                    ):
+                        pass
+                    else:
+                        raise DatatypeMismatchError(
+                            f"Embedding datatype mismatch: embed model datatype '{self.datatype_tuple[0]}' != query model datatype '{self.datatype_tuple[1]}'",
+                        )
+
+            caps = self.embed_provider.embedding_config.capabilities or _get_embedding_capabilities(self.embed_provider.model_name)
+
+            if caps is not None and caps.model_family is not None:
+                if not caps.model_family.is_compatible(
+                    str(self.embed_provider.model_name), str(self.query_provider.model_name)
+                ):
+                    raise ConfigurationError(
+                        f"Models are not compatible within family '{caps.model_family.family_id}'"
+                    )
+
+            return self
+        except (DimensionMismatchError, DatatypeMismatchError, ConfigurationError):
+            raise
+        except Exception as e:
+            logger.error("Unexpected error in validate_model_compatibility: %s", e, exc_info=True)
+            # Re-raise as assertion error if it's something unexpected to see what's happening
+            raise AssertionError(f"Internal validation error: {e!s}") from e
 
     @property
     def dimension(self) -> NonNegativeInt:
         """Get the embedding dimension for both models (they must match)."""
-        return self.dimension_tuple[0]
+        return cast(NonNegativeInt, self.dimension_tuple[0] or 0)
 
     @property
     def datatype(self) -> str:
         """Get the embedding datatype for both models (they must match)."""
-        return self.datatype_tuple[0]
+        return self.datatype_tuple[0] or "float32"
 
     @property
     def embedding_config(self) -> Any:

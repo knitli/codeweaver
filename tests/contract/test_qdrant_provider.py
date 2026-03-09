@@ -119,9 +119,9 @@ def _register_chunk_embeddings(chunk, dense=None, sparse=None):
 
     sparse_info = None
     if sparse is not None:
-        from codeweaver.providers import SparseEmbedding
+        from codeweaver.providers import CodeWeaverSparseEmbedding
 
-        sparse_emb = SparseEmbedding(indices=sparse["indices"], values=sparse["values"])
+        sparse_emb = CodeWeaverSparseEmbedding(indices=sparse["indices"], values=sparse["values"])
         sparse_info = EmbeddingBatchInfo.create_sparse(
             batch_id=cast(UUID, sparse_batch_id),
             batch_index=batch_index,

@@ -99,6 +99,26 @@ async def _get_embedding_capabilities_for_model(
         return resolver_type().resolve(model_name)
 
 
+def _get_embedding_capabilities_sync(
+    model_name: ModelNameT, *, sparse: bool = False
+) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
+    """Synchronously get the embedding model capabilities for a given model name."""
+    import asyncio
+
+    try:
+        return asyncio.run(_get_embedding_capabilities_for_model(model_name, sparse=sparse))
+    except Exception:
+        # Fallback to direct resolution if asyncio.run fails (e.g. nested loops)
+        resolver_module = importlib.import_module(
+            "codeweaver.providers.embedding.capabilities.resolver"
+        )
+        if sparse:
+            resolver = resolver_module.SparseEmbeddingCapabilityResolver()
+        else:
+            resolver = resolver_module.EmbeddingCapabilityResolver()
+        return resolver.resolve(model_name)
+
+
 class SerializedEmbeddingOptionsDict(TypedDict, total=False):
     """A dictionary representing serialized embedding options for different providers."""
 
@@ -384,7 +404,7 @@ class EmbeddingMixin:
     @property
     def capabilities(self) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
         """Get the embedding model capabilities for this configuration."""
-        return _get_embedding_capabilities_for_model(self.model_name, sparse=type(self)._is_sparse)
+        return _get_embedding_capabilities_sync(self.model_name, sparse=type(self)._is_sparse)
 
     @staticmethod
     def _clean_dtypes(
@@ -902,7 +922,7 @@ class FastEmbedEmbeddingConfig(BaseEmbeddingConfig):
         return self
 
     @classmethod
-    def _defaults() -> dict[str, Any]:
+    def _defaults(cls) -> dict[str, Any]:
         """Return default values for the configuration."""
         # ok, there is one parameter
         return {"parallel": effective_cpu_count()}

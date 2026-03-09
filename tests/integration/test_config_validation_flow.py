@@ -90,6 +90,10 @@ def mock_checkpoint_manager(test_checkpoint_data: dict) -> AsyncMock:
     checkpoint.collection_name = test_checkpoint_data["collection_name"]
     checkpoint.total_vectors = test_checkpoint_data["total_vectors"]
 
+    # Support dictionary-like access if something tries to subscript it
+    checkpoint.__getitem__ = Mock(side_effect=test_checkpoint_data.__getitem__)
+    checkpoint.get = Mock(side_effect=test_checkpoint_data.get)
+
     # Create collection metadata
     metadata = Mock()
     metadata.dense_model = test_checkpoint_data["collection_metadata"]["dense_model"]
@@ -103,7 +107,7 @@ def mock_checkpoint_manager(test_checkpoint_data: dict) -> AsyncMock:
 
     checkpoint.collection_metadata = metadata
 
-    manager.load_checkpoint = AsyncMock(return_value=checkpoint)
+    manager.load = AsyncMock(return_value=checkpoint)
     manager.validate_checkpoint_compatibility = AsyncMock(return_value=(True, "NONE"))
 
     return manager
@@ -146,10 +150,11 @@ def test_settings() -> Mock:
 
     # Provider settings
     settings.provider = Mock()
-    settings.provider.embedding = Mock()
-    settings.provider.embedding.model_name = "voyage-code-3"
-    settings.provider.embedding.dimension = 2048
-    settings.provider.embedding.datatype = "float32"
+    embedding_config = Mock()
+    embedding_config.model_name = "voyage-code-3"
+    embedding_config.dimension = 2048
+    embedding_config.datatype = "float32"
+    settings.provider.embedding = [embedding_config]
 
     # Server settings
     settings.server = Mock()

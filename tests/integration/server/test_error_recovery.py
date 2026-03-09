@@ -140,8 +140,8 @@ async def test_sparse_only_fallback(initialize_test_settings, clean_container):
     """
     from codeweaver.core import SearchStrategy
     from codeweaver.providers import (
+        CodeWeaverSparseEmbedding,
         EmbeddingProvider,
-        SparseEmbedding,
         SparseEmbeddingProvider,
         VectorStoreProvider,
     )
@@ -152,10 +152,10 @@ async def test_sparse_only_fallback(initialize_test_settings, clean_container):
     mock_dense_provider.name = Provider.VOYAGE  # Set name property
     mock_dense_provider.embed_query.side_effect = ConnectionError("API unavailable")
 
-    # Sparse embedding works - returns SparseEmbedding format
+    # Sparse embedding works - returns CodeWeaverSparseEmbedding format
     mock_sparse_provider = AsyncMock(spec=SparseEmbeddingProvider)
     mock_sparse_provider.name = Provider.SENTENCE_TRANSFORMERS  # Set name property
-    mock_sparse_provider.embed_query.return_value = SparseEmbedding(
+    mock_sparse_provider.embed_query.return_value = CodeWeaverSparseEmbedding(
         indices=[0, 1, 2], values=[0.5, 0.3, 0.2]
     )
 
@@ -418,55 +418,49 @@ async def test_health_shows_degraded_status(initialize_test_settings, clean_cont
     When: Query /health/ endpoint
     Then: Status = degraded, circuit_breaker_state = open
     """
-    from codeweaver.core import ProviderRegistry, SessionStatistics
+    from codeweaver.core import SessionStatistics
+    from codeweaver.providers import EmbeddingProvider, RerankingProvider, SparseEmbeddingProvider, VectorStoreProvider
     from codeweaver.server import HealthService
 
-    # Mock provider registry with degraded state
-    mock_reg = MagicMock()  # Use loose mock to avoid spec mismatch issues
-
     # Dense embedding provider with open circuit breaker
-    mock_dense = MagicMock()
+    mock_dense = MagicMock(spec=EmbeddingProvider)
     mock_dense.circuit_breaker_state = CircuitBreakerState.OPEN
-    mock_reg.get_provider_instance.side_effect = lambda enum, kind, **kw: (
-        mock_dense
-        if kind == "embedding"
-        else mock_sparse
-        if kind == "sparse_embedding"
-        else mock_vector
-    )
-
-    # Also handle the get_X_provider_instance methods if they are used
-    mock_reg.get_embedding_provider_instance.return_value = mock_dense
+    mock_dense.model_name = "test-dense-model"
 
     # Sparse embedding provider working
-    mock_sparse = MagicMock()
+    mock_sparse = MagicMock(spec=SparseEmbeddingProvider)
     mock_sparse.circuit_breaker_state = CircuitBreakerState.CLOSED
-    mock_reg.get_sparse_embedding_provider_instance.return_value = mock_sparse
+    mock_sparse.__class__.__name__ = "FastEmbedSparseEmbeddingProvider"
+
+    # Reranking provider working
+    mock_rerank = MagicMock(spec=RerankingProvider)
+    mock_rerank.circuit_breaker_state = CircuitBreakerState.CLOSED
+    mock_rerank.model_name = "test-rerank-model"
 
     # Vector store working
-    mock_vector = AsyncMock()
+    mock_vector = AsyncMock(spec=VectorStoreProvider)
     mock_vector.health_check = AsyncMock(return_value={"status": "up"})
-    mock_reg.get_vector_store_provider_instance.return_value = mock_vector
 
     # Mock the stats object
     mock_stats = MagicMock(spec=SessionStatistics)
-    mock_timing = MagicMock()
-    mock_stats.get_timing_statistics.return_value = mock_timing
+    mock_stats.total_requests = 10
+    mock_stats.get_timing_statistics.return_value = {"queries": [0.1, 0.2]}
+    mock_stats.failover_statistics = None
 
     # Apply overrides
-    from codeweaver.core import get_statistics
-
     overrides = {
-        ProviderRegistry: lambda: mock_reg,
+        tuple[EmbeddingProvider, ...]: lambda: (mock_dense,),
+        tuple[SparseEmbeddingProvider, ...]: lambda: (mock_sparse,),
+        tuple[RerankingProvider, ...]: lambda: (mock_rerank,),
+        tuple[VectorStoreProvider, ...]: lambda: (mock_vector,),
         SessionStatistics: lambda: mock_stats,
-        get_statistics: lambda: mock_stats,
     }
 
     with clean_container.use_overrides(overrides):
         # Resolve health service via DI
         health_service = await clean_container.resolve(HealthService)
         # Manually set stopwatch to ensure consistent timing
-        health_service.startup_stopwatch = time.monotonic()
+        health_service._startup_stopwatch = time.monotonic()
 
         # Get health response
         response = await health_service.get_health_response()
@@ -475,8 +469,7 @@ async def test_health_shows_degraded_status(initialize_test_settings, clean_cont
         assert response.status in ["degraded", "healthy"]
 
         # Circuit breaker state should be exposed
-        if hasattr(response, "services") and hasattr(response.services, "embedding_provider"):
-            assert response.services.embedding_provider.circuit_breaker_state == "open"
+        assert response.services.embedding_provider.circuit_breaker_state == "open"
 
 
 @pytest.mark.integration

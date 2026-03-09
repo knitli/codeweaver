@@ -76,15 +76,11 @@ class TestStalePointRemovalInBatchIndexing:
             path=rel_path, content_hash=get_blake_hash(b"old content"), chunk_ids=["old-chunk-1"]
         )
 
-        # Index batch
-        await mock_indexer._index_files_batch([modified_file, new_file], None)
+        # Index batch - pass as list of tuples (Path, content)
+        await mock_indexer._index_files_batch([(modified_file, None), (new_file, None)], None)
 
-        # Verify delete_by_file was called only for modified_file
-        # Note: IndexingService currently deletes for ALL files in batch to be safe
-        # so both might be called. The implementation I added iterates all discovered files.
-        # Note: Paths are relative when _index_files_batch uses DiscoveredFile
-        mock_indexer._vector_store.delete_by_file.assert_any_call(Path("modified.py"))
-        mock_indexer._vector_store.delete_by_file.assert_any_call(Path("new.py"))
+        # Verify delete_by_files was called with relative paths
+        mock_indexer._vector_store.delete_by_files.assert_called_once_with([rel_path, Path("new.py")])
 
     @pytest.mark.asyncio
     async def test_batch_deletes_multiple_modified_files(
@@ -108,8 +104,8 @@ class TestStalePointRemovalInBatchIndexing:
             path=rel_path2, content_hash=get_blake_hash(b"old2"), chunk_ids=["chunk-2"]
         )
 
-        # Index batch
-        await mock_indexer._index_files_batch([file1, file2], None)
+        # Index batch - pass as list of tuples
+        await mock_indexer._index_files_batch([(file1, None), (file2, None)], None)
 
-        # Verify delete_by_file was called for both files
-        assert mock_indexer._vector_store.delete_by_file.call_count == 2
+        # Verify delete_by_files was called once with both relative paths
+        mock_indexer._vector_store.delete_by_files.assert_called_once_with([rel_path1, rel_path2])

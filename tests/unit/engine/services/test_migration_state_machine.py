@@ -146,7 +146,7 @@ def transition(migration: Migration, target_state: MigrationState) -> Migration:
         msg = f"Invalid state transition: {migration.current_state.value} -> {target_state.value}"
         raise InvalidStateTransitionError(msg)
 
-    # Simulate atomic update (mock - real implementation will use database transaction)
+    # State is only updated IF transition is valid
     migration.current_state = target_state
     return migration
 

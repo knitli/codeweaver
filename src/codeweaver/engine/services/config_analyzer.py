@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Literal
@@ -111,7 +112,7 @@ class ConfigChangeAnalyzer:
         if not checkpoint:
             return None
 
-        if self.settings.providers is Unset:
+        if self.settings.provider is Unset:
             return None
         # Get current embedding configuration
         current_embedding = (
@@ -203,6 +204,190 @@ class ConfigChangeAnalyzer:
         # 5. Build response based on detected transformations
         return self._build_analysis_response(old_summary, new_summary, changes, vector_count)
 
+    def _models_compatible(self, old_meta: Any, new_config: EmbeddingProviderSettingsType) -> bool:
+        """Check if models are compatible using family-aware logic."""
+        from codeweaver.providers.config.categories import AsymmetricEmbeddingProviderSettings
+
+        # 1. Symmetric vs Asymmetric
+        if isinstance(new_config, AsymmetricEmbeddingProviderSettings):
+            # Asymmetric requires family tracking
+            if not old_meta.dense_model_family:
+                return False
+
+            # Embed model must match exactly
+            if str(new_config.embed_provider.model_name) != old_meta.dense_model:
+                return False
+
+            # Family must match
+            embed_caps = new_config.embed_provider.embedding_config.capabilities
+            family = (
+                embed_caps.model_family.family_id
+                if embed_caps and embed_caps.model_family
+                else None
+            )
+            return family == old_meta.dense_model_family
+
+        # 2. Symmetric
+        # Must match model name exactly if no family tracking
+        if not old_meta.dense_model_family:
+            return str(new_config.model_name) == old_meta.dense_model
+
+        # Family-aware symmetric
+        embed_caps = new_config.embedding_config.capabilities
+        family = (
+            embed_caps.model_family.family_id if embed_caps and embed_caps.model_family else None
+        )
+        return family == old_meta.dense_model_family
+
+    async def _validate_policy_change(
+        self,
+        old_fingerprint: Any,
+        new_config: EmbeddingProviderSettingsType,
+        new_fingerprint: Any,
+        old_summary: dict[str, Any],
+        new_summary: dict[str, Any],
+        vector_count: int,
+    ) -> ConfigChangeAnalysis | None:
+        """Validate configuration change against collection policy.
+
+        Returns:
+            Analysis with BREAKING impact if blocked, None if allowed.
+        """
+        from codeweaver.core.exceptions import ConfigurationLockError
+
+        try:
+            # 1. Get collection metadata from vector store
+            collection_metadata = await self.vector_store.collection_info()
+            if not collection_metadata:
+                return None
+
+            # 2. Extract proposed models
+            new_dense_model = new_summary.get("embed_model")
+            new_query_model = new_summary.get("query_model")
+            new_sparse_model = new_summary.get("sparse_model")
+            new_provider = new_summary.get("vector_store")
+
+            # 3. Validate against policy
+            collection_metadata.validate_config_change(
+                new_dense_model=new_dense_model,
+                new_query_model=new_query_model,
+                new_sparse_model=new_sparse_model,
+                new_provider=new_provider,
+            )
+
+        except ConfigurationLockError as e:
+            # Policy violation - block the change
+            policy = collection_metadata.policy.value if collection_metadata else "strict"
+            return ConfigChangeAnalysis(
+                impact=ChangeImpact.BREAKING,
+                old_config_summary=old_summary,
+                new_config_summary=new_summary,
+                transformation_type=None,
+                transformations=[],
+                estimated_time=self._estimate_reindex_time(vector_count),
+                estimated_cost=self._estimate_reindex_cost(vector_count),
+                accuracy_impact=f"Collection policy ({policy}) blocks this change",
+                recommendations=self._build_policy_recommendations(policy, e),
+                migration_strategy="full_reindex",
+            )
+        except Exception:
+            # Graceful degradation if metadata cannot be retrieved
+            logger.debug("Failed to perform policy check, skipping", exc_info=True)
+            return None
+        else:
+            return None
+
+    async def _detect_transformations(
+        self,
+        old_fingerprint: Any,
+        new_config: EmbeddingProviderSettingsType,
+        new_fingerprint: Any,
+        old_summary: dict[str, Any],
+        new_summary: dict[str, Any],
+        vector_count: int,
+    ) -> list[TransformationDetails]:
+        """Detect and analyze available transformations (quantization, dimension reduction)."""
+        changes = []
+
+        # 1. Detect Quantization (datatype change)
+        old_dtype = self._get_datatype_from_fingerprint(old_fingerprint) or "float32"
+        new_dtype = self._get_datatype_from_config(new_config) or "float32"
+
+        if old_dtype != new_dtype and self._is_valid_quantization(old_dtype, new_dtype):
+            changes.append(
+                TransformationDetails(
+                    type="quantization",
+                    old_value=old_dtype,
+                    new_value=new_dtype,
+                    complexity="low",
+                    time_estimate=timedelta(seconds=max(5, vector_count / 10000)),
+                    requires_vector_update=False,  # Datatype change only
+                    accuracy_impact="Minimal (<0.1% expected)",
+                )
+            )
+
+        # 2. Detect Dimension Reduction (Matryoshka)
+        old_dim = self._get_dimension_from_fingerprint(old_fingerprint)
+        new_dim = self._get_dimension_from_config(new_config)
+
+        if old_dim and new_dim and new_dim < old_dim:
+            # Estimate impact
+            model_name = new_summary.get("embed_model", "unknown")
+            impact_desc = self._estimate_matryoshka_impact(model_name, old_dim, new_dim)
+
+            changes.append(
+                TransformationDetails(
+                    type="dimension_reduction",
+                    old_value=old_dim,
+                    new_value=new_dim,
+                    complexity="medium",
+                    time_estimate=self._estimate_migration_time(vector_count),
+                    requires_vector_update=True,
+                    accuracy_impact=impact_desc,
+                )
+            )
+
+        return changes
+
+    def _build_analysis_response(
+        self,
+        old_summary: dict[str, Any],
+        new_summary: dict[str, Any],
+        changes: list[TransformationDetails],
+        vector_count: int,
+    ) -> ConfigChangeAnalysis:
+        """Build final analysis response based on detected transformations."""
+        if not changes:
+            # No transformations detected but compatible? Must be query model change
+            return ConfigChangeAnalysis(
+                impact=ChangeImpact.COMPATIBLE,
+                old_config_summary=old_summary,
+                new_config_summary=new_summary,
+                transformation_type=None,
+                transformations=[],
+                estimated_time=timedelta(0),
+                estimated_cost=0.0,
+                accuracy_impact="No impact on indexed data",
+                recommendations=["Ready to use new query model"],
+                migration_strategy="no_action",
+            )
+
+        # Check for mixed transformations
+        has_quant = any(c.type == "quantization" for c in changes)
+        has_dim = any(c.type == "dimension_reduction" for c in changes)
+
+        if has_dim:
+            return self._build_transformable_analysis(
+                old_summary, new_summary, changes, vector_count
+            )
+        if has_quant:
+            return self._build_quantizable_analysis(old_summary, new_summary, changes)
+
+        # Fallback (should not happen with proper detection)
+        return self._build_breaking_analysis(
+            old_summary, new_summary, vector_count, reason="Unknown change"
+        )
+
     def _estimate_matryoshka_impact(self, model_name: str, old_dim: int, new_dim: int) -> str:
         """Estimate accuracy impact using empirical data.
 
@@ -291,16 +476,24 @@ class ConfigChangeAnalyzer:
         Returns:
             Settings object with the simulated change applied
         """
-        # Create copy of settings and apply change
-        new_settings = self.settings.model_copy(deep=True)
+        # Create deep copy of settings
+        new_settings = deepcopy(self.settings)
 
         # Apply key=value to nested settings structure
         # Parse key like "provider.embedding.dimension" and set value
         parts = key.split(".")
-        obj = new_settings
+        target = new_settings
         for part in parts[:-1]:
-            obj = getattr(obj, part)
-        setattr(obj, parts[-1], value)
+            # Handle list indexing (e.g. embedding.0)
+            target = target[int(part)] if part.isdigit() else getattr(target, part)
+
+        last_part = parts[-1]
+        if hasattr(target, last_part):
+            setattr(target, last_part, value)
+        elif isinstance(target, dict):
+            target[last_part] = value
+        elif isinstance(target, list) and last_part.isdigit():
+            target[int(last_part)] = value
 
         return new_settings
 
@@ -439,20 +632,20 @@ class ConfigChangeAnalyzer:
         }
 
     def _get_datatype_from_fingerprint(self, fingerprint: Any) -> str | None:
-        """Extract datatype from checkpoint fingerprint (if available)."""
-        # Note: Current fingerprint doesn't include datatype
-        # This is a placeholder for future enhancement
-        return None
+        """Extract datatype from checkpoint fingerprint."""
+        return getattr(fingerprint, "datatype", None)
 
     def _get_datatype_from_config(self, config: EmbeddingProviderSettingsType) -> str | None:
         """Extract datatype from embedding config."""
-        return str(config.datatype) if hasattr(config, "datatype") else None
+        from codeweaver.providers.config.categories import AsymmetricEmbeddingProviderSettings
+
+        if isinstance(config, AsymmetricEmbeddingProviderSettings):
+            return config.datatype
+        return getattr(config, "datatype", None)
 
     def _get_dimension_from_fingerprint(self, fingerprint: Any) -> int | None:
-        """Extract dimension from checkpoint fingerprint (if available)."""
-        # Note: Current fingerprint doesn't include dimension
-        # This is a placeholder for future enhancement
-        return None
+        """Extract dimension from checkpoint fingerprint."""
+        return getattr(fingerprint, "dimension", None)
 
     def _get_dimension_from_config(self, config: EmbeddingProviderSettingsType) -> int | None:
         """Extract dimension from embedding config."""

@@ -74,6 +74,9 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
     collection: Annotated[
         CollectionConfig, Field(description="Collection configuration for the vector store.")
     ]
+    in_memory_config: MemoryConfig | None = Field(
+        default=None, description="In-memory vector store configuration."
+    )
 
     def __init__(
         self,
@@ -306,8 +309,17 @@ class MemoryVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
         *,
         project_name: str | None = None,
         project_path: Path | None = None,
+        collection_name: str | None = None,
     ) -> None:
         """Initialize Memory vector store provider settings."""
+        if collection_name:
+            if collection is None:
+                collection = CollectionConfig(collection_name=collection_name)
+            elif isinstance(collection, CollectionConfig):
+                collection.collection_name = collection_name
+            elif isinstance(collection, dict):
+                collection["collection_name"] = collection_name
+
         prepared_client_options = (
             client_options if client_options is not None else QdrantClientOptions()
         )

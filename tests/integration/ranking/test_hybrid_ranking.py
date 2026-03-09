@@ -87,14 +87,14 @@ async def test_hybrid_search_ranking(qdrant_test_manager, vector_store_factory):
     await provider.upsert(chunks)
 
     # Execute hybrid search
-    from codeweaver.providers import SparseEmbedding
+    from codeweaver.providers import CodeWeaverSparseEmbedding
 
     results = await provider.search(
         StrategizedQuery(
             query="authentication function",
             strategy=SearchStrategy.HYBRID_SEARCH,
             dense=[1.0, 0.0, 0.0] * 256,
-            sparse=SparseEmbedding(indices=[1, 2], values=[1.0, 0.9]),
+            sparse=CodeWeaverSparseEmbedding(indices=[1, 2], values=[1.0, 0.9]),
         )
     )
 

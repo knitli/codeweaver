@@ -40,7 +40,8 @@ def migration_service():
     vector_store.collection = "test_collection"
 
     checkpoint_manager = Mock(spec=["checkpoint_dir"])
-    checkpoint_manager.checkpoint_dir = Mock()
+    from pathlib import Path
+    checkpoint_manager.checkpoint_dir = Path("/tmp/codeweaver/checkpoints")
 
     return MigrationService(
         vector_store=vector_store,

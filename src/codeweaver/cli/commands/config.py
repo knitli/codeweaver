@@ -181,7 +181,7 @@ def _show_provider_config(provider_settings: ProviderSettingsDep = INJECTED) -> 
         if category not in valid_categories or not configs or isinstance(configs, Unset):
             continue
 
-        config_list = _normalize_provider_configs(configs, field=category)
+        config_list = _normalize_provider_configs(configs, field=category)  # ty:ignore[invalid-argument-type]
         table = Table(
             title=f"{category.replace('_', ' ').title()}",
             show_header=True,

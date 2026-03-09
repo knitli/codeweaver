@@ -26,7 +26,12 @@ from codeweaver.core.constants import (
 )
 from codeweaver.engine.dependencies import FailoverServiceDep, IndexingServiceDep
 from codeweaver.engine.services.indexing_service import IndexingService
-from codeweaver.providers import ProviderSettingsDep
+from codeweaver.providers import (
+    EmbeddingProvidersDep,
+    RerankingProvidersDep,
+    SparseEmbeddingProvidersDep,
+    VectorStoreProvidersDep,
+)
 from codeweaver.server.health.models import (
     EmbeddingProviderServiceInfo,
     FailoverInfo,
@@ -58,7 +63,10 @@ class HealthService:
     def __init__(
         self,
         *,
-        providers: ProviderSettingsDep = INJECTED,
+        embedding_providers: EmbeddingProvidersDep = INJECTED,
+        sparse_embedding_providers: SparseEmbeddingProvidersDep = INJECTED,
+        reranking_providers: RerankingProvidersDep = INJECTED,
+        vector_store_providers: VectorStoreProvidersDep = INJECTED,
         statistics: StatisticsDep = INJECTED,
         indexer: IndexingServiceDep = INJECTED,
         failover_manager: FailoverServiceDep = INJECTED,
@@ -67,13 +75,21 @@ class HealthService:
         """Initialize health service.
 
         Args:
-            providers: Dictionary of all configured providers (primary and backups)
+            embedding_providers: Configured embedding providers
+            sparse_embedding_providers: Configured sparse embedding providers
+            reranking_providers: Configured reranking providers
+            vector_store_providers: Configured vector store providers
             statistics: Session statistics for query metrics
             indexer: IndexingService instance for indexing progress
             failover_manager: FailoverService for vector store failover
             startup_stopwatch: Server startup monotonic time (optional, will use current time if not provided)
         """
-        self._providers = providers
+        self._providers = {
+            "embedding": embedding_providers,
+            "sparse_embedding": sparse_embedding_providers,
+            "reranking": reranking_providers,
+            "vector_store": vector_store_providers,
+        }
         self._statistics = statistics
         self._indexer = indexer
         self._failover_manager = failover_manager

@@ -33,6 +33,7 @@ from codeweaver.core import (
     ResolvedProjectPathDep,
     TypeIs,
     get_blake_hash,
+    get_settings,
     uuid7,
 )
 from codeweaver.core.constants import ONE_HOUR
@@ -62,7 +63,7 @@ def _raise_if_unset_provider() -> NoReturn:
 
 
 def _is_provider_settings(value: Any) -> TypeIs[ProviderSettings]:
-    assert isinstance(ProviderSettings, value)  # noqa: S101
+    assert isinstance(value, ProviderSettings)  # noqa: S101
     return True
 
 
@@ -134,6 +135,8 @@ class CheckpointSettingsFingerprint:
     sparse_model: str | None
     vector_store: str
     config_hash: str
+    dimension: int | None = None
+    datatype: str | None = None
 
     def is_compatible_with(self, other: CheckpointSettingsFingerprint) -> tuple[bool, ChangeImpact]:
         """Check compatibility and classify change impact with family-aware logic.
@@ -246,8 +249,6 @@ def get_checkpoint_settings_map(
     We could also consider vector store changes more carefully -- we can migrate
     vector stores without reindexing if needed.
     """
-    from codeweaver.core import get_settings
-
     # These values will already have been resolved by dependency injection with defaults if needed
     settings = cast(CodeWeaverEngineSettings, get_settings())
     indexer: IndexerSettings = cast(IndexerSettings, settings.indexer)
@@ -472,8 +473,6 @@ class CheckpointManager:
             checkpoints will store fingerprint data directly for better
             forward compatibility.
         """
-        from codeweaver.core import get_settings
-
         settings = cast(CodeWeaverEngineSettings, get_settings())
         if not _is_provider_settings(settings.provider):
             _raise_if_unset_provider()
@@ -518,6 +517,13 @@ class CheckpointManager:
         sparse_model = str(sparse_config.model_name) if sparse_config else None
         vector_store = str(vector_store_config.provider) if vector_store_config else "inmemory"
 
+        # Get dimension and datatype from metadata if available
+        dimension = None
+        datatype = None
+        if checkpoint.collection_metadata:
+            dimension = checkpoint.collection_metadata.dimension
+            datatype = checkpoint.collection_metadata.datatype
+
         return CheckpointSettingsFingerprint(
             embedding_config_type=config_type,
             embed_model=embed_model,
@@ -526,6 +532,8 @@ class CheckpointManager:
             sparse_model=sparse_model,
             vector_store=vector_store,
             config_hash=str(checkpoint.settings_hash or ""),
+            dimension=dimension,
+            datatype=datatype,
         )
 
     def _create_fingerprint(
@@ -542,8 +550,6 @@ class CheckpointManager:
         Returns:
             CheckpointSettingsFingerprint instance
         """
-        from codeweaver.core import get_settings
-
         settings = cast(CodeWeaverEngineSettings, get_settings())
         if not _is_provider_settings(settings.provider):
             _raise_if_unset_provider()
@@ -560,11 +566,15 @@ class CheckpointManager:
         embed_model_family = None
         query_model = None
         config_type: Literal["symmetric", "asymmetric"] = "symmetric"
+        dimension = None
+        datatype = None
 
         if isinstance(config, AsymmetricEmbeddingProviderSettings):
             config_type = "asymmetric"
             embed_model = str(config.embed_provider.model_name)
             query_model = str(config.query_provider.model_name)
+            dimension = config.dimension
+            datatype = config.datatype
 
             # Try to get model family from capabilities
             if (
@@ -575,6 +585,9 @@ class CheckpointManager:
                 embed_model_family = embed_caps.model_family.family_id
         else:
             embed_model = str(config.model_name)
+            dimension = getattr(config, "dimension", None)
+            datatype = getattr(config, "datatype", None)
+
             # Try to get model family for symmetric config too
             if (
                 (embed_caps := config.embedding_config.capabilities)
@@ -597,6 +610,8 @@ class CheckpointManager:
             sparse_model=sparse_model,
             vector_store=vector_store,
             config_hash=str(config_hash),
+            dimension=dimension,
+            datatype=datatype,
         )
 
 

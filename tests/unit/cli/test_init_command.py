@@ -67,8 +67,8 @@ class TestInitConfigCommand:
         assert config_path.exists()
         config = tomli.loads(config_path.read_text())
 
-        assert config["embedding"][0]["provider"] == "voyage"
-        assert config["vector_store"]["provider"] == "qdrant"
+        assert config["provider"]["embedding"][0]["provider"] == "voyage"
+        assert config["provider"]["vector_store"][0]["provider"] == "qdrant"
 
     def test_config_profile_quickstart(
         self, temp_project: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
@@ -92,8 +92,8 @@ class TestInitConfigCommand:
         config = tomli.loads(config_path.read_text())
 
         # Should use local providers (fastembed or sentence-transformers)
-        assert config["embedding"][0]["provider"] in ["fastembed", "sentence-transformers"]
-        assert config["vector_store"]["provider"] == "qdrant"
+        assert config["provider"]["embedding"][0]["provider"] in ["fastembed", "sentence-transformers"]
+        assert config["provider"]["vector_store"][0]["provider"] == "qdrant"
 
     def test_config_quickstart_flag(
         self, temp_project: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
