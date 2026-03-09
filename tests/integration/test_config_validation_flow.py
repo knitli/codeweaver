@@ -34,13 +34,13 @@ if TYPE_CHECKING:
 @pytest.fixture(autouse=True)
 def setup_test_container(test_settings):
     """Create test DI container and override settings so real `get_settings()` works."""
-    from codeweaver.core.di.container import get_container
     from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+    from codeweaver.core.di.container import get_container
 
     container = get_container()
     container.override(CodeWeaverSettingsType, test_settings)
     yield container
-    container.clear()
+    container.clear_overrides()
 
 
 @pytest.fixture
@@ -76,9 +76,17 @@ def test_checkpoint_data(tmp_path: Path) -> dict:
 
 
 @pytest.fixture
-def mock_checkpoint_manager(test_checkpoint_data: dict) -> AsyncMock:
-    """Create mock CheckpointManager with test data."""
-    manager = AsyncMock()
+def mock_checkpoint_manager(test_checkpoint_data: dict) -> Mock:
+    """Create mock CheckpointManager with test data.
+
+    Uses ``Mock()`` as the base type so that synchronous methods like
+    ``_extract_fingerprint`` and ``_create_fingerprint`` return regular ``Mock``
+    objects rather than coroutines.  Async methods (``load``,
+    ``validate_checkpoint_compatibility``) are explicitly configured with
+    ``AsyncMock`` so they can be awaited.  A ``load_checkpoint`` alias pointing
+    at ``manager.load`` is provided for test helpers that call the alias directly.
+    """
+    manager = Mock()
 
     # Create checkpoint object
     checkpoint = Mock()
@@ -103,13 +111,11 @@ def mock_checkpoint_manager(test_checkpoint_data: dict) -> AsyncMock:
 
     checkpoint.collection_metadata = metadata
 
+    # Async methods must be explicit AsyncMock so they can be awaited.
     manager.load = AsyncMock(return_value=checkpoint)
+    # Provide an alias used by several test helpers (the real API is `load()`).
+    manager.load_checkpoint = manager.load
     manager.validate_checkpoint_compatibility = AsyncMock(return_value=(True, "NONE"))
-
-    # Do not mock _extract_fingerprint or _create_fingerprint
-    # The real implementation will be run, but it requires the global settings to exist,
-    # which we've solved by using `container.override(CodeWeaverSettingsType, test_settings)`
-    # However, CheckpointManager uses `get_settings()` from core_settings, which reads from dependency container.
 
     return manager
 
@@ -188,7 +194,7 @@ class TestFullValidationWorkflow:
 
     async def test_analyze_current_config_with_checkpoint(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -211,7 +217,7 @@ class TestFullValidationWorkflow:
 
     async def test_validate_embedding_dimension_change(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -249,7 +255,7 @@ class TestConfigChangeClassification:
 
     async def test_compatible_query_model_change(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -302,7 +308,7 @@ class TestConfigChangeClassification:
 
     async def test_transformable_dimension_reduction(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -350,7 +356,7 @@ class TestConfigChangeClassification:
 
     async def test_breaking_model_change(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -412,7 +418,7 @@ class TestNoCheckpointScenarios:
 
     async def test_first_indexing_no_checkpoint(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -420,8 +426,9 @@ class TestNoCheckpointScenarios:
         """Test analysis when no checkpoint exists (first indexing)."""
         from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
 
-        # No checkpoint = fresh start
-        mock_checkpoint_manager.load_checkpoint = AsyncMock(return_value=None)
+        # No checkpoint = fresh start; configure the real API used by the analyzer
+        mock_checkpoint_manager.load = AsyncMock(return_value=None)
+        mock_checkpoint_manager.load_checkpoint = mock_checkpoint_manager.load
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
@@ -437,7 +444,7 @@ class TestNoCheckpointScenarios:
 
     async def test_config_change_validation_allows_first_config(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -445,8 +452,9 @@ class TestNoCheckpointScenarios:
         """Test that config change validation succeeds for fresh start."""
         from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
 
-        # No checkpoint = fresh start
-        mock_checkpoint_manager.load_checkpoint = AsyncMock(return_value=None)
+        # No checkpoint = fresh start; configure the real API used by the analyzer
+        mock_checkpoint_manager.load = AsyncMock(return_value=None)
+        mock_checkpoint_manager.load_checkpoint = mock_checkpoint_manager.load
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
@@ -477,7 +485,7 @@ class TestEmpiricalDataUsage:
 
     async def test_uses_voyage_3_empirical_data(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -525,7 +533,7 @@ class TestEmpiricalDataUsage:
 
     async def test_falls_back_to_generic_for_unmapped_dimensions(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -587,7 +595,7 @@ class TestEdgeCasesIntegration:
 
     async def test_handles_very_large_collection(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -636,7 +644,7 @@ class TestEdgeCasesIntegration:
 
     async def test_handles_zero_vectors(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -696,7 +704,7 @@ class TestRecommendationsQuality:
 
     async def test_breaking_change_provides_recovery_steps(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -746,7 +754,7 @@ class TestRecommendationsQuality:
 
     async def test_transformable_change_provides_strategy(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -807,7 +815,7 @@ class TestTimeAndCostEstimates:
 
     async def test_estimates_scale_with_vector_count(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -858,7 +866,7 @@ class TestTimeAndCostEstimates:
 
     async def test_no_change_has_zero_estimates(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
