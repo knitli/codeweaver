@@ -65,4 +65,3 @@ with patch("codeweaver.engine.managers.checkpoint_manager.get_settings", return_
 ```
 
 Tests that use a fully-mocked `mock_checkpoint_manager` (i.e., never call the real methods) are unaffected by this limitation.
-
