@@ -235,11 +235,12 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
 
             # Write to temporary file first (atomic write)
             temp_path = self._persist_path.with_suffix(".tmp")  # type: ignore
-            temp_path.parent.mkdir(parents=True, exist_ok=True)  # type: ignore
-            temp_path.write_text(json.dumps(persistence_data, indent=2))  # type: ignore
+            await asyncio.to_thread(temp_path.parent.mkdir, parents=True, exist_ok=True)
+            persist_json = await asyncio.to_thread(json.dumps, persistence_data, indent=2)
+            await asyncio.to_thread(temp_path.write_text, persist_json)
 
             # Atomic rename
-            temp_path.replace(self._persist_path)  # type: ignore
+            await asyncio.to_thread(temp_path.replace, self._persist_path)
 
         except Exception as e:
             raise PersistenceError(f"Failed to persist to disk: {e}") from e
@@ -261,7 +262,8 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             raise ProviderError("Qdrant client not initialized")
         try:
             # Read and parse JSON
-            data = from_json(cast(Path, self._persist_path).read_bytes())  # type: ignore
+            content = await asyncio.to_thread(cast(Path, self._persist_path).read_bytes)
+            data = await asyncio.to_thread(from_json, content)
 
             # Validate version
             if data.get("version") != "1.0":
