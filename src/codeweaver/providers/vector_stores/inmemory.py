@@ -263,7 +263,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         try:
             # Read and parse JSON
             content = await asyncio.to_thread(cast(Path, self._persist_path).read_bytes)
-            data = from_json(content)
+            data = await asyncio.to_thread(from_json, content)
 
             # Validate version
             if data.get("version") != "1.0":
