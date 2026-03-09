@@ -260,14 +260,13 @@ async def test_memory_persistence_performance(chunk_count: int, vector_store_fac
     Contract requirement: 1-3.5s for 10k chunks persist (relaxed for CI/WSL environments).
     Restore should complete in under 4s.
     """
-    from codeweaver.providers.config import (
-        CollectionConfig,
-        MemoryVectorStoreProviderSettings,
-    )
+    from codeweaver.providers.config import CollectionConfig, MemoryVectorStoreProviderSettings
     from codeweaver.providers.embedding.capabilities.resolver import EmbeddingCapabilityResolver
 
     with tempfile.TemporaryDirectory() as tmpdir:
         settings = MemoryVectorStoreProviderSettings(
+            collection=CollectionConfig(collection_name="perf_test"),
+            in_memory_config=MemoryConfig(persist_path=Path(tmpdir), auto_persist=False),
             collection=CollectionConfig(collection_name="perf_test"),
             in_memory_config=MemoryConfig(persist_path=Path(tmpdir), auto_persist=False),
         )

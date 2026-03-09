@@ -1768,6 +1768,7 @@ __all__ = (
     "SparseCapabilities",
     "SparseEmbedding",
     "SparseCapabilityResolverDep",
+    "SparseEmbedding",
     "SparseEmbeddingCapabilityResolver",
     "SparseEmbeddingConfigT",
     "SparseEmbeddingModelCapabilities",

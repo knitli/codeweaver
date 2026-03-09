@@ -143,7 +143,7 @@ class RerankingProviderSettings(BaseRerankingProviderSettings):
                 data["client_options"]["model_name"] = model_name
             else:
                 data["client_options"]["model_name_or_path"] = model_name
-        
+
         reranking_config = data.get("reranking_config")
         if isinstance(reranking_config, dict):
             reranking_config["model_name"] = model_name
@@ -151,6 +151,7 @@ class RerankingProviderSettings(BaseRerankingProviderSettings):
         elif reranking_config is not None:
             reranking_config.model_name = model_name
             with contextlib.suppress(AttributeError):
+                reranking_config.provider = provider
                 reranking_config.provider = provider
         super().__init__(**data)
 

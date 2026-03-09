@@ -141,6 +141,7 @@ async def test_sparse_only_fallback(initialize_test_settings, clean_container):
     from codeweaver.core import SearchStrategy
     from codeweaver.providers import (
         CodeWeaverSparseEmbedding,
+        CodeWeaverSparseEmbedding,
         EmbeddingProvider,
         SparseEmbeddingProvider,
         VectorStoreProvider,
@@ -153,8 +154,10 @@ async def test_sparse_only_fallback(initialize_test_settings, clean_container):
     mock_dense_provider.embed_query.side_effect = ConnectionError("API unavailable")
 
     # Sparse embedding works - returns CodeWeaverSparseEmbedding format
+    # Sparse embedding works - returns CodeWeaverSparseEmbedding format
     mock_sparse_provider = AsyncMock(spec=SparseEmbeddingProvider)
     mock_sparse_provider.name = Provider.SENTENCE_TRANSFORMERS  # Set name property
+    mock_sparse_provider.embed_query.return_value = CodeWeaverSparseEmbedding(
     mock_sparse_provider.embed_query.return_value = CodeWeaverSparseEmbedding(
         indices=[0, 1, 2], values=[0.5, 0.3, 0.2]
     )
@@ -419,17 +422,31 @@ async def test_health_shows_degraded_status(initialize_test_settings, clean_cont
     Then: Status = degraded, circuit_breaker_state = open
     """
     from codeweaver.core import SessionStatistics
-    from codeweaver.providers import EmbeddingProvider, RerankingProvider, SparseEmbeddingProvider, VectorStoreProvider
+    from codeweaver.providers import (
+        EmbeddingProvider,
+        RerankingProvider,
+        SparseEmbeddingProvider,
+        VectorStoreProvider,
+    )
     from codeweaver.server import HealthService
 
     # Dense embedding provider with open circuit breaker
     mock_dense = MagicMock(spec=EmbeddingProvider)
+    mock_dense = MagicMock(spec=EmbeddingProvider)
     mock_dense.circuit_breaker_state = CircuitBreakerState.OPEN
+    mock_dense.model_name = "test-dense-model"
     mock_dense.model_name = "test-dense-model"
 
     # Sparse embedding provider working
     mock_sparse = MagicMock(spec=SparseEmbeddingProvider)
+    mock_sparse = MagicMock(spec=SparseEmbeddingProvider)
     mock_sparse.circuit_breaker_state = CircuitBreakerState.CLOSED
+    mock_sparse.__class__.__name__ = "FastEmbedSparseEmbeddingProvider"
+
+    # Reranking provider working
+    mock_rerank = MagicMock(spec=RerankingProvider)
+    mock_rerank.circuit_breaker_state = CircuitBreakerState.CLOSED
+    mock_rerank.model_name = "test-rerank-model"
     mock_sparse.__class__.__name__ = "FastEmbedSparseEmbeddingProvider"
 
     # Reranking provider working
@@ -439,6 +456,7 @@ async def test_health_shows_degraded_status(initialize_test_settings, clean_cont
 
     # Vector store working
     mock_vector = AsyncMock(spec=VectorStoreProvider)
+    mock_vector = AsyncMock(spec=VectorStoreProvider)
     mock_vector.health_check = AsyncMock(return_value={"status": "up"})
 
     # Mock the stats object
@@ -446,9 +464,16 @@ async def test_health_shows_degraded_status(initialize_test_settings, clean_cont
     mock_stats.total_requests = 10
     mock_stats.get_timing_statistics.return_value = {"queries": [0.1, 0.2]}
     mock_stats.failover_statistics = None
+    mock_stats.total_requests = 10
+    mock_stats.get_timing_statistics.return_value = {"queries": [0.1, 0.2]}
+    mock_stats.failover_statistics = None
 
     # Apply overrides
     overrides = {
+        tuple[EmbeddingProvider, ...]: lambda: (mock_dense,),
+        tuple[SparseEmbeddingProvider, ...]: lambda: (mock_sparse,),
+        tuple[RerankingProvider, ...]: lambda: (mock_rerank,),
+        tuple[VectorStoreProvider, ...]: lambda: (mock_vector,),
         tuple[EmbeddingProvider, ...]: lambda: (mock_dense,),
         tuple[SparseEmbeddingProvider, ...]: lambda: (mock_sparse,),
         tuple[RerankingProvider, ...]: lambda: (mock_rerank,),
@@ -461,6 +486,7 @@ async def test_health_shows_degraded_status(initialize_test_settings, clean_cont
         health_service = await clean_container.resolve(HealthService)
         # Manually set stopwatch to ensure consistent timing
         health_service._startup_stopwatch = time.monotonic()
+        health_service._startup_stopwatch = time.monotonic()
 
         # Get health response
         response = await health_service.get_health_response()
@@ -469,6 +495,7 @@ async def test_health_shows_degraded_status(initialize_test_settings, clean_cont
         assert response.status in ["degraded", "healthy"]
 
         # Circuit breaker state should be exposed
+        assert response.services.embedding_provider.circuit_breaker_state == "open"
         assert response.services.embedding_provider.circuit_breaker_state == "open"
 
 

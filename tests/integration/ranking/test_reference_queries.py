@@ -143,12 +143,16 @@ def calculate_precision(
 
 @pytest.fixture(scope="module")
 def loaded_reference_queries() -> list[ReferenceQuery]:
+def loaded_reference_queries() -> list[ReferenceQuery]:
     """Fixture providing loaded reference queries."""
+    return load_loaded_reference_queries()
     return load_loaded_reference_queries()
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
+async def test_loaded_reference_queries_comprehensive(
+    loaded_reference_queries: list[ReferenceQuery], di_overrides
 async def test_loaded_reference_queries_comprehensive(
     loaded_reference_queries: list[ReferenceQuery], di_overrides
 ) -> None:  # sourcery skip: low-code-quality
@@ -176,6 +180,7 @@ async def test_loaded_reference_queries_comprehensive(
     precision_at_5_scores: list[float] = []
 
     # Execute each query and collect results
+    for test_case in loaded_reference_queries:
     for test_case in loaded_reference_queries:
         logger.info(
             "Executing query: '%s' (intent=%s, target=P@%d)",
@@ -339,6 +344,7 @@ async def test_individual_reference_query(query_index: int) -> None:
 
     This parametrized test allows running specific queries:
         pytest tests/integration/ranking/test_reference_queries.py::test_individual_reference_query[5]
+        pytest tests/integration/ranking/test_reference_queries.py::test_individual_reference_query[5]
 
     Useful for debugging specific query failures without running full suite.
     """
@@ -389,10 +395,12 @@ async def test_individual_reference_query(query_index: int) -> None:
 
 @pytest.mark.integration
 def test_intent_coverage_complete(loaded_reference_queries: list[ReferenceQuery]) -> None:
+def test_intent_coverage_complete(loaded_reference_queries: list[ReferenceQuery]) -> None:
     """Validate that all IntentTypes are covered in reference queries.
 
     Ensures comprehensive testing across all query intent categories.
     """
+    covered_intents = {q.intent for q in loaded_reference_queries}
     covered_intents = {q.intent for q in loaded_reference_queries}
     all_intents = set(IntentType)
 
@@ -405,6 +413,7 @@ def test_intent_coverage_complete(loaded_reference_queries: list[ReferenceQuery]
 
     # Report coverage statistics
     intent_counts = dict.fromkeys(IntentType, 0)
+    for query in loaded_reference_queries:
     for query in loaded_reference_queries:
         intent_counts[query.intent] += 1
 
@@ -420,6 +429,7 @@ def test_intent_coverage_complete(loaded_reference_queries: list[ReferenceQuery]
 
 @pytest.mark.integration
 def test_query_diversity_metrics(loaded_reference_queries: list[ReferenceQuery]) -> None:
+def test_query_diversity_metrics(loaded_reference_queries: list[ReferenceQuery]) -> None:
     """Validate query diversity and balance across intents and difficulties.
 
     Ensures test suite has good coverage of:
@@ -430,12 +440,15 @@ def test_query_diversity_metrics(loaded_reference_queries: list[ReferenceQuery])
     # Check intent distribution
     intent_counts = dict.fromkeys(IntentType, 0)
     for query in loaded_reference_queries:
+    for query in loaded_reference_queries:
         intent_counts[query.intent] += 1
 
     for intent, count in intent_counts.items():
         assert count >= 2, f"Intent {intent.value} has insufficient coverage ({count} queries)"
 
     # Check precision target distribution
+    p3_count = sum(q.precision_target == 3 for q in loaded_reference_queries)
+    p5_count = sum(q.precision_target == 5 for q in loaded_reference_queries)
     p3_count = sum(q.precision_target == 3 for q in loaded_reference_queries)
     p5_count = sum(q.precision_target == 5 for q in loaded_reference_queries)
 
@@ -447,6 +460,7 @@ def test_query_diversity_metrics(loaded_reference_queries: list[ReferenceQuery])
     assert p5_count >= 10, "Need at least 10 P@5 queries for valid metrics"
 
     # Check expected file count diversity
+    file_counts = [len(q.expected_files) for q in loaded_reference_queries]
     file_counts = [len(q.expected_files) for q in loaded_reference_queries]
     avg_files = sum(file_counts) / len(file_counts)
     min_files = min(file_counts)
@@ -465,8 +479,9 @@ __all__ = (
     "ReferenceQuery",
     "calculate_precision",
     "load_loaded_reference_queries",
+    "load_loaded_reference_queries",
     "test_individual_reference_query",
     "test_intent_coverage_complete",
-    "test_query_diversity_metrics",
     "test_loaded_reference_queries_comprehensive",
+    "test_query_diversity_metrics",
 )
