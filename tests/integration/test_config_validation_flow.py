@@ -31,20 +31,16 @@ if TYPE_CHECKING:
 # ===========================================================================
 
 
-@pytest.fixture
-def test_container():
-    """Create test DI container.
+@pytest.fixture(autouse=True)
+def setup_test_container(test_settings):
+    """Create test DI container and override settings so real `get_settings()` works."""
+    from codeweaver.core.di.container import get_container
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 
-    Uses real services where possible, with mocked external dependencies
-    (Qdrant, API providers, etc.) to keep tests fast and isolated.
-    """
-    from codeweaver.core.di.container import Container
-
-    return Container()
-
-    # Configure for testing
-    # NOTE: In real implementation, would use test settings
-    # with inmemory vector store and mock providers
+    container = get_container()
+    container.override(CodeWeaverSettingsType, test_settings)
+    yield container
+    container.clear()
 
 
 @pytest.fixture
@@ -56,7 +52,7 @@ def test_config_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-async def test_checkpoint_data(tmp_path: Path) -> dict:
+def test_checkpoint_data(tmp_path: Path) -> dict:
     """Create test checkpoint data with collection metadata."""
     return {
         "version": "2.0",
@@ -110,6 +106,11 @@ def mock_checkpoint_manager(test_checkpoint_data: dict) -> AsyncMock:
     manager.load = AsyncMock(return_value=checkpoint)
     manager.validate_checkpoint_compatibility = AsyncMock(return_value=(True, "NONE"))
 
+    # Do not mock _extract_fingerprint or _create_fingerprint
+    # The real implementation will be run, but it requires the global settings to exist,
+    # which we've solved by using `container.override(CodeWeaverSettingsType, test_settings)`
+    # However, CheckpointManager uses `get_settings()` from core_settings, which reads from dependency container.
+
     return manager
 
 
@@ -119,6 +120,9 @@ def mock_manifest_manager() -> AsyncMock:
     manager = AsyncMock()
     manager.read_manifest = AsyncMock(return_value=None)
     manager.write_manifest = AsyncMock()
+    manifest_mock = Mock()
+    manifest_mock.total_chunks = 100
+    manager.load = AsyncMock(return_value=manifest_mock)
     return manager
 
 
@@ -134,6 +138,7 @@ def mock_vector_store() -> AsyncMock:
     metadata.validate_config_change = Mock()  # Policy validation method
 
     store.get_collection_metadata = AsyncMock(return_value=metadata)
+    store.collection_info = AsyncMock(return_value=metadata)
 
     return store
 
@@ -172,7 +177,7 @@ def test_settings() -> Mock:
 # ===========================================================================
 
 
-@pytest.mark.async_test
+@pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.external_api
 @pytest.mark.integration
@@ -233,7 +238,7 @@ class TestFullValidationWorkflow:
 # ===========================================================================
 
 
-@pytest.mark.async_test
+@pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.external_api
 @pytest.mark.integration
@@ -396,7 +401,7 @@ class TestConfigChangeClassification:
 # ===========================================================================
 
 
-@pytest.mark.async_test
+@pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.external_api
 @pytest.mark.integration
@@ -461,7 +466,7 @@ class TestNoCheckpointScenarios:
 # ===========================================================================
 
 
-@pytest.mark.async_test
+@pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.external_api
 @pytest.mark.integration
@@ -571,7 +576,7 @@ class TestEmpiricalDataUsage:
 # ===========================================================================
 
 
-@pytest.mark.async_test
+@pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.external_api
 @pytest.mark.integration
@@ -680,7 +685,7 @@ class TestEdgeCasesIntegration:
 # ===========================================================================
 
 
-@pytest.mark.async_test
+@pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.external_api
 @pytest.mark.integration
@@ -791,7 +796,7 @@ class TestRecommendationsQuality:
 # ===========================================================================
 
 
-@pytest.mark.async_test
+@pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.external_api
 @pytest.mark.integration
