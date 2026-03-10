@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, Mock, NonCallableMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -33,24 +33,14 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def setup_test_container(test_settings):
-    """Override DI-injected settings for services resolved through the container.
-
-    Uses ``container.use_overrides`` so that pre-existing overrides are
-    snapshot-restored automatically on teardown without touching private state.
-
-    Note: ``codeweaver.core.get_settings()`` constructs settings directly from
-    the installed package configuration and does *not* consult this container,
-    so this override only affects services that receive their settings via DI
-    resolution.  Code paths that call ``get_settings()`` directly (e.g.
-    ``CheckpointManager._extract_fingerprint``) must be patched separately.
-    """
-    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+    """Create test DI container and override settings so real `get_settings()` works."""
     from codeweaver.core.di.container import get_container
-
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 
     container = get_container()
-    with container.use_overrides({CodeWeaverSettingsType: test_settings}):
-        yield container
+    container.override(CodeWeaverSettingsType, test_settings)
+    yield container
+    container.clear()
 
 
 @pytest.fixture
@@ -114,11 +104,12 @@ def mock_checkpoint_manager(test_checkpoint_data: dict) -> AsyncMock:
     checkpoint.collection_metadata = metadata
 
     manager.load = AsyncMock(return_value=checkpoint)
-    # Some tests may call `load_checkpoint()` instead of `load()`;
-    # make it an alias so both return the same checkpoint object.
-    manager.load_checkpoint = manager.load
     manager.validate_checkpoint_compatibility = AsyncMock(return_value=(True, "NONE"))
 
+    # Do not mock _extract_fingerprint or _create_fingerprint
+    # The real implementation will be run, but it requires the global settings to exist,
+    # which we've solved by using `container.override(CodeWeaverSettingsType, test_settings)`
+    # However, CheckpointManager uses `get_settings()` from core_settings, which reads from dependency container.
 
     return manager
 
@@ -158,13 +149,9 @@ def mock_vector_store() -> AsyncMock:
 
 
 @pytest.fixture
-def test_settings() -> NonCallableMock:
-    """Create test Settings with default configuration.
-
-    Uses ``NonCallableMock`` so the DI container does not invoke the object as
-    a factory when resolving ``CodeWeaverSettingsType``.
-    """
-    settings = NonCallableMock()
+def test_settings() -> Mock:
+    """Create test Settings with default configuration."""
+    settings = Mock()
 
     # Provider settings
     settings.provider = Mock()
