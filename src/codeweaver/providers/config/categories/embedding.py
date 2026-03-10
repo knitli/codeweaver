@@ -223,7 +223,7 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
         with contextlib.suppress(AttributeError, KeyError, ValueError):
             is_sdkclient_member = SDKClient.from_string(self.provider.variable) is not None
         if self.provider.only_uses_own_client and is_sdkclient_member:
-            return cast("LiteralSDKClient", SDKClient.from_string(self.provider.variable))
+            return cast(LiteralSDKClient, SDKClient.from_string(self.provider.variable))
         if self.provider not in (Provider.AZURE, Provider.HEROKU):
             raise ValueError(
                 f"Cannot resolve embedding client for provider {self.provider.variable}.",
@@ -834,7 +834,7 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
     @property
     def dimension(self) -> NonNegativeInt:
         """Get the embedding dimension for both models (they must match)."""
-        return cast("NonNegativeInt", self.dimension_tuple[0] or 0)
+        return cast(NonNegativeInt, self.dimension_tuple[0] or 0)
 
     @property
     def datatype(self) -> str:

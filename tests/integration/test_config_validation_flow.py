@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, NonCallableMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -115,8 +115,10 @@ def mock_checkpoint_manager(test_checkpoint_data: dict) -> Mock:
     manager.delete = AsyncMock()
     # Some tests may call `load_checkpoint()` instead of `load()`;
     # make it an alias so both return the same checkpoint object.
-    manager.load_checkpoint = manager.load
-    manager.validate_checkpoint_compatibility = AsyncMock(return_value=(True, "NONE"))
+    if hasattr(manager, "load_checkpoint"):
+        manager.load_checkpoint = manager.load
+    if hasattr(manager, "validate_checkpoint_compatibility"):
+        manager.validate_checkpoint_compatibility = AsyncMock(return_value=(True, "NONE"))
 
     # Configure synchronous fingerprint helpers with real CheckpointSettingsFingerprint
     # instances so ConfigChangeAnalyzer's ``is_compatible_with`` comparison works correctly.

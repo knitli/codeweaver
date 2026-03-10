@@ -98,7 +98,7 @@ class BaseRerankingProviderSettings(BaseProviderCategorySettings):
     @property
     def client(self) -> LiteralSDKClient:
         """Return the reranking SDKClient enum member."""
-        return cast("LiteralSDKClient", SDKClient.from_string(self.provider.variable))
+        return cast(LiteralSDKClient, SDKClient.from_string(self.provider.variable))
 
     def is_cloud(self) -> bool:
         """Return True if the provider is a cloud provider, False otherwise."""
