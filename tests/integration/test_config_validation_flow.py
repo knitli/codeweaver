@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, NonCallableMock
 
 import pytest
 
@@ -35,6 +35,9 @@ if TYPE_CHECKING:
 def setup_test_container(test_settings):
     """Override DI-injected settings for services resolved through the container.
 
+    Uses ``container.use_overrides`` so that pre-existing overrides are
+    snapshot-restored automatically on teardown without touching private state.
+
     Note: ``codeweaver.core.get_settings()`` constructs settings directly from
     the installed package configuration and does *not* consult this container,
     so this override only affects services that receive their settings via DI
@@ -45,18 +48,8 @@ def setup_test_container(test_settings):
     from codeweaver.core.di.container import get_container
 
     container = get_container()
-    # Snapshot pre-test overrides so teardown can restore them exactly.
-    # NOTE: _overrides is a private attribute; this is acceptable in tests where
-    # no public "snapshot overrides" API exists on the container.
-    initial_overrides = dict(container._overrides) if hasattr(container, "_overrides") else {}
-
-    container.override(CodeWeaverSettingsType, test_settings)
-    yield container
-
-    # Restore overrides to their pre-test state rather than wiping everything.
-    container.clear_overrides()
-    for interface, instance in initial_overrides.items():
-        container.override(interface, instance)
+    with container.use_overrides({CodeWeaverSettingsType: test_settings}):
+        yield container
 
 
 @pytest.fixture
@@ -235,9 +228,13 @@ def mock_vector_store() -> AsyncMock:
 
 
 @pytest.fixture
-def test_settings() -> Mock:
-    """Create test Settings with default configuration."""
-    settings = Mock()
+def test_settings() -> NonCallableMock:
+    """Create test Settings with default configuration.
+
+    Uses ``NonCallableMock`` so the DI container does not invoke the object as
+    a factory when resolving ``CodeWeaverSettingsType``.
+    """
+    settings = NonCallableMock()
 
     # Provider settings
     settings.provider = Mock()
