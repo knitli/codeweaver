@@ -159,7 +159,7 @@ from codeweaver.core import BasedModel, AnonymityConversion, FilteredKey
 class MyModel(BasedModel):
     public_data: str = "safe"
     sensitive_path: str = "/home/user/secret.py"
-    
+
     def _telemetry_keys(self):
         return {
             FilteredKey("sensitive_path"): AnonymityConversion.HASH,
