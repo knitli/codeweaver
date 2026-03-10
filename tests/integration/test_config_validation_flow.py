@@ -46,7 +46,7 @@ def setup_test_container(test_settings):
     """
     from codeweaver.core.config.settings_type import CodeWeaverSettingsType
     from codeweaver.core.di.container import get_container
-    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+
 
     container = get_container()
     with container.use_overrides({CodeWeaverSettingsType: test_settings}):
@@ -114,12 +114,11 @@ def mock_checkpoint_manager(test_checkpoint_data: dict) -> AsyncMock:
     checkpoint.collection_metadata = metadata
 
     manager.load = AsyncMock(return_value=checkpoint)
+    # Some tests may call `load_checkpoint()` instead of `load()`;
+    # make it an alias so both return the same checkpoint object.
+    manager.load_checkpoint = manager.load
     manager.validate_checkpoint_compatibility = AsyncMock(return_value=(True, "NONE"))
 
-    # Do not mock _extract_fingerprint or _create_fingerprint
-    # The real implementation will be run, but it requires the global settings to exist,
-    # which we've solved by using `container.override(CodeWeaverSettingsType, test_settings)`
-    # However, CheckpointManager uses `get_settings()` from core_settings, which reads from dependency container.
 
     return manager
 
