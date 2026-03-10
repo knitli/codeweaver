@@ -55,7 +55,7 @@ def _config_factory[T: RerankingConfigT](data: dict[str, Any], config_class: typ
         )
     )
     if config_data.get("provider") == Provider.BEDROCK and data.get("model_arn"):
-        config_data["model"] = cast("dict[str, Any]", config_data.get("model", {})) | {
+        config_data["model"] = cast(dict[str, Any], config_data.get("model", {})) | {
             "model_arn": data["model_arn"],
         }
     if (
