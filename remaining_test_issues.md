@@ -49,13 +49,17 @@ A large number of tests (around 95) are skipped due to missing infrastructure (e
 
 **Proposed Solutions:**
 1.  **CI Infrastructure:** For tests requiring Qdrant or real external APIs, either use mock containers (like testcontainers) during CI or ensure the environment variables/services are spun up correctly before running the suite.
-2.  **DI Updates:** Complete the integration of the new Dependency Injection system into the legacy tests that are marked with "DI integration not yet implemented". This usually involves replacing `reset_settings` and `get_settings()` patches with `container.override()`.
+2.  **DI Updates:** Complete the integration of the new Dependency Injection system into the legacy tests that are marked with "DI integration not yet implemented".  Note the distinction between two different settings paths:
+    - **DI-resolved services**: use `container.override(CodeWeaverSettingsType, test_settings)` to inject test settings.
+    - **Direct `get_settings()` calls**: `codeweaver.core.get_settings()` constructs settings from the installed package environment and does *not* consult the container.  Code paths that call it directly (e.g. `CheckpointManager._extract_fingerprint`, `_create_fingerprint`) must be patched at the call site — either via `unittest.mock.patch("codeweaver.engine.managers.checkpoint_manager.get_settings", ...)` or by explicitly mocking the methods themselves (as done in the `mock_checkpoint_manager` fixture).
 
 ## 5. `CheckpointManager` and `get_settings()` — Important Note
 
 `CheckpointManager` calls `get_settings()` directly (imported from `codeweaver.core`). This function constructs a new settings instance by detecting the installed package; it does **not** read from the DI container. Therefore, `container.override(CodeWeaverSettingsType, test_settings)` alone will **not** influence what `_extract_fingerprint()` or `_create_fingerprint()` receive when they call `get_settings()` internally.
 
-**Action required:** Any test that exercises the real `_extract_fingerprint()` or `_create_fingerprint()` logic must patch `get_settings` at its call site, for example:
+**Resolution (applied):** The `mock_checkpoint_manager` fixture now explicitly mocks `_extract_fingerprint` and `_create_fingerprint` with `side_effect` functions that return real `CheckpointSettingsFingerprint` instances built from the mock checkpoint/config data.  This avoids the need to either patch `get_settings` or instantiate a real `CheckpointManager` in tests.
+
+For future tests that need to exercise the *real* fingerprint extraction logic, patch `get_settings` at its call site:
 
 ```python
 from unittest.mock import patch
@@ -63,5 +67,3 @@ from unittest.mock import patch
 with patch("codeweaver.engine.managers.checkpoint_manager.get_settings", return_value=test_settings):
     result = checkpoint_manager._extract_fingerprint(checkpoint)
 ```
-
-Tests that use a fully-mocked `mock_checkpoint_manager` (i.e., never call the real methods) are unaffected by this limitation.
