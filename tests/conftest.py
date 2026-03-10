@@ -27,14 +27,11 @@ from codeweaver.core import (
     ExtCategory,
     SemanticSearchLanguage,
 )
-from codeweaver.core.dependencies import SettingsDep
-from codeweaver.core.di.depends import INJECTED
 
 from .qdrant_test_manager import QdrantTestManager
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.dependencies.core_settings import CodeWeaverSettingsType
     from codeweaver.core.di.container import Container
 
 # ===========================================================================
@@ -198,7 +195,7 @@ def di_overrides(
 
 @pytest.fixture(autouse=True)
 def mock_tokenizer_for_unit_tests(
-    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, clean_container: "Container"
 ) -> None:
     """Auto-patch the tokenizer for unit tests that are marked as mock_only.
 
@@ -210,16 +207,26 @@ def mock_tokenizer_for_unit_tests(
     should_mock = "mock_only" in markers or ("unit" in markers and "network" not in markers)
 
     if should_mock:
-        # Patch get_tokenizer to return our mock in all modules that use it
-        modules_to_patch = [
-            "codeweaver_tokenizers.get_tokenizer",
-            "codeweaver.providers",
-            "codeweaver.providers",
-            "codeweaver.providers",
-        ]
+        from codeweaver_tokenizers import Tokenizer
+
+        # 1. DI Override (Preferred)
+        clean_container.override(Tokenizer, MockTokenizer())
+
+        # 2. Monkeypatch fallback for legacy non-DI code
+        modules_to_patch = ["codeweaver_tokenizers.get_tokenizer", "codeweaver.providers"]
         for module_path in modules_to_patch:
             with contextlib.suppress(AttributeError):
                 monkeypatch.setattr(module_path, _mock_get_tokenizer)
+
+
+@pytest.fixture
+def mock_tokenizer(clean_container: "Container") -> MockTokenizer:
+    """Explicitly provide a mock tokenizer and override it in DI container."""
+    from codeweaver_tokenizers import Tokenizer
+
+    mock = MockTokenizer()
+    clean_container.override(Tokenizer, mock)
+    return mock
 
 
 @pytest.fixture
@@ -231,10 +238,10 @@ def initialize_test_settings() -> Generator[None, None, None]:
     the test to avoid cross-test contamination.
     """
     from codeweaver.core.config.loader import get_settings
-    from codeweaver.core.di import reset_container
+    from codeweaver.core.di import reset_container_state
 
     # Reset container to force fresh settings
-    reset_container()
+    reset_container_state()
 
     # Initialize settings by calling get_settings() which will create
     # the global instance with defaults, including the "providers" key
@@ -244,7 +251,7 @@ def initialize_test_settings() -> Generator[None, None, None]:
     yield
 
     # Cleanup: reset container after test
-    reset_container()
+    reset_container_state()
 
 
 @pytest.fixture
@@ -417,8 +424,8 @@ def vector_store_factory(request) -> Any:
         from uuid import uuid4
 
         from pydantic import AnyUrl
-        from qdrant_client import AsyncQdrantClient
 
+        from codeweaver.core.di import get_container
         from codeweaver.providers import (
             CollectionConfig,
             ConfiguredCapability,
@@ -431,7 +438,9 @@ def vector_store_factory(request) -> Any:
             QdrantClientOptions,
             QdrantVectorStoreProvider,
             QdrantVectorStoreProviderSettings,
+            VectorStoreProvider,
         )
+        from codeweaver.providers.dependencies.providers import _instantiate_provider_from_settings
 
         config_overrides = config_overrides or {}
 
@@ -458,6 +467,9 @@ def vector_store_factory(request) -> Any:
             configured_dense = ConfiguredCapability(capability=dense_caps, config=mock_settings)
             embedding_caps = EmbeddingCapabilityGroup(dense=configured_dense, sparse=None)
 
+        container = get_container()
+        container.override(EmbeddingCapabilityGroup, embedding_caps)
+
         if provider_cls is QdrantVectorStoreProvider:
             try:
                 qdrant_test_manager = request.getfixturevalue("qdrant_test_manager")
@@ -483,10 +495,7 @@ def vector_store_factory(request) -> Any:
                 collection=CollectionConfig(collection_name=collection_name),
                 batch_size=config_overrides.get("batch_size", 64),
             )
-            client = AsyncQdrantClient(url=url)
-            provider = QdrantVectorStoreProvider(
-                client=client, _provider=Provider.QDRANT, config=settings, caps=embedding_caps
-            )
+            provider = await _instantiate_provider_from_settings(settings, VectorStoreProvider)
             await provider._initialize()
             return provider
 
@@ -502,12 +511,11 @@ def vector_store_factory(request) -> Any:
                 in_memory_config["persist_path"] = persist_path
 
             settings = MemoryVectorStoreProviderSettings(
-                provider=Provider.MEMORY, in_memory_config=in_memory_config
+                provider=Provider.MEMORY,
+                in_memory_config=in_memory_config,
+                client_options=QdrantClientOptions(location=":memory:"),
             )
-            client = AsyncQdrantClient(location=":memory:")
-            provider = MemoryVectorStoreProvider(
-                client=client, _provider=Provider.MEMORY, config=settings, caps=embedding_caps
-            )
+            provider = await _instantiate_provider_from_settings(settings, VectorStoreProvider)
             await provider._initialize()
             return provider
 
@@ -558,6 +566,7 @@ def create_test_chunk_with_embeddings(
         uuid7,
     )
     from codeweaver.providers import get_embedding_registry
+
     # Create the base chunk
     chunk = CodeChunk(
         chunk_id=chunk_id,
@@ -695,37 +704,16 @@ def cli_api_keys(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     return keys
 
 
-def _get_settings(settings: SettingsDep = INJECTED) -> "CodeWeaverSettingsType":
-    return settings
-
-
-@pytest.fixture(autouse=True)
-def reset_cli_settings_cache() -> None:
-    """Reset settings cache between CLI tests.
-
-    Note: Settings are now managed through DI container, which is reset
-    by the reset_di_container fixture. This fixture is kept for compatibility
-    and performs minimal cache clearing.
-    """
-    if _get_settings():
-        from codeweaver.core.di.container import get_container
-
-        container = get_container()
-        container.clear_request_cache()
-        container.clear_overrides()
-    # reset_di_container is already an autouse fixture - no need to call it
-
-
 @pytest.fixture(autouse=True)
 def reset_di_container() -> Generator[None, None, None]:
     """Reset DI container between tests to ensure isolation."""
-    from codeweaver.core import reset_container
+    from codeweaver.core import reset_container_state
     from codeweaver.providers.embedding.registry import reset_embedding_registry
 
-    reset_container()
+    reset_container_state()
     reset_embedding_registry()
     yield
-    reset_container()
+    reset_container_state()
     reset_embedding_registry()
 
 

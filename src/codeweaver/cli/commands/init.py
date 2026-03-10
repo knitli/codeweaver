@@ -24,9 +24,8 @@ import cyclopts
 from pydantic import AnyHttpUrl
 from pydantic_core import from_json as from_json
 from pydantic_core import to_json as to_json
-from rich.prompt import Confirm
 
-from codeweaver.cli.ui import CLIErrorHandler, get_display
+from codeweaver.cli.ui import CLIErrorHandler, UserInteractionDep, get_display
 from codeweaver.core import CodeWeaverError, get_project_path, get_user_config_dir
 from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.dependencies.core_settings import SettingsDep
@@ -204,6 +203,7 @@ def config(
         ),
     ] = "project",
     force: Annotated[bool, cyclopts.Parameter(name=["--force", "-f"])] = False,
+    interaction: UserInteractionDep = INJECTED,
 ) -> None:
     """Set up CodeWeaver configuration file.
 
@@ -214,6 +214,7 @@ def config(
         vector_url: URL for cloud vector deployment
         config_path: Custom path for configuration file
         force: Overwrite existing configuration file
+        interaction: User interaction service
     """
     display = _display
     error_handler = CLIErrorHandler(display)
@@ -285,7 +286,7 @@ def config(
         config_path
         and config_path.exists()
         and not force
-        and not Confirm.ask(
+        and not interaction.confirm(
             f"[yellow]Configuration file already exists at {config_path}. Overwrite?[/yellow]",
             default=False,
         )

@@ -55,6 +55,7 @@ async def mock_indexer(tmp_path: Path, mock_vector_store, monkeypatch: pytest.Mo
 
 @pytest.mark.async_test
 @pytest.mark.unit
+@pytest.mark.mock_only
 class TestStalePointRemovalInBatchIndexing:
     """Test that _index_files_batch deletes old chunks for modified files."""
 
@@ -80,7 +81,10 @@ class TestStalePointRemovalInBatchIndexing:
         await mock_indexer._index_files_batch([(modified_file, None), (new_file, None)], None)
 
         # Verify delete_by_files was called with relative paths
-        mock_indexer._vector_store.delete_by_files.assert_called_once_with([rel_path, Path("new.py")])
+        mock_indexer._vector_store.delete_by_files.assert_called_once_with([
+            rel_path,
+            Path("new.py"),
+        ])
 
     @pytest.mark.asyncio
     async def test_batch_deletes_multiple_modified_files(

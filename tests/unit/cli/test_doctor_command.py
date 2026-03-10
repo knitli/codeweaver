@@ -28,9 +28,9 @@ from codeweaver.server.config import CodeWeaverSettings
 def temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create temporary project directory."""
     # Reset global settings to avoid state pollution between tests
-    from codeweaver.core.di import reset_container
+    from codeweaver.core.di import reset_container_state
 
-    reset_container()
+    reset_container_state()
 
     project = tmp_path / "test_project"
     project.mkdir()

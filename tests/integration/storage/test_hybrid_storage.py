@@ -73,7 +73,7 @@ async def test_store_hybrid_embeddings(qdrant_provider: QdrantVectorStoreProvide
             strategy=SearchStrategy.DENSE_ONLY,
             dense=[1.0, 0.0, 0.0] * 256,
             sparse=None,
-        ),
+        )
     )
     assert len(dense_results) > 0, "Dense vector search should return results"
     assert dense_results[0].chunk.chunk_id == chunk.chunk_id
@@ -84,9 +84,8 @@ async def test_store_hybrid_embeddings(qdrant_provider: QdrantVectorStoreProvide
             query="authentication function",
             strategy=SearchStrategy.SPARSE_ONLY,
             sparse=CodeWeaverSparseEmbedding(indices=[1, 5, 10], values=[0.8, 0.6, 0.9]),
-            sparse=CodeWeaverSparseEmbedding(indices=[1, 5, 10], values=[0.8, 0.6, 0.9]),
             dense=None,
-        ),
+        )
     )
     assert len(sparse_results) > 0, "Sparse vector search should return results"
     assert sparse_results[0].chunk.chunk_id == chunk.chunk_id
@@ -98,7 +97,7 @@ async def test_store_hybrid_embeddings(qdrant_provider: QdrantVectorStoreProvide
             strategy=SearchStrategy.HYBRID_SEARCH,
             dense=[1.0, 0.0, 0.0] * 256,
             sparse=CodeWeaverSparseEmbedding(indices=[1, 5, 10], values=[0.8, 0.6, 0.9]),
-        ),
+        )
     )
     assert len(hybrid_results) > 0, "Hybrid search should return results"
     assert hybrid_results[0].chunk.chunk_id == chunk.chunk_id

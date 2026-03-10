@@ -79,7 +79,7 @@ TIER_WEIGHTS = {1: 5.0, 2: 4.0, 3: 3.0, 4: 2.0, 5: 1.0}
 
 
 def build_universal_rules(
-    classifications_dir: Path, holdout_lang: str,
+    classifications_dir: Path, holdout_lang: str
 ) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
     """Build universal rules excluding the holdout language.
 
@@ -183,7 +183,7 @@ def classify_thing_universal(
 
 
 def evaluate_holdout(
-    classifications_dir: Path, holdout_lang: str, *, use_overrides: bool = False,
+    classifications_dir: Path, holdout_lang: str, *, use_overrides: bool = False
 ) -> dict[str, Any]:  # sourcery skip: low-code-quality
     """Run holdout evaluation for a single language."""
 
@@ -197,7 +197,7 @@ def evaluate_holdout(
 
     # Build universal rules excluding this language
     exact_rules, majority_rules, category_rules = build_universal_rules(
-        classifications_dir, holdout_lang,
+        classifications_dir, holdout_lang
     )
 
     # Load overrides if requested
@@ -226,7 +226,7 @@ def evaluate_holdout(
                 continue
 
             predicted, method = classify_thing_universal(
-                entry, exact_rules, majority_rules, category_rules, overrides,
+                entry, exact_rules, majority_rules, category_rules, overrides
             )
             method_counts[method] += 1
 
@@ -303,12 +303,12 @@ def evaluate_holdout(
 
 
 def print_summary_table(
-    label: str, results: list[dict[str, Any]],
+    label: str, results: list[dict[str, Any]]
 ) -> tuple[float, float, float, float]:
     """Print a summary table and return averages."""
     w = max(12, max((len(r["language"]) for r in results), default=12) + 2)
     print(
-        f"\n  {'Language':<{w}s}  {'Coverage':>8s}  {'Accuracy':>8s}  {'Overall':>8s}  {'Tier-Wtd':>8s}  {'Uncls':>5s}  {'Wrong':>5s}",
+        f"\n  {'Language':<{w}s}  {'Coverage':>8s}  {'Accuracy':>8s}  {'Overall':>8s}  {'Tier-Wtd':>8s}  {'Uncls':>5s}  {'Wrong':>5s}"
     )
     print(f"  {'─' * w}  {'─' * 8}  {'─' * 8}  {'─' * 8}  {'─' * 8}  {'─' * 5}  {'─' * 5}")
     for r in results:
@@ -316,7 +316,7 @@ def print_summary_table(
         print(
             f"  {r['language']:<{w}s}  {r['coverage_pct']:>7.1f}%  {r['accuracy_pct']:>7.1f}%  "
             f"{r['overall_accuracy_pct']:>7.1f}%  {r['tier_weighted_accuracy_pct']:>7.1f}%  "
-            f"{r['unclassified']:>5d}  {r['incorrect']:>5d}{ovr}",
+            f"{r['unclassified']:>5d}  {r['incorrect']:>5d}{ovr}"
         )
 
     avg_cov = sum(r["coverage_pct"] for r in results) / len(results)
@@ -326,7 +326,7 @@ def print_summary_table(
     print(f"  {'─' * w}  {'─' * 8}  {'─' * 8}  {'─' * 8}  {'─' * 8}  {'─' * 5}  {'─' * 5}")
     print(
         f"  {'AVERAGE':<{w}s}  {avg_cov:>7.1f}%  {avg_acc:>7.1f}%  "
-        f"{avg_ovr:>7.1f}%  {avg_tier:>7.1f}%",
+        f"{avg_ovr:>7.1f}%  {avg_tier:>7.1f}%"
     )
     return avg_cov, avg_acc, avg_ovr, avg_tier
 
@@ -343,7 +343,7 @@ def main() -> int:  # sourcery skip: low-code-quality
 
     parser = argparse.ArgumentParser(description="Holdout evaluation for language classifications")
     parser.add_argument(
-        "--all", action="store_true", help="Evaluate ALL languages (not just holdout set)",
+        "--all", action="store_true", help="Evaluate ALL languages (not just holdout set)"
     )
     parser.add_argument("--lang", nargs="+", help="Evaluate specific language(s)")
     args = parser.parse_args()
@@ -406,7 +406,7 @@ def main() -> int:  # sourcery skip: low-code-quality
         print(
             f"  {lang:<14s}  overall={result['overall_accuracy_pct']:5.1f}%  "
             f"({result['correct']}/{result['total_things']} correct, "
-            f"{result['unclassified']} uncls, {result['incorrect']} wrong)",
+            f"{result['unclassified']} uncls, {result['incorrect']} wrong)"
         )
 
     _display_phase_intro("\n", "PHASE 1 SUMMARY")
@@ -442,7 +442,7 @@ def main() -> int:  # sourcery skip: low-code-quality
                 f"  {lang:<14s}  overall={result['overall_accuracy_pct']:5.1f}%  "
                 f"({result['correct']}/{result['total_things']} correct, "
                 f"{result['unclassified']} uncls, {result['incorrect']} wrong)"
-                f"{marker}",
+                f"{marker}"
             )
 
         _display_phase_intro("\n", "PHASE 2 SUMMARY")
@@ -456,7 +456,7 @@ def main() -> int:  # sourcery skip: low-code-quality
         _display_phase_intro("\n\n", "COMPARISON: Baseline vs With Overrides")
         w = max(12, max((len(r["language"]) for r in baseline_results), default=12) + 2)
         print(
-            f"\n  {'Language':<{w}s}  {'Baseline':>8s}  {'Override':>8s}  {'Delta':>7s}  {'Override Lines':>14s}",
+            f"\n  {'Language':<{w}s}  {'Baseline':>8s}  {'Override':>8s}  {'Delta':>7s}  {'Override Lines':>14s}"
         )
         print(f"  {'─' * w}  {'─' * 8}  {'─' * 8}  {'─' * 7}  {'─' * 14}")
 
@@ -469,7 +469,7 @@ def main() -> int:  # sourcery skip: low-code-quality
             print(
                 f"  {b['language']:<{w}s}  {b['overall_accuracy_pct']:>7.1f}%  "
                 f"{o['overall_accuracy_pct']:>7.1f}%  {sign}{delta:>5.1f}%  "
-                f"{ovr_count:>14d}",
+                f"{ovr_count:>14d}"
             )
 
         delta_overall = avg_o[2] - avg_b[2]
@@ -493,7 +493,7 @@ def main() -> int:  # sourcery skip: low-code-quality
         total_overrides = sum(r["override_count"] for r in override_results)
         langs_with_overrides = sum(r["override_count"] > 0 for r in override_results)
         print(
-            f"  Override cost:               {total_overrides} lines across {langs_with_overrides} files",
+            f"  Override cost:               {total_overrides} lines across {langs_with_overrides} files"
         )
 
     if final_avg[2] >= 95:

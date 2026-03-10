@@ -135,7 +135,11 @@ class ConfiguredCapability(NamedTuple):
 
         # Ensure we are working with an integer for comparison
         if not isinstance(configured_dimension, int):
-            configured_dimension = int(configured_dimension) if hasattr(configured_dimension, "__int__") else (default_dimension or 0)
+            configured_dimension = (
+                int(configured_dimension)
+                if hasattr(configured_dimension, "__int__")
+                else (default_dimension or 0)
+            )
 
         if allowed_values and (max_value := max(allowed_values)):
             configured_dimension = min(max_value, configured_dimension or max_value)
@@ -269,7 +273,9 @@ class EmbeddingCapabilityGroup(NamedTuple):
                     quantization_config=ScalarQuantization.model_construct(scalar={"type": "uint8"})
                     if datatype == "uint8"
                     else None,
-                    datatype=Datatype("float32" if datatype == "float" else (datatype or "float32")),
+                    datatype=Datatype(
+                        "float32" if datatype == "float" else (datatype or "float32")
+                    ),
                 )
             }
         if self.sparse:
@@ -304,13 +310,11 @@ def inject_embedding_settings() -> None:
         SparseEmbeddingProviderSettings,
     )
 
-    globals().update(
-        {
-            "AsymmetricEmbeddingProviderSettings": AsymmetricEmbeddingProviderSettings,
-            "EmbeddingProviderSettings": EmbeddingProviderSettings,
-            "SparseEmbeddingProviderSettings": SparseEmbeddingProviderSettings,
-        }
-    )
+    globals().update({
+        "AsymmetricEmbeddingProviderSettings": AsymmetricEmbeddingProviderSettings,
+        "EmbeddingProviderSettings": EmbeddingProviderSettings,
+        "SparseEmbeddingProviderSettings": SparseEmbeddingProviderSettings,
+    })
 
 
 __all__ = ("ConfiguredCapability", "EmbeddingCapabilityGroup", "inject_embedding_settings")

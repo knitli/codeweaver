@@ -56,7 +56,7 @@ def _config_factory[T: RerankingConfigT](data: dict[str, Any], config_class: typ
     )
     if config_data.get("provider") == Provider.BEDROCK and data.get("model_arn"):
         config_data["model"] = cast(dict[str, Any], config_data.get("model", {})) | {
-            "model_arn": data["model_arn"],
+            "model_arn": data["model_arn"]
         }
     if (
         data["top_n"] != DEFAULT_RERANKING_MAX_RESULTS
@@ -81,7 +81,7 @@ class BaseRerankingProviderSettings(BaseProviderCategorySettings):
 
     model_name: Annotated[ModelNameT, Field(description="The name of the re-ranking model to use.")]
     reranking_config: Annotated[
-        RerankingConfigT, Field(description="Model configuration for reranking operations."),
+        RerankingConfigT, Field(description="Model configuration for reranking operations.")
     ]
     top_n: PositiveInt = DEFAULT_RERANKING_MAX_RESULTS
     client_options: (
@@ -110,7 +110,7 @@ class RerankingProviderSettings(BaseRerankingProviderSettings):
 
     model_name: Annotated[ModelNameT, Field(description="The name of the re-ranking model to use.")]
     reranking_config: Annotated[
-        RerankingConfigT, Field(description="Model configuration for reranking operations."),
+        RerankingConfigT, Field(description="Model configuration for reranking operations.")
     ]
     top_n: PositiveInt | None = DEFAULT_RERANKING_MAX_RESULTS
     client_options: (
@@ -159,7 +159,7 @@ class RerankingProviderSettings(BaseRerankingProviderSettings):
 def _construct_st_client_options(data: dict[str, Any]) -> SentenceTransformersClientOptions:
     """Construct a SentenceTransformersClientOptions from the input data."""
     return SentenceTransformersClientOptions(
-        model_name_or_path=data["model_name"], **data.get("client_options", {}),
+        model_name_or_path=data["model_name"], **data.get("client_options", {})
     )
 
 
@@ -168,7 +168,7 @@ class CohereRerankingProviderSettings(RerankingProviderSettings):
 
     provider: Literal[Provider.COHERE]
     client_options: Annotated[
-        CohereClientOptions | None, Field(description="Client options for the provider's client."),
+        CohereClientOptions | None, Field(description="Client options for the provider's client.")
     ] = None
     reranking_config: CohereRerankingConfig = Field(
         default_factory=lambda data: _config_factory(data, CohereRerankingConfig),
@@ -271,6 +271,11 @@ type RerankingProviderSettingsType = Annotated[
         CohereRerankingProviderSettings,
         Field(description="Settings for Cohere reranking provider."),
         Tag("cohere"),
+    ]
+    | Annotated[
+        SentenceTransformersRerankingProviderSettings,
+        Field(description="Settings for Sentence Transformers reranking provider."),
+        Tag("sentence_transformers"),
     ]
     | Annotated[
         RerankingProviderSettings,

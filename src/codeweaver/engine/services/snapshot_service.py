@@ -104,31 +104,34 @@ class QdrantSnapshotBackupService:
             return snapshot_name
 
     async def _wait_for_snapshot(
-        self, snapshot_name: str, timeout: int = ONE_MINUTE
+        self, snapshot_name: str, snapshot_timeout: int = ONE_MINUTE
     ) -> bool:
         """Wait for snapshot creation to complete.
 
         Args:
             snapshot_name: Name of the snapshot to wait for
-            timeout: Maximum wait time in seconds
+            snapshot_timeout: Maximum wait time in seconds
 
         Returns:
             True if snapshot is ready, False if timeout or error
         """
-        start_time = datetime.now(UTC)
-        while (datetime.now(UTC) - start_time).total_seconds() < timeout:
-            try:
-                snapshots = await asyncio.to_thread(
-                    self.vector_store.client.list_snapshots, collection_name=self.collection_name
-                )
-                if any(s.name == snapshot_name for s in snapshots):
-                    return True
-                await asyncio.sleep(1)
-            except Exception as e:
-                logger.warning("Error checking snapshot status: %s", e)
-                await asyncio.sleep(1)
-        logger.warning("Snapshot creation timeout for: %s", snapshot_name)
-        return False
+        try:
+            async with asyncio.timeout(snapshot_timeout):
+                while True:
+                    try:
+                        snapshots = await asyncio.to_thread(
+                            self.vector_store.client.list_snapshots,
+                            collection_name=self.collection_name,
+                        )
+                        if any(s.name == snapshot_name for s in snapshots):
+                            return True
+                        await asyncio.sleep(1)
+                    except Exception as e:
+                        logger.warning("Error checking snapshot status: %s", e)
+                        await asyncio.sleep(1)
+        except TimeoutError:
+            logger.warning("Snapshot creation timeout for: %s", snapshot_name)
+            return False
 
     async def list_snapshots(self) -> list[dict[str, Any]]:
         """List all available snapshots for the collection.

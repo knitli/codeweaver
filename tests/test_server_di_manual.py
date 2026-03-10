@@ -7,13 +7,13 @@ import asyncio
 import sys
 
 from codeweaver.core.dependencies import bootstrap_settings
-from codeweaver.core.di import get_container, reset_container
+from codeweaver.core.di import get_container, reset_container_state
 from codeweaver.server.server import CodeWeaverState
 
 
 async def test_di_resolution():
     print("Resetting container...")
-    reset_container()
+    reset_container_state()
 
     print("Bootstrapping settings...")
     # This registers the settings provider

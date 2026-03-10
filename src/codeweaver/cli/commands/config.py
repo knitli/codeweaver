@@ -17,7 +17,7 @@ from cyclopts import App
 from pydantic import FilePath
 from rich.table import Table
 
-from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, UserInteractionDep, get_display
 from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.dependencies import ResolvedProjectPathDep, SettingsDep
@@ -222,6 +222,7 @@ async def set_config(
     ] = False,
     config_analyzer: ConfigChangeAnalyzerDep = INJECTED,
     settings: SettingsDep = INJECTED,
+    interaction: UserInteractionDep = INJECTED,
 ) -> None:
     """Set a configuration value with proactive validation.
 
@@ -234,9 +235,8 @@ async def set_config(
         force: Skip validation and apply change immediately
         config_analyzer: DI-injected configuration analyzer
         settings: DI-injected settings service
+        interaction: User interaction service
     """
-    from rich.prompt import Confirm
-
     display.print_command_header("Set Configuration")
 
     # Validate change using injected analyzer
@@ -256,7 +256,7 @@ async def set_config(
                         display.console.print("Options:")
                         for i, rec in enumerate(analysis.recommendations, 1):
                             display.console.print(f"  {i}. {rec}")
-                        if not Confirm.ask("Continue anyway?"):
+                        if not interaction.confirm("Continue anyway?"):
                             display.print_warning("Configuration change cancelled")
                             return
 
@@ -276,7 +276,7 @@ async def set_config(
 
         except Exception as e:
             display.print_warning(f"Could not validate change: {e}")
-            if not force and not Confirm.ask("Continue without validation?"):
+            if not force and not interaction.confirm("Continue without validation?"):
                 display.print_warning("Configuration change cancelled")
                 return
 

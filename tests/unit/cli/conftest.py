@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(autouse=True)
-def mock_settings_dependency(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def mock_settings_dependency(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, clean_container):
     """Mock the settings dependency for CLI commands.
 
     This prevents DependsPlaceholder errors by providing a minimal mock
@@ -28,6 +28,8 @@ def mock_settings_dependency(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 
     Applied automatically to all CLI unit tests.
     """
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+
     # Create a minimal mock settings object
     mock_settings = MagicMock()
 
@@ -66,12 +68,7 @@ provider = "qdrant"
     # Mock the view property (used by config command)
     mock_settings.view = lambda: {}  # noqa: PIE807
 
-    # Patch the _get_settings function in init command
-    def mock_get_settings(*args, **kwargs):
-        return mock_settings
-
-    # Patch all locations where _get_settings might be called
-    monkeypatch.setattr("codeweaver.cli.commands.init._get_settings", mock_get_settings)
-    monkeypatch.setattr("codeweaver.cli.commands.config._settings", mock_get_settings)
+    # Apply override to DI container
+    clean_container.override(CodeWeaverSettingsType, mock_settings)
 
     return mock_settings

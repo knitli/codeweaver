@@ -1275,18 +1275,14 @@ def _build_vector_store_cards() -> list[ServiceCard]:
         service_card_factory(
             "qdrant",
             "vector_store",
-            lateimport(
-                "codeweaver.providers.vector_store.providers.qdrant", "QdrantVectorStoreProvider"
-            ),
+            lateimport("codeweaver.providers.vector_stores.qdrant", "QdrantVectorStoreProvider"),
             lateimport("qdrant_client", "AsyncQdrantClient"),
             "qdrant",
         ),
         service_card_factory(
             "memory",
             "vector_store",
-            lateimport(
-                "codeweaver.providers.vector_store.providers.inmemory", "MemoryVectorStoreProvider"
-            ),
+            lateimport("codeweaver.providers.vector_stores.inmemory", "MemoryVectorStoreProvider"),
             lateimport("qdrant_client", "AsyncQdrantClient"),
             "qdrant",
         ),

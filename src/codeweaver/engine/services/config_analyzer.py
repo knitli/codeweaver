@@ -485,7 +485,7 @@ class ConfigChangeAnalyzer:
         target = new_settings
         for part in parts[:-1]:
             # Handle list indexing (e.g. embedding.0)
-            target = target[int(part)] if part.isdigit() else getattr(target, part)
+            target = target[int(part)] if part.isdigit() else getattr(target, part)  # ty:ignore[not-subscriptable]
 
         last_part = parts[-1]
         if hasattr(target, last_part):

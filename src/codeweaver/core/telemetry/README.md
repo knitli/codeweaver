@@ -99,7 +99,7 @@ tools_above_privacy = true  # to opt-in to enhanced
 from codeweaver.core.telemetry import get_telemetry_client
 
 # Get singleton client (configured from settings)
-client = get_telemetry_client()
+client = await get_telemetry_client()
 
 # Start session with metadata
 client.start_session({"version": "0.5.0", "backend": "qdrant"})
@@ -127,7 +127,7 @@ from codeweaver.agent_api import IntentType
 from codeweaver.agent_api import SearchStrategy
 
 # Capture a search event (convenience function)
-capture_search_event(
+await capture_search_event(
     response=find_code_response,  # FindCodeResponseSummary
     query="how does authentication work",
     intent_type=IntentType.UNDERSTAND,
@@ -143,7 +143,7 @@ capture_search_event(
 from codeweaver.core.telemetry import get_telemetry_client
 
 # Automatic session cleanup
-with get_telemetry_client() as client:
+with await get_telemetry_client() as client:
     client.start_session({"version": "0.5.0"})
     # ... use client ...
     # end_session() called automatically on exit
@@ -187,7 +187,7 @@ CodeWeaver supports A/B testing via PostHog feature flags:
 ```python
 from codeweaver.core.telemetry import get_telemetry_client
 
-client = get_telemetry_client()
+client = await get_telemetry_client()
 
 # Get single feature flag
 variant = client.get_feature_flag("new_reranker")
@@ -209,7 +209,7 @@ Aggregated session statistics sent at session end:
 from codeweaver.core.telemetry.events import capture_session_event
 
 # Capture session event (convenience function)
-capture_session_event(
+await capture_session_event(
     stats=session_statistics,  # SessionStatistics object
     version="0.5.0",
     setup_success=True,
@@ -234,7 +234,7 @@ Per-search analytics for find_code:
 from codeweaver.core.telemetry.events import capture_search_event
 
 # Capture search event
-capture_search_event(
+await capture_search_event(
     response=find_code_response,  # FindCodeResponseSummary
     query="authentication flow",
     intent_type=IntentType.UNDERSTAND,
@@ -294,7 +294,7 @@ class MyCustomEvent:
 ```python
 from codeweaver.core.telemetry import get_telemetry_client
 
-client = get_telemetry_client()
+client = await get_telemetry_client()
 event = MyCustomEvent(my_metric=10)
 client.capture_from_event(event)
 ```
@@ -320,7 +320,7 @@ All settings use `CODEWEAVER__TELEMETRY__` prefix (note the double underscores):
 
 1. Check if enabled:
 ```bash
-python -c "from codeweaver.core.telemetry import get_telemetry_client; print(get_telemetry_client().enabled)"
+python -c "from codeweaver.core.telemetry import get_telemetry_client; print(await get_telemetry_client().enabled)"
 ```
 
 2. Check if disabled:

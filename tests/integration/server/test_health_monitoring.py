@@ -154,29 +154,41 @@ def session_statistics() -> SessionStatistics:
 
 
 @pytest.fixture
-def health_service(
-    mock_providers: dict, session_statistics: SessionStatistics, mocker
+async def health_service(
+    mock_providers: dict, session_statistics: SessionStatistics, mocker, clean_container
 ) -> HealthService:
-    """Create health service instance using new DI pattern.
+    """Create health service instance using the DI container.
 
-    The new HealthService signature uses DI type annotations but accepts direct
-    arguments for testing. Pass the mock_providers dict directly as the providers
-    parameter.
+    The new HealthService signature uses DI type annotations. We override
+    its dependencies in the DI container for testing.
     """
+    from codeweaver.core import StatisticsDep
+    from codeweaver.engine.dependencies import FailoverServiceDep
+    from codeweaver.providers import (
+        EmbeddingProvidersDep,
+        RerankingProvidersDep,
+        SparseEmbeddingProvidersDep,
+        VectorStoreProvidersDep,
+    )
+
     mock_failover = mocker.MagicMock()
     mock_failover._failover_active = False
     mock_failover._primary_store = None
     mock_failover.settings = mocker.MagicMock()
     mock_failover.settings.disable_failover = False
 
-    # Pass providers using the new DI pattern signature
-    return HealthService(
-        providers=mock_providers,
-        statistics=session_statistics,
-        indexer=None,
-        failover_manager=mock_failover,
-        startup_stopwatch=time.monotonic(),
+    # Apply overrides to container
+    clean_container.override(EmbeddingProvidersDep, mock_providers.get("embedding", ()))
+    clean_container.override(
+        SparseEmbeddingProvidersDep, mock_providers.get("sparse_embedding", ())
     )
+    clean_container.override(RerankingProvidersDep, mock_providers.get("reranking", ()))
+    clean_container.override(VectorStoreProvidersDep, mock_providers.get("vector_store", ()))
+    clean_container.override(StatisticsDep, session_statistics)
+    clean_container.override(FailoverServiceDep, mock_failover)
+
+    # Return the resolved service
+    return await clean_container.resolve(HealthService)
 
 
 @pytest.mark.integration

@@ -20,7 +20,6 @@ import logging
 import sys
 import time
 
-from functools import cache
 from types import TracebackType
 from typing import Any, Self, cast
 
@@ -29,7 +28,7 @@ from pydantic.types import SecretStr
 
 from codeweaver.core import Unset, UUID7HexT, has_package, uuid7
 from codeweaver.core.dependencies import TelemetrySettingsDep
-from codeweaver.core.di import INJECTED
+from codeweaver.core.di import INJECTED, dependency_provider
 from codeweaver.core.telemetry._project import CODEWEAVER_POSTHOG_PROJECT_KEY
 
 
@@ -150,6 +149,7 @@ class TelemetryService:
             self.logger.info("Telemetry disabled by configuration")
 
     @classmethod
+    @dependency_provider("TelemetryService", scope="singleton")
     def from_settings(cls, settings: TelemetrySettingsDep = INJECTED) -> TelemetryService:
         """
         Create PostHog client from telemetry settings.
@@ -367,15 +367,16 @@ class TelemetryService:
         self.end_session()
 
 
-@cache
-def get_telemetry_client() -> TelemetryService:
+async def get_telemetry_client() -> TelemetryService:
     """
     Get singleton telemetry client instance.
 
     Returns:
         Cached PostHog client configured from settings
     """
-    return TelemetryService.from_settings()
+    from codeweaver.core.di import get_container
+
+    return await get_container().resolve(TelemetryService)
 
 
 __all__ = ("NO_HOG", "SESSION_ID", "TelemetryService", "get_telemetry_client")

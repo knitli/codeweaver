@@ -97,6 +97,7 @@ if TYPE_CHECKING:
         ResolutionResult,
         get_container,
         reset_container,
+        reset_container_state,
     )
     from codeweaver.core.di.depends import (
         INJECTED,
@@ -132,6 +133,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "is_depends_marker": (__spec__.parent, "depends"),
     "is_provider_registered": (__spec__.parent, "utils"),
     "reset_container": (__spec__.parent, "container"),
+    "reset_container_state": (__spec__.parent, "container"),
 })
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
@@ -153,6 +155,7 @@ __all__ = (
     "is_depends_marker",
     "is_provider_registered",
     "reset_container",
+    "reset_container_state",
 )
 
 

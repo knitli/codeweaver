@@ -109,7 +109,7 @@ def load_reference_queries() -> list[ReferenceQuery]:
 
 
 def calculate_precision(
-    expected_files: list[str], actual_files: list[str], top_k: int,
+    expected_files: list[str], actual_files: list[str], top_k: int
 ) -> tuple[int, float]:
     """Calculate precision@K for a query result.
 
@@ -150,7 +150,7 @@ def loaded_reference_queries() -> list[ReferenceQuery]:
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_loaded_reference_queries_comprehensive(
-    loaded_reference_queries: list[ReferenceQuery], di_overrides,
+    loaded_reference_queries: list[ReferenceQuery], di_overrides
 ) -> None:  # sourcery skip: low-code-quality
     """Execute all reference queries and validate precision targets.
 
@@ -177,7 +177,6 @@ async def test_loaded_reference_queries_comprehensive(
 
     # Execute each query and collect results
     for test_case in loaded_reference_queries:
-    for test_case in loaded_reference_queries:
         logger.info(
             "Executing query: '%s' (intent=%s, target=P@%d)",
             test_case.query,
@@ -193,7 +192,7 @@ async def test_loaded_reference_queries_comprehensive(
 
         # Calculate precision at target level
         hits, precision = calculate_precision(
-            test_case.expected_files, actual_files, test_case.precision_target,
+            test_case.expected_files, actual_files, test_case.precision_target
         )
 
         # Store result
@@ -305,7 +304,7 @@ async def test_loaded_reference_queries_comprehensive(
     if is_mock_provider:
         logger.warning(
             "Using mock providers - skipping quality target assertions. "
-            "Test validates basic functionality only.",
+            "Test validates basic functionality only."
         )
         # Just verify the test infrastructure works
         assert results, "Should have executed at least one query"
@@ -361,7 +360,7 @@ async def test_individual_reference_query(query_index: int) -> None:
 
     # Calculate precision
     hits, precision = calculate_precision(
-        test_case.expected_files, actual_files, test_case.precision_target,
+        test_case.expected_files, actual_files, test_case.precision_target
     )
 
     # Report
@@ -391,12 +390,10 @@ async def test_individual_reference_query(query_index: int) -> None:
 
 @pytest.mark.integration
 def test_intent_coverage_complete(loaded_reference_queries: list[ReferenceQuery]) -> None:
-def test_intent_coverage_complete(loaded_reference_queries: list[ReferenceQuery]) -> None:
     """Validate that all IntentTypes are covered in reference queries.
 
     Ensures comprehensive testing across all query intent categories.
     """
-    covered_intents = {q.intent for q in loaded_reference_queries}
     covered_intents = {q.intent for q in loaded_reference_queries}
     all_intents = set(IntentType)
 
@@ -409,7 +406,6 @@ def test_intent_coverage_complete(loaded_reference_queries: list[ReferenceQuery]
 
     # Report coverage statistics
     intent_counts = dict.fromkeys(IntentType, 0)
-    for query in loaded_reference_queries:
     for query in loaded_reference_queries:
         intent_counts[query.intent] += 1
 
@@ -425,7 +421,6 @@ def test_intent_coverage_complete(loaded_reference_queries: list[ReferenceQuery]
 
 @pytest.mark.integration
 def test_query_diversity_metrics(loaded_reference_queries: list[ReferenceQuery]) -> None:
-def test_query_diversity_metrics(loaded_reference_queries: list[ReferenceQuery]) -> None:
     """Validate query diversity and balance across intents and difficulties.
 
     Ensures test suite has good coverage of:
@@ -436,15 +431,12 @@ def test_query_diversity_metrics(loaded_reference_queries: list[ReferenceQuery])
     # Check intent distribution
     intent_counts = dict.fromkeys(IntentType, 0)
     for query in loaded_reference_queries:
-    for query in loaded_reference_queries:
         intent_counts[query.intent] += 1
 
     for intent, count in intent_counts.items():
         assert count >= 2, f"Intent {intent.value} has insufficient coverage ({count} queries)"
 
     # Check precision target distribution
-    p3_count = sum(q.precision_target == 3 for q in loaded_reference_queries)
-    p5_count = sum(q.precision_target == 5 for q in loaded_reference_queries)
     p3_count = sum(q.precision_target == 3 for q in loaded_reference_queries)
     p5_count = sum(q.precision_target == 5 for q in loaded_reference_queries)
 

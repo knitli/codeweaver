@@ -346,7 +346,7 @@ def main() -> int:
                 "modification": profile["modification"],
                 "debugging": profile["debugging"],
                 "documentation": profile["documentation"],
-            },
+            }
         }
 
     with (output_dir / "_scoring.json").open("w", encoding="utf-8") as f:
@@ -442,7 +442,7 @@ def main() -> int:
     print(f"  High confidence:   {total_confident:,} ({meta['confident_pct']}%)")
     print(f"  Unclassified:      {len(unclassified_things):,}")
     print(
-        f"  Universal exact:   {len(universal_exact):,} thing names classified same in all languages",
+        f"  Universal exact:   {len(universal_exact):,} thing names classified same in all languages"
     )
     print(f"  Universal 75%+:    {len(universal_majority):,} thing names with majority agreement")
     print("\n  Tier distribution:")

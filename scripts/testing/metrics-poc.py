@@ -31,11 +31,7 @@ import argparse
 import sys
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-
-if TYPE_CHECKING:
-    pass
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -141,12 +137,10 @@ def print_separator(title: str = "") -> None:
     if title:
         print(f"\n{'=' * 70}")
         print(f" {title}")
-        print(f"{'=' * 70}\n")
-    else:
-        print(f"{'=' * 70}\n")
+    print(f"{'=' * 70}\n")
 
 
-def main() -> None:
+async def main() -> None:  # sourcery skip: low-code-quality
     """Run the metrics POC demonstration."""
     parser = argparse.ArgumentParser(description="CodeWeaver Metrics POC")
     parser.add_argument(
@@ -374,7 +368,7 @@ def main() -> None:
         try:
             from codeweaver.common import get_telemetry_client
 
-            client = get_telemetry_client()
+            client = await get_telemetry_client()
 
             if client.enabled:
                 print("📤 Sending session summary event...")
@@ -425,4 +419,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+
+    asyncio.run(main())

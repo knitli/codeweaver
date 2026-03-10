@@ -35,8 +35,8 @@ from codeweaver.engine.managers.checkpoint_manager import (
 @pytest.fixture(autouse=True)
 def setup_test_container(test_settings):
     """Create test DI container and override settings so real `get_settings()` works."""
-    from codeweaver.core.di.container import get_container
     from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+    from codeweaver.core.di.container import get_container
 
     container = get_container()
     container.override(CodeWeaverSettingsType, test_settings)
@@ -170,7 +170,6 @@ def mock_checkpoint_manager(test_checkpoint_data: dict) -> Mock:
 
     manager._extract_fingerprint = Mock(side_effect=_extract_fingerprint_side_effect)
     manager._create_fingerprint = Mock(side_effect=_create_fingerprint_side_effect)
-
 
     return manager
 
@@ -735,7 +734,7 @@ class TestEdgeCasesIntegration:
         )
 
         analysis = await analyzer.analyze_config_change(
-            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=0,
+            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=0
         )
 
         # Should not crash
@@ -906,12 +905,12 @@ class TestTimeAndCostEstimates:
 
         # Get estimates for checkpoint vector count
         analysis_1 = await analyzer.analyze_config_change(
-            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=5000,
+            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=5000
         )
 
         # Get estimates for larger vector count
         analysis_2 = await analyzer.analyze_config_change(
-            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=50000,
+            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=50000
         )
 
         # Larger collection should have larger estimates

@@ -261,7 +261,7 @@ async def _instantiate_provider_from_settings[T](
     card = get_service_card(
         provider=settings.provider.variable,
         category=settings.category.variable,
-        client_preference=settings.sdk_client.variable,
+        client_preference=settings.client.variable,
         model_hint=str(model_hint) if model_hint else None,
     )
 

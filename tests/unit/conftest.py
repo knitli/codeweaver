@@ -14,22 +14,19 @@ import pytest
 
 
 @pytest.fixture
-def mock_confirm(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
-    """Mock rich.prompt.Confirm for CLI tests.
+def mock_confirm(clean_container) -> MagicMock:
+    """Mock UserInteraction for CLI tests.
 
-    Returns a mock Confirm object that automatically returns True for all confirmations.
-    Tests can override by setting mock_confirm.ask.return_value to False.
-
-    Patches module-level imports of Confirm to avoid stdin access issues during testing
-    when pytest captures output. Patches the actual location where Confirm is used.
+    Returns a mock Interaction object that automatically returns True for all confirmations.
+    Tests can override by setting mock_confirm.confirm.return_value to False.
     """
-    mock = MagicMock()
-    mock.ask.return_value = True
+    from codeweaver.cli.ui import UserInteraction
 
-    # Patch where Confirm is actually used in init.py
-    monkeypatch.setattr("codeweaver.cli.commands.init.Confirm", mock)
-    # Also patch the base location to catch any other imports
-    monkeypatch.setattr("rich.prompt.Confirm", mock)
+    mock = MagicMock()
+    mock.confirm.return_value = True
+
+    # Override in DI container
+    clean_container.override(UserInteraction, mock)
 
     return mock
 

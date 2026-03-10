@@ -19,6 +19,11 @@ from lateimport import create_late_getattr
 
 if TYPE_CHECKING:
     from codeweaver.cli.ui.error_handler import CLIErrorHandler
+    from codeweaver.cli.ui.interaction import (
+        RichUserInteraction,
+        UserInteraction,
+        UserInteractionDep,
+    )
     from codeweaver.cli.ui.status_display import (
         AtomicAwareBarColumn,
         AtomicAwareCountColumn,
@@ -38,6 +43,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "StatusDisplay": (__spec__.parent, "status_display"),
     "CLIErrorHandler": (__spec__.parent, "error_handler"),
     "get_display": (__spec__.parent, "status_display"),
+    "RichUserInteraction": (__spec__.parent, "interaction"),
+    "UserInteraction": (__spec__.parent, "interaction"),
+    "UserInteractionDep": (__spec__.parent, "interaction"),
 })
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
@@ -49,7 +57,10 @@ __all__ = (
     "AtomicAwareSeparatorColumn",
     "CLIErrorHandler",
     "IndexingProgress",
+    "RichUserInteraction",
     "StatusDisplay",
+    "UserInteraction",
+    "UserInteractionDep",
     "get_display",
 )
 

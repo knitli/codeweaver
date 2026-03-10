@@ -54,6 +54,7 @@ def mock_checkpoint_manager() -> Mock:
     # mock _create_fingerprint to return something compatible with analysis
     def create_fp(config):
         from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
+
         fp = Mock()
         fp.embed_model = str(getattr(config, "model_name", "voyage-code-3"))
         fp.dimension = getattr(config, "dimension", 2048)
@@ -102,7 +103,7 @@ def mock_manifest_manager() -> Mock:
 def collection_metadata() -> Mock:
     """Create mock CollectionMetadata for testing."""
     from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
-    from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
+
     metadata = Mock()
     metadata.embed_model = "voyage-code-3"
     metadata.embed_model = "voyage-code-3"
@@ -200,7 +201,6 @@ def config_analyzer(
     mock_manifest_manager: Mock,
     mock_vector_store: Mock,
 ) -> Any:
-) -> Any:
     """Create ConfigChangeAnalyzer with mock dependencies."""
     from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
 
@@ -218,14 +218,13 @@ def config_analyzer(
 
 
 @pytest.mark.asyncio
-@pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.unit
 class TestAnalyzeCurrentConfig:
     """Tests for analyze_current_config method."""
 
     async def test_no_checkpoint_returns_none(
-        self, config_analyzer: Any, mock_checkpoint_manager: Mock,
+        self, config_analyzer: Any, mock_checkpoint_manager: Mock
     ) -> None:
         """Test that None is returned when no checkpoint exists."""
         mock_checkpoint_manager.load = AsyncMock(return_value=None)
@@ -238,7 +237,7 @@ class TestAnalyzeCurrentConfig:
         mock_checkpoint_manager.load.assert_called_once()
 
     async def test_loads_checkpoint_metadata(
-        self, config_analyzer: Any, mock_checkpoint_manager: Mock, collection_metadata: Mock,
+        self, config_analyzer: Any, mock_checkpoint_manager: Mock, collection_metadata: Mock
     ) -> None:
         """Test that checkpoint metadata is loaded correctly."""
         checkpoint = Mock()
@@ -256,7 +255,7 @@ class TestAnalyzeCurrentConfig:
         config_analyzer.analyze_config_change.assert_called_once()
 
     async def test_calls_analyze_with_current_config(
-        self, config_analyzer: Any, mock_checkpoint_manager: Mock, collection_metadata: Mock,
+        self, config_analyzer: Any, mock_checkpoint_manager: Mock, collection_metadata: Mock
     ) -> None:
         """Test that analyze_config_change is called with current settings."""
         checkpoint = Mock()
@@ -290,7 +289,7 @@ class TestModelCompatibility:
     """Tests for _models_compatible method."""
 
     def test_symmetric_same_model_is_compatible(
-        self, config_analyzer: Any, collection_metadata: Mock, embedding_config: Mock,
+        self, config_analyzer: Any, collection_metadata: Mock, embedding_config: Mock
     ) -> None:
         """Test that same symmetric model is compatible."""
         embedding_config.model_name = "voyage-code-3"
@@ -304,7 +303,7 @@ class TestModelCompatibility:
         assert result is True
 
     def test_symmetric_different_model_is_incompatible(
-        self, config_analyzer: Any, collection_metadata: Mock, embedding_config: Mock,
+        self, config_analyzer: Any, collection_metadata: Mock, embedding_config: Mock
     ) -> None:
         """Test that different symmetric model is incompatible."""
         embedding_config.model_name = "voyage-code-2"
@@ -318,7 +317,7 @@ class TestModelCompatibility:
         assert result is False
 
     def test_asymmetric_same_family_compatible(
-        self, config_analyzer: Any, collection_metadata: Mock, asymmetric_embedding_config: Mock,
+        self, config_analyzer: Any, collection_metadata: Mock, asymmetric_embedding_config: Mock
     ) -> None:
         """Test that asymmetric with same family and embed model is compatible."""
         from codeweaver.providers.config.categories import AsymmetricEmbeddingProviderSettings
@@ -337,7 +336,7 @@ class TestModelCompatibility:
         asymmetric_embedding_config.embed_provider.embedding_config.capabilities = embed_caps
 
         result = config_analyzer._models_compatible(
-            collection_metadata, asymmetric_embedding_config,
+            collection_metadata, asymmetric_embedding_config
         )
 
         assert result is True
@@ -356,7 +355,7 @@ class TestAnalyzeConfigChangeNoChange:
     """Tests for no-change scenarios."""
 
     async def test_identical_config_returns_none_impact(
-        self, config_analyzer: Any, collection_metadata: Mock, embedding_config: Mock,
+        self, config_analyzer: Any, collection_metadata: Mock, embedding_config: Mock
     ) -> None:
         """Test that identical config returns NONE impact."""
         from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
@@ -383,7 +382,7 @@ class TestAnalyzeConfigChangeNoChange:
         config_analyzer._models_compatible = Mock(return_value=True)
 
         analysis = await config_analyzer.analyze_config_change(
-            old_fingerprint=old_fp, new_config=embedding_config, vector_count=1000,
+            old_fingerprint=old_fp, new_config=embedding_config, vector_count=1000
         )
 
         assert analysis.impact == ChangeImpact.NONE
@@ -402,7 +401,7 @@ class TestAnalyzeConfigChangeBreaking:
     """Tests for breaking change detection."""
 
     async def test_incompatible_models_returns_breaking(
-        self, config_analyzer: Any, collection_metadata: Mock, embedding_config: Mock,
+        self, config_analyzer: Any, collection_metadata: Mock, embedding_config: Mock
     ) -> None:
         """Test that incompatible models return BREAKING impact."""
         from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
@@ -417,13 +416,13 @@ class TestAnalyzeConfigChangeBreaking:
         config_analyzer._models_compatible = Mock(return_value=False)
 
         analysis = await config_analyzer.analyze_config_change(
-            old_fingerprint=collection_metadata, new_config=embedding_config, vector_count=1000,
+            old_fingerprint=collection_metadata, new_config=embedding_config, vector_count=1000
         )
 
         assert analysis.impact == ChangeImpact.BREAKING
 
     async def test_dimension_increase_returns_breaking(
-        self, config_analyzer: Any, collection_metadata: Mock, embedding_config: Mock,
+        self, config_analyzer: Any, collection_metadata: Mock, embedding_config: Mock
     ) -> None:
         """Test that dimension increase returns BREAKING impact."""
         from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
@@ -442,7 +441,7 @@ class TestAnalyzeConfigChangeBreaking:
         config_analyzer._models_compatible = Mock(return_value=True)
 
         analysis = await config_analyzer.analyze_config_change(
-            old_fingerprint=old_fp, new_config=embedding_config, vector_count=1000,
+            old_fingerprint=old_fp, new_config=embedding_config, vector_count=1000
         )
 
         assert analysis.impact == ChangeImpact.BREAKING
@@ -461,7 +460,7 @@ class TestAnalyzeConfigChangeQuantization:
     """Tests for quantization scenarios."""
 
     async def test_valid_quantization_returns_quantizable(
-        self, config_analyzer: Any, collection_metadata: Mock, embedding_config: Mock,
+        self, config_analyzer: Any, collection_metadata: Mock, embedding_config: Mock
     ) -> None:
         """Test that valid quantization returns QUANTIZABLE impact."""
         from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
@@ -484,10 +483,11 @@ class TestAnalyzeConfigChangeQuantization:
         config_analyzer._is_valid_quantization = Mock(return_value=True)
 
         analysis = await config_analyzer.analyze_config_change(
-            old_fingerprint=old_fp, new_config=embedding_config, vector_count=1000,
+            old_fingerprint=old_fp, new_config=embedding_config, vector_count=1000
         )
 
         assert analysis.impact == ChangeImpact.QUANTIZABLE
+
 
 # ===========================================================================
 # *                    Tests: Dimension Reduction
@@ -502,7 +502,7 @@ class TestAnalyzeConfigChangeDimensionReduction:
     """Tests for dimension reduction scenarios."""
 
     async def test_dimension_reduction_returns_transformable(
-        self, config_analyzer: Any, collection_metadata: Mock, embedding_config: Mock,
+        self, config_analyzer: Any, collection_metadata: Mock, embedding_config: Mock
     ) -> None:
         """Test that dimension reduction returns TRANSFORMABLE impact."""
         from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
@@ -525,7 +525,7 @@ class TestAnalyzeConfigChangeDimensionReduction:
         config_analyzer._estimate_matryoshka_impact = Mock(return_value="~0.5% (empirical)")
 
         analysis = await config_analyzer.analyze_config_change(
-            old_fingerprint=old_fp, new_config=embedding_config, vector_count=1000,
+            old_fingerprint=old_fp, new_config=embedding_config, vector_count=1000
         )
 
         assert analysis.impact == ChangeImpact.TRANSFORMABLE
@@ -541,7 +541,6 @@ class TestAnalyzeConfigChangeDimensionReduction:
 class TestMatryoshkaImpactEstimation:
     """Tests for Matryoshka impact estimation with empirical data."""
 
-    def test_voyage_code_3_empirical_2048_to_1024(self, config_analyzer: Any) -> None:
     def test_voyage_code_3_empirical_2048_to_1024(self, config_analyzer: Any) -> None:
         """Test empirical Voyage-3 impact for 2048->1024 reduction."""
         impact = config_analyzer._estimate_matryoshka_impact("voyage-code-3", 2048, 1024)
@@ -562,6 +561,7 @@ class TestSimulateConfigChange:
 
     def test_simulate_creates_copy(self, config_analyzer: Any, mock_settings: Mock) -> None:
         """Test that simulation creates a new settings object."""
+
         # Setup mock hierarchy to allow deepcopy and field access
         def mock_copy():
             new_mock = Mock()
@@ -592,7 +592,11 @@ class TestPolicyEnforcement:
     """Tests for collection policy enforcement."""
 
     async def test_strict_policy_blocks_change(
-        self, config_analyzer: Any, mock_vector_store: Mock, embedding_config: Mock, collection_metadata: Mock,
+        self,
+        config_analyzer: Any,
+        mock_vector_store: Mock,
+        embedding_config: Mock,
+        collection_metadata: Mock,
     ) -> None:
         """Test that STRICT policy blocks any configuration change."""
         from codeweaver.core.exceptions import ConfigurationLockError
@@ -603,7 +607,9 @@ class TestPolicyEnforcement:
         mock_vector_store.collection_info.return_value = collection_metadata
 
         # Mock validate_config_change to raise policy error
-        collection_metadata.validate_config_change = Mock(side_effect=ConfigurationLockError("Strict policy blocks change"))
+        collection_metadata.validate_config_change = Mock(
+            side_effect=ConfigurationLockError("Strict policy blocks change")
+        )
 
         # Create different model
         # Create different model
@@ -619,11 +625,17 @@ class TestPolicyEnforcement:
         old_fp.__iter__ = Mock(return_value=iter([False, ChangeImpact.BREAKING]))
 
         analysis = await config_analyzer.analyze_config_change(
-            old_fingerprint=old_fp, new_config=embedding_config, vector_count=1000,
+            old_fingerprint=old_fp, new_config=embedding_config, vector_count=1000
         )
 
         assert analysis.impact == ChangeImpact.BREAKING
         # Use more robust check for policy mention
-        assert any("policy" in str(rec).lower() for rec in analysis.recommendations) or "policy" in analysis.accuracy_impact.lower()
+        assert (
+            any("policy" in str(rec).lower() for rec in analysis.recommendations)
+            or "policy" in analysis.accuracy_impact.lower()
+        )
         # Use more robust check for policy mention
-        assert any("policy" in str(rec).lower() for rec in analysis.recommendations) or "policy" in analysis.accuracy_impact.lower()
+        assert (
+            any("policy" in str(rec).lower() for rec in analysis.recommendations)
+            or "policy" in analysis.accuracy_impact.lower()
+        )

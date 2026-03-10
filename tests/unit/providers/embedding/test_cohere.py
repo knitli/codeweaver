@@ -86,9 +86,7 @@ def mock_cohere_config():
         model={},
     )
     return CohereEmbeddingProviderSettings(
-        provider=Provider.COHERE,
-        model_name="embed-english-v3.0",
-        embedding_config=embedding_config,
+        provider=Provider.COHERE, model_name="embed-english-v3.0", embedding_config=embedding_config
     )
 
 

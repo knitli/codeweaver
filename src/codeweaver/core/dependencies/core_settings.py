@@ -40,6 +40,7 @@ def _resolve_config_file() -> Path | None:
     return None
 
 
+@dependency_provider(CodeWeaverSettingsType, scope="singleton", tags=["settings"])
 async def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSettingsType:
     """Bootstrap global settings as DI root.
 
@@ -87,9 +88,7 @@ async def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSetti
     return settings
 
 
-SettingsDep = Annotated[
-    CodeWeaverSettingsType, depends(bootstrap_settings, scope="singleton", tags={"settings"})
-]
+type SettingsDep = Annotated[CodeWeaverSettingsType, depends(scope="singleton", tags={"settings"})]
 
 
 @dependency_provider(DictView[CodeWeaverSettingsDict])

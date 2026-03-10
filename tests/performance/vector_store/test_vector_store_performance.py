@@ -140,7 +140,7 @@ async def memory_store(vector_store_factory) -> AsyncGenerator[MemoryVectorStore
 @pytest.mark.asyncio
 @pytest.mark.parametrize("chunk_count", [1000, 5000, 10000])
 async def test_qdrant_search_latency(
-    qdrant_store: QdrantVectorStoreProvider, chunk_count: int,
+    qdrant_store: QdrantVectorStoreProvider, chunk_count: int
 ) -> None:
     """Test search latency meets <200ms p95 requirement.
 
@@ -207,7 +207,7 @@ async def test_qdrant_upsert_batch_performance(qdrant_store: QdrantVectorStorePr
 @pytest.mark.asyncio
 @pytest.mark.parametrize("chunks_per_file", [10, 50, 100])
 async def test_qdrant_delete_by_file_performance(
-    qdrant_store: QdrantVectorStoreProvider, chunks_per_file: int,
+    qdrant_store: QdrantVectorStoreProvider, chunks_per_file: int
 ) -> None:
     """Test delete_by_file performance meets <100ms requirement.
 
@@ -265,8 +265,6 @@ async def test_memory_persistence_performance(chunk_count: int, vector_store_fac
 
     with tempfile.TemporaryDirectory() as tmpdir:
         settings = MemoryVectorStoreProviderSettings(
-            collection=CollectionConfig(collection_name="perf_test"),
-            in_memory_config=MemoryConfig(persist_path=Path(tmpdir), auto_persist=False),
             collection=CollectionConfig(collection_name="perf_test"),
             in_memory_config=MemoryConfig(persist_path=Path(tmpdir), auto_persist=False),
         )
@@ -410,7 +408,7 @@ async def test_hybrid_search_performance(qdrant_store: QdrantVectorStoreProvider
                 strategy=SearchStrategy.HYBRID_SEARCH,
                 dense=dense_vector,
                 sparse=sparse_vector,
-            ),
+            )
         )
         latency_ms = (time.perf_counter() - start) * 1000
         hybrid_latencies.append(latency_ms)
@@ -483,14 +481,14 @@ async def test_performance_regression_check(qdrant_store: QdrantVectorStoreProvi
 
         print("\nPerformance comparison vs baseline:")
         print(
-            f"  Search P95: {metrics['search']['p95_ms']:.2f}ms (baseline: {baseline['search']['p95_ms']:.2f}ms)",
+            f"  Search P95: {metrics['search']['p95_ms']:.2f}ms (baseline: {baseline['search']['p95_ms']:.2f}ms)"
         )
         print(f"  Regression: {search_regression * 100:+.1f}%")
 
         # Alert on >20% regression
         if search_regression > 0.2:
             pytest.fail(
-                f"Performance regression detected: {search_regression * 100:.1f}% slower than baseline",
+                f"Performance regression detected: {search_regression * 100:.1f}% slower than baseline"
             )
 
     print("\nCurrent performance metrics:")

@@ -72,7 +72,9 @@ async def test_partial_embeddings(qdrant_test_manager, vector_store_factory):
             query="function with failed dense embedding",
             strategy=SearchStrategy.SPARSE_ONLY,
             dense=None,
-            sparse=CodeWeaverSparseEmbedding(indices=test_sparse_indices, values=test_sparse_values),
+            sparse=CodeWeaverSparseEmbedding(
+                indices=test_sparse_indices, values=test_sparse_values
+            ),
         )
     )
     assert len(results) > 0, "Sparse search should find the chunk"

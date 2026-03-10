@@ -281,6 +281,7 @@ class Container[T]:
         """Clear all registered dependencies and state."""
         self._factories.clear()
         self._singletons.clear()
+        self._tagged_singletons.clear()
         self._overrides.clear()
         self._is_singleton.clear()
         self._scope.clear()
@@ -289,6 +290,21 @@ class Container[T]:
         self._cleanup_stack = None
         self._request_cache.clear()
         self._providers_loaded = False  # Reset to allow re-loading
+
+    def reset_state(self) -> None:
+        """Reset container state for testing, keeping auto-discovered providers.
+
+        Clears singletons, overrides, hooks, and request cache, but preserves
+        the factory registry and the providers_loaded flag to avoid
+        expensive re-discovery cycles in unit tests.
+        """
+        self._singletons.clear()
+        self._tagged_singletons.clear()
+        self._overrides.clear()
+        self._startup_hooks.clear()
+        self._shutdown_hooks.clear()
+        self._cleanup_stack = None
+        self._request_cache.clear()
 
     def clear_request_cache(self) -> None:
         """Clear the request-scoped dependency cache.
@@ -495,10 +511,10 @@ class Container[T]:
             instance = await self._resolve_union_interface(interface, cache_key, _resolution_stack)
             return cast(T, instance)
 
-        # 1. Check overrides first (only for untagged resolution)
-        if not tag_set and (
-            override_result := await self._resolve_override(interface, cache_key, _resolution_stack)
-        ):
+        # 1. Check overrides first
+        # We check overrides before tags and singletons because overrides
+        # are primarily for testing and should take absolute precedence.
+        if override_result := await self._resolve_override(interface, cache_key, _resolution_stack):
             return override_result
 
         # 2. Check singleton cache
@@ -1028,4 +1044,22 @@ def reset_container() -> None:
     _default_container = None
 
 
-__all__ = ("Container", "ResolutionResult", "get_container", "reset_container")
+def reset_container_state() -> None:
+    """Reset the global container state (singletons/overrides) for testing.
+
+    Unlike `reset_container()`, this does not clear auto-discovered factories,
+    making it much faster for test suites that need clean state but don't
+    need to reload the entire provider ecosystem.
+    """
+    global _default_container
+    if _default_container:
+        _default_container.reset_state()
+
+
+__all__ = (
+    "Container",
+    "ResolutionResult",
+    "get_container",
+    "reset_container",
+    "reset_container_state",
+)

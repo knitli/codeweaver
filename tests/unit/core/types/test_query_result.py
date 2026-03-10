@@ -86,7 +86,10 @@ class TestQueryResult:
     def test_dict_access_pattern(self):
         """Test that QueryResult supports dict-like access patterns."""
         result = QueryResult(
-            vectors={"primary": [0.1, 0.2], "sparse": CodeWeaverSparseEmbedding(indices=[1], values=[0.9])}
+            vectors={
+                "primary": [0.1, 0.2],
+                "sparse": CodeWeaverSparseEmbedding(indices=[1], values=[0.9]),
+            }
         )
 
         # Test iteration over intents

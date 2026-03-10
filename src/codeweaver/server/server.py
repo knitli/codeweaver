@@ -205,7 +205,7 @@ async def _cleanup_state(
             from codeweaver.core.telemetry import capture_session_event
 
             duration_seconds = time.time() - state.startup_time
-            capture_session_event(
+            await capture_session_event(
                 state.statistics,
                 version=version,
                 setup_success=state.initialized,

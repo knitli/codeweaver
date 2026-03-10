@@ -427,46 +427,45 @@ class TestContextManagement:
 
 
 @pytest.mark.mock_only
+@pytest.mark.asyncio
 @pytest.mark.telemetry
 class TestConvenienceFunctions:
     """Test convenience functions for capturing events."""
 
-    def test_capture_session_event_respects_opt_out(self) -> None:
+    async def test_capture_session_event_respects_opt_out(self, clean_container) -> None:
         """Test capture_session_event doesn't capture when disabled."""
         from codeweaver.core import capture_session_event
 
-        # Patch get_telemetry_client at its definition location
-        with patch("codeweaver.core.telemetry.client.get_telemetry_client") as mock_get_client:
-            mock_client = MagicMock()
-            mock_client.enabled = False
-            mock_get_client.return_value = mock_client
+        # Override TelemetryService in DI container
+        mock_client = MagicMock()
+        mock_client.enabled = False
+        clean_container.override(TelemetryService, mock_client)
 
-            stats = create_session_statistics()
-            capture_session_event(stats, version="0.5.0", duration_seconds=100.0)
+        stats = create_session_statistics()
+        await capture_session_event(stats, version="0.5.0", duration_seconds=100.0)
 
-            # capture should not be called when disabled
-            mock_client.capture.assert_not_called()
+        # capture should not be called when disabled
+        mock_client.capture.assert_not_called()
 
-    def test_capture_search_event_respects_opt_out(self) -> None:
+    async def test_capture_search_event_respects_opt_out(self, clean_container) -> None:
         """Test capture_search_event doesn't capture when disabled."""
         from codeweaver.core import SearchStrategy, capture_search_event
         from codeweaver.server.agent_api import IntentType
 
-        # Patch get_telemetry_client at its definition location
-        with patch("codeweaver.core.telemetry.client.get_telemetry_client") as mock_get_client:
-            mock_client = MagicMock()
-            mock_client.enabled = False
-            mock_get_client.return_value = mock_client
+        # Override TelemetryService in DI container
+        mock_client = MagicMock()
+        mock_client.enabled = False
+        clean_container.override(TelemetryService, mock_client)
 
-            response = create_find_code_response()
+        response = create_find_code_response()
 
-            capture_search_event(
-                response=response,
-                query="test",
-                intent_type=IntentType.UNDERSTAND,
-                strategies=[SearchStrategy.HYBRID_SEARCH],
-                execution_time_ms=100.0,
-            )
+        await capture_search_event(
+            response=response,
+            query="test",
+            intent_type=IntentType.UNDERSTAND,
+            strategies=[SearchStrategy.HYBRID_SEARCH],
+            execution_time_ms=100.0,
+        )
 
-            # capture should not be called when disabled
-            mock_client.capture.assert_not_called()
+        # capture should not be called when disabled
+        mock_client.capture.assert_not_called()

@@ -357,7 +357,7 @@ class SearchEvent:
         return (self.EVENT_NAME, properties)
 
 
-def capture_session_event(
+async def capture_session_event(
     stats: SessionStatistics,
     *,
     version: str = "unknown",
@@ -379,7 +379,7 @@ def capture_session_event(
     """
     from codeweaver.core.telemetry import get_telemetry_client
 
-    client = get_telemetry_client()
+    client = await get_telemetry_client()
     if not client.enabled:
         return
 
@@ -396,7 +396,7 @@ def capture_session_event(
     client.capture(event_name, properties)
 
 
-def capture_search_event(
+async def capture_search_event(
     response: FindCodeResponseSummary,
     query: str,
     intent_type: IntentType,
@@ -420,7 +420,7 @@ def capture_search_event(
     """
     from codeweaver.core.telemetry import get_telemetry_client
 
-    client = get_telemetry_client()
+    client = await get_telemetry_client()
     if not client.enabled:
         return
 

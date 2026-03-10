@@ -62,11 +62,13 @@ from codeweaver.providers.config.categories import (
     AsymmetricEmbeddingProviderSettings,
     DuckDuckGoProviderSettings,
     EmbeddingProviderSettings,
+    FastEmbedRerankingProviderSettings,
     FastEmbedSparseEmbeddingProviderSettings,
     QdrantVectorStoreProviderSettings,
-    RerankingProviderSettings,
+    SentenceTransformersRerankingProviderSettings,
     SparseEmbeddingProviderSettings,
     TavilyProviderSettings,
+    VoyageRerankingProviderSettings,
 )
 from codeweaver.providers.config.clients import QdrantClientOptions
 from codeweaver.providers.config.sdk import (
@@ -242,7 +244,7 @@ def _recommended_default(
             ),
         ),
         reranking=(
-            RerankingProviderSettings(
+            VoyageRerankingProviderSettings(
                 provider=Provider.VOYAGE,
                 model_name=ModelName(RECOMMENDED_CLOUD_RERANKING_MODEL),
                 reranking_config=VoyageRerankingConfig(
@@ -326,7 +328,11 @@ def _quickstart_default(
             ),
         ),
         reranking=(
-            RerankingProviderSettings(
+            (
+                SentenceTransformersRerankingProviderSettings
+                if HAS_ST
+                else FastEmbedRerankingProviderSettings
+            )(
                 provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
                 model_name=reranking_model,
                 reranking_config=SentenceTransformersRerankingConfig(model_name=reranking_model)
@@ -397,7 +403,11 @@ def _testing_profile(
         ),
     }
     backup_settings["reranking"] = (
-        RerankingProviderSettings(
+        (
+            FastEmbedRerankingProviderSettings
+            if HAS_FASTEMBED
+            else SentenceTransformersRerankingProviderSettings
+        )(
             provider=Provider.FASTEMBED if HAS_FASTEMBED else Provider.SENTENCE_TRANSFORMERS,
             model_name=ModelName(reranking_model),
             reranking_config=FastEmbedRerankingConfig(model_name=ModelName(reranking_model))

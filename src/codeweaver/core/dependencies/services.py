@@ -36,20 +36,7 @@ type StatisticsDep = Annotated[SessionStatistics, depends(_get_statistics)]
 from codeweaver.core.telemetry.client import TelemetryService
 
 
-async def _create_telemetry_service() -> TelemetryService:
-    from codeweaver.core.di.container import get_container
-
-    container = get_container()
-    settings = container.resolve("CodeWeaverSettingsType")
-
-    return TelemetryService(
-        api_key=settings.posthog_project_key,
-        host=str(settings.posthog_host),
-        enabled=not settings.disable_telemetry,
-    )
-
-
-type TelemetryServiceDep = Annotated["TelemetryService", depends(_create_telemetry_service)]
+type TelemetryServiceDep = Annotated[TelemetryService, depends()]
 
 
 from codeweaver.core.ui_protocol import (

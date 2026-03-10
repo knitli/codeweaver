@@ -247,6 +247,7 @@ if TYPE_CHECKING:
         ResolutionResult,
         get_container,
         reset_container,
+        reset_container_state,
     )
     from codeweaver.core.di.depends import (
         INJECTED,
@@ -1168,6 +1169,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "record_timed_http_request": (__spec__.parent, "statistics"),
     "redact_identifiable_info": (__spec__.parent, "telemetry.utils"),
     "reset_container": (__spec__.parent, "di.container"),
+    "reset_container_state": (__spec__.parent, "di.container"),
     "return_type": (__spec__.parent, "utils.introspect"),
     "rpartial": (__spec__.parent, "utils.general"),
     "sanitize_unicode": (__spec__.parent, "utils.text"),
@@ -1731,6 +1733,7 @@ __all__ = (
     "record_timed_http_request",
     "redact_identifiable_info",
     "reset_container",
+    "reset_container_state",
     "return_type",
     "rpartial",
     "sanitize_unicode",
