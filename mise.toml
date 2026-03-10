@@ -140,6 +140,7 @@ run = [
   "echo 'coverage.xml' >> .git/info/exclude",
   "echo 'test-results.xml' >> .git/info/exclude",
   "ln -sf AGENTS.md CLAUDE.md",
+  "ln -sf AGENTS.md GEMINI.md",
   "eval \"$(mise activate \"$ACTIVE_SHELL\")\" &>/dev/null",
 ]
 run_windows = [
@@ -154,6 +155,7 @@ run_windows = [
   "echo coverage.xml >> .git\\info\\exclude",
   "echo test-results.xml >> .git\\info\\exclude",
   "mklink CLAUDE.md AGENTS.md > NUL 2>&1",
+  "mklink GEMINI.md AGENTS.md > NUL 2>&1",
   "mise activate cmd",
 ]
 silent = "stdout"
@@ -172,6 +174,7 @@ run = [
   "echo \"running cloud-setup task\"",
   "echo \"[codeweaver] Setting up cloud development environment...\"",
   "ln -sf AGENTS.md CLAUDE.md",
+  "ln -sf AGENTS.md GEMINI.md",
   '''if ! command -v mise &>/dev/null; then
       if [ -d "$HOME/.local/share/mise" ] || [ -d "$HOME/.mise" ] || [ -f "$HOME/.local/bin/mise" ]; then
         export PATH="$HOME/.local/bin:$HOME/.mise/bin:$HOME/.local/share/mise/bin:$PATH"
