@@ -109,7 +109,7 @@ def load_reference_queries() -> list[ReferenceQuery]:
 
 
 def calculate_precision(
-    expected_files: list[str], actual_files: list[str], top_k: int
+    expected_files: list[str], actual_files: list[str], top_k: int,
 ) -> tuple[int, float]:
     """Calculate precision@K for a query result.
 
@@ -144,13 +144,13 @@ def calculate_precision(
 @pytest.fixture(scope="module")
 def loaded_reference_queries() -> list[ReferenceQuery]:
     """Fixture providing loaded reference queries."""
-    return load_loaded_reference_queries()
+    return load_reference_queries()
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_loaded_reference_queries_comprehensive(
-    loaded_reference_queries: list[ReferenceQuery], di_overrides
+    loaded_reference_queries: list[ReferenceQuery], di_overrides,
 ) -> None:  # sourcery skip: low-code-quality
     """Execute all reference queries and validate precision targets.
 
@@ -192,7 +192,7 @@ async def test_loaded_reference_queries_comprehensive(
 
         # Calculate precision at target level
         hits, precision = calculate_precision(
-            test_case.expected_files, actual_files, test_case.precision_target
+            test_case.expected_files, actual_files, test_case.precision_target,
         )
 
         # Store result
@@ -304,7 +304,7 @@ async def test_loaded_reference_queries_comprehensive(
     if is_mock_provider:
         logger.warning(
             "Using mock providers - skipping quality target assertions. "
-            "Test validates basic functionality only."
+            "Test validates basic functionality only.",
         )
         # Just verify the test infrastructure works
         assert results, "Should have executed at least one query"
@@ -359,7 +359,7 @@ async def test_individual_reference_query(query_index: int) -> None:
 
     # Calculate precision
     hits, precision = calculate_precision(
-        test_case.expected_files, actual_files, test_case.precision_target
+        test_case.expected_files, actual_files, test_case.precision_target,
     )
 
     # Report
@@ -464,9 +464,9 @@ __all__ = (
     "QueryResult",
     "ReferenceQuery",
     "calculate_precision",
-    "load_loaded_reference_queries",
+    "load_reference_queries",
     "test_individual_reference_query",
     "test_intent_coverage_complete",
-    "test_query_diversity_metrics",
     "test_loaded_reference_queries_comprehensive",
+    "test_query_diversity_metrics",
 )

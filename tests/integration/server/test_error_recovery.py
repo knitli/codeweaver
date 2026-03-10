@@ -156,7 +156,7 @@ async def test_sparse_only_fallback(initialize_test_settings, clean_container):
     mock_sparse_provider = AsyncMock(spec=SparseEmbeddingProvider)
     mock_sparse_provider.name = Provider.SENTENCE_TRANSFORMERS  # Set name property
     mock_sparse_provider.embed_query.return_value = CodeWeaverSparseEmbedding(
-        indices=[0, 1, 2], values=[0.5, 0.3, 0.2]
+        indices=[0, 1, 2], values=[0.5, 0.3, 0.2],
     )
 
     # Vector store works
@@ -299,7 +299,7 @@ async def test_circuit_breaker_half_open():
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_indexing_continues_on_file_errors(
-    initialize_test_settings, test_project_path: Path, clean_container
+    initialize_test_settings, test_project_path: Path, clean_container,
 ):
     """T013: Indexing continues when file processing errors occur.
 
@@ -419,7 +419,12 @@ async def test_health_shows_degraded_status(initialize_test_settings, clean_cont
     Then: Status = degraded, circuit_breaker_state = open
     """
     from codeweaver.core import SessionStatistics
-    from codeweaver.providers import EmbeddingProvider, RerankingProvider, SparseEmbeddingProvider, VectorStoreProvider
+    from codeweaver.providers import (
+        EmbeddingProvider,
+        RerankingProvider,
+        SparseEmbeddingProvider,
+        VectorStoreProvider,
+    )
     from codeweaver.server import HealthService
 
     # Dense embedding provider with open circuit breaker
@@ -525,7 +530,7 @@ async def test_retry_with_exponential_backoff():
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_graceful_shutdown_with_checkpoint(
-    initialize_test_settings, clean_container, tmp_path: Path
+    initialize_test_settings, clean_container, tmp_path: Path,
 ):
     """T013: Server saves checkpoint on graceful shutdown.
 
@@ -567,7 +572,7 @@ async def test_graceful_shutdown_with_checkpoint(
     checkpoint_dir = tmp_path / ".checkpoints"
     # Verify checkpoint exists
     checkpoint_mgr = CheckpointManager(
-        project_path=project_root, checkpoint_dir=checkpoint_dir, project_name="test_project"
+        project_path=project_root, checkpoint_dir=checkpoint_dir, project_name="test_project",
     )
     checkpoint_file = checkpoint_mgr.checkpoint_file
 

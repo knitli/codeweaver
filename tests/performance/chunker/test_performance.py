@@ -82,13 +82,11 @@ def generate_javascript_file(num_lines: int) -> str:
 @pytest.fixture(scope="module")
 def performance_selector():
     """Create a performance-optimized selector without DI proxies."""
-    from codeweaver.engine import ChunkerSelector, ChunkGovernor
-    from codeweaver.providers import EmbeddingModelCapabilities
     from tests.conftest import MockTokenizer
 
     # Create mock capabilities with typical context window
     mock_cap = EmbeddingModelCapabilities(
-        name="test-model", default_dimension=768, output_dimensions=(768,), context_window=8192
+        name="test-model", default_dimension=768, output_dimensions=(768,), context_window=8192,
     )
     governor = ChunkGovernor(capabilities=(mock_cap,))
     tokenizer = MockTokenizer()

@@ -16,14 +16,15 @@ from __future__ import annotations
 
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-
-if TYPE_CHECKING:
-    pass
+from codeweaver.engine.managers.checkpoint_manager import (
+    ChangeImpact,
+    CheckpointManager,
+    CheckpointSettingsFingerprint,
+)
 
 
 # ===========================================================================
@@ -76,9 +77,15 @@ def test_checkpoint_data(tmp_path: Path) -> dict:
 
 
 @pytest.fixture
-def mock_checkpoint_manager(test_checkpoint_data: dict) -> AsyncMock:
-    """Create mock CheckpointManager with test data."""
-    manager = AsyncMock()
+def mock_checkpoint_manager(test_checkpoint_data: dict) -> Mock:
+    """Create mock CheckpointManager with test data.
+
+    Uses ``Mock(spec=CheckpointManager)`` so that synchronous methods such as
+    ``_extract_fingerprint`` and ``_create_fingerprint`` remain plain ``Mock``
+    objects.  Only the truly-async methods (``load``, ``save``, ``delete``) are
+    wrapped with ``AsyncMock``.
+    """
+    manager = Mock(spec=CheckpointManager)
 
     # Create checkpoint object
     checkpoint = Mock()
@@ -104,12 +111,66 @@ def mock_checkpoint_manager(test_checkpoint_data: dict) -> AsyncMock:
     checkpoint.collection_metadata = metadata
 
     manager.load = AsyncMock(return_value=checkpoint)
-    manager.validate_checkpoint_compatibility = AsyncMock(return_value=(True, "NONE"))
+    manager.save = AsyncMock()
+    manager.delete = AsyncMock()
+    # Some tests may call `load_checkpoint()` instead of `load()`;
+    # make it an alias so both return the same checkpoint object.
+    if hasattr(manager, "load_checkpoint"):
+        manager.load_checkpoint = manager.load
+    if hasattr(manager, "validate_checkpoint_compatibility"):
+        manager.validate_checkpoint_compatibility = AsyncMock(return_value=(True, "NONE"))
 
-    # Do not mock _extract_fingerprint or _create_fingerprint
-    # The real implementation will be run, but it requires the global settings to exist,
-    # which we've solved by using `container.override(CodeWeaverSettingsType, test_settings)`
-    # However, CheckpointManager uses `get_settings()` from core_settings, which reads from dependency container.
+    # Configure synchronous fingerprint helpers with real CheckpointSettingsFingerprint
+    # instances so ConfigChangeAnalyzer's ``is_compatible_with`` comparison works correctly.
+
+    def _extract_fingerprint_side_effect(chk: Mock) -> CheckpointSettingsFingerprint:
+        meta = chk.collection_metadata
+        return CheckpointSettingsFingerprint(
+            embedding_config_type="asymmetric" if meta.query_model else "symmetric",
+            embed_model=str(meta.dense_model),
+            embed_model_family=str(meta.dense_model_family) if meta.dense_model_family else None,
+            query_model=str(meta.query_model) if meta.query_model else None,
+            sparse_model=None,
+            vector_store="qdrant",
+            config_hash="test_hash",
+            dimension=meta.dimension,
+            datatype=meta.datatype,
+        )
+
+    def _create_fingerprint_side_effect(config: Mock) -> CheckpointSettingsFingerprint:
+        # Detect asymmetric config by presence of string ``embed_model`` + ``query_model``
+        embed_model_attr = getattr(config, "embed_model", None)
+        query_model_attr = getattr(config, "query_model", None)
+        is_asymmetric = isinstance(embed_model_attr, str) and isinstance(query_model_attr, str)
+        if is_asymmetric:
+            family = getattr(config, "embed_model_family", None)
+            return CheckpointSettingsFingerprint(
+                embedding_config_type="asymmetric",
+                embed_model=embed_model_attr,
+                embed_model_family=str(family) if isinstance(family, str) else None,
+                query_model=query_model_attr,
+                sparse_model=None,
+                vector_store="qdrant",
+                config_hash="test_hash",
+                dimension=getattr(config, "dimension", None),
+                datatype=getattr(config, "datatype", None),
+            )
+        model_name = getattr(config, "model_name", None)
+        return CheckpointSettingsFingerprint(
+            embedding_config_type="symmetric",
+            embed_model=str(model_name) if isinstance(model_name, str) else "voyage-code-3",
+            embed_model_family=None,
+            query_model=None,
+            sparse_model=None,
+            vector_store="qdrant",
+            config_hash="test_hash",
+            dimension=getattr(config, "dimension", None),
+            datatype=getattr(config, "datatype", None),
+        )
+
+    manager._extract_fingerprint = Mock(side_effect=_extract_fingerprint_side_effect)
+    manager._create_fingerprint = Mock(side_effect=_create_fingerprint_side_effect)
+
 
     return manager
 
@@ -188,7 +249,7 @@ class TestFullValidationWorkflow:
 
     async def test_analyze_current_config_with_checkpoint(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -211,7 +272,7 @@ class TestFullValidationWorkflow:
 
     async def test_validate_embedding_dimension_change(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -249,13 +310,12 @@ class TestConfigChangeClassification:
 
     async def test_compatible_query_model_change(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test that changing query model in asymmetric config is compatible."""
-        from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
         from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
 
         # Original config in checkpoint: voyage-4-large
@@ -302,13 +362,12 @@ class TestConfigChangeClassification:
 
     async def test_transformable_dimension_reduction(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test that dimension reduction is transformable."""
-        from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
         from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
 
         analyzer = ConfigChangeAnalyzer(
@@ -337,6 +396,7 @@ class TestConfigChangeClassification:
             sparse_model=None,
             vector_store="qdrant",
             config_hash="test_hash",
+            dimension=checkpoint.collection_metadata.dimension,
         )
 
         analysis = await analyzer.analyze_config_change(
@@ -350,13 +410,12 @@ class TestConfigChangeClassification:
 
     async def test_breaking_model_change(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test that different model is breaking."""
-        from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
         from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
 
         analyzer = ConfigChangeAnalyzer(
@@ -412,7 +471,7 @@ class TestNoCheckpointScenarios:
 
     async def test_first_indexing_no_checkpoint(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -421,7 +480,7 @@ class TestNoCheckpointScenarios:
         from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
 
         # No checkpoint = fresh start
-        mock_checkpoint_manager.load_checkpoint = AsyncMock(return_value=None)
+        mock_checkpoint_manager.load = AsyncMock(return_value=None)
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
@@ -437,7 +496,7 @@ class TestNoCheckpointScenarios:
 
     async def test_config_change_validation_allows_first_config(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -446,7 +505,7 @@ class TestNoCheckpointScenarios:
         from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
 
         # No checkpoint = fresh start
-        mock_checkpoint_manager.load_checkpoint = AsyncMock(return_value=None)
+        mock_checkpoint_manager.load = AsyncMock(return_value=None)
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
@@ -477,7 +536,7 @@ class TestEmpiricalDataUsage:
 
     async def test_uses_voyage_3_empirical_data(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -511,6 +570,7 @@ class TestEmpiricalDataUsage:
             sparse_model=None,
             vector_store="qdrant",
             config_hash="test_hash",
+            dimension=checkpoint.collection_metadata.dimension,
         )
 
         analysis = await analyzer.analyze_config_change(
@@ -525,7 +585,7 @@ class TestEmpiricalDataUsage:
 
     async def test_falls_back_to_generic_for_unmapped_dimensions(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -559,6 +619,7 @@ class TestEmpiricalDataUsage:
             sparse_model=None,
             vector_store="qdrant",
             config_hash="test_hash",
+            dimension=checkpoint.collection_metadata.dimension,
         )
 
         analysis = await analyzer.analyze_config_change(
@@ -587,7 +648,7 @@ class TestEdgeCasesIntegration:
 
     async def test_handles_very_large_collection(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -622,6 +683,7 @@ class TestEdgeCasesIntegration:
             sparse_model=None,
             vector_store="qdrant",
             config_hash="test_hash",
+            dimension=2048,
         )
 
         analysis = await analyzer.analyze_config_change(
@@ -636,7 +698,7 @@ class TestEdgeCasesIntegration:
 
     async def test_handles_zero_vectors(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -673,7 +735,7 @@ class TestEdgeCasesIntegration:
         )
 
         analysis = await analyzer.analyze_config_change(
-            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=0
+            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=0,
         )
 
         # Should not crash
@@ -696,7 +758,7 @@ class TestRecommendationsQuality:
 
     async def test_breaking_change_provides_recovery_steps(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -746,7 +808,7 @@ class TestRecommendationsQuality:
 
     async def test_transformable_change_provides_strategy(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -807,7 +869,7 @@ class TestTimeAndCostEstimates:
 
     async def test_estimates_scale_with_vector_count(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
@@ -844,12 +906,12 @@ class TestTimeAndCostEstimates:
 
         # Get estimates for checkpoint vector count
         analysis_1 = await analyzer.analyze_config_change(
-            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=5000
+            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=5000,
         )
 
         # Get estimates for larger vector count
         analysis_2 = await analyzer.analyze_config_change(
-            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=50000
+            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=50000,
         )
 
         # Larger collection should have larger estimates
@@ -858,13 +920,12 @@ class TestTimeAndCostEstimates:
 
     async def test_no_change_has_zero_estimates(
         self,
-        mock_checkpoint_manager: AsyncMock,
+        mock_checkpoint_manager: Mock,
         mock_manifest_manager: AsyncMock,
         mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test that no-change scenario has zero time/cost estimates."""
-        from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
         from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
 
         analyzer = ConfigChangeAnalyzer(
