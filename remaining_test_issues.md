@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
 # Remaining Test Issues & Proposed Solutions
 
 This document outlines the current state of the test suite after initial fixes, including specific issues that are blocking tests from passing and proposed solutions for each.

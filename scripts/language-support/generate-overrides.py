@@ -189,11 +189,11 @@ def generate_toml(lang_entry: dict) -> str | None:
     lines.append(f"# {language.capitalize()} language classification overrides")
     lines.append(
         f"# Holdout evaluation: {baseline_pct}% overall"
-        f" \u2192 expected {expected_label} with overrides"
+        f" \u2192 expected {expected_label} with overrides",
     )
     lines.append(
         f"# {len(misclassifications)} items to override"
-        f" ({n_unclassified} unclassified + {n_misclassified} misclassified)"
+        f" ({n_unclassified} unclassified + {n_misclassified} misclassified)",
     )
 
     # [overrides] section
@@ -219,7 +219,7 @@ def generate_toml(lang_entry: dict) -> str | None:
 
 
 def _emit_entries(
-    lines: list[str], entries: list[dict], key_width: int, val_width: int, *, is_doc: bool
+    lines: list[str], entries: list[dict], key_width: int, val_width: int, *, is_doc: bool,
 ) -> None:
     """Emit sorted, tier-grouped TOML entries with aligned columns."""
     current_tier: int | None = None
@@ -264,7 +264,7 @@ def _emit_doc_entries(lines: list[str], entries: list[dict], key_width: int) -> 
 
 def main() -> None:  # sourcery skip: low-code-quality
     parser = argparse.ArgumentParser(
-        description="Generate TOML override files from holdout evaluation data."
+        description="Generate TOML override files from holdout evaluation data.",
     )
     parser.add_argument(
         "--all",
@@ -272,7 +272,7 @@ def main() -> None:  # sourcery skip: low-code-quality
         help="Regenerate ALL languages, even those with existing overrides.",
     )
     parser.add_argument(
-        "--lang", nargs="+", metavar="LANG", help="Generate overrides for specific languages only."
+        "--lang", nargs="+", metavar="LANG", help="Generate overrides for specific languages only.",
     )
     parser.add_argument(
         "--dry-run",
