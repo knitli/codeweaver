@@ -1766,7 +1766,6 @@ __all__ = (
     "SnowflakeEmbeddingCapabilities",
     "SnowflakeProvider",
     "SparseCapabilities",
-    "SparseEmbedding",
     "SparseCapabilityResolverDep",
     "SparseEmbedding",
     "SparseEmbeddingCapabilityResolver",

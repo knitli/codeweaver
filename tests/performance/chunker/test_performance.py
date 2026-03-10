@@ -86,7 +86,7 @@ def performance_selector():
 
     # Create mock capabilities with typical context window
     mock_cap = EmbeddingModelCapabilities(
-        name="test-model", default_dimension=768, output_dimensions=(768,), context_window=8192
+        name="test-model", default_dimension=768, output_dimensions=(768,), context_window=8192,
     )
     governor = ChunkGovernor(capabilities=(mock_cap,))
     tokenizer = MockTokenizer()
