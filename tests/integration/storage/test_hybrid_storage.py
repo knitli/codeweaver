@@ -84,6 +84,7 @@ async def test_store_hybrid_embeddings(qdrant_provider: QdrantVectorStoreProvide
             query="authentication function",
             strategy=SearchStrategy.SPARSE_ONLY,
             sparse=CodeWeaverSparseEmbedding(indices=[1, 5, 10], values=[0.8, 0.6, 0.9]),
+            sparse=CodeWeaverSparseEmbedding(indices=[1, 5, 10], values=[0.8, 0.6, 0.9]),
             dense=None,
         ),
     )

@@ -55,6 +55,7 @@ class TestChunkEmbeddingsProperties:
     def test_has_sparse_with_sparse(self, sample_chunk):
         """Test has_sparse returns True when sparse embedding exists."""
         sparse_emb = CodeWeaverSparseEmbedding(indices=[1, 2], values=[0.8, 0.7])
+        sparse_emb = CodeWeaverSparseEmbedding(indices=[1, 2], values=[0.8, 0.7])
         sparse_info = EmbeddingBatchInfo.create_sparse(
             batch_id=uuid7(),
             batch_index=0,
@@ -82,6 +83,7 @@ class TestChunkEmbeddingsProperties:
             intent="primary",
         )
 
+        sparse_emb = CodeWeaverSparseEmbedding(indices=[1, 2, 3], values=[0.8, 0.7, 0.6])
         sparse_emb = CodeWeaverSparseEmbedding(indices=[1, 2, 3], values=[0.8, 0.7, 0.6])
         sparse_info = EmbeddingBatchInfo.create_sparse(
             batch_id=uuid7(),
@@ -154,6 +156,7 @@ class TestChunkEmbeddingsProperties:
     def test_multiple_sparse_kinds(self, sample_chunk):
         """Test has_sparse with different sparse intents."""
         sparse1 = CodeWeaverSparseEmbedding(indices=[1], values=[0.9])
+        sparse1 = CodeWeaverSparseEmbedding(indices=[1], values=[0.9])
         sparse_info1 = EmbeddingBatchInfo.create_sparse(
             batch_id=uuid7(),
             batch_index=0,
@@ -163,6 +166,7 @@ class TestChunkEmbeddingsProperties:
             intent="sparse",
         )
 
+        sparse2 = CodeWeaverSparseEmbedding(indices=[2, 3], values=[0.8, 0.7])
         sparse2 = CodeWeaverSparseEmbedding(indices=[2, 3], values=[0.8, 0.7])
         sparse_info2 = EmbeddingBatchInfo.create_sparse(
             batch_id=uuid7(),
@@ -189,6 +193,7 @@ class TestChunkEmbeddingsProperties:
             dimension=512,
         )
 
+        sparse_emb = CodeWeaverSparseEmbedding(indices=[1], values=[0.9])
         sparse_emb = CodeWeaverSparseEmbedding(indices=[1], values=[0.9])
         sparse_info = EmbeddingBatchInfo.create_sparse(
             batch_id=uuid7(),

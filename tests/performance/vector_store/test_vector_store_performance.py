@@ -267,6 +267,8 @@ async def test_memory_persistence_performance(chunk_count: int, vector_store_fac
         settings = MemoryVectorStoreProviderSettings(
             collection=CollectionConfig(collection_name="perf_test"),
             in_memory_config=MemoryConfig(persist_path=Path(tmpdir), auto_persist=False),
+            collection=CollectionConfig(collection_name="perf_test"),
+            in_memory_config=MemoryConfig(persist_path=Path(tmpdir), auto_persist=False),
         )
         # Create store and populate
         store = MemoryVectorStoreProvider(

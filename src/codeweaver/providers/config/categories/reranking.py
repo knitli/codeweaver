@@ -152,6 +152,7 @@ class RerankingProviderSettings(BaseRerankingProviderSettings):
             reranking_config.model_name = model_name
             with contextlib.suppress(AttributeError):
                 reranking_config.provider = provider
+                reranking_config.provider = provider
         super().__init__(**data)
 
 

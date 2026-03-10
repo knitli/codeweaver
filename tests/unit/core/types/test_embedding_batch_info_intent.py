@@ -49,6 +49,7 @@ class TestEmbeddingBatchInfoIntent:
     def test_create_sparse_with_default_intent(self):
         """Test creating sparse embedding with default intent."""
         sparse_emb = CodeWeaverSparseEmbedding(indices=[1, 2], values=[0.8, 0.7])
+        sparse_emb = CodeWeaverSparseEmbedding(indices=[1, 2], values=[0.8, 0.7])
 
         info = EmbeddingBatchInfo.create_sparse(
             batch_id=uuid7(),
@@ -65,6 +66,7 @@ class TestEmbeddingBatchInfoIntent:
 
     def test_create_sparse_with_custom_intent(self):
         """Test creating sparse embedding with custom intent."""
+        sparse_emb = CodeWeaverSparseEmbedding(indices=[1, 2], values=[0.8, 0.7])
         sparse_emb = CodeWeaverSparseEmbedding(indices=[1, 2], values=[0.8, 0.7])
 
         info = EmbeddingBatchInfo.create_sparse(

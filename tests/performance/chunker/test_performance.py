@@ -99,12 +99,14 @@ class TestChunkerPerformance:
     # Typical files: 100-1000 lines
     @pytest.mark.dev_only
     def test_typical_python_file_performance(self, performance_selector):
+    def test_typical_python_file_performance(self, performance_selector):
         """Benchmark typical Python file (500 lines).
 
         Current measured: ~700ms per file (~1.4 files/second)
         Regression threshold: < 1000ms per file (allows 40% margin)
         Architectural target: 5ms per file (200 files/second)
         """
+        selector = performance_selector
         selector = performance_selector
         content = generate_python_file(500)
         file_path = Path("benchmark_test.py")
@@ -143,11 +145,13 @@ class TestChunkerPerformance:
 
     @pytest.mark.dev_only
     def test_typical_javascript_file_performance(self, performance_selector):
+    def test_typical_javascript_file_performance(self, performance_selector):
         """Benchmark typical JavaScript file (500 lines).
 
         Current measured: ~700ms per file
         Regression threshold: < 1000ms per file
         """
+        selector = performance_selector
         selector = performance_selector
         content = generate_javascript_file(500)
         file_path = Path("benchmark_test.js")
@@ -176,6 +180,7 @@ class TestChunkerPerformance:
     # Large files: 1000-5000 lines
     @pytest.mark.dev_only
     def test_large_python_file_performance(self, performance_selector):
+    def test_large_python_file_performance(self, performance_selector):
         """Benchmark large Python file (1500 lines - reduced due to timeout constraints).
 
         Current baseline: ~3.95s mean per file (measured)
@@ -183,6 +188,7 @@ class TestChunkerPerformance:
         Architectural target (3000 lines): 20ms per file (50 files/second)
         Note: File size reduced from 3000 to 1500 lines to stay within 30s timeout
         """
+        selector = performance_selector
         selector = performance_selector
         content = generate_python_file(1500)
         file_path = Path("large_benchmark.py")
@@ -213,6 +219,7 @@ class TestChunkerPerformance:
     @pytest.mark.dev_only
     @pytest.mark.timeout(90)  # Extended timeout due to slow performance
     def test_very_large_python_file_performance(self, performance_selector):
+    def test_very_large_python_file_performance(self, performance_selector):
         """Benchmark very large Python file (2000 lines - reduced due to timeout).
 
         Current baseline: ~6.74s mean per file (measured)
@@ -220,6 +227,7 @@ class TestChunkerPerformance:
         Architectural target (7000 lines): 100ms per file (10 files/second)
         Note: File size reduced from 7000 to 2000 lines to stay within 30s chunker timeout
         """
+        selector = performance_selector
         selector = performance_selector
         content = generate_python_file(2000)
         file_path = Path("very_large_benchmark.py")
@@ -249,12 +257,14 @@ class TestChunkerPerformance:
     # Memory profiling
     @pytest.mark.dev_only
     def test_memory_usage_typical_file(self, performance_selector):
+    def test_memory_usage_typical_file(self, performance_selector):
         """Verify memory usage stays under 100MB for typical files.
 
         Target: < 100MB per operation
         """
         import tracemalloc
 
+        selector = performance_selector
         selector = performance_selector
         content = generate_python_file(500)
         file_path = Path("memory_test.py")
@@ -283,6 +293,7 @@ class TestChunkerPerformance:
     @pytest.mark.dev_only
     @pytest.mark.timeout(60)  # Extended timeout due to slow chunking performance
     def test_memory_usage_large_file(self, performance_selector):
+    def test_memory_usage_large_file(self, performance_selector):
         """Verify memory usage stays under 100MB even for large files.
 
         Target: < 100MB per operation
@@ -290,6 +301,7 @@ class TestChunkerPerformance:
         """
         import tracemalloc
 
+        selector = performance_selector
         selector = performance_selector
         content = generate_python_file(1000)
         file_path = Path("memory_large_test.py")
@@ -315,6 +327,7 @@ class TestChunkerPerformance:
     # Throughput test
     @pytest.mark.dev_only
     def test_bulk_file_throughput(self, performance_selector):
+    def test_bulk_file_throughput(self, performance_selector):
         """Test throughput with multiple files of varying sizes.
 
         Current baseline: ~0.2 files/second (measured with large files)
@@ -322,6 +335,7 @@ class TestChunkerPerformance:
         Architectural target: 50 files/second
         Note: Reduced file sizes to prevent timeout issues
         """
+        selector = performance_selector
         selector = performance_selector
         test_files = [
             (generate_python_file(200), Path("small_1.py")),
@@ -352,6 +366,7 @@ class TestChunkerPerformance:
     # Performance regression tracking
     @pytest.mark.dev_only
     def test_semantic_vs_delimiter_performance(self, performance_selector):
+    def test_semantic_vs_delimiter_performance(self, performance_selector):
         """Compare semantic and delimiter chunker performance on same content.
 
         Current measured: Semantic ~2.16s, Delimiter faster
@@ -360,6 +375,7 @@ class TestChunkerPerformance:
         from codeweaver.core import SemanticSearchLanguage
         from codeweaver.engine import DelimiterChunker, SemanticChunker
 
+        selector = performance_selector
         selector = performance_selector
         content = generate_python_file(500)
         file_path = Path("comparison.py")
@@ -407,10 +423,12 @@ class TestChunkerScalability:
 
     @pytest.mark.dev_only
     def test_chunking_consistency_across_sizes(self, performance_selector):
+    def test_chunking_consistency_across_sizes(self, performance_selector):
         """Verify chunking quality doesn't degrade with file size.
 
         Note: File sizes reduced to stay within 30s chunker timeout
         """
+        selector = performance_selector
         selector = performance_selector
         file_sizes = [100, 500, 1000, 1500]  # Reduced from [100, 500, 1000, 2000, 5000]
 
@@ -431,8 +449,11 @@ class TestChunkerScalability:
 
     @pytest.mark.dev_only
     def test_concurrent_chunking_safety(self, performance_selector):
+    def test_concurrent_chunking_safety(self, performance_selector):
         """Verify concurrent chunking operations are safe."""
         import concurrent.futures
+
+        selector = performance_selector
 
         selector = performance_selector
 

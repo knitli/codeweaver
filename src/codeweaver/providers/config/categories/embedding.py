@@ -115,6 +115,20 @@ def _get_embedding_capabilities_sync(model_name: ModelNameT) -> EmbeddingModelCa
         return None
 
 
+def _get_embedding_capabilities_sync(model_name: ModelNameT) -> EmbeddingModelCapabilities | None:
+    """Synchronously get the embedding model capabilities for a given model name."""
+    import asyncio
+    try:
+        resolver_module = importlib.import_module(
+            "codeweaver.providers.embedding.capabilities.resolver"
+        )
+        resolver = resolver_module.EmbeddingCapabilityResolver()
+        return asyncio.run(resolver.resolve(model_name))
+    except Exception as e:
+        logger.debug("Failed to resolve capabilities for %s: %s", model_name, e)
+        return None
+
+
 def _get_embedding_capabilities(model_name: ModelNameT) -> EmbeddingModelCapabilities | None:
     """Get the embedding model capabilities for a given model name.
 
@@ -124,6 +138,8 @@ def _get_embedding_capabilities(model_name: ModelNameT) -> EmbeddingModelCapabil
     Returns:
         The embedding model capabilities or None if not found.
     """
+    # This is a legacy helper, but we should use the sync version here for pydantic validators
+    return _get_embedding_capabilities_sync(model_name)
     # This is a legacy helper, but we should use the sync version here for pydantic validators
     return _get_embedding_capabilities_sync(model_name)
 
@@ -742,8 +758,37 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
         except Exception as e:
             logger.exception("Error calculating dimension_tuple: %s", e)
             return None, None
+    def dimension_tuple(self) -> tuple[int | None, int | None]:
+        """Get the embedding dimensions for embed and query models."""
+        try:
+            embed_dim = self.embed_provider.embedding_config.dimension
+            query_dim = self.query_provider.embedding_config.dimension
+
+            if embed_dim is not None and query_dim is not None:
+                return embed_dim, query_dim
+
+            # Try to resolve from capabilities
+            embed_caps = self.embed_provider.embedding_config.capabilities or _get_embedding_capabilities(self.embed_provider.model_name)
+            query_caps = self.query_provider.embedding_config.capabilities or _get_embedding_capabilities(self.query_provider.model_name)
+
+            if embed_dim is None and embed_caps:
+                embed_dim = embed_caps.default_dimension
+            if query_dim is None and query_caps:
+                query_dim = query_caps.default_dimension
+
+            # If one is still None, try to use the other if they are from same family
+            if embed_dim is None and query_dim is not None:
+                embed_dim = query_dim
+            if query_dim is None and embed_dim is not None:
+                query_dim = embed_dim
+
+            return embed_dim, query_dim
+        except Exception as e:
+            logger.error("Error calculating dimension_tuple: %s", e)
+            return None, None
 
     @cached_property
+    def datatype_tuple(self) -> tuple[str | None, str | None]:
     def datatype_tuple(self) -> tuple[str | None, str | None]:
         """Get the embedding datatypes for embed and query models.
 
@@ -772,12 +817,38 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
             query_dt = embed_dt
 
         return embed_dt, query_dt
+        embed_dt = self.embed_provider.embedding_config.datatype
+        query_dt = self.query_provider.embedding_config.datatype
+
+        if embed_dt is not None and query_dt is not None:
+            return embed_dt, query_dt
+
+        # Try to resolve from capabilities
+        embed_caps = self.embed_provider.embedding_config.capabilities or _get_embedding_capabilities(self.embed_provider.model_name)
+        query_caps = self.query_provider.embedding_config.capabilities or _get_embedding_capabilities(self.query_provider.model_name)
+
+        if embed_dt is None and embed_caps:
+            embed_dt = embed_caps.default_dtype
+        if query_dt is None and query_caps:
+            query_dt = query_caps.default_dtype
+
+        # Fallback
+        if embed_dt is None and query_dt is not None:
+            embed_dt = query_dt
+        if query_dt is None and embed_dt is not None:
+            query_dt = embed_dt
+
+        return embed_dt, query_dt
 
     @model_validator(mode="after")
     def validate_model_compatibility(self) -> AsymmetricEmbeddingProviderSettings:
         """Validate that embed and query models are compatible."""
+        """Validate that embed and query models are compatible."""
         from codeweaver.core.exceptions import ConfigurationError
 
+        try:
+            if not self.validate_family_compatibility:
+                return self
         try:
             if not self.validate_family_compatibility:
                 return self
@@ -830,15 +901,24 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
             logger.error("Unexpected error in validate_model_compatibility: %s", e, exc_info=True)
             # Re-raise as assertion error if it's something unexpected to see what's happening
             raise AssertionError(f"Internal validation error: {e!s}") from e
+            return self
+        except (DimensionMismatchError, DatatypeMismatchError, ConfigurationError):
+            raise
+        except Exception as e:
+            logger.error("Unexpected error in validate_model_compatibility: %s", e, exc_info=True)
+            # Re-raise as assertion error if it's something unexpected to see what's happening
+            raise AssertionError(f"Internal validation error: {e!s}") from e
 
     @property
     def dimension(self) -> NonNegativeInt:
         """Get the embedding dimension for both models (they must match)."""
         return cast(NonNegativeInt, self.dimension_tuple[0] or 0)
+        return cast(NonNegativeInt, self.dimension_tuple[0] or 0)
 
     @property
     def datatype(self) -> str:
         """Get the embedding datatype for both models (they must match)."""
+        return self.datatype_tuple[0] or "float32"
         return self.datatype_tuple[0] or "float32"
 
     @property

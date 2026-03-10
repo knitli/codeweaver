@@ -36,6 +36,11 @@ def mock_settings() -> Mock:
     embedding_config.dimension = 2048
     embedding_config.datatype = "float32"
     settings.provider.embedding = [embedding_config]
+    embedding_config = Mock()
+    embedding_config.model_name = "voyage-code-3"
+    embedding_config.dimension = 2048
+    embedding_config.datatype = "float32"
+    settings.provider.embedding = [embedding_config]
     settings.model_copy = Mock(return_value=settings)
     return settings
 
@@ -81,7 +86,9 @@ def mock_checkpoint_manager() -> Mock:
 def mock_manifest_manager() -> Mock:
     """Create mock FileManifestManager."""
     manager = Mock(spec=["read_manifest", "load"])
+    manager = Mock(spec=["read_manifest", "load"])
     manager.read_manifest = AsyncMock(return_value=None)
+    manager.load = AsyncMock(return_value=None)
     manager.load = AsyncMock(return_value=None)
     return manager
 
@@ -95,13 +102,16 @@ def mock_manifest_manager() -> Mock:
 def collection_metadata() -> Mock:
     """Create mock CollectionMetadata for testing."""
     from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
+    from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
     metadata = Mock()
+    metadata.embed_model = "voyage-code-3"
     metadata.embed_model = "voyage-code-3"
     metadata.dense_model = "voyage-code-3"
     metadata.dense_model_family = "voyage-4"
     metadata.query_model = "voyage-4-large"
     metadata.dimension = 2048
     metadata.datatype = "float32"
+    metadata.embedding_config_type = "symmetric"
     metadata.embedding_config_type = "symmetric"
 
     # Add methods
@@ -179,6 +189,7 @@ def mock_vector_store() -> Mock:
     """Create mock VectorStoreProvider for ConfigChangeAnalyzer."""
     store = Mock()
     store.collection_info = AsyncMock(return_value=None)
+    store.collection_info = AsyncMock(return_value=None)
     return store
 
 
@@ -188,6 +199,7 @@ def config_analyzer(
     mock_checkpoint_manager: Mock,
     mock_manifest_manager: Mock,
     mock_vector_store: Mock,
+) -> Any:
 ) -> Any:
     """Create ConfigChangeAnalyzer with mock dependencies."""
     from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
@@ -206,6 +218,7 @@ def config_analyzer(
 
 
 @pytest.mark.asyncio
+@pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.unit
 class TestAnalyzeCurrentConfig:
@@ -216,10 +229,12 @@ class TestAnalyzeCurrentConfig:
     ) -> None:
         """Test that None is returned when no checkpoint exists."""
         mock_checkpoint_manager.load = AsyncMock(return_value=None)
+        mock_checkpoint_manager.load = AsyncMock(return_value=None)
 
         result = await config_analyzer.analyze_current_config()
 
         assert result is None
+        mock_checkpoint_manager.load.assert_called_once()
         mock_checkpoint_manager.load.assert_called_once()
 
     async def test_loads_checkpoint_metadata(
@@ -229,6 +244,7 @@ class TestAnalyzeCurrentConfig:
         checkpoint = Mock()
         checkpoint.collection_metadata = collection_metadata
         checkpoint.total_vectors = 1000
+        mock_checkpoint_manager.load = AsyncMock(return_value=checkpoint)
         mock_checkpoint_manager.load = AsyncMock(return_value=checkpoint)
 
         # Mock the analyze_config_change method to verify it's called
@@ -247,6 +263,7 @@ class TestAnalyzeCurrentConfig:
         checkpoint.collection_metadata = collection_metadata
         checkpoint.total_vectors = 5000
         mock_checkpoint_manager.load = AsyncMock(return_value=checkpoint)
+        mock_checkpoint_manager.load = AsyncMock(return_value=checkpoint)
 
         config_analyzer.analyze_config_change = AsyncMock(return_value=Mock(impact="COMPATIBLE"))
 
@@ -256,6 +273,8 @@ class TestAnalyzeCurrentConfig:
         call_kwargs = config_analyzer.analyze_config_change.call_args[1]
         assert "vector_count" in call_kwargs
         assert call_kwargs["old_fingerprint"] is not None
+        assert "vector_count" in call_kwargs
+        assert call_kwargs["old_fingerprint"] is not None
 
 
 # ===========================================================================
@@ -263,6 +282,7 @@ class TestAnalyzeCurrentConfig:
 # ===========================================================================
 
 
+@pytest.mark.asyncio
 @pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.unit
@@ -276,6 +296,8 @@ class TestModelCompatibility:
         embedding_config.model_name = "voyage-code-3"
         collection_metadata.dense_model = "voyage-code-3"
         collection_metadata.dense_model_family = "voyage-4"
+        collection_metadata.dense_model = "voyage-code-3"
+        collection_metadata.dense_model_family = "voyage-4"
 
         result = config_analyzer._models_compatible(collection_metadata, embedding_config)
 
@@ -286,6 +308,8 @@ class TestModelCompatibility:
     ) -> None:
         """Test that different symmetric model is incompatible."""
         embedding_config.model_name = "voyage-code-2"
+        embedding_config.embedding_config.capabilities.model_family.family_id = "voyage-2"
+        collection_metadata.dense_model_family = "voyage-4"
         embedding_config.embedding_config.capabilities.model_family.family_id = "voyage-2"
         collection_metadata.dense_model_family = "voyage-4"
 
@@ -324,6 +348,7 @@ class TestModelCompatibility:
 # ===========================================================================
 
 
+@pytest.mark.asyncio
 @pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.unit
@@ -370,6 +395,7 @@ class TestAnalyzeConfigChangeNoChange:
 
 
 @pytest.mark.asyncio
+@pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.unit
 class TestAnalyzeConfigChangeBreaking:
@@ -382,6 +408,8 @@ class TestAnalyzeConfigChangeBreaking:
         from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
 
         embedding_config.model_name = "voyage-code-2"
+        # Old FP is different model
+        collection_metadata.embed_model = "voyage-code-3"
         # Old FP is different model
         collection_metadata.embed_model = "voyage-code-3"
 
@@ -426,6 +454,7 @@ class TestAnalyzeConfigChangeBreaking:
 
 
 @pytest.mark.asyncio
+@pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.unit
 class TestAnalyzeConfigChangeQuantization:
@@ -465,6 +494,7 @@ class TestAnalyzeConfigChangeQuantization:
 # ===========================================================================
 
 
+@pytest.mark.asyncio
 @pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.unit
@@ -512,6 +542,7 @@ class TestMatryoshkaImpactEstimation:
     """Tests for Matryoshka impact estimation with empirical data."""
 
     def test_voyage_code_3_empirical_2048_to_1024(self, config_analyzer: Any) -> None:
+    def test_voyage_code_3_empirical_2048_to_1024(self, config_analyzer: Any) -> None:
         """Test empirical Voyage-3 impact for 2048->1024 reduction."""
         impact = config_analyzer._estimate_matryoshka_impact("voyage-code-3", 2048, 1024)
 
@@ -544,6 +575,8 @@ class TestSimulateConfigChange:
 
         # Should be different objects
         assert new_settings is not mock_settings
+        # Should be different objects
+        assert new_settings is not mock_settings
 
 
 # ===========================================================================
@@ -551,6 +584,7 @@ class TestSimulateConfigChange:
 # ===========================================================================
 
 
+@pytest.mark.asyncio
 @pytest.mark.asyncio
 @pytest.mark.config
 @pytest.mark.unit
@@ -572,6 +606,7 @@ class TestPolicyEnforcement:
         collection_metadata.validate_config_change = Mock(side_effect=ConfigurationLockError("Strict policy blocks change"))
 
         # Create different model
+        # Create different model
         embedding_config.model_name = "voyage-4-large"
         collection_metadata.embed_model = "voyage-code-3"
 
@@ -588,5 +623,7 @@ class TestPolicyEnforcement:
         )
 
         assert analysis.impact == ChangeImpact.BREAKING
+        # Use more robust check for policy mention
+        assert any("policy" in str(rec).lower() for rec in analysis.recommendations) or "policy" in analysis.accuracy_impact.lower()
         # Use more robust check for policy mention
         assert any("policy" in str(rec).lower() for rec in analysis.recommendations) or "policy" in analysis.accuracy_impact.lower()
