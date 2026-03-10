@@ -34,24 +34,14 @@ from codeweaver.engine.managers.checkpoint_manager import (
 
 @pytest.fixture(autouse=True)
 def setup_test_container(test_settings):
-    """Override DI-injected settings for services resolved through the container.
-
-    Uses ``container.use_overrides`` so that pre-existing overrides are
-    snapshot-restored automatically on teardown without touching private state.
-
-    Note: ``codeweaver.core.get_settings()`` constructs settings directly from
-    the installed package configuration and does *not* consult this container,
-    so this override only affects services that receive their settings via DI
-    resolution.  Code paths that call ``get_settings()`` directly (e.g.
-    ``CheckpointManager._extract_fingerprint``) must be patched separately.
-    """
-    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+    """Create test DI container and override settings so real `get_settings()` works."""
     from codeweaver.core.di.container import get_container
-
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 
     container = get_container()
-    with container.use_overrides({CodeWeaverSettingsType: test_settings}):
-        yield container
+    container.override(CodeWeaverSettingsType, test_settings)
+    yield container
+    container.clear()
 
 
 @pytest.fixture
@@ -218,13 +208,9 @@ def mock_vector_store() -> AsyncMock:
 
 
 @pytest.fixture
-def test_settings() -> NonCallableMock:
-    """Create test Settings with default configuration.
-
-    Uses ``NonCallableMock`` so the DI container does not invoke the object as
-    a factory when resolving ``CodeWeaverSettingsType``.
-    """
-    settings = NonCallableMock()
+def test_settings() -> Mock:
+    """Create test Settings with default configuration."""
+    settings = Mock()
 
     # Provider settings
     settings.provider = Mock()
