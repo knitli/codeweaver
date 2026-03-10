@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, NonCallableMock
 
 import pytest
 
@@ -33,14 +33,24 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def setup_test_container(test_settings):
-    """Create test DI container and override settings so real `get_settings()` works."""
+    """Override DI-injected settings for services resolved through the container.
+
+    Uses ``container.use_overrides`` so that pre-existing overrides are
+    snapshot-restored automatically on teardown without touching private state.
+
+    Note: ``codeweaver.core.get_settings()`` constructs settings directly from
+    the installed package configuration and does *not* consult this container,
+    so this override only affects services that receive their settings via DI
+    resolution.  Code paths that call ``get_settings()`` directly (e.g.
+    ``CheckpointManager._extract_fingerprint``) must be patched separately.
+    """
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
     from codeweaver.core.di.container import get_container
     from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 
     container = get_container()
-    container.override(CodeWeaverSettingsType, test_settings)
-    yield container
-    container.clear()
+    with container.use_overrides({CodeWeaverSettingsType: test_settings}):
+        yield container
 
 
 @pytest.fixture
@@ -149,9 +159,13 @@ def mock_vector_store() -> AsyncMock:
 
 
 @pytest.fixture
-def test_settings() -> Mock:
-    """Create test Settings with default configuration."""
-    settings = Mock()
+def test_settings() -> NonCallableMock:
+    """Create test Settings with default configuration.
+
+    Uses ``NonCallableMock`` so the DI container does not invoke the object as
+    a factory when resolving ``CodeWeaverSettingsType``.
+    """
+    settings = NonCallableMock()
 
     # Provider settings
     settings.provider = Mock()
