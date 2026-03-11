@@ -21,7 +21,7 @@ from fastmcp.server.proxy import FastMCPProxy, ProxyClient
 from fastmcp.tools import Tool
 from lateimport import lateimport
 
-from codeweaver.core import DictView, SettingsMapDep, StatisticsDep, Unset
+from codeweaver.core import UNSET, DictView, SettingsMapDep, StatisticsDep
 from codeweaver.core.constants import DEFAULT_MCP_PORT, LOCALHOST, MCP_ENDPOINT
 from codeweaver.core.di.depends import INJECTED
 from codeweaver.server.config import (
@@ -59,12 +59,12 @@ def _get_fastmcp_settings_map(
     if http:
         return (
             settings_map.get_subview("mcp_server")
-            if settings_map.get("mcp_server") is not Unset
+            if settings_map.get("mcp_server") is not UNSET
             else DictView(FastMcpServerSettingsDict(**FastMcpHttpServerSettings().as_settings()))
         )
     return (
         settings_map.get_subview("stdio_server")
-        if settings_map.get("stdio_server") is not Unset
+        if settings_map.get("stdio_server") is not UNSET
         else DictView(FastMcpServerSettingsDict(**FastMcpStdioServerSettings().as_settings()))
     )
 
@@ -75,7 +75,7 @@ def _get_middleware_settings(
     """Get the current middleware settings."""
     return (
         settings_map.get_subview("middleware")
-        if settings_map.get("middleware") is not Unset
+        if settings_map.get("middleware") is not UNSET
         else None
     )
 
@@ -191,11 +191,15 @@ def setup_middleware(
     # Convert container to set for modification
     result: set[McpMiddleware] = set()
 
+    def _get_mw_name(mw: Any) -> str:
+        return str(getattr(mw, "__name__", type(mw).__name__))
+
     # Apply middleware settings
     # ty gets very confused here, so we ignore most issues
 
     for mw in middleware:  # type: ignore
-        match mw.__name__:
+        mw_name = _get_mw_name(mw)
+        match mw_name:
             case "ErrorHandlingMiddleware":
                 instance = mw(
                     **(
@@ -218,7 +222,7 @@ def setup_middleware(
             case "ResponseCachingMiddleware":
                 instance = mw(**middleware_settings.get("caching", {}))  # type: ignore
             case _:
-                if any_settings := middleware_settings.get(mw.__name__.lower()):
+                if any_settings := middleware_settings.get(mw_name.lower()):
                     instance = mw(**any_settings)
                 else:
                     instance = mw()
@@ -341,12 +345,12 @@ async def create_stdio_server(
     Returns:
         Configured FastMCP stdio server instance.
     """
-    if settings and (stdio_settings := settings.get("stdio_server")) is not Unset:
+    if settings and (stdio_settings := settings.get("stdio_server")) is not UNSET:
         stdio_settings = DictView(FastMcpServerSettingsDict(**cast(dict, stdio_settings)))
     else:
         stdio_settings = _get_fastmcp_settings_map(http=False)
     app = _setup_server(stdio_settings, transport="stdio")
-    if settings and (http_settings := settings.get("mcp_server")) is not Unset:
+    if settings and (http_settings := settings.get("mcp_server")) is not UNSET:
         http_settings = DictView(FastMcpServerSettingsDict(**cast(dict, http_settings)))
     else:
         http_settings = _get_fastmcp_settings_map(http=True)

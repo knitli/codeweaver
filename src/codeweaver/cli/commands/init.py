@@ -135,17 +135,18 @@ def _create_codeweaver_config(
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Create settings from profile (don't use DI since container isn't initialized yet)
-    from codeweaver.providers.config.providers import ProviderSettings
     from codeweaver.server.config.settings import CodeWeaverSettings
 
-    settings = CodeWeaverSettings(
-        project_path=project_path,
-        project_name=project_path.name,
-        config_file=config_path,
-        provider=ProviderSettings.model_construct(**(profile.as_provider_settings())),
-    )
+    # Use model_validate to ensure all fields are correctly marked as "set"
+    # and not just passed through the constructor which might ignore them.
+    settings = CodeWeaverSettings.model_validate({
+        "project_path": project_path,
+        "project_name": project_path.name,
+        "config_file": config_path,
+        "provider": profile.as_provider_settings(),
+    })
 
-    # Save to TOML file
+    # Save to TOML file using the robust settings method
     settings.save_to_file(config_path)
 
     display.print_success(f"Created configuration file: {config_path}")

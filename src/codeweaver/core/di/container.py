@@ -29,6 +29,17 @@ from codeweaver.core.exceptions import DependencyInjectionError
 logger = logging.getLogger(__name__)
 
 
+def _get_name(obj: Any) -> str:
+    """Safely get the name of an object, handling strings, classes, and callables."""
+    if isinstance(obj, str):
+        return obj
+    if hasattr(obj, "__name__"):
+        return str(obj.__name__)
+    if hasattr(obj, "__class__") and hasattr(obj.__class__, "__name__"):
+        return str(obj.__class__.__name__)
+    return str(obj)
+
+
 @dataclass
 class ResolutionResult:
     """Result of dependency resolution with error tracking.
@@ -134,7 +145,7 @@ class Container[T]:
 
                     # Try to find this type in registered factories
                     for factory_type in self._factories:
-                        if factory_type.__name__ == base_type_str:
+                        if _get_name(factory_type) == base_type_str:
                             # Reconstruct the Annotated type using the resolved base type
                             # We need Annotated from typing
 
@@ -146,7 +157,7 @@ class Container[T]:
                                 return eval(type_str, enhanced_globalns)
         # Fallback: try to find a factory by matching type name
         return next(
-            (factory_type for factory_type in self._factories if factory_type.__name__ == type_str),
+            (factory_type for factory_type in self._factories if _get_name(factory_type) == type_str),
             None,
         )
 
@@ -185,8 +196,8 @@ class Container[T]:
 
                 logger.debug(
                     "Auto-discovered provider: %s -> %s (scope=%s, tags=%s, is_generator=%s, is_async_generator=%s)",
-                    interface.__name__,
-                    factory.__name__ if hasattr(factory, "__name__") else factory,
+                    _get_name(interface),
+                    _get_name(factory),
                     metadata.scope,
                     metadata.tags,
                     metadata.is_generator,
@@ -232,7 +243,7 @@ class Container[T]:
 
         logger.debug(
             "Registered %s -> %s (singleton=%s, scope=%s, tags=%s)",
-            interface.__name__,
+            _get_name(interface),
             target,
             singleton,
             self._scope[interface],
@@ -674,7 +685,7 @@ class Container[T]:
             )
 
         raise TypeError(
-            f"Parameter '{name}' in {obj.__name__} has INJECTED sentinel "
+            f"Parameter '{name}' in {_get_name(obj)} has INJECTED sentinel "
             f"but no Depends() marker and type cannot be auto-resolved.  "
             f"Use:  Annotated[{annotation}, Depends(... )]"
         )
@@ -1013,7 +1024,7 @@ class Container[T]:
         """
         if interface in self._singletons:
             return cast(T, self._singletons[interface])
-        raise KeyError(f"Type {interface.__name__} not yet resolved or not a singleton.")
+        raise KeyError(f"Type {_get_name(interface)} not yet resolved or not a singleton.")
 
 
 # Global default container for convenience (though explicit usage is preferred)

@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Literal
 
-from codeweaver.core import Unset
+from codeweaver.core.types import UNSET
 from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
 
 
@@ -112,7 +112,7 @@ class ConfigChangeAnalyzer:
         if not checkpoint:
             return None
 
-        if self.settings.provider is Unset:
+        if self.settings.provider is UNSET:
             return None
         # Get current embedding configuration
         current_embedding = (

@@ -37,6 +37,7 @@ from codeweaver.core.constants import (
     ZERO,
 )
 from codeweaver.core.types import (
+    UNSET,
     BasedModel,
     DictView,
     LiteralProviderCategoryType,
@@ -45,7 +46,6 @@ from codeweaver.core.types import (
     Provider,
     ProviderCategory,
     ProviderCategoryLiteralString,
-    Unset,
 )
 from codeweaver.core.utils import has_package
 from codeweaver.providers import AnthropicAgentProviderSettings, VoyageClientOptions
@@ -607,7 +607,7 @@ class ProviderSettings(BasedModel):
                 default_value = AllDefaultProviderSettings.get(key)
                 setattr(self, key, default_value)
                 value = default_value
-            if value is Unset:
+            if value is UNSET:
                 default_value = AllDefaultProviderSettings.get(key)
                 setattr(self, key, default_value)
                 value = default_value
@@ -623,7 +623,7 @@ class ProviderSettings(BasedModel):
         Returns:
             Self for method chaining.
         """
-        if self.embedding is not None and self.embedding is not Unset and self.embedding:
+        if self.embedding is not None and self.embedding is not UNSET and self.embedding:
             # Check if we have asymmetric or symmetric configs
             first_config = self.embedding[0]
             if isinstance(first_config, AsymmetricEmbeddingProviderSettings):
@@ -657,7 +657,7 @@ class ProviderSettings(BasedModel):
             if setting_name in ProviderCategoryLiteralString.__value__.__args__
             else cast(ProviderCategory, setting_name).variable
         )
-        return getattr(self, setting) is not Unset  # type: ignore
+        return getattr(self, setting) is not UNSET  # type: ignore
 
     @computed_field
     @property
@@ -694,7 +694,7 @@ class ProviderSettings(BasedModel):
             field_name: settings
             if isinstance(settings, tuple)
             else (settings,)
-            if settings and settings is not Unset
+            if settings and settings is not UNSET
             else ()
             for field_name, settings in self.model_dump().items()
             if field_name in self._field_names
@@ -815,7 +815,7 @@ class ProviderSettings(BasedModel):
         setting = getattr(self, setting_field, None)  # type: ignore
         if setting is None:
             return None
-        if setting is Unset:
+        if setting is UNSET:
             setting = AllDefaultProviderSettings.get(setting_field)  # type: ignore
             setattr(self, setting_field, setting)  # type: ignore
         if primary and isinstance(setting, tuple) and len(setting) > ZERO:

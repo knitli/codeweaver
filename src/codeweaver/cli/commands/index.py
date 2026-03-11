@@ -19,11 +19,11 @@ from pydantic import FilePath
 
 from codeweaver.cli.dependencies import setup_cli_di
 from codeweaver.cli.ui import CLIErrorHandler, IndexingProgress, StatusDisplay, get_display
-from codeweaver.core import CodeWeaverError, SettingsMapDep, Unset
+from codeweaver.core import CodeWeaverError, SettingsMapDep
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.constants import ONE_MINUTE
 from codeweaver.core.di.depends import INJECTED
-from codeweaver.core.types.dictview import DictView
+from codeweaver.core.types import UNSET, DictView
 from codeweaver.engine import CheckpointManager, FileManifestManager
 from codeweaver.engine.services.indexing_service import IndexingService
 from codeweaver.providers import VectorStoreProvider
@@ -87,7 +87,7 @@ async def _derive_collection_name(
         (provider_settings := settings.provider)
         and isinstance(provider_settings, ProviderSettings)
         and (vector_settings := provider_settings.vector_store)
-        and vector_settings is not Unset
+        and vector_settings is not UNSET
     ):
         return (
             vector_settings[0].collection.collection_name

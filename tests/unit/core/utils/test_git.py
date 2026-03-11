@@ -22,7 +22,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from codeweaver.core import MISSING, Missing, has_git, in_codeweaver_clone
+from codeweaver.core import MISSING, has_git, in_codeweaver_clone
 from codeweaver.core.utils.filesystem import (
     _get_branch_from_origin,
     _get_git_dir,
@@ -462,7 +462,7 @@ class TestGetGitDir:
 
         result = _get_git_dir(temp_non_git_dir)
         assert result is MISSING
-        assert isinstance(result, Missing)
+        assert result is MISSING
 
 
 # ===========================================================================

@@ -284,6 +284,85 @@ class CodeWeaverSettings(CodeWeaverEngineSettings):
         ),
     ] = UNSET
 
+    def __init__(
+        self,
+        token_limit: PositiveInt | Unset = UNSET,
+        max_results: PositiveInt | Unset = UNSET,
+        mcp_server: FastMcpHttpServerSettings | Unset = UNSET,
+        stdio_server: FastMcpStdioServerSettings | Unset = UNSET,
+        middleware: MiddlewareOptions | Unset = UNSET,
+        endpoints: EndpointSettingsDict | Unset = UNSET,
+        uvicorn: UvicornServerSettings | Unset = UNSET,
+        management_host: str | Unset = UNSET,
+        management_port: PositiveInt | Unset = UNSET,
+        default_mcp_config: MCPServerConfig | Unset = UNSET,
+        **data: Any,
+    ) -> None:
+        """Initialize server settings."""
+        self._set_unset_fields(
+            token_limit=token_limit,
+            max_results=max_results,
+            mcp_server=mcp_server,
+            stdio_server=stdio_server,
+            middleware=middleware,
+            endpoints=endpoints,
+            uvicorn=uvicorn,
+            management_host=management_host,
+            management_port=management_port,
+            default_mcp_config=default_mcp_config,
+        )
+        data["token_limit"] = (
+            token_limit
+            if token_limit is not UNSET and token_limit is not None
+            else DEFAULT_MAX_TOKENS
+        )
+        data["max_results"] = (
+            max_results
+            if max_results is not UNSET and max_results is not None
+            else DEFAULT_MAX_RESULTS
+        )
+        data["mcp_server"] = (
+            mcp_server
+            if mcp_server is not UNSET and mcp_server is not None
+            else FastMcpHttpServerSettings.model_construct(**DefaultFastMcpServerSettings)
+        )
+        data["stdio_server"] = (
+            stdio_server
+            if stdio_server is not UNSET and stdio_server is not None
+            else FastMcpStdioServerSettings.model_construct(**BaseFastMcpServerSettings)
+        )
+        data["middleware"] = (
+            middleware
+            if middleware is not UNSET and middleware is not None
+            else DefaultMiddlewareSettings
+        )
+        data["endpoints"] = (
+            endpoints
+            if endpoints is not UNSET and endpoints is not None
+            else DefaultEndpointSettings
+        )
+        data["uvicorn"] = (
+            uvicorn if uvicorn is not UNSET and uvicorn is not None else DefaultUvicornSettings
+        )
+        data["management_host"] = (
+            management_host
+            if management_host is not UNSET and management_host is not None
+            else LOCALHOST
+        )
+        data["management_port"] = (
+            management_port
+            if management_port is not UNSET and management_port is not None
+            else DEFAULT_MANAGEMENT_PORT
+        )
+        data["default_mcp_config"] = (
+            default_mcp_config
+            if default_mcp_config is not UNSET and default_mcp_config is not None
+            else StdioCodeWeaverConfig.model_construct(
+                **StdioCodeWeaverConfigDict(**StdioCodeWeaverConfig().model_dump())
+            )
+        )
+        super().__init__(**data)
+
     async def _initialize(self, **kwargs: Any) -> None:
         """Initialize server settings."""
         mcp_stdio_default = FastMcpStdioServerSettings().as_settings()
@@ -302,7 +381,7 @@ class CodeWeaverSettings(CodeWeaverEngineSettings):
         for field_name, default, type_cls in fields:
             existing_value = (
                 value
-                if (value := getattr(self, field_name, None)) and value is not Unset
+                if (value := getattr(self, field_name, None)) and value is not UNSET
                 else default
             )
             existing_value = (
@@ -312,13 +391,13 @@ class CodeWeaverSettings(CodeWeaverEngineSettings):
             )
             if (
                 existing_value != default
-                and existing_value is not Unset
+                and existing_value is not UNSET
                 and isinstance(existing_value, dict)
             ):
                 existing_value = self._resolve_default_and_provided(existing_value, default)
             field_value = (
                 v
-                if (v := kwargs.get(field_name, "NON_EXISTENT_VALUE")) is not Unset
+                if (v := kwargs.get(field_name, "NON_EXISTENT_VALUE")) is not UNSET
                 else "NON_EXISTENT_VALUE"
             )
             if field_value not in ("NON_EXISTENT_VALUE", None, default):

@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 import pytest
 
 from codeweaver.cli import app as doctor_app
-from codeweaver.core import CodeWeaverCoreSettings, Provider, SentinelName, Unset
+from codeweaver.core import UNSET, CodeWeaverCoreSettings, Provider, SentinelName, Unset
 from codeweaver.server.config import CodeWeaverSettings
 
 
@@ -58,7 +58,7 @@ class TestDoctorUnsetHandling:
         )
 
         # Settings should auto-detect project_path, not leave it as Unset
-        assert not isinstance(settings.project_path, Unset)
+        assert settings.project_path is not UNSET
         assert isinstance(settings.project_path, Path)
         assert settings.project_path.exists()
 
@@ -67,8 +67,8 @@ class TestDoctorUnsetHandling:
         unset_value = Unset(name=SentinelName("UNSET"), module_name=__name__)
 
         assert unset_value is not None
-        assert isinstance(unset_value, Unset)
-        assert not isinstance(None, Unset)
+        assert unset_value is UNSET
+        assert None is not UNSET
 
     def test_doctor_handles_auto_detected_settings(
         self,
@@ -88,7 +88,7 @@ class TestDoctorUnsetHandling:
         )
 
         # project_path should be auto-detected
-        assert not isinstance(settings.project_path, Unset)
+        assert settings.project_path is not UNSET
 
         # Doctor should not crash on auto-detected settings (may exit with 0 or 1 depending on provider availability)
         with pytest.raises(SystemExit) as exc_info:
@@ -104,7 +104,7 @@ class TestDoctorUnsetHandling:
         unset_value = Unset(name="UNSET", module_name=__name__)
 
         # CORRECT pattern
-        if isinstance(unset_value, Unset):
+        if unset_value is UNSET:
             assert True  # This should execute
 
         # WRONG pattern (would raise TypeError)
@@ -285,7 +285,7 @@ class TestDoctorConfigAssumptions:
         # Should be valid
         assert settings.project_path == temp_project
         embedding_settings = settings.provider.embedding
-        assert not isinstance(embedding_settings, Unset), "Embedding settings should not be Unset"
+        assert embedding_settings is not UNSET, "Embedding settings should not be Unset"
         # Verify provider is set
         if isinstance(embedding_settings, tuple):
             assert embedding_settings[0]["provider"] in (
@@ -331,7 +331,7 @@ class TestDoctorConfigAssumptions:
 
         # Also verify that provider settings are properly initialized (not Unset)
         embedding_settings = settings.provider.embedding
-        assert not isinstance(embedding_settings, Unset), "Embedding settings should be initialized"
+        assert embedding_settings is not UNSET, "Embedding settings should be initialized"
 
 
 @pytest.mark.unit

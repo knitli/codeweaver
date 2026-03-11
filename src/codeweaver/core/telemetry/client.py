@@ -26,10 +26,11 @@ from typing import Any, Self, cast
 from pydantic import HttpUrl
 from pydantic.types import SecretStr
 
-from codeweaver.core import Unset, UUID7HexT, has_package, uuid7
+from codeweaver.core import UUID7HexT, has_package, uuid7
 from codeweaver.core.dependencies import TelemetrySettingsDep
 from codeweaver.core.di import INJECTED, dependency_provider
 from codeweaver.core.telemetry._project import CODEWEAVER_POSTHOG_PROJECT_KEY
+from codeweaver.core.types import UNSET
 
 
 NO_HOG = not has_package("posthog") or sys.modules.get("posthog") is None
@@ -172,7 +173,7 @@ class TelemetryService:
             return cls(enabled=False)
         posthog_host = (
             HttpUrl("https://us.i.posthog.com")
-            if isinstance(settings.posthog_host, Unset)
+            if settings.posthog_host is UNSET
             else settings.posthog_host
         )
         return cls(

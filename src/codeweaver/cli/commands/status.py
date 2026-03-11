@@ -19,7 +19,7 @@ from pydantic_core import from_json
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.core import SettingsMapDep, Unset
+from codeweaver.core import UNSET, SettingsMapDep
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.di.depends import INJECTED
 from codeweaver.core.types.dictview import DictView
@@ -41,7 +41,7 @@ def get_url() -> str:
     mcp_server_settings = settings_map["mcp_server"]
     run_args = (
         DefaultFastMcpHttpRunArgs
-        if mcp_server_settings["run_args"] is Unset
+        if mcp_server_settings["run_args"] is UNSET
         else mcp_server_settings["run_args"]
     )
     host = run_args["host"] or "127.0.0.1"
@@ -54,11 +54,11 @@ def get_management_url() -> str:
     settings_map = _settings_map()
     mgmt_host = (
         settings_map["management_host"]
-        if settings_map["management_host"] is not Unset
+        if settings_map["management_host"] is not UNSET
         else "127.0.0.1"
     )
     mgmt_port = (
-        settings_map["management_port"] if settings_map["management_port"] is not Unset else 9329
+        settings_map["management_port"] if settings_map["management_port"] is not UNSET else 9329
     )
     return f"http://{mgmt_host}:{mgmt_port}"
 

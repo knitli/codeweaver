@@ -15,7 +15,7 @@ from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from codeweaver.core.types.aliases import CategoryName, LiteralStringT
+from codeweaver.core.types import UNSET, CategoryName, LiteralStringT
 
 
 if TYPE_CHECKING:
@@ -100,17 +100,13 @@ def _try_for_settings() -> CodeWeaverSettingsType | None:
     with contextlib.suppress(Exception):
         from codeweaver.core.config import get_settings
 
-        if (settings := get_settings()) is not None:
-            from codeweaver.core.types.sentinel import Unset
-
-            if not isinstance(settings, Unset):
-                return settings
+        if (settings := get_settings()) is not None and settings is not UNSET:
+            return settings
     return None
 
 
 def _get_project_name() -> str:
     """Get the project name from settings or fallback to the project path name."""
-    from codeweaver.core.types.sentinel import Unset
     from codeweaver.core.utils.filesystem import get_project_path
 
     if (env_project_name := os.environ.get("CODEWEAVER_PROJECT_NAME")) is not None:
@@ -120,7 +116,7 @@ def _get_project_name() -> str:
     if (
         (settings := _try_for_settings()) is not None
         and (project_name := settings.project_name) is not None
-        and project_name is not Unset
+        and project_name is not UNSET
     ):
         return cast(str, project_name)
     return get_project_path().name

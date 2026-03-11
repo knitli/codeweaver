@@ -21,6 +21,7 @@ from fastmcp import FastMCP
 from pydantic import FilePath
 
 from codeweaver.core import (
+    UNSET,
     InitializationError,
     LoggerDep,
     ProgressReporterDep,
@@ -127,7 +128,7 @@ async def _run_http_server(
         verbose: Enable verbose logging
         debug: Enable debug logging
     """
-    from codeweaver.core import Unset, get_project_path
+    from codeweaver.core import get_project_path
     from codeweaver.server.lifespan import http_lifespan
     from codeweaver.server.management import ManagementServer
     from codeweaver.server.mcp.server import create_http_server
@@ -140,7 +141,7 @@ async def _run_http_server(
         settings.config_file = config_file
     if project_path:
         settings.project_path = project_path
-    elif isinstance(settings.project_path, Unset):
+    elif settings.project_path is UNSET:
         settings.project_path = get_project_path()
 
     # Setup logging

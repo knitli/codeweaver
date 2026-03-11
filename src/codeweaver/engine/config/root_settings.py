@@ -72,6 +72,32 @@ class CodeWeaverEngineSettings(CodeWeaverProviderSettings):
         FailoverSettings | Unset, Field(description="Failover configuration for service resilience")
     ] = UNSET
 
+    def __init__(
+        self,
+        indexer: IndexerSettings | Unset = UNSET,
+        chunker: ChunkerSettings | Unset = UNSET,
+        failover: FailoverSettings | Unset = UNSET,
+        **data: Any,
+    ) -> None:
+        """Initialize engine settings."""
+        self._set_unset_fields(indexer=indexer, chunker=chunker, failover=failover)
+        data["indexer"] = (
+            indexer
+            if indexer is not UNSET and indexer is not None
+            else IndexerSettings.model_construct(**DefaultIndexerSettings)
+        )
+        data["chunker"] = (
+            chunker
+            if chunker is not UNSET and chunker is not None
+            else ChunkerSettings.model_construct(**DefaultChunkerSettings)
+        )
+        data["failover"] = (
+            failover
+            if failover is not UNSET and failover is not None
+            else FailoverSettings.model_construct(**DefaultFailoverSettings)
+        )
+        super().__init__(**data)
+
     async def _initialize(self, **kwargs: Any) -> None:
         """Initialize engine settings - resolve defaults."""
         fields_and_defaults = (
@@ -85,7 +111,7 @@ class CodeWeaverEngineSettings(CodeWeaverProviderSettings):
                 if (resolved_field := kwargs.get(field_name)) and resolved_field is not UNSET
                 else getattr(self, field_name, None)
             )
-            if field_value is Unset or field_value is None:
+            if field_value is UNSET or field_value is None:
                 setattr(self, field_name, default)
             else:
                 existing_value = (

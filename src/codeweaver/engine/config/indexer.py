@@ -17,7 +17,7 @@ import re
 from collections.abc import Callable
 from functools import cache, cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, NotRequired, TypedDict, cast
 
 from anyio import Path as AsyncPath
 from fastmcp import Context as FastMCPContext
@@ -440,7 +440,7 @@ class IndexerSettings(BasedModel):
             # rignore_options if they need filesize filtering (at the cost of extension
             # filtering not working properly).
             same_file_system=True,
-        ) | ({} if isinstance(self.rignore_options, Unset) else self.rignore_options)
+        ) | ({} if self.rignore_options is UNSET else cast(dict, self.rignore_options))
 
         rignore_settings["path"] = project_path
 

@@ -72,6 +72,17 @@ def _get_issue_information() -> tuple[str, ...]:
     )
 
 
+def _get_name(obj: Any) -> str:
+    """Safely get the name of an object, handling strings, classes, and callables."""
+    if isinstance(obj, str):
+        return obj
+    if hasattr(obj, "__name__"):
+        return str(obj.__name__)
+    if hasattr(obj, "__class__") and hasattr(obj.__class__, "__name__"):
+        return str(obj.__class__.__name__)
+    return str(obj)
+
+
 def _get_reporting_info(detail_parts: list[str]) -> str:
     """Generate issue reporting information."""
     detail_parts = detail_parts or []
@@ -405,15 +416,15 @@ class UnresolvableDependencyError(DependencyInjectionError):
             suggestions: Actionable suggestions for resolving the error
         """
         super().__init__(
-            message=f"Cannot resolve dependency {interface.__name__}: {reason}",
+            message=f"Cannot resolve dependency {_get_name(interface)}: {reason}",
             details=details,
             suggestions=suggestions
             or [
-                f"Ensure {interface.__name__} is registered with the DI container:",
-                f"  container.register({interface.__name__}, factory_function)",
+                f"Ensure {_get_name(interface)} is registered with the DI container:",
+                f"  container.register({_get_name(interface)}, factory_function)",
                 "Or use the dependency_provider decorator:",
-                f"  dependency_provider({interface.__name__})",
-                f"  def get_{interface.__name__.lower()}(): ...",
+                f"  dependency_provider({_get_name(interface)})",
+                f"  def get_{_get_name(interface).lower()}(): ...",
             ],
         )
         self.interface = interface

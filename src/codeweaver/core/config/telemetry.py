@@ -131,9 +131,7 @@ class TelemetrySettings(BasedModel):
         """Post-initialization to track unset fields and set defaults."""
         if not getattr(self, "_unset_fields", None):
             self._unset_fields = {
-                field
-                for field in type(self).model_fields
-                if isinstance(getattr(self, field), Unset)
+                field for field in type(self).model_fields if getattr(self, field, UNSET) is UNSET
             }
         if (
             self.disable_telemetry is True
@@ -143,7 +141,7 @@ class TelemetrySettings(BasedModel):
             # telemetry explicitly disabled, so we turn it off completely
             self._dismantle_telemetry()
             return
-        if self.disable_telemetry is Unset:
+        if self.disable_telemetry is UNSET:
             self.disable_telemetry = False  # ensure telemetry is enabled if not explicitly disabled
         if (
             self.tools_over_privacy is True
@@ -152,13 +150,13 @@ class TelemetrySettings(BasedModel):
         ):
             # tools_over_privacy explicitly enabled, so we allow tools data to be collected
             self.tools_over_privacy = True
-        elif self.tools_over_privacy is Unset:
+        elif self.tools_over_privacy is UNSET:
             self.tools_over_privacy = False  # default to privacy first
         if (env_value := os.getenv("CODEWEAVER__TELEMETRY__POSTHOG_PROJECT_KEY")) is not None:
             self.posthog_project_key = SecretStr(env_value)
-        if isinstance(self.batch_size, Unset):
+        if self.batch_size is UNSET:
             self.batch_size = 10  # default batch size
-        if isinstance(self.batch_interval_seconds, Unset):
+        if self.batch_interval_seconds is UNSET:
             self.batch_interval_seconds = ONE_MINUTE  # default batch interval
         if self.tools_over_privacy and not has_package("codeweaver.server"):
             # not running a full install, tools_over_privacy is not applicable

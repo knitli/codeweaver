@@ -21,9 +21,9 @@ from types import MappingProxyType
 
 import textcase
 
-from codeweaver.core import SettingsDep, Unset
+from codeweaver.core import SettingsDep
 from codeweaver.core.di.depends import INJECTED
-from codeweaver.core.types import DelimiterKind
+from codeweaver.core.types import UNSET, DelimiterKind
 from codeweaver.engine.chunker.delimiters.patterns import (
     EMPTY_PATTERN,
     LINEBREAK,
@@ -687,7 +687,7 @@ def get_custom_patterns(language: str, settings: SettingsDep = INJECTED) -> list
     if (
         settings
         and (chunker := settings.chunker)  # ty:ignore[unresolved-attribute]
-        and not isinstance(chunker, Unset)
+        and chunker is not UNSET
         and (custom_delimiters := chunker.custom_delimiters)
     ):
         for delim in custom_delimiters:

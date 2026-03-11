@@ -16,10 +16,10 @@ from cyclopts import App, Parameter
 from pydantic import PositiveInt
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.core import SettingsMapDep, Unset
+from codeweaver.core import SettingsMapDep
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.di import INJECTED
-from codeweaver.core.types.dictview import DictView
+from codeweaver.core.types import UNSET, DictView
 
 
 def _settings_map(settings: SettingsMapDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
@@ -36,11 +36,11 @@ def _get_default_host_port() -> tuple[str, int]:
     settings_map = _settings_map()
     mgmt_host = (
         settings_map["management_host"]
-        if settings_map["management_host"] is not Unset
+        if settings_map["management_host"] is not UNSET
         else "127.0.0.1"
     )
     mgmt_port = (
-        settings_map["management_port"] if settings_map["management_port"] is not Unset else 9329
+        settings_map["management_port"] if settings_map["management_port"] is not UNSET else 9329
     )
     return mgmt_host, mgmt_port
 

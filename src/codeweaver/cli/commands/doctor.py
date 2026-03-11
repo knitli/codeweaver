@@ -29,7 +29,6 @@ from codeweaver.cli.utils import check_provider_package_available
 from codeweaver.core import (
     ProviderCategory,
     SettingsMapDep,
-    Unset,
     get_codeweaver_config_paths,
     get_project_path,
     is_git_dir,
@@ -37,7 +36,7 @@ from codeweaver.core import (
 from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.di import INJECTED
-from codeweaver.core.types.dictview import DictView
+from codeweaver.core.types import UNSET, DictView
 from codeweaver.core.utils import has_package
 from codeweaver.engine import ConfigChangeAnalyzerDep
 
@@ -291,8 +290,8 @@ def check_configuration_file(settings: CodeWeaverSettingsType) -> DoctorCheck:
             check.message = f"Valid config at {found_config}"
         elif (
             settings.config_file
-            and not isinstance(settings.config_file, Unset)
-            and settings.config_file.exists()
+            and settings.config_file is not UNSET
+            and cast(Path, settings.config_file).exists()
         ):
             # Fallback to settings.config_file if set
             check.status = "✅"
@@ -373,7 +372,7 @@ async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     check = DoctorCheck("Vector Store Configuration")
 
     # Check if vector store is configured in provider settings
-    if isinstance(settings.vector_store, Unset):
+    if settings.vector_store is UNSET:
         return DoctorCheck.set_check(
             check.name,
             "warn",
@@ -902,13 +901,13 @@ async def process_checks(
                 ["Check logs for details", "Report issue if this persists"],
             )
         )
-    if config_failed or settings is None or isinstance(settings, Unset):
+    if config_failed or settings is None or settings is UNSET:
         return checks
     checks.extend((check_project_path(settings), check_indexer_config(settings)))
     if (
         not hasattr(settings, "provider")
         or not (provider_settings := settings.provider)
-        or isinstance(provider_settings, Unset)
+        or provider_settings is UNSET
     ):
         checks.append(
             DoctorCheck.set_check(
@@ -941,7 +940,7 @@ async def process_checks(
     if (
         not hasattr(settings, "provider")
         or not (provider_settings := settings.provider)
-        or isinstance(provider_settings, Unset)
+        or provider_settings is UNSET
     ):
         return checks
     if remote_providers := {

@@ -58,7 +58,7 @@ class TestInitFullWorkflow:
 
         # Parse and execute init command
         func, bound_args, _ = init_app.parse_args(
-            ["--quickstart", "--client", "claude_code", "--project", str(project)],
+            ["init", "--quickstart", "--client", "claude_code", "--project", str(project)],
             exit_on_error=False,
         )
         # Execute the function - successful execution doesn't raise SystemExit
@@ -99,6 +99,7 @@ class TestInitFullWorkflow:
         # Execute init with explicit HTTP transport
         func, bound_args, _ = init_app.parse_args(
             [
+                "init",
                 "--quickstart",
                 "--client",
                 "claude_code",
@@ -109,6 +110,9 @@ class TestInitFullWorkflow:
             ],
             exit_on_error=False,
         )
+        from codeweaver.core import get_container
+
+        get_container()
         func(**bound_args.arguments)
 
         mcp_config_path = project / ".claude" / "mcp.json"
@@ -141,9 +145,12 @@ class TestInitModes:
 
         # Execute init with --config-only
         func, bound_args, _ = init_app.parse_args(
-            ["--quickstart", "--config-only", "--force", "--project", str(project)],
+            ["init", "--quickstart", "--config-only", "--force", "--project", str(project)],
             exit_on_error=False,
         )
+        from codeweaver.core import get_container
+
+        get_container()
         func(**bound_args.arguments)
 
         # CodeWeaver config created
@@ -164,9 +171,12 @@ class TestInitModes:
 
         # Execute init with --mcp-only
         func, bound_args, _ = init_app.parse_args(
-            ["--mcp-only", "--client", "claude_code", "--project", str(project)],
+            ["init", "--mcp-only", "--client", "claude_code", "--project", str(project)],
             exit_on_error=False,
         )
+        from codeweaver.core import get_container
+
+        get_container()
         func(**bound_args.arguments)
 
         # MCP config created
@@ -202,13 +212,16 @@ class TestInitIntegration:
 
         # Init
         func, bound_args, _ = init_app.parse_args(
-            ["--quickstart", "--config-only", "--force", "--project", str(project)],
+            ["init", "--quickstart", "--config-only", "--force", "--project", str(project)],
             exit_on_error=False,
         )
+        from codeweaver.core import get_container
+
+        get_container()
         func(**bound_args.arguments)
 
         # Config show should work (default command, no args needed)
-        func, bound_args, _ = config_app.parse_args([], exit_on_error=False)
+        func, bound_args, _ = config_app.parse_args(["config"], exit_on_error=False)
         func(**bound_args.arguments)
 
         captured = capsys.readouterr()
@@ -230,15 +243,18 @@ class TestInitIntegration:
 
         # Init
         func, bound_args, _ = init_app.parse_args(
-            ["--quickstart", "--config-only", "--force", "--project", str(project)],
+            ["init", "--quickstart", "--config-only", "--force", "--project", str(project)],
             exit_on_error=False,
         )
+        from codeweaver.core import get_container
+
+        get_container()
         func(**bound_args.arguments)
 
         # Doctor may report issues with quick config (missing providers)
         # Exit code 1 is acceptable for warnings - but doctor command doesn't raise SystemExit
         # on success, only on errors
-        func, bound_args, _ = doctor_app.parse_args([], exit_on_error=False)
+        func, bound_args, _ = doctor_app.parse_args(["doctor"], exit_on_error=False)
         func(**bound_args.arguments)  # Successful execution doesn't raise
 
     def test_init_respects_existing_config(
@@ -259,9 +275,12 @@ provider = "fastembed"
 
         # Init should detect existing config and overwrite with --force
         func, bound_args, _ = init_app.parse_args(
-            ["--quickstart", "--config-only", "--force", "--project", str(project)],
+            ["init", "--quickstart", "--config-only", "--force", "--project", str(project)],
             exit_on_error=False,
         )
+        from codeweaver.core import get_container
+
+        get_container()
         func(**bound_args.arguments)  # Should succeed without raising
 
         # Config file should still exist and be updated
@@ -286,9 +305,12 @@ class TestInitMultipleClients:
         mock_confirm.ask.return_value = True
 
         func, bound_args, _ = init_app.parse_args(
-            ["--mcp-only", "--client", "claude_code", "--project", str(project)],
+            ["init", "--mcp-only", "--client", "claude_code", "--project", str(project)],
             exit_on_error=False,
         )
+        from codeweaver.core import get_container
+
+        get_container()
         func(**bound_args.arguments)
 
         config_path = project / ".claude" / "mcp.json"
@@ -306,9 +328,12 @@ class TestInitMultipleClients:
         exit_code = None
         try:
             func, bound_args, _ = init_app.parse_args(
-                ["--mcp-only", "--client", "claude_desktop", "--project", str(project)],
+                ["init", "--mcp-only", "--client", "claude_desktop", "--project", str(project)],
                 exit_on_error=False,
             )
+            from codeweaver.core import get_container
+
+            get_container()
             func(**bound_args.arguments)
         except SystemExit as e:
             exit_code = e.code if e.code is not None else 0
@@ -332,9 +357,12 @@ class TestInitMultipleClients:
             exit_code = None
             try:
                 func, bound_args, _ = init_app.parse_args(
-                    ["--mcp-only", "--client", client, "--project", str(project)],
+                    ["init", "--mcp-only", "--client", client, "--project", str(project)],
                     exit_on_error=False,
                 )
+                from codeweaver.core import get_container
+
+                get_container()
                 func(**bound_args.arguments)
             except SystemExit as e:
                 exit_code = e.code if e.code is not None else 0

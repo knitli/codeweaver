@@ -65,9 +65,9 @@ class Sentinel(BasedModel):
         from pydantic_core import core_schema as cs
 
         # Define serialization function
-        def serialize_sentinel(value: Sentinel) -> str:
-            """Serialize Sentinel to string."""
-            return str(value.name)
+        def serialize_sentinel(value: Sentinel) -> None:
+            """Serialize Sentinel to None."""
+            return
 
         assert source_type is cls, "Sentinel can only validate its own instances."  # noqa: S101
         # Use is_instance schema with custom serialization
@@ -77,7 +77,7 @@ class Sentinel(BasedModel):
             cls,
             cls_repr=repr(cls),
             serialization=cs.plain_serializer_function_ser_schema(
-                serialize_sentinel, return_schema=cs.str_schema(), when_used="json"
+                serialize_sentinel, return_schema=cs.none_schema(), when_used="always"
             ),
         )
         # spellchecker:on

@@ -26,6 +26,7 @@ from pydantic import FilePath, PositiveInt
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.core import (
+    UNSET,
     CodeWeaverSettingsType,
     ProgressReporter,
     ProgressReporterDep,
@@ -264,19 +265,17 @@ async def start_cw_services(
 
 def get_network_settings() -> NetworkConfig:
     """Get network configuration from settings."""
-    from codeweaver.core import Unset
-
     settings_map = _get_settings_map()
 
     management_host = (
         settings_map["management_host"]
-        if settings_map["management_host"] is not Unset
+        if settings_map["management_host"] is not UNSET
         else "127.0.0.1"
     )
     management_port = (
-        settings_map["management_port"] if settings_map["management_port"] is not Unset else 9329
+        settings_map["management_port"] if settings_map["management_port"] is not UNSET else 9329
     )
-    if (mcp_http_server := settings_map["mcp_server"]) is not Unset:
+    if (mcp_http_server := settings_map["mcp_server"]) is not UNSET:
         mcp_host = mcp_http_server.get("host", "127.0.0.1")
         mcp_port = mcp_http_server.get("port", 9328)
     else:
@@ -392,11 +391,10 @@ async def start(
         display.print_error("Invalid host or port provided. Please check your inputs.")
         return
     get_project_path = lateimport("codeweaver.core", "get_project_path")
-    from codeweaver.core import Unset
 
     project = (
         project or project_path
-        if (project_path := settings_map.get("project_path")) is not Unset
+        if (project_path := settings_map.get("project_path")) is not UNSET
         else get_project_path._resolve()()
     )
     if not project and isinstance(project, Path) and project.exists():

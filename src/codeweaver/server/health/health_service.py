@@ -53,6 +53,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _get_class_name(obj: Any) -> str:
+    """Safely get the class name of an object."""
+    if hasattr(obj, "__class__") and hasattr(obj.__class__, "__name__"):
+        return str(obj.__class__.__name__)
+    return str(type(obj).__name__)
+
+
 def _get_statistics(statistics: StatisticsDep) -> SessionStatistics:
     return statistics
 
@@ -114,7 +121,7 @@ class HealthService:
         if not self._providers:
             return None
         providers = self._providers.get(kind, ())
-        return next((p for p in providers if "Backup" not in p.__class__.__name__), None)
+        return next((p for p in providers if "Backup" not in _get_class_name(p)), None)
 
     async def get_health_response(self) -> HealthResponse:
         """Collect health information from all components and return complete response.
@@ -251,7 +258,7 @@ class HealthService:
         try:
             if sparse_provider_instance := self._get_primary_provider("sparse_embedding"):
                 # Assuming provider name is available or just use class name
-                provider_name = sparse_provider_instance.__class__.__name__
+                provider_name = _get_class_name(sparse_provider_instance)
                 return SparseEmbeddingServiceInfo(status="up", provider=provider_name)
             logger.info("No sparse embedding provider configured")
         except Exception as e:

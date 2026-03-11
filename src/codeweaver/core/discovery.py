@@ -135,12 +135,12 @@ class DiscoveredFile(BasedModel):
             object.__setattr__(self, "_file_hash", get_blake_hash(path.read_bytes()))
         else:
             object.__setattr__(self, "_file_hash", None)
-        if git_branch and git_branch is not Missing:
+        if git_branch and git_branch is not MISSING:
             object.__setattr__(self, "_git_branch", git_branch)
         elif path.exists():
-            object.__setattr__(self, "_git_branch", get_git_branch(path) or Missing)
+            object.__setattr__(self, "_git_branch", get_git_branch(path) or MISSING)
         else:
-            object.__setattr__(self, "_git_branch", Missing)
+            object.__setattr__(self, "_git_branch", MISSING)
         object.__setattr__(self, "source_id", kwargs.get("source_id", uuid7()))
         # Don't call super().__init__() for frozen models with manual attribute setting
 
@@ -195,8 +195,8 @@ class DiscoveredFile(BasedModel):
     @property
     def git_branch(self) -> str | Missing:
         """Return the git branch the file was discovered in, if available."""
-        if self._git_branch is Missing:
-            return get_git_branch(self.path.parent) or Missing
+        if self._git_branch is MISSING:
+            return get_git_branch(self.path.parent) or MISSING
         return self._git_branch
 
     @property

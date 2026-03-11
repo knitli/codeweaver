@@ -15,19 +15,21 @@ from __future__ import annotations
 import logging
 import os
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import asdict
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, Self, cast, overload
 
 from pydantic import (
+    AnyUrl,
     BaseModel,
     DirectoryPath,
     Field,
     FilePath,
     HttpUrl,
     PrivateAttr,
+    SecretStr,
     ValidationError,
     computed_field,
 )
@@ -48,8 +50,7 @@ from pydantic_settings import (
 
 from codeweaver.core.config._logging import DefaultLoggingSettings, LoggingSettingsDict
 from codeweaver.core.config.telemetry import DefaultTelemetrySettings, TelemetrySettings
-from codeweaver.core.types.dictview import DictView
-from codeweaver.core.types.sentinel import UNSET, Unset
+from codeweaver.core.types import UNSET, DictView, Sentinel, Unset
 from codeweaver.core.types.settings_model import BaseCodeWeaverSettings
 from codeweaver.core.utils.checks import has_package
 from codeweaver.core.utils.filesystem import get_user_config_dir
@@ -267,6 +268,55 @@ def _set_or_unset(env_var: str, *, is_path: bool = False) -> str | Unset | Path:
     return os.getenv(env_var, UNSET)
 
 
+def _clean_mapping_for_toml(mapping: Mapping[str, Any]) -> dict[str, Any]:
+    """Recursively clean a mapping for TOML serialization by removing None/Sentinels."""
+    return {
+        k: _clean_for_toml(v)
+        for k, v in mapping.items()
+        if v is not None
+        and not isinstance(v, Sentinel | SecretStr)
+        and not (isinstance(v, str) and v.lower() in ("unset", "missing"))
+    }
+
+
+def _clean_sequence_for_toml(sequence: list | tuple | set) -> list:
+    """Recursively clean a sequence for TOML serialization by removing None/Sentinels."""
+    return [
+        _clean_for_toml(item)
+        for item in sequence
+        if item is not None
+        and not isinstance(item, Sentinel | SecretStr)
+        and not (isinstance(item, str) and item.lower() in ("unset", "missing"))
+    ]
+
+
+def _clean_for_toml(obj: Any) -> Any:
+    """Recursively clean an object for TOML serialization by removing None/Sentinels."""
+    # we want to check for both Missing and Unset sentinels, which are both subclasses of Sentinel
+    # so we'll check against Sentinel directly
+    from codeweaver.core.types.sentinel import Sentinel
+
+    if isinstance(obj, Mapping):
+        return _clean_mapping_for_toml(obj)
+
+    if isinstance(obj, list | tuple | set):
+        return _clean_sequence_for_toml(obj)
+
+    # Pydantic types like HttpUrl must be strings for TOML
+    if (hasattr(obj, "__str__") and type(obj).__name__ in ("HttpUrl", "Url")) or isinstance(
+        obj, AnyUrl | HttpUrl | Path
+    ):
+        return str(obj)
+
+    if (
+        obj is None
+        or isinstance(obj, Sentinel | SecretStr)
+        or (isinstance(obj, str) and obj.lower() in ("unset", "missing"))
+    ):
+        return None
+    return obj
+
+
 # spellchecker:off
 class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
     """Root settings for core-only CodeWeaver installation, and base settings for all CodeWeaver installations. Other CodeWeaver packages extend this class to add additional configuration as needed.
@@ -360,36 +410,44 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
         Note: To load settings from a config file, use the `from_config` class method instead.
         The __init__ method handles initialization from data, not file loading.
         """
-        unset_fields = {
-            key
-            for key in type(self).model_fields
-            if data.get(key) is UNSET or locals().get(key) is UNSET
-        }
-        if project_path is not UNSET and project_path is not None:
-            data["project_path"] = cast(DirectoryPath, project_path).resolve()
-        else:
-            if (env_path := _set_or_unset("CODEWEAVER_PROJECT_PATH", is_path=True)) is not UNSET:
-                data["project_path"] = env_path.resolve()  # ty:ignore[unresolved-attribute]
-            else:
-                data["project_path"] = _resolve_project_path()
-        if (env_config_file := _set_or_unset("CODEWEAVER_CONFIG_FILE", is_path=True)) is not UNSET:
-            data["config_file"] = cast(Path, env_config_file).resolve()
-        else:
-            data["config_file"] = None
+        self._set_unset_fields(
+            project_path=project_path,
+            project_name=project_name,
+            config_file=config_file,
+            logging=logging,
+            telemetry=telemetry,
+        )
+        data["project_path"] = (
+            cast(DirectoryPath, project_path).resolve()
+            if project_path is not UNSET and project_path is not None
+            else (
+                cast(DirectoryPath, env_path).resolve()
+                if (env_path := _set_or_unset("CODEWEAVER_PROJECT_PATH", is_path=True)) is not UNSET
+                else _resolve_project_path()
+            )
+        )
         data["project_name"] = project_name or os.getenv(
             "CODEWEAVER_PROJECT_NAME", data["project_path"].name
         )
-        if logging is not Unset and logging is not None:
-            data["logging"] = logging
-        else:
-            data["logging"] = DefaultLoggingSettings
-        if telemetry is not Unset and telemetry is not None:
-            data["telemetry"] = telemetry
-        else:
-            data["telemetry"] = TelemetrySettings.model_construct(**DefaultTelemetrySettings)
+        data["config_file"] = (
+            cast(FilePath, config_file).resolve()
+            if config_file is not UNSET and config_file is not None
+            else (
+                cast(FilePath, env_config).resolve()
+                if (env_config := _set_or_unset("CODEWEAVER_CONFIG_FILE", is_path=True))
+                is not UNSET
+                else None
+            )
+        )
+        data["logging"] = (
+            logging if logging is not UNSET and logging is not None else DefaultLoggingSettings
+        )
+        data["telemetry"] = (
+            telemetry
+            if telemetry is not UNSET and telemetry is not None
+            else TelemetrySettings.model_construct(**DefaultTelemetrySettings)
+        )
         super().__init__(**data)
-        # Now that the parent is initialized, we can set the private attribute
-        self._unset_fields |= unset_fields
         if not type(self).__pydantic_complete__:
             type(self).model_rebuild()
 
@@ -399,6 +457,13 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
 
     async def _finalize(self) -> None:
         """Finalize settings after loading. Unused for core settings."""
+
+    def _set_unset_fields(self, **kwargs: Any) -> None:
+        """Update the set of unset fields based on provided kwargs."""
+        self._unset_fields = self._unset_fields or set()
+        self._unset_fields |= {
+            key for key in kwargs if kwargs[key] is UNSET and key in type(self).model_fields
+        }
 
     @staticmethod
     def _resolve_default_and_provided(defaults: dict[str, Any], provided: Any) -> dict[str, Any]:
@@ -554,7 +619,7 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
         """
         path: Path | None = (  # ty:ignore[invalid-assignment]
             path
-            if path and path is not Unset
+            if path and path is not UNSET
             else self.config_file
             if self.config_file is not UNSET
             else None
@@ -564,35 +629,40 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
         if path is None:
             raise ValueError("No path provided to save configuration file.")
         extension = cast(Path, path).suffix.lower()
-        # Use mode='json' to serialize Path objects to strings (needed for TOML/YAML)
-        # model_dump kwargs (indent is NOT a valid model_dump parameter)
+
+        # model_dump kwargs
         dump_kwargs = {
-            "exclude_unset": True,
+            "exclude_unset": False,
             "by_alias": True,
-            "exclude_defaults": True,
+            "exclude_defaults": False,
             "round_trip": True,
             "exclude_computed_fields": True,
-            "mode": "json",  # Changed from "python" to handle Path serialization
-            "exclude_none": True,  # Exclude None values for TOML compatibility
+            "mode": "python",
+            "exclude_none": True,
             "exclude": {"config_file", "default_mcp_config"},
         }
-        # JSON serialization kwargs (includes indent for to_json)
-        json_kwargs = {"indent": 4, "round_trip": True}
+
         as_obj = self.model_dump(**dump_kwargs)
+
+        # Guaranteed to be a dict or empty dict, with NO None values
+        raw_final = {k: _clean_for_toml(v) for k, v in as_obj.items() if v is not None}
+        final_obj = raw_final or {}
+
         data: str
         match extension:
             case ".json":
                 from pydantic_core import to_json
 
-                data = to_json(as_obj, **json_kwargs).decode("utf-8")
+                json_kwargs = {"indent": 4, "round_trip": True}
+                data = to_json(final_obj, **json_kwargs).decode("utf-8")
             case ".toml":
                 import tomli_w
 
-                data = tomli_w.dumps(as_obj)
+                data = tomli_w.dumps(final_obj)
             case ".yaml" | ".yml":
                 import yaml
 
-                data = yaml.dump(self.model_dump())
+                data = yaml.dump(final_obj)
             case _:
                 raise ValueError(f"Unsupported configuration file format: {extension}")
         _ = path.write_text(data, encoding="utf-8")
@@ -653,11 +723,11 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
     @property
     def project_root(self) -> Path:
         """Get the project root directory. Alias for `project_path`."""
-        if isinstance(self.project_path, Unset):
+        if self.project_path is UNSET:
             from codeweaver.core import get_project_path
 
             self.project_path = get_project_path()
-        return self.project_path.resolve()
+        return cast(Path, self.project_path).resolve()
 
     @classmethod
     def _base_settings_sources(

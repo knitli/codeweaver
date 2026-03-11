@@ -22,6 +22,7 @@ from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.dependencies import ResolvedProjectPathDep, SettingsDep
 from codeweaver.core.di import INJECTED
+from codeweaver.core.types import UNSET
 from codeweaver.core.utils import detect_root_package, is_codeweaver_config_path
 from codeweaver.engine import ConfigChangeAnalyzerDep
 from codeweaver.providers import ProviderSettings, ProviderSettingsDep
@@ -125,11 +126,9 @@ def _normalize_provider_configs(
     field: Literal["vector_store", "reranking", "embedding", "sparse_embedding", "agent", "data"],
 ) -> tuple[ProviderSettings, ...]:
     """Normalize provider configs to a tuple of valid config dicts."""
-    from codeweaver.core.types import Unset
-
     if isinstance(configs, tuple):
         return configs
-    if configs is None or isinstance(configs, Unset):
+    if configs is None or configs is UNSET:
         if detect_root_package() == "core":
             return ()
         from codeweaver.providers.config.profiles import ProviderProfile
@@ -160,11 +159,9 @@ def _build_provider_details(config) -> str:
 
 def _show_provider_config(provider_settings: ProviderSettingsDep = INJECTED) -> None:
     """Display provider configuration details."""
-    from codeweaver.core import Unset
-
     display.print_section("Provider Configuration")
 
-    if not provider_settings or isinstance(provider_settings, Unset):
+    if not provider_settings or provider_settings is UNSET:
         display.print_warning("No providers configured")
         return
 
@@ -178,7 +175,7 @@ def _show_provider_config(provider_settings: ProviderSettingsDep = INJECTED) -> 
     )
 
     for category, configs in provider_settings.items():
-        if category not in valid_categories or not configs or isinstance(configs, Unset):
+        if category not in valid_categories or not configs or configs is UNSET:
             continue
 
         config_list = _normalize_provider_configs(configs, field=category)  # ty:ignore[invalid-argument-type]
@@ -192,7 +189,7 @@ def _show_provider_config(provider_settings: ProviderSettingsDep = INJECTED) -> 
         table.add_column("Details", style="white")
 
         for config in config_list:
-            if config is None or isinstance(config, Unset):
+            if config is None or config is UNSET:
                 continue
 
             provider = config.get("provider")

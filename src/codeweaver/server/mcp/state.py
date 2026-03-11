@@ -15,12 +15,12 @@ from typing import TYPE_CHECKING, Annotated, Any
 from fastmcp import FastMCP
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, PrivateAttr, computed_field
 
-from codeweaver.core import DictView, SettingsMapDep, Unset, elapsed_time_to_human_readable
+from codeweaver.core import DictView, SettingsMapDep, elapsed_time_to_human_readable
 from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.constants import DEFAULT_MCP_PORT, LOCALHOST
 from codeweaver.core.di.depends import INJECTED
-from codeweaver.core.types import BasedModel
+from codeweaver.core.types import UNSET, BasedModel
 from codeweaver.server.config import (
     DefaultFastMcpHttpRunArgs,
     FastMcpHttpRunArgs,
@@ -53,12 +53,12 @@ def _get_fastmcp_settings_map(*, http: bool = False) -> DictView[FastMcpServerSe
     if http:
         return (
             settings_map.get_subview("mcp_server")
-            if settings_map.get("mcp_server") is not Unset
+            if settings_map.get("mcp_server") is not UNSET
             else DictView(FastMcpHttpServerSettings().as_settings())
         )
     return (
         settings_map.get_subview("stdio_server")
-        if settings_map.get("stdio_server") is not Unset
+        if settings_map.get("stdio_server") is not UNSET
         else DictView(FastMcpStdioServerSettings().as_settings())
     )
 

@@ -24,6 +24,7 @@ from codeweaver.core.config._logging import LoggingSettingsDict
 from codeweaver.core.config.core_settings import CodeWeaverCoreSettings
 from codeweaver.core.config.telemetry import TelemetrySettingsDict
 from codeweaver.core.types.sentinel import UNSET, Unset
+from codeweaver.core.utils import is_test_environment
 from codeweaver.providers.config import ProviderProfile
 from codeweaver.providers.config.providers import ProviderSettings, ProviderSettingsDict
 
@@ -77,19 +78,57 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
         else UNSET
     )  # ty: ignore[invalid-assignment]
 
+    def __init__(
+        self,
+        provider: ProviderSettings | Unset = UNSET,
+        profile: ProviderProfile | Unset | None = UNSET,
+        **data: Any,
+    ) -> None:
+        """Initialize provider settings."""
+        self._set_unset_fields(provider=provider, profile=profile)
+        if (provider is UNSET or provider is None) and profile is not UNSET and profile is not None:
+            data["provider"] = ProviderSettings.model_construct(
+                **cast(ProviderProfile, profile).as_provider_settings()
+            )
+        if provider is not UNSET and provider is not None:
+            if profile is not UNSET and profile is not None:
+                data["provider"] = ProviderSettings.model_construct(
+                    **(
+                        self._resolve_default_and_provided(
+                            cast(ProviderProfile, profile).as_provider_settings(),
+                            provider.model_dump(),
+                        )
+                    )
+                )
+            else:
+                data["provider"] = provider
+        else:
+            data["provider"] = ProviderSettings.model_construct(
+                **cast(
+                    ProviderProfile,
+                    (
+                        profile
+                        or (
+                            ProviderProfile.TESTING
+                            if is_test_environment()
+                            else ProviderProfile.RECOMMENDED
+                        )
+                    ),
+                ).as_provider_settings()
+            )
+        super().__init__(**data)
+
     async def _initialize(self, **kwargs: Any) -> None:
         """Initialize provider settings."""
-        from codeweaver.core.utils import is_test_environment
-
-        if is_test_environment():
+        if is_test_environment() and "profile" not in kwargs and self.profile is UNSET:
             kwargs["profile"] = ProviderProfile.TESTING
             self.provider = UNSET
         profile_config = kwargs.get("profile") or self.profile
         if (
             (provider_config := kwargs.get("provider") or self.provider)
-            and provider_config is not Unset
+            and provider_config is not UNSET
             and profile_config
-            and profile_config is not Unset
+            and profile_config is not UNSET
         ):
             provider = ProviderSettings.model_validate(
                 **(

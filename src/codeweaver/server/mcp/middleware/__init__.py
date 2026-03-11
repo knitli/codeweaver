@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from codeweaver.server.mcp.middleware.fastmcp import McpMiddleware
 
@@ -33,10 +33,14 @@ def default_middleware_for_transport(
     ]
     if transport == "streamable-http":
         return [*base_middleware[:-1], StructuredLoggingMiddleware]
+
+    def get_name(middleware: Any) -> str:
+        return str(getattr(middleware, "__name__", type(middleware).__name__))
+
     return [
         mw
         for mw in base_middleware
-        if mw.__name__ not in ("RetryMiddleware", "RateLimitingMiddleware")
+        if get_name(mw) not in ("RetryMiddleware", "RateLimitingMiddleware")
     ]
 
 
