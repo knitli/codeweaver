@@ -329,7 +329,7 @@ class CodeWeaverSettings(CodeWeaverEngineSettings):
         data["stdio_server"] = (
             stdio_server
             if stdio_server is not UNSET and stdio_server is not None
-            else FastMcpStdioServerSettings.model_construct(**BaseFastMcpServerSettings)
+            else FastMcpStdioServerSettings.model_construct(**DefaultFastMcpServerSettings)
         )
         data["middleware"] = (
             middleware

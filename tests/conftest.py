@@ -17,7 +17,7 @@ from uuid import UUID
 
 import pytest
 
-from pydantic.types import UUID7
+from pydantic import UUID7
 from qdrant_client import AsyncQdrantClient
 
 from codeweaver.core import (
