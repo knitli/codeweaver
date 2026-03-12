@@ -455,9 +455,10 @@ async def _try_rerank_with_provider(
     from codeweaver.providers import RerankingResult
     from codeweaver.providers.exceptions import CircuitBreakerOpenError
 
-    if not (
-        provider := provider or _get_package().reranking[0] if _get_package().reranking else None
-    ):
+    if provider is None:
+        pkg_reranking = _get_package().reranking
+        provider = pkg_reranking[0] if pkg_reranking else None
+    if not provider:
         if idx == total_providers - 1:
             await log_to_client_or_fallback(
                 context,
@@ -592,7 +593,18 @@ async def rerank_results(
     """Rerank search results using configured reranking provider(s) with cascading fallback."""
     from codeweaver.core import log_to_client_or_fallback
 
-    providers = reranking or _get_package().reranking
+    if reranking is None:
+        try:
+            raw_reranking = _get_package().reranking
+        except AttributeError:
+            raw_reranking = None
+    else:
+        raw_reranking = reranking
+    # Normalize single provider to tuple
+    if raw_reranking is not None and not isinstance(raw_reranking, tuple):
+        providers: tuple[Any, ...] | None = (raw_reranking,)
+    else:
+        providers = raw_reranking
     if not providers or not candidates:
         await log_to_client_or_fallback(
             context,

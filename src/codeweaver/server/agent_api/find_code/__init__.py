@@ -338,7 +338,7 @@ async def find_code(
     """Find relevant code based on semantic search with intent-driven ranking."""
     # Resolve dependencies if not provided (supports direct calls in tests)
     from codeweaver.core.di import get_container
-    from codeweaver.core.di.depends import is_depends_marker
+    from codeweaver.core.di.dependency import is_depends_marker
 
     if is_depends_marker(search_package):
         container = get_container()

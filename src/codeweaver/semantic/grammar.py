@@ -307,7 +307,7 @@ _resolving_grammar: ContextVar[bool] = ContextVar("_resolving_grammar", default=
 
 def _get_registry(registry: ThingRegistryDep = INJECTED) -> ThingRegistry:
     """Lazily import and return the global ThingRegistry instance."""
-    from codeweaver.core.di.depends import DependsPlaceholder, _InjectedProxy
+    from codeweaver.core.di.dependency import DependsPlaceholder, _InjectedProxy
 
     if isinstance(registry, (_InjectedProxy, DependsPlaceholder)):
         from codeweaver.semantic.ast_grep import AstThing
@@ -594,7 +594,7 @@ class CompositeThing(Thing):
 
     @staticmethod
     def _registry(registry: ThingRegistryDep = INJECTED) -> ThingRegistry:
-        from codeweaver.core.di.depends import DependsPlaceholder, _InjectedProxy
+        from codeweaver.core.di.dependency import DependsPlaceholder, _InjectedProxy
 
         if isinstance(registry, (_InjectedProxy, DependsPlaceholder)):
             from codeweaver.semantic.ast_grep import AstThing
@@ -912,7 +912,7 @@ class Connection(BasedModel):
 
     @staticmethod
     def _registry(registry: ThingRegistryDep = INJECTED) -> ThingRegistry:
-        from codeweaver.core.di.depends import DependsPlaceholder, _InjectedProxy
+        from codeweaver.core.di.dependency import DependsPlaceholder, _InjectedProxy
 
         if isinstance(registry, (_InjectedProxy, DependsPlaceholder)):
             from codeweaver.semantic.ast_grep import AstThing

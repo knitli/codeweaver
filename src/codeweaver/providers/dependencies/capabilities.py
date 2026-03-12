@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from codeweaver.core.dependencies.utils import ensure_container_initialized
-from codeweaver.core.di.depends import depends
+from codeweaver.core.di.dependency import depends
 from codeweaver.core.di.utils import dependency_provider
 from codeweaver.providers import EmbeddingCapabilityGroup
 from codeweaver.providers.agent.resolver import AgentCapabilityResolver

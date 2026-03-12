@@ -11,7 +11,7 @@ import asyncio
 
 from typing import TYPE_CHECKING, Annotated
 
-from codeweaver.core.di.depends import depends
+from codeweaver.core.di.dependency import depends
 from codeweaver.core.exceptions import NodeParsingFailureError
 
 

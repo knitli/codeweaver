@@ -181,8 +181,13 @@ class ConfigChangeAnalyzer:
                 old_summary, new_summary, vector_count, reason="Requires full reindex"
             )
 
-        # 3. If no changes, return early
-        if impact == ChangeImpact.NONE:
+        # 3. Detect transformations (must run before classifying NONE vs transformable/quantizable)
+        changes = await self._detect_transformations(
+            old_fingerprint, new_config, new_fingerprint, old_summary, new_summary, vector_count
+        )
+
+        # 4. If fingerprint says NONE and no transformations detected, return NONE
+        if impact == ChangeImpact.NONE and not changes:
             return ConfigChangeAnalysis(
                 impact=ChangeImpact.NONE,
                 old_config_summary=old_summary,
@@ -195,11 +200,6 @@ class ConfigChangeAnalyzer:
                 recommendations=[],
                 migration_strategy="no_action",
             )
-
-        # 4. Detect transformations
-        changes = await self._detect_transformations(
-            old_fingerprint, new_config, new_fingerprint, old_summary, new_summary, vector_count
-        )
 
         # 5. Build response based on detected transformations
         return self._build_analysis_response(old_summary, new_summary, changes, vector_count)
@@ -641,6 +641,12 @@ class ConfigChangeAnalyzer:
 
         if isinstance(config, AsymmetricEmbeddingProviderSettings):
             return config.datatype
+        # Check nested embedding_config first (consistent with _get_dimension_from_config)
+        nested = getattr(config, "embedding_config", None)
+        if nested:
+            nested_dtype = getattr(nested, "datatype", None)
+            if isinstance(nested_dtype, str):
+                return nested_dtype
         return getattr(config, "datatype", None)
 
     def _get_dimension_from_fingerprint(self, fingerprint: Any) -> int | None:

@@ -209,8 +209,10 @@ def get_provider_configs(provider_name: str) -> tuple[ProviderEnvConfig, ...] | 
 
     configs = registry_map[provider_name]
 
-    # Registry definitions are lists of ProviderEnvConfig
-    return tuple(configs) if isinstance(configs, list) else None
+    # Registry definitions can be lists, tuples, or single ProviderEnvConfig objects
+    if isinstance(configs, (list, tuple)):
+        return tuple(configs)
+    return (configs,)
 
 
 def get_provider_env_vars_from_registry(provider_name: str) -> tuple[ProviderEnvVars, ...] | None:

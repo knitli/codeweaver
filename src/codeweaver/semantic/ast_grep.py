@@ -108,7 +108,7 @@ from codeweaver.core import (
     humanize,
     uuid7,
 )
-from codeweaver.core.di.depends import INJECTED
+from codeweaver.core.di.dependency import INJECTED
 from codeweaver.semantic.dependencies import ThingRegistryDep
 
 # Runtime imports needed for cast operations and type checking
@@ -482,7 +482,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         When called directly (e.g. in tests), creates singleton instance.
         Ensures registry is populated on first access via lazy loading.
         """
-        from codeweaver.core.di.depends import DependsPlaceholder, _InjectedProxy
+        from codeweaver.core.di.dependency import DependsPlaceholder, _InjectedProxy
         from codeweaver.semantic.registry import ThingRegistry
 
         # Check if registry is INJECTED placeholder (either proxy or sentinel)

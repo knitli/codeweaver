@@ -21,7 +21,7 @@ from anyio import Path as AsyncPath
 
 from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.config.types import CodeWeaverSettingsDict
-from codeweaver.core.di.depends import INJECTED, depends
+from codeweaver.core.di.dependency import INJECTED, depends
 from codeweaver.core.di.utils import dependency_provider
 from codeweaver.core.types.dictview import DictView
 

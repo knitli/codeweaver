@@ -22,7 +22,7 @@ from types import MappingProxyType
 import textcase
 
 from codeweaver.core import SettingsDep
-from codeweaver.core.di.depends import INJECTED
+from codeweaver.core.di.dependency import INJECTED
 from codeweaver.core.types import UNSET, DelimiterKind
 from codeweaver.engine.chunker.delimiters.patterns import (
     EMPTY_PATTERN,

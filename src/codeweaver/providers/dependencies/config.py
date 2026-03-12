@@ -25,7 +25,7 @@ async def _get_global_settings() -> CodeWeaverSettingsType:
     return await container.resolve(CodeWeaverSettingsType)
 
 
-from codeweaver.core.di.depends import depends
+from codeweaver.core.di.dependency import depends
 from codeweaver.core.di.utils import dependency_provider
 from codeweaver.providers.config.providers import ProviderSettings
 

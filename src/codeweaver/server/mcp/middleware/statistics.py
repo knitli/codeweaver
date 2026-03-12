@@ -45,7 +45,7 @@ from codeweaver.core import (
     TimingStatisticsDict,
 )
 from codeweaver.core.constants import DEFAULT_LOG_LEVEL, ONE_MILLISECOND_IN_MICROSECONDS
-from codeweaver.core.di.depends import INJECTED
+from codeweaver.core.di.dependency import INJECTED
 from codeweaver.core.exceptions import ProviderError
 from codeweaver.core.utils import TypeIs
 

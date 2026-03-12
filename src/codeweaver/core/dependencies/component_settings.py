@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Annotated
 
 from pydantic import DirectoryPath
 
-from codeweaver.core.di.depends import depends
+from codeweaver.core.di.dependency import depends
 from codeweaver.core.di.utils import dependency_provider
 from codeweaver.core.types.service_cards import ServiceCard
 

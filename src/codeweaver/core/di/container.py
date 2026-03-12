@@ -22,7 +22,7 @@ from typing import Annotated, Any, TypeAliasType, Union, cast, get_args, get_ori
 from pydantic._internal._core_utils import get_type_ref
 from pydantic._internal._typing_extra import annotated_type, get_function_type_hints
 
-from codeweaver.core.di.depends import Depends, DependsPlaceholder, _InjectedProxy
+from codeweaver.core.di.dependency import Depends, DependsPlaceholder, _InjectedProxy
 from codeweaver.core.exceptions import DependencyInjectionError
 
 

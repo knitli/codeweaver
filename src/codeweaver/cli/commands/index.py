@@ -22,7 +22,7 @@ from codeweaver.cli.ui import CLIErrorHandler, IndexingProgress, StatusDisplay, 
 from codeweaver.core import CodeWeaverError, SettingsMapDep
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.constants import ONE_MINUTE
-from codeweaver.core.di.depends import INJECTED
+from codeweaver.core.di.dependency import INJECTED
 from codeweaver.core.types import UNSET, DictView
 from codeweaver.engine import CheckpointManager, FileManifestManager
 from codeweaver.engine.services.indexing_service import IndexingService

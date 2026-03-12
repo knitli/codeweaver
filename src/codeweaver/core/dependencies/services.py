@@ -13,7 +13,7 @@ ensure_settings_initialized()
 
 from typing import Annotated
 
-from codeweaver.core.di.depends import depends
+from codeweaver.core.di.dependency import depends
 from codeweaver.core.di.utils import dependency_provider
 from codeweaver.core.statistics import SessionStatistics
 

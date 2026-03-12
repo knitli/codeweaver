@@ -23,7 +23,7 @@ from lateimport import lateimport
 
 from codeweaver.core import UNSET, DictView, SettingsMapDep, StatisticsDep
 from codeweaver.core.constants import DEFAULT_MCP_PORT, LOCALHOST, MCP_ENDPOINT
-from codeweaver.core.di.depends import INJECTED
+from codeweaver.core.di.dependency import INJECTED
 from codeweaver.server.config import (
     FastMcpHttpRunArgs,
     FastMcpHttpServerSettings,

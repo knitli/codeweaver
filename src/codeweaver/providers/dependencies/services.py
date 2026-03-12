@@ -12,7 +12,7 @@ from codeweaver.core.dependencies.utils import ensure_container_initialized
 
 ensure_container_initialized()
 
-from codeweaver.core.di.depends import depends
+from codeweaver.core.di.dependency import depends
 from codeweaver.core.di.utils import dependency_provider
 from codeweaver.providers.embedding.cache_manager import EmbeddingCacheManager
 from codeweaver.providers.embedding.registry import EmbeddingRegistry

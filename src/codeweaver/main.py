@@ -38,7 +38,7 @@ from codeweaver.core.constants import (
     LOCALHOST,
     ZERO,
 )
-from codeweaver.core.di.depends import INJECTED
+from codeweaver.core.di.dependency import INJECTED
 
 
 def _logger(logger: LoggerDep = INJECTED) -> logging.Logger:

@@ -21,7 +21,7 @@ from rich.table import Table
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.core import UNSET, SettingsMapDep
 from codeweaver.core.config.types import CodeWeaverSettingsDict
-from codeweaver.core.di.depends import INJECTED
+from codeweaver.core.di.dependency import INJECTED
 from codeweaver.core.types.dictview import DictView
 from codeweaver.server.config import DefaultFastMcpHttpRunArgs
 
