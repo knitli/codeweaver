@@ -227,7 +227,7 @@ overrides:
   include:
     "codeweaver.core.di.utils":
       - dependency_provider
-    "codeweaver.core.di.depends":
+    "codeweaver.core.di.dependency":
       - INJECTED
   exclude:
     "codeweaver.main":
@@ -747,7 +747,7 @@ rule_files = [
 
 [overrides.include]
 "codeweaver.core.di.utils" = ["dependency_provider"]
-"codeweaver.core.di.depends" = ["INJECTED"]
+"codeweaver.core.di.dependency" = ["INJECTED"]
 
 [overrides.exclude]
 "codeweaver.main" = ["UvicornAccessLogFilter"]

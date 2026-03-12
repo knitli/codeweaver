@@ -99,7 +99,7 @@ if TYPE_CHECKING:
         reset_container,
         reset_container_state,
     )
-    from codeweaver.core.di.depends import (
+    from codeweaver.core.di.dependency import (
         INJECTED,
         Depends,
         DependsPlaceholder,
@@ -117,20 +117,20 @@ if TYPE_CHECKING:
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "INJECTED": (__spec__.parent, "depends"),
+    "INJECTED": (__spec__.parent, "dependency"),
     "Container": (__spec__.parent, "container"),
-    "Depends": (__spec__.parent, "depends"),
-    "DependsPlaceholder": (__spec__.parent, "depends"),
+    "Depends": (__spec__.parent, "dependency"),
+    "DependsPlaceholder": (__spec__.parent, "dependency"),
     "ProviderMetadata": (__spec__.parent, "utils"),
     "ResolutionResult": (__spec__.parent, "container"),
     "dependency_provider": (__spec__.parent, "utils"),
-    "depends": (__spec__.parent, "depends"),
+    "depends": (__spec__.parent, "dependency"),
     "get_all_provider_metadata": (__spec__.parent, "utils"),
     "get_all_providers": (__spec__.parent, "utils"),
     "get_container": (__spec__.parent, "container"),
     "get_provider": (__spec__.parent, "utils"),
     "get_provider_metadata": (__spec__.parent, "utils"),
-    "is_depends_marker": (__spec__.parent, "depends"),
+    "is_depends_marker": (__spec__.parent, "dependency"),
     "is_provider_registered": (__spec__.parent, "utils"),
     "reset_container": (__spec__.parent, "container"),
     "reset_container_state": (__spec__.parent, "container"),
