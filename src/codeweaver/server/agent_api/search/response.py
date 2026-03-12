@@ -20,8 +20,8 @@ from codeweaver.core.di import INJECTED
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
 from codeweaver.providers.reranking.providers.base import RerankingProvider
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
-from codeweaver.server.agent_api.find_code.intent import IntentType
-from codeweaver.server.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
+from codeweaver.server.agent_api.search.intent import IntentType
+from codeweaver.server.agent_api.search.types import CodeMatch, FindCodeResponseSummary
 from codeweaver.server.dependencies import CodeWeaverStateDep
 
 
@@ -205,7 +205,7 @@ def build_error_response(
     """
     # Get indexing state from global application state
     indexing_state, index_coverage = get_indexer_state_info()
-    from codeweaver.server.agent_api.find_code.types import FindCodeResponseSummary
+    from codeweaver.server.agent_api.search.types import FindCodeResponseSummary
 
     mode = "unknown"
     if vector_store and dense and reranking and sparse:

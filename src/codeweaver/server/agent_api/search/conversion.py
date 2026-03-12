@@ -18,7 +18,7 @@ from pathlib import Path
 
 from codeweaver.core import DiscoveredFile, SearchResult, Span
 from codeweaver.core.constants import POSIX_NEWLINE
-from codeweaver.server.agent_api.find_code.types import CodeMatch, CodeMatchType
+from codeweaver.server.agent_api.search.types import CodeMatch, CodeMatchType
 
 
 async def convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:

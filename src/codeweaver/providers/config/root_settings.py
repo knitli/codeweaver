@@ -103,8 +103,14 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
             else:
                 data["provider"] = provider
         else:
-            actual_profile = profile if profile is not UNSET and profile is not None else (
-                ProviderProfile.TESTING if is_test_environment() else ProviderProfile.RECOMMENDED
+            actual_profile = (
+                profile
+                if profile is not UNSET and profile is not None
+                else (
+                    ProviderProfile.TESTING
+                    if is_test_environment()
+                    else ProviderProfile.RECOMMENDED
+                )
             )
             data["provider"] = ProviderSettings.model_construct(
                 **cast(ProviderProfile, actual_profile).as_provider_settings()

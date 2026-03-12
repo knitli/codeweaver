@@ -157,7 +157,11 @@ class Container[T]:
                                 return eval(type_str, enhanced_globalns)
         # Fallback: try to find a factory by matching type name
         return next(
-            (factory_type for factory_type in self._factories if _get_name(factory_type) == type_str),
+            (
+                factory_type
+                for factory_type in self._factories
+                if _get_name(factory_type) == type_str
+            ),
             None,
         )
 

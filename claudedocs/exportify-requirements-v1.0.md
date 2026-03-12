@@ -1678,7 +1678,7 @@ hypothesis = "^6.122.0"  # Property-based testing
 - Complex TYPE_CHECKING block
 - Sorted exports
 
-### Example A2: `codeweaver.server.agent_api.find_code.__init__.py`
+### Example A2: `codeweaver.server.agent_api.search.__init__.py`
 
 **Features Demonstrated**:
 - Minimal exports

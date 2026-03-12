@@ -56,7 +56,7 @@ ast-grep = "latest"
 # Where needed, tools are defined at the task level here, which allows for more granular control
 python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 uv = "latest"
-"pipx:exportify" = "0.2.4"
+"pipx:exportify" = "0.2.5"
 
 # Quick note for those unfamiliar with mise:
 #   - despite the namespace, tools prefixed with "pipx:" are installed via "uv" (I assume once upon a time they were installed with pipx before uv came along)

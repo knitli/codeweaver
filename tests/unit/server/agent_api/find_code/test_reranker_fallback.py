@@ -22,7 +22,7 @@ import pytest
 
 from codeweaver.core import SearchStrategy
 from codeweaver.providers.exceptions import CircuitBreakerOpenError
-from codeweaver.server.agent_api.find_code.pipeline import rerank_results
+from codeweaver.server.agent_api.search.pipeline import rerank_results
 
 
 if TYPE_CHECKING:

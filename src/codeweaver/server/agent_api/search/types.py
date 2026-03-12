@@ -25,7 +25,7 @@ from codeweaver.core import (
     ValidationError,
 )
 from codeweaver.core.constants import ONE_POINT_ZERO, ZERO
-from codeweaver.server.agent_api.find_code.intent import IntentType
+from codeweaver.server.agent_api.search.intent import IntentType
 
 
 if TYPE_CHECKING:

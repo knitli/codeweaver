@@ -21,18 +21,14 @@ if TYPE_CHECKING:
     from codeweaver.server._assets import CODEWEAVER_SVG_ICON
     from codeweaver.server._logging import setup_logger
     from codeweaver.server.agent_api import get_user_agent
-    from codeweaver.server.agent_api.find_code import (
-        CodeWeaverSettingsType,
-        MatchedSection,
-        find_code,
-    )
-    from codeweaver.server.agent_api.find_code.intent import (
+    from codeweaver.server.agent_api.search import CodeWeaverSettingsType, MatchedSection, find_code
+    from codeweaver.server.agent_api.search.intent import (
         IntentResult,
         IntentType,
         QueryComplexity,
         QueryIntent,
     )
-    from codeweaver.server.agent_api.find_code.types import (
+    from codeweaver.server.agent_api.search.types import (
         CodeMatch,
         CodeMatchType,
         FindCodeResponseSummary,
@@ -143,11 +139,11 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "BRACKET_PATTERN": (__spec__.parent, "server"),
     "CODEWEAVER_SVG_ICON": (__spec__.parent, "_assets"),
     "BaseFastMcpServerSettings": (__spec__.parent, "config.settings"),
-    "CodeMatch": (__spec__.parent, "agent_api.find_code.types"),
-    "CodeMatchType": (__spec__.parent, "agent_api.find_code.types"),
+    "CodeMatch": (__spec__.parent, "agent_api.search.types"),
+    "CodeMatchType": (__spec__.parent, "agent_api.search.types"),
     "CodeWeaverSettings": (__spec__.parent, "config.settings"),
     "CodeWeaverSettingsDict": (__spec__.parent, "config.settings"),
-    "CodeWeaverSettingsType": (__spec__.parent, "agent_api.find_code"),
+    "CodeWeaverSettingsType": (__spec__.parent, "agent_api.search"),
     "CodeWeaverState": (__spec__.parent, "server"),
     "CodeWeaverStateDep": (__spec__.parent, "dependencies"),
     "ContextAgentToolkit": (__spec__.parent, "mcp.tools"),
@@ -168,24 +164,24 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FastMcpHttpServerSettings": (__spec__.parent, "config.settings"),
     "FastMcpServerSettingsDict": (__spec__.parent, "config.types"),
     "FastMcpStdioServerSettings": (__spec__.parent, "config.settings"),
-    "FindCodeResponseSummary": (__spec__.parent, "agent_api.find_code.types"),
-    "FindCodeSubmission": (__spec__.parent, "agent_api.find_code.types"),
+    "FindCodeResponseSummary": (__spec__.parent, "agent_api.search.types"),
+    "FindCodeSubmission": (__spec__.parent, "agent_api.search.types"),
     "HealthResponse": (__spec__.parent, "health.models"),
     "HealthService": (__spec__.parent, "health.health_service"),
     "HealthServiceDep": (__spec__.parent, "dependencies"),
     "IndexingInfo": (__spec__.parent, "health.models"),
     "IndexingProgressInfo": (__spec__.parent, "health.models"),
-    "IntentResult": (__spec__.parent, "agent_api.find_code.intent"),
-    "IntentType": (__spec__.parent, "agent_api.find_code.intent"),
+    "IntentResult": (__spec__.parent, "agent_api.search.intent"),
+    "IntentType": (__spec__.parent, "agent_api.search.intent"),
     "LoggingMiddleware": (__spec__.parent, "mcp.middleware.fastmcp"),
     "LoggingMiddlewareSettings": (__spec__.parent, "config.middleware"),
     "ManagementServer": (__spec__.parent, "management"),
     "ManagementServerDep": (__spec__.parent, "dependencies"),
-    "MatchedSection": (__spec__.parent, "agent_api.find_code"),
+    "MatchedSection": (__spec__.parent, "agent_api.search"),
     "McpMiddleware": (__spec__.parent, "mcp.middleware.fastmcp"),
     "MiddlewareOptions": (__spec__.parent, "config.middleware"),
-    "QueryComplexity": (__spec__.parent, "agent_api.find_code.intent"),
-    "QueryIntent": (__spec__.parent, "agent_api.find_code.intent"),
+    "QueryComplexity": (__spec__.parent, "agent_api.search.intent"),
+    "QueryIntent": (__spec__.parent, "agent_api.search.intent"),
     "RateLimitingMiddleware": (__spec__.parent, "mcp.middleware.fastmcp"),
     "RateLimitingMiddlewareSettings": (__spec__.parent, "config.middleware"),
     "RerankingServiceInfo": (__spec__.parent, "health.models"),
@@ -215,7 +211,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "create_stdio_server": (__spec__.parent, "mcp.server"),
     "FastMCPServerSettings": (__spec__.parent, "mcp.state"),
     "favicon": (__spec__.parent, "management"),
-    "find_code": (__spec__.parent, "agent_api.find_code"),
+    "find_code": (__spec__.parent, "agent_api.search"),
     "find_code_tool": (__spec__.parent, "mcp.user_agent"),
     "get_bulk_tool": (__spec__.parent, "mcp.tools"),
     "get_settings": (__spec__.parent, "config.helpers"),

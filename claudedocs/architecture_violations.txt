@@ -204,10 +204,10 @@ Package: codeweaver-telemetry
     -> Imports: codeweaver.config._project (codeweaver-engine)
     (Not in allowed dependencies: {'codeweaver-core'})
   FAILED: src/codeweaver/common/telemetry/events.py
-    -> Imports: codeweaver.agent_api.find_code.intent (codeweaver)
+    -> Imports: codeweaver.agent_api.search.intent (codeweaver)
     (Not in allowed dependencies: {'codeweaver-core'})
   FAILED: src/codeweaver/common/telemetry/events.py
-    -> Imports: codeweaver.agent_api.find_code.types (codeweaver)
+    -> Imports: codeweaver.agent_api.search.types (codeweaver)
     (Not in allowed dependencies: {'codeweaver-core'})
 
 Package: codeweaver-tokenizers

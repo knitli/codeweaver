@@ -740,7 +740,9 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
 
         _fields = ("embedding", "sparse_embedding", "reranking", "vector_store", "agent", "data")
         return ProviderSettingsDict(**{
-            k: v for k in _fields if (v := getattr(self, k, None)) is not None
+            k: v if isinstance(v, tuple) else (v,)
+            for k in _fields
+            if (v := getattr(self, k, None)) is not None
         })
 
 

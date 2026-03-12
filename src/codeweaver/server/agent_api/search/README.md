@@ -12,7 +12,7 @@ The `find_code` package provides CodeWeaver's semantic code search functionality
 ## Quick Start
 
 ```python
-from codeweaver.server.agent_api.find_code import find_code
+from codeweaver.server.agent_api.search import find_code
 
 # Basic usage
 response = await find_code("how does authentication work")
@@ -122,7 +122,7 @@ async def expand_query(query):
 
 ```python
 # Test individual components
-from codeweaver.server.agent_api.find_code.filters import filter_by_languages
+from codeweaver.server.agent_api.search.filters import filter_by_languages
 
 candidates = [...]  # SearchResult objects
 filtered = filter_by_languages(candidates, ("python", "javascript"))

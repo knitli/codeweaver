@@ -18,7 +18,7 @@ I performed a deep dive into the `codeweaver` codebase to resolve critical bugs 
 
 ### 2. Dependency Injection Sentinel Failures
 - **Issue:** The `find_code` tool and its pipeline components were receiving the `INJECTED` sentinel (a `DependsPlaceholder` object) but failing to resolve it when called outside of the standard FastMCP execution flow (e.g., in integration tests). This led to `AttributeError: 'DependsPlaceholder' object has no attribute 'embed_query'`.
-- **Resolution:** Updated `src/codeweaver/agent_api/find_code/__init__.py` and `pipeline.py` to explicitly check for the sentinel using `hasattr(obj, "__pydantic_serializer__")` and manually resolve the required providers via `get_container().resolve()`.
+- **Resolution:** Updated `src/codeweaver/server/agent_api/search/__init__.py` and `pipeline.py` to explicitly check for the sentinel using `hasattr(obj, "__pydantic_serializer__")` and manually resolve the required providers via `get_container().resolve()`.
 
 ### 3. Infinite Recursion in AST and Grammar Models
 - **Issue:** Multiple `RecursionError` instances were triggered by circular relationships between `AstThing`, `registry`, and `Grammar` properties.
@@ -63,7 +63,7 @@ I resolved critical runtime errors affecting the `Indexer`, parallel chunking, a
 
 ### 4. Import & Syntax Errors
 - **Issue:** `ImportError: cannot import name 'ChunkGovernor' from 'codeweaver.engine.chunking_service'` in `indexer.py`.
-- **Issue:** `NameError: name 'VectorStoreProvider' is not defined` in `agent_api/find_code/__init__.py`.
+- **Issue:** `NameError: name 'VectorStoreProvider' is not defined` in `server/agent_api/search/__init__.py`.
 - **Issue:** `SyntaxError` in `src/codeweaver/di/__init__.py` due to a missing comma.
 - **Issue:** `NameError: name 'Tokenizer' is not defined` in `src/codeweaver/engine/chunking_service.py`.
 - **Resolution:** Corrected imports and fixed syntax errors across the affected files. All critical components now import correctly.

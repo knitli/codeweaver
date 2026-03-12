@@ -27,18 +27,14 @@ from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.server.agent_api.find_code import (
-        CodeWeaverSettingsType,
-        MatchedSection,
-        find_code,
-    )
-    from codeweaver.server.agent_api.find_code.intent import (
+    from codeweaver.server.agent_api.search import CodeWeaverSettingsType, MatchedSection, find_code
+    from codeweaver.server.agent_api.search.intent import (
         IntentResult,
         IntentType,
         QueryComplexity,
         QueryIntent,
     )
-    from codeweaver.server.agent_api.find_code.types import (
+    from codeweaver.server.agent_api.search.types import (
         CodeMatch,
         CodeMatchType,
         FindCodeResponseSummary,
@@ -46,17 +42,17 @@ if TYPE_CHECKING:
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "CodeMatch": (__spec__.parent, "find_code.types"),
-    "CodeMatchType": (__spec__.parent, "find_code.types"),
-    "CodeWeaverSettingsType": (__spec__.parent, "find_code"),
-    "FindCodeResponseSummary": (__spec__.parent, "find_code.types"),
-    "FindCodeSubmission": (__spec__.parent, "find_code.types"),
-    "IntentResult": (__spec__.parent, "find_code.intent"),
-    "IntentType": (__spec__.parent, "find_code.intent"),
-    "MatchedSection": (__spec__.parent, "find_code"),
-    "QueryComplexity": (__spec__.parent, "find_code.intent"),
-    "QueryIntent": (__spec__.parent, "find_code.intent"),
-    "find_code": (__spec__.parent, "find_code"),
+    "CodeMatch": (__spec__.parent, "search.types"),
+    "CodeMatchType": (__spec__.parent, "search.types"),
+    "CodeWeaverSettingsType": (__spec__.parent, "search"),
+    "FindCodeResponseSummary": (__spec__.parent, "search.types"),
+    "FindCodeSubmission": (__spec__.parent, "search.types"),
+    "IntentResult": (__spec__.parent, "search.intent"),
+    "IntentType": (__spec__.parent, "search.intent"),
+    "MatchedSection": (__spec__.parent, "search"),
+    "QueryComplexity": (__spec__.parent, "search.intent"),
+    "QueryIntent": (__spec__.parent, "search.intent"),
+    "find_code": (__spec__.parent, "search"),
 })
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)

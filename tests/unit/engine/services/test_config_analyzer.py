@@ -60,9 +60,15 @@ def mock_checkpoint_manager() -> Mock:
         # Support nested embedding_config; guard against auto-generated Mock attributes
         nested = getattr(config, "embedding_config", None)
         nested_dim = getattr(nested, "dimension", None) if nested else None
-        fp.dimension = nested_dim if isinstance(nested_dim, int) else getattr(config, "dimension", 2048)
+        fp.dimension = (
+            nested_dim if isinstance(nested_dim, int) else getattr(config, "dimension", 2048)
+        )
         nested_dtype = getattr(nested, "datatype", None) if nested else None
-        fp.datatype = nested_dtype if isinstance(nested_dtype, str) else getattr(config, "datatype", "float32")
+        fp.datatype = (
+            nested_dtype
+            if isinstance(nested_dtype, str)
+            else getattr(config, "datatype", "float32")
+        )
         fp.embedding_config_type = "symmetric"
 
         # Real logic for is_compatible_with that takes ANOTHER fingerprint

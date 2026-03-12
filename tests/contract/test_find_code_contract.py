@@ -27,8 +27,8 @@ from pydantic import ValidationError
 
 from codeweaver.core import ChunkKind, SemanticSearchLanguage
 from codeweaver.core.types import SearchStrategy
-from codeweaver.server.agent_api.find_code import find_code
-from codeweaver.server.agent_api.find_code.types import (
+from codeweaver.server.agent_api.search import find_code
+from codeweaver.server.agent_api.search.types import (
     CodeMatch,
     CodeMatchType,
     FindCodeResponseSummary,
@@ -477,7 +477,7 @@ class TestTypesSafety:
         """Verify find_code returns Pydantic model, not dict."""
         # This is enforced by type hints and Pydantic
         # Need to include locals to resolve INJECTED sentinels
-        from codeweaver.server.agent_api.find_code import INJECTED
+        from codeweaver.server.agent_api.search import INJECTED
 
         type_hints = get_type_hints(find_code, localns={"INJECTED": INJECTED})
         return_type_repr = str(type_hints.get("return", ""))

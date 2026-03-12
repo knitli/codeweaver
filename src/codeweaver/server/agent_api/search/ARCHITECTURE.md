@@ -14,7 +14,7 @@ The `find_code` package has been refactored into a modular structure to improve 
 ## Package Structure
 
 ```
-codeweaver/agent_api/find_code/
+codeweaver/server/agent_api/search/
 ├── __init__.py       # Main entry point and orchestration
 ├── conversion.py     # Result format conversions
 ├── filters.py        # Post-search filtering logic
@@ -126,7 +126,7 @@ Clear separation of concerns makes it easier to:
 All existing imports continue to work:
 ```python
 # Still works exactly as before
-from codeweaver.server.agent_api.find_code import find_code, MatchedSection
+from codeweaver.server.agent_api.search import find_code, MatchedSection
 from codeweaver.agent_api import find_code
 ```
 

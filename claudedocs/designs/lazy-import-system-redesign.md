@@ -206,9 +206,9 @@ rules:
     match:
       any:
         - name_exact: "find_code"
-          module_exact: "codeweaver.server.agent_api.find_code"
+          module_exact: "codeweaver.server.agent_api.search"
         - name_exact: "MatchedSection"
-          module_exact: "codeweaver.server.agent_api.find_code"
+          module_exact: "codeweaver.server.agent_api.search"
         - name_pattern: "^(track_|emit_)"
           module_pattern: "codeweaver\\.core\\.telemetry\\.events"
     action: include

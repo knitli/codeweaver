@@ -19,7 +19,7 @@ from codeweaver.core import CodeChunk, SearchResult
 from codeweaver.core.constants import DEFAULT_DENSE_WEIGHT, DEFAULT_SPARSE_WEIGHT, ZERO_POINT_ZERO
 from codeweaver.providers import RerankingResult
 from codeweaver.semantic import AgentTask
-from codeweaver.server.agent_api.find_code.intent import IntentType
+from codeweaver.server.agent_api.search.intent import IntentType
 
 
 logger = logging.getLogger(__name__)

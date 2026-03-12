@@ -70,28 +70,25 @@ from codeweaver.engine.services.indexing_service import IndexingService
 from codeweaver.providers import SearchPackageDep, VectorStoreProvider
 from codeweaver.providers.types import SearchPackage
 from codeweaver.semantic import AgentTask
-from codeweaver.server.agent_api.find_code.conversion import convert_search_result_to_code_match
-from codeweaver.server.agent_api.find_code.filters import apply_filters
-from codeweaver.server.agent_api.find_code.intent import (
+from codeweaver.server.agent_api.search.conversion import convert_search_result_to_code_match
+from codeweaver.server.agent_api.search.filters import apply_filters
+from codeweaver.server.agent_api.search.intent import (
     INTENT_TO_AGENT_TASK,
     IntentType,
     detect_intent,
 )
-from codeweaver.server.agent_api.find_code.pipeline import (
+from codeweaver.server.agent_api.search.pipeline import (
     build_query_vector,
     embed_query,
     execute_vector_search,
     rerank_results,
 )
-from codeweaver.server.agent_api.find_code.response import (
-    build_error_response,
-    build_success_response,
-)
-from codeweaver.server.agent_api.find_code.scoring import (
+from codeweaver.server.agent_api.search.response import build_error_response, build_success_response
+from codeweaver.server.agent_api.search.scoring import (
     process_reranked_results,
     process_unranked_results,
 )
-from codeweaver.server.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
+from codeweaver.server.agent_api.search.types import CodeMatch, FindCodeResponseSummary
 
 
 logger = logging.getLogger(__name__)
@@ -484,25 +481,25 @@ from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.server.agent_api.find_code.filters import filter_by_languages, filter_test_files
-    from codeweaver.server.agent_api.find_code.intent import (
+    from codeweaver.server.agent_api.search.filters import filter_by_languages, filter_test_files
+    from codeweaver.server.agent_api.search.intent import (
         INTENT_KEYWORDS,
         IntentResult,
         QueryComplexity,
         QueryIntent,
     )
-    from codeweaver.server.agent_api.find_code.pipeline import raise_value_error
-    from codeweaver.server.agent_api.find_code.response import (
+    from codeweaver.server.agent_api.search.pipeline import raise_value_error
+    from codeweaver.server.agent_api.search.response import (
         calculate_token_count,
         extract_languages,
         generate_summary,
         get_indexer_state_info,
     )
-    from codeweaver.server.agent_api.find_code.scoring import (
+    from codeweaver.server.agent_api.search.scoring import (
         apply_hybrid_weights,
         apply_semantic_weighting,
     )
-    from codeweaver.server.agent_api.find_code.types import CodeMatchType, FindCodeSubmission
+    from codeweaver.server.agent_api.search.types import CodeMatchType, FindCodeSubmission
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "INTENT_KEYWORDS": (__spec__.parent, "intent"),
