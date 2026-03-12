@@ -113,8 +113,7 @@ def mock_checkpoint_manager(test_checkpoint_data: dict) -> Mock:
     manager.load = AsyncMock(return_value=checkpoint)
     manager.save = AsyncMock()
     manager.delete = AsyncMock()
-    # Some tests may call `load_checkpoint()` instead of `load()`;
-    # make it an alias so both return the same checkpoint object.
+    # Alias provided for backwards compatibility if needed.
     if hasattr(manager, "load_checkpoint"):
         manager.load_checkpoint = manager.load
     if hasattr(manager, "validate_checkpoint_compatibility"):
@@ -336,7 +335,7 @@ class TestConfigChangeClassification:
         new_config.datatype = "float32"
 
         # Get checkpoint metadata
-        checkpoint = await mock_checkpoint_manager.load_checkpoint()
+        checkpoint = await mock_checkpoint_manager.load()
 
         # Create fingerprint from checkpoint metadata
         from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
@@ -382,7 +381,7 @@ class TestConfigChangeClassification:
         new_config.dimension = 1024  # Reduced from 2048
         new_config.datatype = "float32"
 
-        checkpoint = await mock_checkpoint_manager.load_checkpoint()
+        checkpoint = await mock_checkpoint_manager.load()
 
         # Create fingerprint from checkpoint metadata
         from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
@@ -430,7 +429,7 @@ class TestConfigChangeClassification:
         new_config.dimension = 2048
         new_config.datatype = "float32"
 
-        checkpoint = await mock_checkpoint_manager.load_checkpoint()
+        checkpoint = await mock_checkpoint_manager.load()
 
         # Create fingerprint from checkpoint metadata
         from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
@@ -556,7 +555,7 @@ class TestEmpiricalDataUsage:
         new_config.dimension = 512
         new_config.datatype = "float32"
 
-        checkpoint = await mock_checkpoint_manager.load_checkpoint()
+        checkpoint = await mock_checkpoint_manager.load()
 
         # Create fingerprint
         from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
@@ -605,7 +604,7 @@ class TestEmpiricalDataUsage:
         new_config.dimension = 768  # Uncommon dimension
         new_config.datatype = "float32"
 
-        checkpoint = await mock_checkpoint_manager.load_checkpoint()
+        checkpoint = await mock_checkpoint_manager.load()
 
         # Create fingerprint
         from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
@@ -656,7 +655,7 @@ class TestEdgeCasesIntegration:
         from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
 
         # Update checkpoint with large vector count
-        checkpoint = await mock_checkpoint_manager.load_checkpoint()
+        checkpoint = await mock_checkpoint_manager.load()
         checkpoint.total_vectors = 10_000_000
 
         analyzer = ConfigChangeAnalyzer(
@@ -703,7 +702,7 @@ class TestEdgeCasesIntegration:
         test_settings: Mock,
     ) -> None:
         """Test handling of collection with zero vectors."""
-        checkpoint = await mock_checkpoint_manager.load_checkpoint()
+        checkpoint = await mock_checkpoint_manager.load()
         checkpoint.total_vectors = 0
 
         from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
@@ -778,7 +777,7 @@ class TestRecommendationsQuality:
         new_config.dimension = 2048
         new_config.datatype = "float32"
 
-        checkpoint = await mock_checkpoint_manager.load_checkpoint()
+        checkpoint = await mock_checkpoint_manager.load()
 
         # Create fingerprint
         from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
@@ -827,7 +826,7 @@ class TestRecommendationsQuality:
         new_config.dimension = 512  # Reduction
         new_config.datatype = "float32"
 
-        checkpoint = await mock_checkpoint_manager.load_checkpoint()
+        checkpoint = await mock_checkpoint_manager.load()
 
         # Create fingerprint
         from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
@@ -888,7 +887,7 @@ class TestTimeAndCostEstimates:
         new_config.dimension = 1024
         new_config.datatype = "float32"
 
-        await mock_checkpoint_manager.load_checkpoint()
+        await mock_checkpoint_manager.load()
 
         # Create fingerprint
         from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
@@ -940,7 +939,7 @@ class TestTimeAndCostEstimates:
         new_config.dimension = 2048
         new_config.datatype = "float32"
 
-        checkpoint = await mock_checkpoint_manager.load_checkpoint()
+        checkpoint = await mock_checkpoint_manager.load()
 
         # Create fingerprint
         from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint

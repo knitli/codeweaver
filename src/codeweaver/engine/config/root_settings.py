@@ -94,7 +94,7 @@ class CodeWeaverEngineSettings(CodeWeaverProviderSettings):
         data["failover"] = (
             failover
             if failover is not UNSET and failover is not None
-            else FailoverSettings.model_construct(**DefaultFailoverSettings)
+            else FailoverSettings.model_construct(**DefaultFailoverSettings())
         )
         super().__init__(**data)
 

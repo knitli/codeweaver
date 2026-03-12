@@ -460,7 +460,8 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
 
     def _set_unset_fields(self, **kwargs: Any) -> None:
         """Update the set of unset fields based on provided kwargs."""
-        self._unset_fields = self._unset_fields or set()
+        if not hasattr(self, "_unset_fields") or self._unset_fields is None:
+            self._unset_fields = set()
         self._unset_fields |= {
             key for key in kwargs if kwargs[key] is UNSET and key in type(self).model_fields
         }
