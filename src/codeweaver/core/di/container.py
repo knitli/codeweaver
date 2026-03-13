@@ -1030,11 +1030,16 @@ class Container[T]:
             if cache_key in self._request_cache:
                 return self._request_cache[cache_key]
 
-            # Create and cache in request scope
+            # Create and cache in request scope.
+            # Use _call_with_injection directly (not resolve()) so the result is NOT
+            # stored in the singleton cache — resolve() defaults to singleton=True for
+            # unknown callables, which would cause the same instance to be returned after
+            # clear_request_cache() even though a fresh instance is expected.
             if marker.dependency:
-                instance = await self.resolve(marker.dependency, _resolution_stack, tags=tag_set)
+                instance = await self._call_with_injection(marker.dependency, _resolution_stack)
             else:
-                instance = await self.resolve(target_type, _resolution_stack, tags=tag_set)
+                factory = self._get_factory(target_type, tag_set)
+                instance = await self._call_with_injection(factory, _resolution_stack)
 
             self._request_cache[cache_key] = instance
             return instance

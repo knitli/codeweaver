@@ -114,20 +114,27 @@ class TestSnapshotCreation:
         assert call_args[1]["collection_name"] == "test_collection"
         assert call_args[1]["snapshot_name"] == snapshot_name
 
-    @pytest.mark.slow
     @pytest.mark.asyncio
     async def test_create_snapshot_with_wait(self, snapshot_service, mock_vector_store: Mock):
         """Test snapshot creation with wait for completion."""
+        fixed_timestamp = "20250127_120000"
+        expected_name = f"snapshot_test_collection_{fixed_timestamp}"
+
         mock_snapshot = Mock()
-        mock_snapshot.name = "snapshot_test_collection_20250127_120000"
+        mock_snapshot.name = expected_name
 
         mock_vector_store.client.create_snapshot = Mock(return_value=mock_snapshot)
         mock_vector_store.client.list_snapshots = Mock(return_value=[mock_snapshot])
 
-        snapshot_name = await snapshot_service.create_snapshot(wait=True)
+        with patch("codeweaver.engine.services.snapshot_service.datetime") as mock_datetime:
+            mock_now = Mock()
+            mock_now.strftime = Mock(return_value=fixed_timestamp)
+            mock_datetime.now = Mock(return_value=mock_now)
+            mock_datetime.UTC = UTC
 
-        assert snapshot_name is not None
-        assert snapshot_name.startswith("snapshot_test_collection_")
+            snapshot_name = await snapshot_service.create_snapshot(wait=True)
+
+        assert snapshot_name == expected_name
         mock_vector_store.client.list_snapshots.assert_called()
 
     @pytest.mark.asyncio
