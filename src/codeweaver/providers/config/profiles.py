@@ -429,7 +429,7 @@ def _testing_profile(
         backup_settings["vector_store"] = QdrantVectorStoreProviderSettings(
             provider=Provider.QDRANT,
             client_options=QdrantClientOptions(
-                path=str(get_user_data_dir() / f"backup-{project_name}")
+                path=str(get_user_data_dir() / f"backup-{project_name or 'default'}")
             ),
             collection=default_collection,
         )

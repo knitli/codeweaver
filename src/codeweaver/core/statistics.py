@@ -99,7 +99,7 @@ async def _is_cloud_embedding_model() -> bool:
         config = (
             embedding_settings.embedding_config
             if embedding_settings.config_type == "symmetric"
-            else embedding_settings.embedding_provider.embedding_config
+            else embedding_settings.embed_provider.embedding_config
         )
         if embedding_settings is not None:
             provider = config.provider

@@ -611,7 +611,11 @@ class ProviderSettings(BasedModel):
                 default_value = AllDefaultProviderSettings.get(key)
                 setattr(self, key, default_value)
                 value = default_value
-            if not isinstance(value, tuple) and key != "disable_backup_system":
+            if (
+                not isinstance(value, tuple)
+                and key != "disable_backup_system"
+                and value is not None
+            ):
                 value = (value,)
                 setattr(self, key, value)
         return self

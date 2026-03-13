@@ -229,7 +229,9 @@ class Container[T]:
 
         if not self._providers_loaded:
             self._providers_loaded = True
-            logger.debug("Loaded providers from registry (total interfaces: %d)", len(providers_map))
+            logger.debug(
+                "Loaded providers from registry (total interfaces: %d)", len(providers_map)
+            )
         elif new_count:
             logger.debug("Incrementally loaded %d new provider(s) from registry", new_count)
 
@@ -482,14 +484,27 @@ class Container[T]:
         Returns:
             The cached singleton instance, or None if not cached or not marked as singleton.
         """
+        # Check actual cache contents directly.  This is intentionally done before consulting
+        # _is_singleton so that function-as-interface resolutions (where the function itself is
+        # passed as `interface` and therefore never appears in _is_singleton) are still served
+        # from the cache.  _cache_singleton uses a default of True so such entries are stored;
+        # without this symmetric check they would be re-created on every resolution.
+        if tag_set:
+            tagged_key = (interface, tag_set)
+            if tagged_key in self._tagged_singletons:
+                return cast(T, self._tagged_singletons[tagged_key])
+        elif interface in self._singletons:
+            return cast(T, self._singletons[interface])
+
+        # Not yet cached.  Only consider this interface singleton-eligible if it is explicitly
+        # registered as such — prevents accidental caching of non-singleton interfaces.
         if not self._is_singleton.get(interface):
             return None
 
-        if tag_set:
-            tagged_key = (interface, tag_set)
-            return cast(T | None, self._tagged_singletons.get(tagged_key))
-
-        return cast(T | None, self._singletons.get(interface))
+        # Interface is singleton-eligible but not yet cached (can only reach here when
+        # _is_singleton says yes but neither cache dict has an entry yet, which should be
+        # uncommon after the checks above).
+        return None
 
     def _cache_singleton(
         self, interface: type[T], instance: T, tag_set: frozenset[str] | None

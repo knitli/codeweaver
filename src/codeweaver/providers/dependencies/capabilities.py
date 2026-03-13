@@ -96,9 +96,7 @@ async def _create_all_configured_capabilities() -> tuple[ConfiguredCapability, .
     sparse_configs = (
         settings.sparse_embedding
         if isinstance(settings.sparse_embedding, tuple)
-        else (
-            (settings.sparse_embedding,) if settings.sparse_embedding is not None else ()
-        )
+        else ((settings.sparse_embedding,) if settings.sparse_embedding is not None else ())
     )
     dense_resolver = await _resolve_type_from_container(EmbeddingCapabilityResolver)
     sparse_resolver = await _resolve_type_from_container(SparseEmbeddingCapabilityResolver)
@@ -131,13 +129,15 @@ async def _get_tokenizer() -> Tokenizer:
     embedding_settings = (
         settings.embedding[0] if isinstance(settings.embedding, tuple) else settings.embedding
     )
+    from codeweaver_tokenizers import get_tokenizer
+
+    if embedding_settings is None:
+        return get_tokenizer("tiktoken", "o200k_base")
     config = (
         embedding_settings.embedding_config
         if embedding_settings.config_type == "symmetric"
-        else embedding_settings.embedding_provider.embedding_config
+        else embedding_settings.embed_provider.embedding_config
     )
-    from codeweaver_tokenizers import get_tokenizer
-
     if (
         config
         and config.capabilities

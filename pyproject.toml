@@ -336,7 +336,11 @@ dev-helpers = [
   "pyperclip>=1.11.0",
   "superclaude>=4.2.0",
 ]
-docs = ["griffe==1.15.0"]
+docs = [
+  "griffe==1.15.0",
+  "griffe-pydantic>=1.1.0",
+  "griffe2md>=0.1.0",
+]
 test = [
   "dirty-equals>=0.11.0",
   "hypothesis>=6.151.9",

@@ -1058,23 +1058,71 @@ async def initialized_cw_state(
     import codeweaver.core.dependencies
     import codeweaver.server.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
 
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
     from codeweaver.providers import VectorStoreProvider
+    from codeweaver.providers.dependencies.providers import (
+        PrimaryVectorStoreProviderDep,
+        VectorStoreProvidersDep,
+    )
     from codeweaver.server import CodeWeaverState
 
     # Don't reset container here - clean_container fixture already handles it
     # Force provider loading if not already done
     clean_container._load_providers()
 
-    # Override only the vector store provider
+    project_name = f"test_workflow_{tmp_path.name}"
+
+    # Override settings to use in-memory Qdrant and set project_path before DI
+    # resolves CodeWeaverState. Without this, bootstrap_settings() constructs
+    # ProviderProfile.TESTING which uses path=backup-None (disk-based Qdrant),
+    # causing "already accessed" RuntimeError when multiple tests run in parallel,
+    # and "Unset.resolve()" AttributeError when project_path is still UNSET.
+    async def get_test_settings() -> CodeWeaverSettingsType:
+        from codeweaver.core.config.loader import get_settings_async
+        from codeweaver.core.types.sentinel import UNSET
+        from codeweaver.providers.config.categories.vector_store import (
+            MemoryVectorStoreProviderSettings,
+        )
+        from codeweaver.providers.config.clients.vector_store import QdrantClientOptions
+        from codeweaver.providers.config.profiles import ProviderProfile
+        from codeweaver.providers.config.providers import ProviderSettings
+
+        settings = await get_settings_async()
+        settings.project_path = tmp_path
+        settings.project_name = project_name
+        if settings.provider is UNSET:
+            profile_settings = ProviderProfile.TESTING.as_provider_settings()
+            # Replace disk-based Qdrant (backup-None) with in-memory to avoid
+            # lock conflicts across parallel tests.
+            profile_settings["vector_store"] = (
+                MemoryVectorStoreProviderSettings(
+                    project_name=project_name,
+                    client_options=QdrantClientOptions(location=":memory:"),
+                ),
+            )
+            settings.provider = ProviderSettings.model_construct(**profile_settings)
+        return settings
+
+    clean_container.override(CodeWeaverSettingsType, get_test_settings)
+
+    # Also override vector store providers to use the shared actual_vector_store.
     clean_container.override(VectorStoreProvider, actual_vector_store)
+    clean_container.override(VectorStoreProvidersDep, (actual_vector_store,))
+    clean_container.override(PrimaryVectorStoreProviderDep, actual_vector_store)
+
+    # Resolve and cache settings in _singletons so _global_settings() can find
+    # them synchronously (container[T] only checks _singletons, not overrides),
+    # preventing _get_canonical_project_path from falling through to loop.to_thread.
+    test_settings = await clean_container.resolve(CodeWeaverSettingsType)
+    clean_container._singletons[CodeWeaverSettingsType] = test_settings
 
     # Resolve state via container (this will trigger resolution of all deps including settings)
     state = await clean_container.resolve(CodeWeaverState)
 
-    # Modify settings after creation to use test project path
+    # Ensure state uses the correct project path (may have been set via settings already)
     if state.settings:
         state.settings.project_path = tmp_path
-        state.settings.project_name = f"test_workflow_{tmp_path.name}"
+        state.settings.project_name = project_name
     state.project_path = tmp_path
 
     # CRITICAL: Set the global state so get_state() works during tests

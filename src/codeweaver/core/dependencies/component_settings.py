@@ -86,12 +86,13 @@ async def _get_canonical_project_path() -> DirectoryPath:
     await asyncio.sleep(0)  # Yield control to the event loop
     with contextlib.suppress(Exception):
         settings = _global_settings()
-        if settings and settings.project_path:
+        from codeweaver.core.types.sentinel import Unset
+
+        if settings and settings.project_path and not isinstance(settings.project_path, Unset):
             return settings.project_path
     from codeweaver.core.utils.filesystem import get_project_path
 
-    loop = asyncio.get_running_loop()
-    return await loop.to_thread(get_project_path)
+    return await asyncio.to_thread(get_project_path)
 
 
 type ResolvedProjectPathDep = Annotated[DirectoryPath, depends(_get_canonical_project_path)]
@@ -101,7 +102,9 @@ async def _get_canonical_project_name() -> str:
     await asyncio.sleep(0)  # Yield control to the event loop
     with contextlib.suppress(Exception):
         settings = _global_settings()
-        if settings and settings.project_name:
+        from codeweaver.core.types.sentinel import Unset
+
+        if settings and settings.project_name and not isinstance(settings.project_name, Unset):
             return settings.project_name
     return (await _get_canonical_project_path()).name
 

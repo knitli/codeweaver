@@ -36,11 +36,52 @@ def test_project_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-async def migration_service(clean_container):
-    """Get real MigrationService from DI container."""
+async def migration_service(tmp_path: Path, clean_container):
+    """Get real MigrationService from DI container.
+
+    Uses an in-memory Qdrant store to avoid the backup-None disk lock conflicts
+    that occur when ProviderProfile.TESTING creates path=backup-{None} and
+    multiple tests compete for the same storage folder.
+    """
     import codeweaver.engine.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
 
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
     from codeweaver.engine.services.migration_service import MigrationService
+
+    project_name = f"test_migration_{tmp_path.name}"
+
+    async def get_test_settings() -> CodeWeaverSettingsType:
+        from codeweaver.core.config.loader import get_settings_async
+        from codeweaver.core.types.sentinel import UNSET
+        from codeweaver.providers.config.categories.vector_store import (
+            MemoryVectorStoreProviderSettings,
+        )
+        from codeweaver.providers.config.clients.vector_store import QdrantClientOptions
+        from codeweaver.providers.config.profiles import ProviderProfile
+        from codeweaver.providers.config.providers import ProviderSettings
+
+        settings = await get_settings_async()
+        settings.project_path = tmp_path
+        settings.project_name = project_name
+        if settings.provider is UNSET:
+            profile_settings = ProviderProfile.TESTING.as_provider_settings()
+            # Replace disk-based Qdrant (backup-None) with in-memory to avoid
+            # "already accessed" RuntimeError and "Unset.resolve()" AttributeError.
+            profile_settings["vector_store"] = (
+                MemoryVectorStoreProviderSettings(
+                    project_name=project_name,
+                    client_options=QdrantClientOptions(location=":memory:"),
+                ),
+            )
+            settings.provider = ProviderSettings.model_construct(**profile_settings)
+        return settings
+
+    clean_container.override(CodeWeaverSettingsType, get_test_settings)
+
+    # Resolve and cache settings in _singletons so _global_settings() can find
+    # them synchronously (container[T] only checks _singletons, not overrides).
+    test_settings = await clean_container.resolve(CodeWeaverSettingsType)
+    clean_container._singletons[CodeWeaverSettingsType] = test_settings
 
     return await clean_container.resolve(MigrationService)
 
@@ -60,7 +101,9 @@ class TestQuantizationFlow:
 
     async def test_quantization_float32_to_int8(self, migration_service) -> None:
         """Test complete quantization flow: float32 -> int8."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Create collection with float32 vectors
         # Execute: Run quantization migration
@@ -69,7 +112,9 @@ class TestQuantizationFlow:
 
     async def test_quantization_float32_to_binary(self, migration_service) -> None:
         """Test complete quantization flow: float32 -> binary."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Create collection with float32 vectors
         # Execute: Run binary quantization
@@ -78,7 +123,9 @@ class TestQuantizationFlow:
 
     async def test_quantization_preserves_search_quality(self, migration_service) -> None:
         """Test that quantization preserves search quality (recall >80%)."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Collection with known query/result pairs
         # Execute: Quantize
@@ -100,7 +147,9 @@ class TestDimensionReductionFlow:
 
     async def test_dimension_reduction_2048_to_1024(self, migration_service) -> None:
         """Test complete dimension reduction: 2048 -> 1024."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Collection with 2048-dim vectors
         # Execute: Reduce to 1024
@@ -109,7 +158,9 @@ class TestDimensionReductionFlow:
 
     async def test_dimension_reduction_with_hybrid_vectors(self, migration_service) -> None:
         """Test dimension reduction preserves sparse component."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Hybrid vectors (dense + sparse)
         # Execute: Reduce dense dimension
@@ -118,7 +169,9 @@ class TestDimensionReductionFlow:
 
     async def test_dimension_reduction_accuracy_impact(self, migration_service) -> None:
         """Test dimension reduction accuracy impact matches empirical data."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: voyage-code-3 vectors 2048-dim
         # Execute: Reduce to 512
@@ -141,7 +194,9 @@ class TestMigrationWithResume:
 
     async def test_resume_from_25_percent_completion(self, migration_service) -> None:
         """Test resume from 25% completion point."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Start migration
         # Simulate: Failure at 25%
@@ -150,7 +205,9 @@ class TestMigrationWithResume:
 
     async def test_resume_from_50_percent_completion(self, migration_service) -> None:
         """Test resume from 50% completion point."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Start migration
         # Simulate: Failure at 50%
@@ -159,7 +216,9 @@ class TestMigrationWithResume:
 
     async def test_resume_from_90_percent_completion(self, migration_service) -> None:
         """Test resume from 90% completion point."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Start migration
         # Simulate: Failure at 90%
@@ -168,7 +227,9 @@ class TestMigrationWithResume:
 
     async def test_resume_with_different_worker_count(self, migration_service) -> None:
         """Test resume with different number of workers."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Start with 4 workers
         # Simulate: Failure
@@ -177,7 +238,9 @@ class TestMigrationWithResume:
 
     async def test_checkpoint_corruption_handling(self, migration_service) -> None:
         """Test handling of corrupted checkpoint file."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Start migration
         # Simulate: Corrupt checkpoint file
@@ -200,7 +263,9 @@ class TestDataIntegrityValidation:
 
     async def test_validation_layer_1_with_real_vectors(self, migration_service) -> None:
         """Test Layer 1 (vector count) with real vector store."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Create collection with known count
         # Execute: Migrate
@@ -208,7 +273,9 @@ class TestDataIntegrityValidation:
 
     async def test_validation_layer_2_with_real_payloads(self, migration_service) -> None:
         """Test Layer 2 (payload checksums) with real payloads."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Collection with complex payloads
         # Execute: Migrate
@@ -216,7 +283,9 @@ class TestDataIntegrityValidation:
 
     async def test_validation_layer_3_with_real_vectors(self, migration_service) -> None:
         """Test Layer 3 (semantic equivalence) with real vectors."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Collection with known vectors
         # Execute: Migrate
@@ -224,7 +293,9 @@ class TestDataIntegrityValidation:
 
     async def test_validation_layer_4_with_real_search(self, migration_service) -> None:
         """Test Layer 4 (search quality) with real search."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Collection with known query/result pairs
         # Execute: Migrate
@@ -232,7 +303,9 @@ class TestDataIntegrityValidation:
 
     async def test_validation_detects_count_mismatch(self, migration_service) -> None:
         """Test that validation detects vector count mismatch."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Simulate migration with missing vector
         # Execute: Validate
@@ -240,7 +313,9 @@ class TestDataIntegrityValidation:
 
     async def test_validation_detects_payload_corruption(self, migration_service) -> None:
         """Test that validation detects payload corruption."""
-        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - MigrationService is implemented, test logic needs to be added"
+        )
 
         # Setup: Simulate corrupted payload
         # Execute: Validate
@@ -262,7 +337,9 @@ class TestCLIIntegration:
 
     async def test_cli_migrate_dimension_command(self, test_project_dir: Path) -> None:
         """Test CLI migrate dimension command."""
-        pytest.skip("Test body not yet written - CLI migrate commands exist, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - CLI migrate commands exist, test logic needs to be added"
+        )
 
         # Execute: codeweaver migrate dimension --new-dimension 1024
         # Verify: Migration completes
@@ -270,7 +347,9 @@ class TestCLIIntegration:
 
     async def test_cli_migrate_quantize_command(self, test_project_dir: Path) -> None:
         """Test CLI migrate quantize command."""
-        pytest.skip("Test body not yet written - CLI migrate commands exist, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - CLI migrate commands exist, test logic needs to be added"
+        )
 
         # Execute: codeweaver migrate quantize --datatype int8
         # Verify: Quantization completes
@@ -278,7 +357,9 @@ class TestCLIIntegration:
 
     async def test_cli_migrate_resume_command(self, test_project_dir: Path) -> None:
         """Test CLI migrate resume command."""
-        pytest.skip("Test body not yet written - CLI migrate commands exist, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - CLI migrate commands exist, test logic needs to be added"
+        )
 
         # Setup: Start migration
         # Simulate: Interrupt
@@ -287,7 +368,9 @@ class TestCLIIntegration:
 
     async def test_cli_migrate_rollback_command(self, test_project_dir: Path) -> None:
         """Test CLI migrate rollback command."""
-        pytest.skip("Test body not yet written - CLI migrate commands exist, test logic needs to be added")
+        pytest.skip(
+            "Test body not yet written - CLI migrate commands exist, test logic needs to be added"
+        )
 
         # Setup: Complete migration
         # Execute: codeweaver migrate rollback

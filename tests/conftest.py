@@ -731,6 +731,35 @@ def cli_api_keys(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     return keys
 
 
+def _release_qdrant_file_locks() -> None:
+    """Release any open Qdrant local storage file locks from GC-pending objects.
+
+    Qdrant's AsyncQdrantLocal holds a portalocker file lock that is only released
+    when close() is called or the file descriptor is garbage collected. When the
+    DI container clears its singletons without calling close(), the lock may stay
+    held until GC runs. This forces deterministic cleanup between tests.
+    """
+    import gc
+
+    import portalocker
+
+    gc.collect()
+    for obj in gc.get_objects():
+        try:
+            flock = getattr(obj, "_flock_file", None)
+            if flock is not None and not flock.closed:
+                try:
+                    portalocker.unlock(flock)
+                except Exception:
+                    pass
+                try:
+                    flock.close()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+
 @pytest.fixture(autouse=True)
 def reset_di_container() -> Generator[None, None, None]:
     """Reset DI container between tests to ensure isolation."""
@@ -739,9 +768,11 @@ def reset_di_container() -> Generator[None, None, None]:
 
     reset_container_state()
     reset_embedding_registry()
+    _release_qdrant_file_locks()
     yield
     reset_container_state()
     reset_embedding_registry()
+    _release_qdrant_file_locks()
 
 
 @pytest.fixture
