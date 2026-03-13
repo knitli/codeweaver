@@ -60,7 +60,7 @@ class QdrantSnapshotBackupService:
         self.vector_store = vector_store
         self.retention_count = retention_count
         self.collection_name = (
-            collection_name or vector_store.collection or generate_collection_name()
+            collection_name or vector_store.collection_name or generate_collection_name()
         )
         if storage_path:
             self.storage_path = Path(storage_path)

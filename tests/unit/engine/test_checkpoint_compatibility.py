@@ -23,10 +23,7 @@ from codeweaver.engine.managers.checkpoint_manager import (
     CheckpointSettingsFingerprint,
     IndexingCheckpoint,
 )
-from codeweaver.providers.config.categories import (
-    AsymmetricEmbeddingProviderSettings,
-    EmbeddingProviderSettings,
-)
+from codeweaver.providers.config.categories import AsymmetricEmbeddingProviderSettings
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities, ModelFamily
 
 
@@ -323,7 +320,10 @@ class TestCheckpointManagerCompatibility:
     async def test_checkpoint_save_load_roundtrip(self, checkpoint_manager: CheckpointManager):
         """Test basic checkpoint save and load."""
         checkpoint = IndexingCheckpoint(
-            project_path=Path("/test/project"), files_discovered=10, files_indexed=5
+            project_path=Path("/test/project"),
+            files_discovered=10,
+            files_indexed=5,
+            settings_hash=get_blake_hash(b"test_settings"),  # Avoid calling get_checkpoint_settings_map() which requires DI
         )
 
         await checkpoint_manager.save(checkpoint)
@@ -353,10 +353,13 @@ class TestCheckpointManagerCompatibility:
                 model_name="voyage-3", model_family=mock_voyage_3_family, default_dimension=1024
             )
 
-            mock_provider_settings = MagicMock()
-            mock_provider_settings.embedding = [mock_embedding_config]
-            mock_provider_settings.sparse_embedding = None
-            mock_provider_settings.vector_store = [MagicMock(provider="qdrant")]
+            from codeweaver.providers.config.providers import ProviderSettings
+
+            mock_provider_settings = ProviderSettings.model_construct(
+                embedding=(mock_embedding_config,),
+                sparse_embedding=None,
+                vector_store=(MagicMock(provider="qdrant"),),
+            )
 
             mock_settings = MagicMock()
             mock_settings.provider = mock_provider_settings
@@ -379,15 +382,19 @@ class TestCheckpointManagerCompatibility:
         with patch(
             "codeweaver.engine.managers.checkpoint_manager.get_settings"
         ) as mock_get_settings:
-            mock_embedding_config = MagicMock(spec=EmbeddingProviderSettings)
+            mock_embedding_config = MagicMock()  # No spec - pydantic fields not in dir()
             mock_embedding_config.model_name = "voyage-3"
             mock_embedding_config.embedding_config.capabilities = EmbeddingModelCapabilities(
                 model_name="voyage-3", model_family=mock_voyage_3_family, default_dimension=1024
             )
 
-            mock_provider_settings = MagicMock()
-            mock_provider_settings.sparse_embedding = None
-            mock_provider_settings.vector_store = [MagicMock(provider="qdrant")]
+            from codeweaver.providers.config.providers import ProviderSettings
+
+            mock_provider_settings = ProviderSettings.model_construct(
+                embedding=None,
+                sparse_embedding=None,
+                vector_store=(MagicMock(provider="qdrant"),),
+            )
 
             mock_settings = MagicMock()
             mock_settings.provider = mock_provider_settings
@@ -447,10 +454,13 @@ class TestCheckpointManagerCompatibility:
             mock_new_embedding.embed_provider = mock_embed_provider_new
             mock_new_embedding.query_provider = mock_query_provider_new
 
-            mock_provider_settings = MagicMock()
-            mock_provider_settings.embedding = [mock_old_embedding]
-            mock_provider_settings.sparse_embedding = None
-            mock_provider_settings.vector_store = [MagicMock(provider="qdrant")]
+            from codeweaver.providers.config.providers import ProviderSettings
+
+            mock_provider_settings = ProviderSettings.model_construct(
+                embedding=(mock_old_embedding,),
+                sparse_embedding=None,
+                vector_store=(MagicMock(provider="qdrant"),),
+            )
 
             mock_settings = MagicMock()
             mock_settings.provider = mock_provider_settings
@@ -485,24 +495,27 @@ class TestCheckpointManagerCompatibility:
         with patch(
             "codeweaver.engine.managers.checkpoint_manager.get_settings"
         ) as mock_get_settings:
-            # Setup old config: voyage-2
-            mock_old_embedding = MagicMock(spec=EmbeddingProviderSettings)
+            # Setup old config: voyage-2 (no spec - pydantic fields not in dir())
+            mock_old_embedding = MagicMock()
             mock_old_embedding.model_name = "voyage-2"
             mock_old_embedding.embedding_config.capabilities = EmbeddingModelCapabilities(
                 model_name="voyage-2", model_family=mock_voyage_2_family, default_dimension=1024
             )
 
-            # Setup new config: voyage-3
-            mock_new_embedding = MagicMock(spec=EmbeddingProviderSettings)
+            # Setup new config: voyage-3 (no spec - pydantic fields not in dir())
+            mock_new_embedding = MagicMock()
             mock_new_embedding.model_name = "voyage-3"
             mock_new_embedding.embedding_config.capabilities = EmbeddingModelCapabilities(
                 model_name="voyage-3", model_family=mock_voyage_3_family, default_dimension=1024
             )
 
-            mock_provider_settings = MagicMock()
-            mock_provider_settings.embedding = [mock_old_embedding]
-            mock_provider_settings.sparse_embedding = None
-            mock_provider_settings.vector_store = [MagicMock(provider="qdrant")]
+            from codeweaver.providers.config.providers import ProviderSettings
+
+            mock_provider_settings = ProviderSettings.model_construct(
+                embedding=(mock_old_embedding,),
+                sparse_embedding=None,
+                vector_store=(MagicMock(provider="qdrant"),),
+            )
 
             mock_settings = MagicMock()
             mock_settings.provider = mock_provider_settings

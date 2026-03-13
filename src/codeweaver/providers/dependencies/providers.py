@@ -56,19 +56,20 @@ async def _get_settings_for_category(
     category: ProviderCategoryLiteralString,
 ) -> tuple[ProviderCategorySettingsType, ...]:
     """Get the settings for a given provider category."""
+    provider_settings = await _get_provider_settings()
     match category:
         case "agent":
-            return await _get_provider_settings().agent
+            return provider_settings.agent
         case "embedding":
-            return await _get_provider_settings().embedding
+            return provider_settings.embedding
         case "data":
-            return await _get_provider_settings().data
+            return provider_settings.data
         case "sparse_embedding":
-            return await _get_provider_settings().sparse_embedding
+            return provider_settings.sparse_embedding
         case "vector_store":
-            return await _get_provider_settings().vector_store
+            return provider_settings.vector_store
         case "reranking":
-            return await _get_provider_settings().reranking
+            return provider_settings.reranking
     raise ValueError(f"Unknown provider category: {category}")
 
 

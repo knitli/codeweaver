@@ -21,7 +21,7 @@ from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, UserInteractionDep
 from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.dependencies import ResolvedProjectPathDep, SettingsDep
-from codeweaver.core.di import INJECTED
+from codeweaver.core.di import INJECTED, get_container
 from codeweaver.core.types import UNSET
 from codeweaver.core.utils import detect_root_package, is_codeweaver_config_path
 from codeweaver.engine import ConfigChangeAnalyzerDep
@@ -39,7 +39,7 @@ def _project_path(project_path: ResolvedProjectPathDep) -> Path:
     return project_path
 
 
-def _settings(settings: SettingsDep) -> CodeWeaverSettingsType:
+def _settings(settings: SettingsDep = INJECTED) -> CodeWeaverSettingsType:
     return settings
 
 
@@ -78,7 +78,7 @@ async def config(
 
     else:
         try:
-            settings = _settings()  # ty:ignore[missing-argument]
+            settings = await get_container().resolve(CodeWeaverSettingsType)
             settings.project_path = project_path or settings.project_path
         except CodeWeaverError as e:
             error_handler.handle_error(e, "Configuration", exit_code=1)

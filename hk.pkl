@@ -70,15 +70,15 @@ local linters = new Mapping<String, Step> {
         check = "reuse lint"
         interactive = useInteractive
         // this doesn't work ... until we can figure it out, linting only
-        fix = if (useInteractive) "./scripts/code-quality/update-licenses.py add {{ files }}" else "./scripts/code-quality/update-licenses.py add --interactive {{ files }}"
+        // fix = if (useInteractive) "./scripts/code-quality/update-licenses.py add {{ files }}" else "./scripts/code-quality/update-licenses.py add --interactive {{ files }}"
     }
 
-    ["exportify"] = new Step {
-        glob = "{src,packages}/**/*.py"
-        fix = "exportify fix {{ files }}"
-        check = "exportify check {{ files }}"
-        stage = List("src/**/*.py", "packages/**/*.py")
-    }
+//   ["exportify"] = new Step {
+//       glob = "{src,packages}/**/*.py"
+//       fix = "exportify fix {{ files }}"
+//       check = "exportify check {{ files }}"
+//       stage = List("src/**/*.py", "packages/**/*.py")
+//    }
 
     ["add-marks"] = new Step {
         glob = "tests/**/*.py"

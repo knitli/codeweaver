@@ -131,7 +131,7 @@ async def _async_main() -> None:
     except Exception as e:
         _print_error_message(" [bold red]Fatal error during DI initialization: ", e)
     try:
-        app()
+        await app.run_async()
     except KeyboardInterrupt:
         _handle_keyboard_interrupt()
     except Exception as e:

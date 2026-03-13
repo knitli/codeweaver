@@ -76,7 +76,11 @@ class TestCheckpointFrequency:
             nonlocal batches_processed
             batches_processed += 1
             if batches_processed <= 25:  # Process 25 batches
-                return [Mock()]
+                record = Mock()
+                record.vector = [0.1, 0.2, 0.3]  # Iterable for _truncate_vector
+                record.id = "test-id"
+                record.payload = {}
+                return [record]
             return []
 
         migration_service._fetch_batch = mock_fetch

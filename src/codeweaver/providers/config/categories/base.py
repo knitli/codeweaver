@@ -125,7 +125,8 @@ class BaseProviderCategorySettings(BasedModel, ABC):
         data.pop("as_backup", None)
         data.pop("_as_backup", None)
         object.__setattr__(self, "client_options", data.get("client_options"))
-        data |= {"client_options": self.client_options}
+        if self.client_options is not None:
+            data |= {"client_options": self.client_options}
         if (
             "model_name" in type(self).model_fields
             and "model_name" not in data

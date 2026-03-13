@@ -166,7 +166,7 @@ class TestSnapshotCreation:
         # Never return the snapshot we're waiting for
         mock_vector_store.client.list_snapshots = Mock(return_value=[])
 
-        result = await snapshot_service._wait_for_snapshot("missing_snapshot", timeout=2)
+        result = await snapshot_service._wait_for_snapshot("missing_snapshot", snapshot_timeout=2)
 
         assert result is False
 
@@ -177,7 +177,7 @@ class TestSnapshotCreation:
         """Test that _wait_for_snapshot handles errors during polling."""
         mock_vector_store.client.list_snapshots = Mock(side_effect=Exception("Connection error"))
 
-        result = await snapshot_service._wait_for_snapshot("test_snapshot", timeout=2)
+        result = await snapshot_service._wait_for_snapshot("test_snapshot", snapshot_timeout=2)
 
         assert result is False
 

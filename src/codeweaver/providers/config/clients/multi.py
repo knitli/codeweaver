@@ -316,8 +316,9 @@ class SentenceTransformersClientOptions(ClientOptions):
 
     def __init__(self, **data: Any) -> None:
         """Initialize the SentenceTransformers client options."""
+        model_name = data.get("model_name_or_path") or ""
         data = deep_merge_dicts(
-            self.default_kwargs_for_model(str(self.model_name_or_path)),  # type: ignore
+            self.default_kwargs_for_model(model=str(model_name)) if model_name else {},
             data or {},  # type: ignore
         )  # type: ignore
         super().__init__(**data)

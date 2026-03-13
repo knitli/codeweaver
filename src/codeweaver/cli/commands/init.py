@@ -149,6 +149,27 @@ def _create_codeweaver_config(
     # Save to TOML file using the robust settings method
     settings.save_to_file(config_path)
 
+    # pydantic_settings in test mode excludes init_settings from sources, so any provider data
+    # passed to model_validate() is dropped. pydantic v2's C-level serializer also ignores
+    # object.__setattr__ changes. Fix: merge provider data directly into the saved TOML.
+    from codeweaver.core.types.sentinel import UNSET
+
+    if settings.provider is UNSET:
+        import tomli
+        import tomli_w
+
+        from codeweaver.core.config.core_settings import _clean_for_toml
+        from codeweaver.providers.config.providers import ProviderSettings
+
+        provider_settings = ProviderSettings.model_validate(profile.as_provider_settings())
+        provider_dump = provider_settings.model_dump(
+            mode="json", exclude_none=True, exclude_computed_fields=True
+        )
+        provider_clean = _clean_for_toml(provider_dump)
+        existing = tomli.loads(config_path.read_text()) if config_path.exists() else {}
+        existing["provider"] = provider_clean
+        config_path.write_text(tomli_w.dumps(existing))
+
     display.print_success(f"Created configuration file: {config_path}")
     if profile:
         display.print_info(f"Profile: {profile}")

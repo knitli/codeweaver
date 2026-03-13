@@ -626,9 +626,11 @@ class Container[T]:
         except (ValueError, TypeError) as e:
             raise DependencyInjectionError(f"Cannot get signature for {obj}") from e
 
-        # Try to get type hints with pydantic's robust resolver
+        # Try to get type hints with pydantic's robust resolver.
+        # For classes, get_function_type_hints returns {} so use __init__ instead.
+        type_hints_target = obj.__init__ if inspect.isclass(obj) else obj
         try:
-            type_hints = get_function_type_hints(obj, globalns=globalns)
+            type_hints = get_function_type_hints(type_hints_target, globalns=globalns)
         except NameError:
             type_hints = {
                 param_name: param.annotation
@@ -901,6 +903,12 @@ class Container[T]:
             if resolved is not None:
                 target_annotation = resolved
 
+        # Unwrap TypeAliasType (Python 3.12 `type X = ...` syntax)
+        from typing import TypeAliasType
+
+        if isinstance(target_annotation, TypeAliasType):
+            target_annotation = target_annotation.__value__
+
         if get_origin(target_annotation) is Annotated:
             for arg in get_args(target_annotation):
                 # Handle both direct Depends and nested Depends if it was resolved
@@ -934,8 +942,19 @@ class Container[T]:
         tags = getattr(marker, "tags", None)
         tag_set = frozenset(tags) if tags else None
 
+        # Check if the original annotation (TypeAliasType) has a direct override.
+        # This preserves override behavior for type aliases like EmbeddingProvidersDep.
+        raw_annotation = annotation or param.annotation
+        from typing import TypeAliasType
+
+        if isinstance(raw_annotation, TypeAliasType) and raw_annotation in self._overrides:
+            override = self._overrides[raw_annotation]
+            if callable(override) and not isinstance(override, type):
+                return await self._call_with_injection(override, _resolution_stack)
+            return override
+
         # Get target type for caching
-        target_type = annotation or param.annotation
+        target_type = raw_annotation
         if isinstance(target_type, str):
             resolved = self._resolve_string_type(target_type, globalns)
             if resolved is not None:

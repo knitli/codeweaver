@@ -271,10 +271,8 @@ def inject_failure_during_transition() -> Generator[None, None, None]:
     This is used to test atomicity of state transitions.
     """
     # Mock implementation - will raise exception during transition
-    with patch(
-        "tests.unit.engine.services.test_migration_state_machine.transition",
-        side_effect=RuntimeError("Simulated failure during transition"),
-    ):
+    # Use __name__ to get the correct module path (works with --import-mode=importlib)
+    with patch(f"{__name__}.transition", side_effect=RuntimeError("Simulated failure during transition")):
         yield
 
 

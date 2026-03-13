@@ -92,22 +92,16 @@ class TestConfigValidation:
     """Tests for config validation."""
 
     def test_invalid_provider_rejected(self, temp_project: Path) -> None:
-        """Test invalid provider names are rejected."""
-        config_path = temp_project / "codeweaver.toml"
-        config_content = """
-[provider.embedding]
-provider = "invalid_provider_xyz"
+        """Test invalid provider names are rejected at the ProviderSettings validation level.
 
-[provider.primary.embedding.model_settings]
-model = "test-model"
-"""
-        config_path.write_text(config_content)
-        project_path = temp_project
-        project_name = "temp_project"
-        from codeweaver.core import CodeWeaverError
-        from codeweaver.server import CodeWeaverSettings
+        Note: CodeWeaverSettings in test mode excludes config file sources (to prevent
+        test pollution), so provider validation is tested directly via ProviderSettings.
+        """
+        from pydantic import ValidationError
 
-        with pytest.raises((CodeWeaverError, ValueError)):
-            CodeWeaverSettings(
-                config_file=config_path, project_path=project_path, project_name=project_name
-            )
+        from codeweaver.providers.config.providers import ProviderSettings
+
+        with pytest.raises((ValidationError, ValueError)):
+            ProviderSettings.model_validate({
+                "embedding": [{"provider": "invalid_provider_xyz", "model_name": "test-model"}]
+            })

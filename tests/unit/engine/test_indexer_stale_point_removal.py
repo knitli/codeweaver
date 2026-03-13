@@ -38,8 +38,13 @@ async def mock_indexer(tmp_path: Path, mock_vector_store, monkeypatch: pytest.Mo
     indexer._embedding_provider = AsyncMock()
     indexer._sparse_provider = AsyncMock()
     indexer._chunking_service = MagicMock()
-    # chunk_files should return an iterable of (file, chunks) tuples
-    indexer._chunking_service.chunk_files = MagicMock(return_value=[])
+
+    # chunk_files is an async generator; return an async-iterable empty result
+    async def _empty_chunk_files(_files):
+        return
+        yield  # Makes this an async generator
+
+    indexer._chunking_service.chunk_files = _empty_chunk_files
     indexer._progress_tracker = MagicMock()
     indexer._progress_tracker.get_stats = MagicMock(return_value=MagicMock(files_processed=0))
 

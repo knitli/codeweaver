@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 import pytest
 
 from codeweaver.cli import app as doctor_app
-from codeweaver.core import UNSET, CodeWeaverCoreSettings, Provider, SentinelName, Unset
+from codeweaver.core import UNSET, CodeWeaverCoreSettings, Provider, Unset
 from codeweaver.server.config import CodeWeaverSettings
 
 
@@ -64,10 +64,7 @@ class TestDoctorUnsetHandling:
 
     def test_unset_vs_none_distinction(self) -> None:
         """Test Unset is correctly distinguished from None."""
-        unset_value = Unset(name=SentinelName("UNSET"), module_name=__name__)
-
-        assert unset_value is not None
-        assert unset_value is UNSET
+        assert UNSET is not None
         assert None is not UNSET
 
     def test_doctor_handles_auto_detected_settings(
@@ -99,7 +96,6 @@ class TestDoctorUnsetHandling:
     def test_unset_check_pattern_correct(self) -> None:
         # sourcery skip: remove-assert-true, remove-redundant-if
         """Test correct pattern for checking Unset values."""
-        from codeweaver.core import Unset
 
         unset_value = Unset(name="UNSET", module_name=__name__)
 

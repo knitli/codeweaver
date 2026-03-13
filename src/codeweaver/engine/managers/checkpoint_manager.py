@@ -520,9 +520,10 @@ class CheckpointManager:
         # Get dimension and datatype from metadata if available
         dimension = None
         datatype = None
-        if checkpoint.collection_metadata:
-            dimension = checkpoint.collection_metadata.dimension
-            datatype = checkpoint.collection_metadata.datatype
+        collection_metadata = getattr(checkpoint, "collection_metadata", None)
+        if collection_metadata:
+            dimension = collection_metadata.dimension
+            datatype = collection_metadata.datatype
 
         return CheckpointSettingsFingerprint(
             embedding_config_type=config_type,

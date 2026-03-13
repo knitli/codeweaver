@@ -1324,9 +1324,10 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
         Returns:
             Explicitly configured dimension or None
         """
-        if self.embedding and (dimensions := self.embedding.get("dimensions")):
+        dimensions = self.embedding.get("dimensions") if self.embedding else None
+        if dimensions:
             return dimensions
-        if not dimensions and self.model_name in (
+        if self.model_name in (
             "text-embedding-3-large",
             "text-embedding-3-small",
         ):

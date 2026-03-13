@@ -163,7 +163,7 @@ async def health_service(
     its dependencies in the DI container for testing.
     """
     from codeweaver.core import StatisticsDep
-    from codeweaver.engine.dependencies import FailoverServiceDep
+    from codeweaver.engine.dependencies import FailoverServiceDep, IndexingServiceDep
     from codeweaver.providers import (
         EmbeddingProvidersDep,
         RerankingProvidersDep,
@@ -186,6 +186,7 @@ async def health_service(
     clean_container.override(VectorStoreProvidersDep, mock_providers.get("vector_store", ()))
     clean_container.override(StatisticsDep, session_statistics)
     clean_container.override(FailoverServiceDep, mock_failover)
+    clean_container.override(IndexingServiceDep, None)  # Not tested in health monitoring tests
 
     # Return the resolved service
     return await clean_container.resolve(HealthService)

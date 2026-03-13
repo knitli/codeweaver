@@ -1,10 +1,10 @@
 ---
-title: CodeWeaver Documentation
-description: Semantic code search and understanding for modern development teams
+title: CodeWeaver Alpha 6
+description: Exquisite Context for Agents. Infrastructure that is extensible, predictable, and resilient.
 template: splash
 hero:
-  title: CodeWeaver
-  tagline: Semantic code search and understanding for AI, and you.
+  title: Exquisite Context for Agents
+  tagline: CodeWeaver Alpha 6 transforms from a search tool to professional context infrastructure. Extensible, predictable, and resilient.
   image:
     file: ../../assets/codeweaver-primary.svg
   actions:
@@ -19,38 +19,57 @@ hero:
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## Features
+## Industrial-Grade Context
+
+CodeWeaver Alpha 6 provides the "Safety Net" and "Universal Extensibility" required for professional AI agent deployments.
 
 <CardGrid>
-  <Card title="Semantic Search" icon="magnifier">
-    Search your codebase using natural language queries powered by advanced embeddings
+  <Card title="Universal Extensibility (DI)" icon="puzzle">
+    Swap embedding providers or vector stores with a configuration change. No code required.
   </Card>
-  <Card title="Multi-Provider Support" icon="puzzle">
-    Works with multiple embedding providers, vector stores, and reranking services
+  <Card title="Predictable Configuration" icon="approve-check">
+    Pydantic-driven validation catches setup errors at boot-time before they impact your agents.
   </Card>
-  <Card title="Fast & Efficient" icon="rocket">
-    Optimized chunking and indexing for large codebases
+  <Card title="Resilient Intelligence" icon="rocket">
+    Automatic local fallbacks (FastEmbed/Sentence-Transformers) ensure agents never lose context during cloud outages.
   </Card>
-  <Card title="Developer Friendly" icon="laptop">
-    Simple CLI, MCP server support, and comprehensive API
+  <Card title="Deep Language Support" icon="document">
+    Full AST support for 27 languages and heuristic support for 166+ more.
   </Card>
 </CardGrid>
+
+## The Alpha 6 Advantage
+
+CodeWeaver outperforms legacy search tools by combining semantic understanding with structural code analysis.
+
+| Feature | Legacy Search | CodeWeaver Alpha 6 |
+| :--- | :--- | :--- |
+| **Search Type** | Keyword Only | Hybrid (Semantic + AST + Keyword) |
+| **Context Quality** | Noisy / Irrelevant | Exquisite / High-Precision |
+| **Extensibility** | Hardcoded | DI-Driven (Zero-Code Provider Swap) |
+| **Reliability** | Fails on API Timeout | Resilient (Automatic Local Fallback) |
+| **Token Usage** | Wasted on Noise | Optimized (60–80% Reduction) |
 
 ## Quick Start
 
 ```bash
 # Install CodeWeaver
-uv pip install code-weaver
+uv add code-weaver
+
+# Initialize with a profile
+cw init --profile recommended
 
 # Start the daemon
-cw start --project /path/to/your/codebase
+cw start
 
-# Search your code -- use the same tool your agent does
-cw search "authentication logic"
+# Give your agent exquisite context
+cw search "How is the DI container initialized?"
 ```
 
 ## What's Next?
 
-- Learn [Why CodeWeaver](/why/) is the right choice for your team
-- Explore the [CLI Reference](/cli/) for detailed command documentation
-- Check out the [API Reference](/api/) for integration guides
+- **Getting Started:** [Installation & Setup](/guides/installation/)
+- **Core Concepts:** [DI Architecture](/concepts/di-system/) \| [Exquisite Context](/concepts/exquisite-context/) \| [Language Support](/concepts/languages/)
+- **Workflows:** [Resilience & Fallbacks](/guides/resilience/) \| [Local-Only Operation](/guides/local-only/) \| [Choosing a Profile](/guides/profiles/)
+- **Reference:** [CLI Reference](/cli/) \| [Configuration Guide](/guides/configuration/) \| [Provider Registry](/api/providers/)
+- **Future:** [Roadmap to Alpha 7](/concepts/roadmap/)

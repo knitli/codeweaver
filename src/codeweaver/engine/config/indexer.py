@@ -589,7 +589,7 @@ if not IndexerSettings.__pydantic_complete__:
     IndexerSettings.model_rebuild()
 
 DefaultIndexerSettings = IndexerSettingsDict(
-    IndexerSettings().model_dump(exclude_none=True, exclude_computed_fields=True)
+    IndexerSettings().model_dump(exclude_unset=True, exclude_computed_fields=True)
 )
 
 __all__ = (

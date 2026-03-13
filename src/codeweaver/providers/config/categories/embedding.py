@@ -179,12 +179,37 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
             Provider.SENTENCE_TRANSFORMERS,
             Provider.FASTEMBED,
         ):
-            if provider == Provider.FASTEMBED:
-                data = self._set_client_option(data, "model_name", data.get("model_name"))
-            if provider == Provider.SENTENCE_TRANSFORMERS:
-                data = self._set_client_option(data, "model_name_or_path", data.get("model_name"))
-            else:
-                data = self._set_client_option(data, "model", data.get("model_name"))
+            model_name = data.get("model_name")
+            if "client_options" not in data and model_name:
+                # Pre-build client_options when absent so the default_factory doesn't need to
+                # access model_name (which may not yet be validated due to field ordering).
+                if provider == Provider.FASTEMBED:
+                    from codeweaver.providers.config.clients.multi import FastEmbedClientOptions
+
+                    data["client_options"] = FastEmbedClientOptions(
+                        model_name=ModelName(model_name)
+                    )
+                elif provider == Provider.SENTENCE_TRANSFORMERS:
+                    from codeweaver.providers.config.clients.multi import (
+                        SentenceTransformersClientOptions,
+                    )
+
+                    data["client_options"] = SentenceTransformersClientOptions(
+                        model_name_or_path=str(model_name)
+                    )
+                elif provider == Provider.HUGGINGFACE_INFERENCE:
+                    from codeweaver.providers.config.clients.multi import HuggingFaceClientOptions
+
+                    data["client_options"] = HuggingFaceClientOptions(
+                        model=str(model_name)
+                    )
+            elif "client_options" in data:
+                if provider == Provider.FASTEMBED:
+                    data = self._set_client_option(data, "model_name", model_name)
+                if provider == Provider.SENTENCE_TRANSFORMERS:
+                    data = self._set_client_option(data, "model_name_or_path", model_name)
+                else:
+                    data = self._set_client_option(data, "model", model_name)
         data |= super()._initialize(data)
         return data
 
@@ -192,18 +217,19 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
         """Initialize embedding provider settings."""
         if model_name := data.get("model_name"):
             data["model_name"] = ModelName(model_name)
-        config = data["embedding_config"]
-        if (
-            not (
-                config_model_name := config.get("model_name")
-                if isinstance(config, dict)
-                else config.model_name
-            )
-            and model_name
-        ):
-            config["model_name"] = ModelName(model_name)
-        elif config_model_name and not model_name:
-            data["model_name"] = ModelName(config_model_name)
+        config = data.get("embedding_config")
+        if config is not None:
+            if (
+                not (
+                    config_model_name := config.get("model_name")
+                    if isinstance(config, dict)
+                    else config.model_name
+                )
+                and model_name
+            ):
+                config["model_name"] = ModelName(model_name)
+            elif config_model_name and not model_name:
+                data["model_name"] = ModelName(config_model_name)
         super().__init__(**data)
 
     def _get_capabilities(self) -> Any:
@@ -869,7 +895,12 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
                     str(self.embed_provider.model_name), str(self.query_provider.model_name)
                 ):
                     raise ConfigurationError(
-                        f"Models are not compatible within family '{caps.model_family.family_id}'"
+                        f"Models '{self.embed_provider.model_name}' and '{self.query_provider.model_name}' "
+                        f"are not compatible within family '{caps.model_family.family_id}'",
+                        suggestions=[
+                            f"Use models from the same family (e.g., two '{caps.model_family.family_id}' models)",
+                            "Set validate_family_compatibility=False to skip this check",
+                        ],
                     )
 
             return self

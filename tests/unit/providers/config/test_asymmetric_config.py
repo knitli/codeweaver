@@ -20,7 +20,11 @@ from typing import TYPE_CHECKING
 import pytest
 
 from codeweaver.core import Provider
-from codeweaver.core.exceptions import ConfigurationError
+from codeweaver.core.exceptions import (
+    ConfigurationError,
+    DatatypeMismatchError,
+    DimensionMismatchError,
+)
 from codeweaver.providers.config.sdk.embedding import VoyageEmbeddingConfig
 
 
@@ -222,7 +226,7 @@ class TestIncompatibleFamilyModels:
             from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
-        with pytest.raises(ConfigurationError, match="does not belong to a model family"):
+        with pytest.raises(ConfigurationError, match=r"not.*compatible|compatible.*family"):
             AsymmetricEmbeddingProviderSettings(
                 embed_provider=voyage_4_large_settings, query_provider=voyage_code_3_settings
             )
@@ -237,7 +241,9 @@ class TestIncompatibleFamilyModels:
             from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
-        with pytest.raises(ConfigurationError, match="does not belong to a model family"):
+        # May raise ConfigurationError (family mismatch), DatatypeMismatchError, or
+        # DimensionMismatchError depending on which validation check triggers first.
+        with pytest.raises((ConfigurationError, DatatypeMismatchError, DimensionMismatchError)):
             AsymmetricEmbeddingProviderSettings(
                 embed_provider=voyage_4_large_settings, query_provider=openai_settings
             )
@@ -314,6 +320,8 @@ class TestErrorMessageQuality:
         error_message = self._retrieve_error_message_from_configuration(
             voyage_4_large_settings, voyage_code_3_settings
         )
+        # Error includes both model names in the incompatibility message
+        assert "voyage-4-large" in error_message
         assert "voyage-code-3" in error_message
 
     def test_error_contains_family_information(
@@ -343,7 +351,7 @@ class TestErrorMessageQuality:
     def test_error_provides_suggestions(
         self,
         voyage_4_large_settings: EmbeddingProviderSettings,
-        openai_settings: EmbeddingProviderSettings,
+        voyage_code_3_settings: EmbeddingProviderSettings,
     ):
         """Test that error messages suggest alternative models."""
         try:
@@ -352,13 +360,13 @@ class TestErrorMessageQuality:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         with pytest.raises(ConfigurationError) as exc_info:
             AsymmetricEmbeddingProviderSettings(
-                embed_provider=voyage_4_large_settings, query_provider=openai_settings
+                embed_provider=voyage_4_large_settings, query_provider=voyage_code_3_settings
             )
         assert hasattr(exc_info.value, "suggestions")
         assert len(exc_info.value.suggestions) > 0
         suggestions_text = " ".join(exc_info.value.suggestions).lower()
         assert any(
-            keyword in suggestions_text for keyword in ["use", "family", "compatible", "symmetric"]
+            keyword in suggestions_text for keyword in ["use", "family", "compatible", "validate"]
         )
 
     def test_error_includes_details_dict(

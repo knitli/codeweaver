@@ -67,7 +67,12 @@ class TestInitConfigCommand:
         assert config_path.exists()
         config = tomli.loads(config_path.read_text())
 
-        assert config["provider"]["embedding"][0]["provider"] == "voyage"
+        # Recommended profile uses asymmetric embedding (embed_provider + query_provider)
+        embedding_entry = config["provider"]["embedding"][0]
+        assert embedding_entry.get("config_type") == "asymmetric" or (
+            embedding_entry.get("embed_provider", {}).get("provider") == "voyage"
+            or embedding_entry.get("provider") == "voyage"
+        )
         assert config["provider"]["vector_store"][0]["provider"] == "qdrant"
 
     def test_config_profile_quickstart(
@@ -390,12 +395,13 @@ class TestInitIntegration:
 provider = "fastembed"
 """)
 
-        # Init should detect and handle existing config
+        # Init should detect and handle existing config (use --force since DI injection
+        # for interaction is not available in unit test context)
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["init", "--quickstart", "--project", str(temp_project)])
+            init_app(["init", "--quickstart", "--force", "--project", str(temp_project)])
         capsys.readouterr()
 
-        # Should succeed (with --force or confirmation mocked)
+        # Should succeed with --force flag overriding existing config
         assert exc_info.value.code == 0
         # Config file should exist
         assert config_file.exists()

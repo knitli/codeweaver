@@ -103,7 +103,7 @@ class CodeWeaverEngineSettings(CodeWeaverProviderSettings):
         fields_and_defaults = (
             ("indexer", DefaultIndexerSettings, IndexerSettings),
             ("chunker", DefaultChunkerSettings, ChunkerSettings),
-            ("failover", DefaultFailoverSettings, FailoverSettings),
+            ("failover", DefaultFailoverSettings(), FailoverSettings),
         )
         for field_name, default, type_cls in fields_and_defaults:
             field_value = (

@@ -42,12 +42,35 @@ export default defineConfig({
         label: 'Getting Started',
         items: [
           { label: 'Why CodeWeaver?', slug: 'why' },
-          { label: 'CLI Reference', slug: 'cli' },
+          { label: 'Installation & Setup', slug: 'guides/installation' },
         ],
       },
       {
-        label: 'API Reference',
-        link: '/api/',
+        label: 'Core Concepts',
+        items: [
+          { label: 'Exquisite Context', slug: 'concepts/exquisite-context' },
+          { label: 'DI Architecture', slug: 'concepts/di-system' },
+          { label: 'Language Support', slug: 'concepts/languages' },
+          { label: 'Roadmap to Alpha 7', slug: 'concepts/roadmap' },
+        ],
+      },
+      {
+        label: 'Guides',
+        items: [
+          { label: 'Configuration', slug: 'guides/configuration' },
+          { label: 'Choosing a Profile', slug: 'guides/profiles' },
+          { label: 'Resilience & Fallbacks', slug: 'guides/resilience' },
+          { label: 'Local-Only Operation', slug: 'guides/local-only' },
+          { label: 'Custom Providers', slug: 'guides/custom-providers' },
+        ],
+      },
+      {
+        label: 'Reference',
+        items: [
+          { label: 'CLI Reference', slug: 'cli' },
+          { label: 'Provider Registry', slug: 'api/providers' },
+          { label: 'API Reference', link: '/api/' },
+        ],
       },
     ],
   }), markdoc()],

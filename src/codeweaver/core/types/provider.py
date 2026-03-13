@@ -249,7 +249,7 @@ def get_categories(provider: Provider) -> tuple[ProviderCategory, ...]:
     return tuple(ProviderCategory.from_string(category) for category in get_categories(provider))
 
 
-class Provider(BaseEnum):
+class Provider(str, BaseEnum):  # noqa: SLOT000
     """Enumeration of available providers."""
 
     ALIBABA = "alibaba"
