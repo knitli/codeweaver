@@ -12,7 +12,6 @@ import starlightLinksValidator from 'starlight-links-validator'
 import starlightSidebarTopics from 'starlight-sidebar-topics';
 import starlightScrollToTop from 'starlight-scroll-to-top';
 import starlightPluginIcons from 'starlight-plugin-icons';
-import starlightContributorList from 'starlight-contributor-list';
 import starlightPageActions from 'starlight-page-actions';
 import astroD2 from 'astro-d2';
 import markdoc from '@astrojs/markdoc';
@@ -69,12 +68,15 @@ export default defineConfig({
         items: [
           { label: 'CLI Reference', slug: 'cli' },
           { label: 'Provider Registry', slug: 'api/providers' },
-          { label: 'API Reference', link: '/api/' },
+          {
+            label: 'API Reference',
+            autogenerate: { directory: 'api' },
+          },
         ],
       },
     ],
   }), markdoc()],
   vite: {
-    plugins: [tailwindcss(), starlightLinksValidator(), starlightSidebarTopics(), starlightScrollToTop(), starlightChangelogs(), starlightPluginIcons(), starlightContributorList(), astroD2(), starlightPageActions({ baseUrl: 'https://docs.knitli.com/codeweaver' })],
+    plugins: [tailwindcss(), starlightLinksValidator(), starlightSidebarTopics(), starlightScrollToTop(), starlightChangelogs(), starlightPluginIcons(), astroD2(), starlightPageActions({ baseUrl: 'https://docs.knitli.com/codeweaver' })],
   },
 });

@@ -1,0 +1,331 @@
+---
+title: core_settings
+description: API reference for codeweaver.core.config.core_settings
+---
+
+# core_settings
+
+Root settings for core-only CodeWeaver installation.
+
+This module provides the root settings class when only the core package
+is installed (logging and telemetry configuration only).
+
+## Class: `AnonymityConversion`
+
+Enumeration of anonymity conversion methods for telemetry data.
+
+These methods define how telemetry data should be anonymized or aggregated
+to protect user privacy. Only applies to filtered fields.
+
+### Method: `filtered`
+
+```python
+filtered()
+```
+
+Process values according to the anonymity conversion method.
+
+## Class: `BaseCodeWeaverSettings`
+
+Base settings model for CodeWeaver with privacy-preserving telemetry serialization.
+
+This class extends `pydantic_settings.BaseSettings` to provide a foundation for CodeWeaver's configuration management.
+
+As with all CodeWeaver base models, it mandates all subclasses implement the `_telemetry_keys` method to specify how sensitive data should be handled during telemetry serialization. This makes it each class's responsibility to define which fields are safe for telemetry and how they should be anonymized or excluded. Classes can implement a `_telemetry_handler` method for finer control over the telemetry serialization process.
+
+
+
+Subclasses can use the `from_config` class method to create instances from specific configuration files, facilitating testing and specialized setups. If a subclass is subordinate to the main `CodeWeaverSettings`, it should handle settings_customise_sources in a way that avoids conflicts -- mirroring a localized version of the logic here, but only when the main class is not available. Since users can install only parts of CodeWeaver, this is important for modularity.
+
+Every class has the `project_path`, `config_file`, and `user_config_dir` properties available for use in configuration; primarily for situations where `CodeWeaverSettings` is not available.
+
+## Class: `CodeWeaverCoreSettings`
+
+Root settings for core-only CodeWeaver installation, and base settings for all CodeWeaver installations. Other CodeWeaver packages extend this class to add additional configuration as needed.
+
+The class also includes an implementation of BaseSettings's `settings_customise_sources` method to define a comprehensive and prioritized configuration source hierarchy, including support for environment variables, dotenv files, multiple configuration file formats in a dozen or so locations, and secret management services.
+
+When only the core package is installed, this provides configuration
+for logging and telemetry only. All other CodeWeaver functionality
+requires additional packages (providers, engine, server).
+
+Configuration structure:
+    ```toml
+    [logging]
+    level = "INFO"
+
+    [telemetry]
+    enabled = true
+    ```
+
+### Method: `finalize`
+
+```python
+finalize()
+```
+
+Finalize settings after loading.
+
+This method exists for backwards compatibility and may be used for future
+settings post-processing if needed.
+
+Returns:
+    Self for chaining
+
+Note:
+    This method is idempotent - calling it multiple times is safe.
+
+### Method: `from_config`
+
+```python
+from_config()
+```
+
+Create a CodeWeaverSettings instance from a configuration file.
+
+This is a convenience method for creating a settings instance from a specific config file. By default, CodeWeaverSettings will look for configuration files in standard locations (like codeweaver.toml in the project root -- see `get_config_locations`). This method allows you to specify a particular config file to load settings from, primarily for testing or special use cases.
+
+### Method: `generate_default_config`
+
+```python
+generate_default_config()
+```
+
+Generate a default configuration file at the specified path.
+
+The file format is determined by the file extension (.toml, .yaml/.yml, .json).
+
+### Method: `json_schema`
+
+```python
+json_schema()
+```
+
+Get the JSON validation schema for the settings model.
+
+Note: For build-time schema generation, use scripts/build/generate-schema.py instead.
+This method is kept for runtime introspection and testing purposes.
+
+### Method: `python_json_schema`
+
+```python
+python_json_schema()
+```
+
+Get the JSON validation schema for the settings model as a string.
+
+### Method: `save_to_file`
+
+```python
+save_to_file()
+```
+
+Save the current settings to a configuration file.
+
+The file format is determined by the file extension (.toml, .yaml/.yml, .json).
+
+### Method: `serialize_for_telemetry`
+
+```python
+serialize_for_telemetry()
+```
+
+Serialize the model for telemetry output, filtering sensitive keys.
+
+### Method: `settings_customise_sources`
+
+```python
+settings_customise_sources()
+```
+
+Customize settings sources for CodeWeaverSettings and subclasses.
+
+This method defines the configuration source hierarchy for CodeWeaver settings classes. It prioritizes environment variables, dotenv files, multiple configuration file formats in various locations, and secret management services. Subclasses can override this method to modify the source order or add additional sources as needed.
+
+### Method: `view`
+
+```python
+view()
+```
+
+Get a read-only mapping view of the settings.
+
+### Method: `write_json_schema`
+
+```python
+write_json_schema()
+```
+
+Write the JSON schema to a file.
+
+If no path is provided, writes to 'codeweaver.schema.json' in the current directory.
+
+## Class: `CodeWeaverSettingsDict`
+
+TypedDict for CodeWeaver settings.
+
+Not intended to be used directly; used for internal type checking and validation.
+
+## Class: `DictView`
+
+Read-only view wrapper around a mapping (intended for TypedDict-backed dicts).
+
+Provides a read-only view of a TypedDict (or other) mapping, preventing any modifications to the underlying data. This is useful for exposing configuration or data structures that should not be altered after creation.
+
+Args:
+    mapping (TypedDictT): The mapping to wrap.
+    make_immutable (bool, optional): Whether to make the underlying mapping immutable using `MappingProxyType`. Defaults to `True`. Important things to understand here:
+        - DictView is always read-only, and the underlying mapping, if it is mutable, cannot be modified through the DictView interface (but can still be modified directly if the original mapping is accessible).
+        - If `make_immutable` is `True`, the underlying mapping is wrapped in a `MappingProxyType`, making it immutable. This prevents any modifications to the original mapping through any references *to this mapping* -- like DictView, MappingProxyType provides a dynamic read-only view of the original mapping. The main difference is hashability and performance: MappingProxyType is hashable and slightly faster for read operations.
+        - If `make_immutable` is `False`, the original mapping is used directly. This is useful if the original mapping is already immutable or you're not paranoid about mutability like we are.
+
+### Method: `get`
+
+```python
+get()
+```
+
+Return the value for the given key, or the default value if the key is not found.
+
+### Method: `get_subview`
+
+```python
+get_subview()
+```
+
+Return a DictView of the sub-mapping at the given key.
+
+### Method: `items`
+
+```python
+items()
+```
+
+Return a view of the items in the mapping.
+
+### Method: `keys`
+
+```python
+keys()
+```
+
+Return a view of the keys in the mapping.
+
+### Method: `values`
+
+```python
+values()
+```
+
+Return a view of the values in the mapping.
+
+## Class: `LoggingSettingsDict`
+
+Global logging settings.
+
+## Class: `Sentinel`
+
+Create a unique sentinel object.
+...
+
+## Class: `TelemetrySettings`
+
+Telemetry configuration settings.
+
+We collect basic telemetry data **by default** to help us improve CodeWeaver. **We do not collect _any_ potentially identifying information.**
+        We **DO _NOT_ collect**:
+            - file paths and repository names (all hashed),
+            - potential secrets (explicitly not included in serialization),
+            - any queries or results content (unless you explicitly tell us we can, see `tools_over_privacy`).
+        If enabled, we **DO collect**:
+            - usage patterns,
+            - errors,
+            - performance metrics,
+            - settings usage (e.g., which providers you use, whether you explicitly set certain settings, etc).
+        This helps us make CodeWeaver better for everyone.  **We will never sell your data or show you ads. We only use it to improve CodeWeaver.**
+CodeWeaver implements a granular privacy-first approach to telemetry. *Every single serializable class must define its own `__telemetry_keys__` method to explicitly list which fields are safe to serialize for telemetry purposes.* This ensures that no potentially identifying information is ever collected.
+
+We further screen data on ingest at Posthog to filter out any potential secrets or PII before we actually see and store it.
+
+### Method: `model_post_init`
+
+```python
+model_post_init()
+```
+
+Post-initialization to track unset fields and set defaults.
+
+## Class: `Unset`
+
+A sentinel value to indicate that a value is unset.
+Used as a default value in function arguments to distinguish between
+an explicit `None` value and an uninitialized parameter.
+
+## Function: `aws_secret_store_configured`
+
+```python
+aws_secret_store_configured()
+```
+
+Check if AWS Secrets Manager is configured for use as a settings source.
+
+## Function: `azure_key_vault_configured`
+
+```python
+azure_key_vault_configured()
+```
+
+Check if Azure Key Vault is configured for use as a settings source.
+
+## Function: `get_config_locations`
+
+```python
+get_config_locations()
+```
+
+Get standard configuration file locations for CodeWeaverSettings.
+
+Also ensures that the user configuration directories exist with correct permissions.
+
+## Function: `get_dotenv_locations`
+
+```python
+get_dotenv_locations()
+```
+
+Get standard dotenv file locations for CodeWeaverSettings.
+
+## Function: `get_possible_config_paths`
+
+```python
+get_possible_config_paths()
+```
+
+Get possible configuration file paths for CodeWeaverSettings.
+
+## Function: `get_user_config_dir`
+
+```python
+get_user_config_dir()
+```
+
+Get the user configuration directory based on the operating system.
+
+## Function: `google_secret_manager_configured`
+
+```python
+google_secret_manager_configured()
+```
+
+Check if Google Secret Manager is configured for use as a settings source.
+
+## Function: `has_package`
+
+```python
+has_package()
+```
+
+Check if a package is installed.
+
+First checks via importlib.metadata to catch cases like `fastembed-gpu` which don't import under that name.
+Then falls back to importlib.util.find_spec to catch packages that may not be registered in metadata.
