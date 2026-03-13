@@ -105,14 +105,13 @@ class ProviderEnvRegistry:
         provider_key = provider.lower()
         configs = cls._registry.get(provider_key, [])
 
-        # Resolve inheritance
+        # Resolve inheritance — child config first, then parent configs
         resolved = []
         for cfg in configs:
+            resolved.append(cfg)
             if cfg.inherits_from:
-                # Add parent configs first
                 parent_configs = cls.get(cfg.inherits_from)
                 resolved.extend(parent_configs)
-            resolved.append(cfg)
 
         return resolved
 

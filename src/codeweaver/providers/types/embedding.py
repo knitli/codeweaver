@@ -290,8 +290,12 @@ class EmbeddingCapabilityGroup(NamedTuple):
             }
         if self.idf:
             datatype = await self.idf.datatype()
+            # Use PRIMARY_SPARSE_VECTOR_NAME ("sparse") for IDF/BM25 vectors so the
+            # collection schema key matches the upsert and search paths, which both
+            # use "sparse" regardless of whether the backing model is a true sparse
+            # encoder or an IDF model like BM25.
             params["sparse_vectors"] = {
-                "idf": SparseVectorParams(index=None, modifier=Modifier.IDF)
+                PRIMARY_SPARSE_VECTOR_NAME: SparseVectorParams(index=None, modifier=Modifier.IDF)
             }
 
         return CollectionParams.model_construct(**params)

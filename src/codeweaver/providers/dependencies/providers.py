@@ -49,7 +49,7 @@ async def _get_global_settings() -> CodeWeaverSettingsType:
 async def _get_provider_settings() -> ProviderSettings:
     """Get the provider settings from the global settings."""
     global_settings = await _get_global_settings()
-    return global_settings.providers
+    return global_settings.provider
 
 
 async def _get_settings_for_category(
@@ -94,7 +94,7 @@ async def _get_capabilities_for_model(
         from codeweaver.providers.embedding.capabilities.resolver import EmbeddingCapabilityResolver
 
         resolver = await container.resolve(EmbeddingCapabilityResolver)
-    return await resolver.resolve(model_name)
+    return resolver.resolve(model_name)
 
 
 # ===========================================================================
@@ -192,8 +192,14 @@ async def _construct_agent_provider(
     client_options = (
         provider_settings.client_options.as_settings() if provider_settings.client_options else {}
     )
-    client_instance = await card.create_instance_async(target="client", **client_options)
-    return await card.create_instance_async(target="provider", client=client_instance)
+    if card.metadata and card.metadata.provider_handler:
+        # Card has a custom handler — let it manage client creation/passing.
+        client_instance = await card.create_instance_async(target="client", **client_options)
+        return await card.create_instance_async(target="provider", client=client_instance)
+    # No provider_handler: instantiate the provider directly with client_options
+    # (e.g., AnthropicProvider(api_key=...) instead of AnthropicProvider(client=...)).
+    # Pydantic-ai providers accept api_key and similar kwargs directly.
+    return await card.create_instance_async(target="provider", **client_options)
 
 
 async def _get_agent_resolver() -> Any:
@@ -215,8 +221,8 @@ async def _construct_model_for_agent_provider(
 
     model_settings = provider_settings.agent_config
     resolver = await _get_agent_resolver()
-    model_name = model_settings.model_name
-    profile = await resolver.resolve(model_name)
+    model_name = provider_settings.model_name
+    profile = resolver.resolve(model_name)
     provider = provider or await _construct_agent_provider(provider_settings, card)
     model_cls = type(infer_model(model_name, lambda: provider))
     return model_cls(model_name, provider=provider, profile=profile, settings=model_settings)  # ty:ignore[too-many-positional-arguments, unknown-argument]
@@ -387,25 +393,24 @@ type PrimaryEmbeddingProviderDep = Annotated[
 
 
 @dependency_provider(EmbeddingProvider, scope="singleton", tags=["embedding", "query"])
-async def _create_query_embedding_provider() -> EmbeddingProvider:
+async def _create_query_embedding_provider(
+    providers: EmbeddingProvidersDep = INJECTED,
+) -> EmbeddingProvider:
     """Factory function to create the primary embedding provider for query operations.
 
     If the user has asymmetric embedding providers configured, this returns the 'query' provider. Otherwise, it returns the single symmetric embedding provider. This allows us to route query operations to the correct provider without requiring the user to specify it.
     """
-    providers = await _resolve_type_from_container(tuple[EmbeddingProvider, ...])
-    if (
-        len(providers) == 1 or not providers[0].capabilities.model_family
-        if providers[0].capabilities
-        else True
-    ):
-        # If there's only one provider, or the first provider doesn't have capabilities that indicate it's an asymmetric 'embed' provider, we assume it's a symmetric provider and return it.
+    first_caps = getattr(providers[0], "caps", None)
+    if len(providers) == 1 or not (first_caps and first_caps.model_family):
+        # If there's only one provider, or the first provider doesn't have capabilities that
+        # indicate it's an asymmetric 'embed' provider, assume it's a symmetric provider.
         return providers[0]
     return next(
         (
             p
             for p in providers[1:]
-            if p.capabilities
-            and p.capabilities.model_family == providers[0].capabilities.model_family
+            if (p_caps := getattr(p, "caps", None))
+            and p_caps.model_family == first_caps.model_family
         ),
         providers[0],
     )
@@ -425,10 +430,11 @@ from codeweaver.providers.embedding import SparseEmbeddingProvider
 async def _create_sparse_embedding_providers() -> tuple[SparseEmbeddingProvider, ...]:
     """Factory function to create sparse embedding providers."""
     category_settings = await _get_settings_for_category("sparse_embedding")
-    return tuple(
+    providers = [
         await _instantiate_provider_from_settings(s, SparseEmbeddingProvider)
         for s in category_settings
-    )
+    ]
+    return tuple(providers)
 
 
 type SparseEmbeddingProvidersDep = Annotated[
@@ -480,30 +486,35 @@ type DataProvidersDep = Annotated[
 
 
 @dependency_provider(Agent, scope="singleton", tags=["agent"])
-async def _create_agent_providers(tools: DataProvidersDep = INJECTED) -> Agent:
-    """Factory function to create agent providers."""
+async def _create_agent_providers(tools: DataProvidersDep = INJECTED) -> Agent | None:
+    """Factory function to create agent providers.
+
+    Returns None when no agent provider settings are configured (e.g., testing profile).
+    """
     from codeweaver.core.types.service_cards import get_service_card
 
     tools = await _resolve_type_from_container(tuple[DataProviderType, ...], tags=["data"])
     category_settings = await _get_settings_for_category("agent")
+    if not category_settings:
+        return None
     service_cards = tuple(
         get_service_card(
             s.provider.variable,
             "agent",
             model_hint=str(s.model_name),
-            client_hint=s.client_options.sdk_client.variable if s.client_options else None,
+            client_preference=s.client_options.sdk_client.variable if s.client_options else None,
         )
         for s in category_settings
     )
-    models = tuple(
+    models = tuple([
         await _construct_model_for_agent_provider(s, card)
         for s, card in zip(category_settings, service_cards, strict=True)
-    )
+    ])
     return await _construct_multi_model_agent(models=models, tools=tools, system_prompt=None)
 
 
 type AgentProviderDep = Annotated[
-    Agent, depends(_create_agent_providers, use_cache=True, tags=["agent"])
+    Agent | None, depends(_create_agent_providers, use_cache=True, tags=["agent"])
 ]
 
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
@@ -513,9 +524,11 @@ from codeweaver.providers.vector_stores.base import VectorStoreProvider
 async def _create_vector_store_providers() -> tuple[VectorStoreProvider, ...]:
     """Factory function to create vector store providers."""
     category_settings = await _get_settings_for_category("vector_store")
-    return tuple(
-        await _instantiate_provider_from_settings(s, VectorStoreProvider) for s in category_settings
-    )
+    providers = [
+        await _instantiate_provider_from_settings(s, VectorStoreProvider)
+        for s in category_settings
+    ]
+    return tuple(providers)
 
 
 type VectorStoreProvidersDep = Annotated[
@@ -546,9 +559,11 @@ from codeweaver.providers.reranking.providers.base import RerankingProvider
 async def _create_reranking_providers() -> tuple[RerankingProvider, ...]:
     """Factory function to create reranking providers."""
     category_settings = await _get_settings_for_category("reranking")
-    return tuple(
-        await _instantiate_provider_from_settings(s, RerankingProvider) for s in category_settings
-    )
+    providers = [
+        await _instantiate_provider_from_settings(s, RerankingProvider)
+        for s in category_settings
+    ]
+    return tuple(providers)
 
 
 type RerankingProvidersDep = Annotated[
@@ -562,12 +577,16 @@ from codeweaver.providers.types.search import SearchPackage
 @dependency_provider(SearchPackage, scope="singleton", tags=["search_package"])
 async def _create_search_package(
     query_provider: QueryEmbeddingProviderDep = INJECTED,
-    sparse_provider: SparseEmbeddingProvidersDep = INJECTED,
+    sparse_provider: PrimarySparseEmbeddingProviderDep = INJECTED,
     reranking_providers: RerankingProvidersDep = INJECTED,
     vector_store_provider: PrimaryVectorStoreProviderDep = INJECTED,
     agent_provider: AgentProviderDep = INJECTED,
 ) -> SearchPackage:
-    """Factory function to create a search package."""
+    """Factory function to create a search package.
+
+    agent_provider may be None when no agent settings are configured (e.g., testing profile).
+    """
+    # agent_provider is Agent | None — SearchPackage accepts None gracefully.
     return SearchPackage(
         embedding=query_provider,
         sparse_embedding=sparse_provider,

@@ -312,7 +312,7 @@ async def test_e2e_parallel_dict_convenience():
     # Get sample files
     fixture_dir = Path("tests/fixtures")
     files = [
-        DiscoveredFile.from_path(fixture_path)
+        DiscoveredFile.from_path(Path(fixture_path))  # Convert anyio.Path → pathlib.Path
         async for fixture_path in anyio.Path(fixture_dir).glob("sample*.py")
     ]
 
@@ -325,8 +325,8 @@ async def test_e2e_parallel_dict_convenience():
 
     if not files:
         pytest.skip("No fixture files available for parallel dict test")
-    # Get results as dict
-    results = await chunk_files_parallel_dict(files, governor, max_workers=2)
+    # Get results as dict (use thread executor to avoid pickling issues with dev/venv mismatch)
+    results = await chunk_files_parallel_dict(files, governor, max_workers=2, executor_type="thread")
 
     # Verify it's a dictionary
     assert isinstance(results, dict), "Should return dictionary"

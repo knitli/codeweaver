@@ -138,6 +138,10 @@ async def test_sparse_only_fallback(initialize_test_settings, clean_container):
     When: Search query submitted
     Then: Falls back to sparse-only search, warns user
     """
+    import codeweaver.core.dependencies
+    import codeweaver.engine.dependencies
+    import codeweaver.server.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
+
     from codeweaver.core import SearchStrategy
     from codeweaver.providers import (
         CodeWeaverSparseEmbedding,
@@ -171,10 +175,32 @@ async def test_sparse_only_fallback(initialize_test_settings, clean_container):
     mock_vector_store.client.get_collection.return_value = mock_collection_info
 
     # Apply overrides using context manager
+    # Override both the singleton types and the collection type aliases so the
+    # search pipeline can resolve providers without reading from settings.
+    from codeweaver.core.config.telemetry import TelemetrySettings
+    from codeweaver.providers import RerankingProvider
+    from codeweaver.providers.dependencies.providers import (
+        AgentProviderDep,
+        EmbeddingProvidersDep,
+        RerankingProvidersDep,
+        SparseEmbeddingProvidersDep,
+        VectorStoreProvidersDep,
+    )
+
+    mock_reranking_provider = AsyncMock(spec=RerankingProvider)
+    mock_reranking_provider.rerank = AsyncMock(return_value=[])
+
     overrides = {
         EmbeddingProvider: lambda: mock_dense_provider,
+        EmbeddingProvidersDep: (mock_dense_provider,),
         SparseEmbeddingProvider: lambda: mock_sparse_provider,
+        SparseEmbeddingProvidersDep: (mock_sparse_provider,),
         VectorStoreProvider: lambda: mock_vector_store,
+        VectorStoreProvidersDep: (mock_vector_store,),
+        RerankingProvider: lambda: mock_reranking_provider,
+        RerankingProvidersDep: (mock_reranking_provider,),
+        AgentProviderDep: MagicMock(),
+        TelemetrySettings: TelemetrySettings(),
     }
 
     with clean_container.use_overrides(overrides):
@@ -308,28 +334,62 @@ async def test_indexing_continues_on_file_errors(
     When: Indexing runs
     Then: Successfully discovers and processes the 2 Python files
     """
+    import codeweaver.core.dependencies
+    import codeweaver.engine.dependencies
+    import codeweaver.providers.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
+
     from codeweaver.engine import IndexingService
+    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider, VectorStoreProvider
+    from codeweaver.providers.config.profiles import ProviderProfile
+    from codeweaver.providers.config.providers import ProviderSettings
+    from codeweaver.providers.dependencies.providers import (
+        EmbeddingProvidersDep,
+        SparseEmbeddingProvidersDep,
+        VectorStoreProvidersDep,
+    )
 
     # Configure settings for this test
     async def get_test_settings() -> CodeWeaverSettingsType:
-        from codeweaver.server.config.helpers import get_settings
+        from codeweaver.core.config.loader import get_settings
 
         settings = get_settings()
         settings.project_path = test_project_path
+        # Explicitly set provider since sync get_settings() never calls _initialize(),
+        # leaving provider=UNSET. This ensures _get_provider_settings() doesn't fail.
+        settings.provider = ProviderSettings.model_construct(
+            **ProviderProfile.TESTING.as_provider_settings()
+        )
         return settings
 
-    overrides = {CodeWeaverSettingsType: get_test_settings}
+    # Mock providers to avoid requiring real API keys/services for indexing tests
+    mock_embed = AsyncMock(spec=EmbeddingProvider)
+    mock_embed.model_name = "mock-dense-model"
+    mock_embed.embed_documents = AsyncMock(return_value=[[0.1] * 256])
+    mock_sparse = AsyncMock(spec=SparseEmbeddingProvider)
+    mock_sparse.model_name = "mock-sparse-model"
+    mock_sparse.embed_documents = AsyncMock(return_value=[{"indices": [0], "values": [0.1]}])
+    mock_store = AsyncMock(spec=VectorStoreProvider)
+    mock_store.collection_name = "test_collection"
+    mock_store.upsert = AsyncMock()
+    mock_store.delete_by_file = AsyncMock()
+
+    overrides = {
+        CodeWeaverSettingsType: get_test_settings,
+        # Override the collection-type deps directly using TypeAliasType keys so the
+        # container's _resolve_dependency() intercepts them before calling the real factories.
+        EmbeddingProvidersDep: (mock_embed,),
+        SparseEmbeddingProvidersDep: (mock_sparse,),
+        VectorStoreProvidersDep: (mock_store,),
+    }
 
     with clean_container.use_overrides(overrides):
+        # Resolve settings first, then store directly in _singletons so that the sync
+        # container[T] access path used by _global_settings() can find it without going
+        # through the override mechanism (which bypasses singleton caching).
+        test_settings = await clean_container.resolve(CodeWeaverSettingsType)
+        clean_container._singletons[CodeWeaverSettingsType] = test_settings
         # Resolve Indexer via DI
         indexer = await clean_container.resolve(IndexingService)
-
-        # Ensure it's not trying to hit real APIs
-        # indexer._providers_initialized = True
-
-        # Manually set walker settings if they didn't get picked up
-        # Indexer uses _walker_settings internally
-        # indexer._walker_settings = {"path": str(test_project_path)}
 
         # Run indexing
         discovered_count = await indexer.index_project(force_reindex=True)
@@ -344,7 +404,7 @@ async def test_indexing_continues_on_file_errors(
         stats = indexer.stats
 
         # Should have discovered at least 2 Python files
-        assert stats.total_files_discovered() >= 2
+        assert stats.files_discovered >= 2
 
         # Binary files are filtered out before processing, so no errors expected
 
@@ -359,7 +419,19 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path, cl
     When: Indexing encounters ≥25 errors
     Then: Warning displayed to stderr
     """
+    import codeweaver.core.dependencies
+    import codeweaver.engine.dependencies
+    import codeweaver.providers.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
+
     from codeweaver.engine import IndexingService
+    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider, VectorStoreProvider
+    from codeweaver.providers.config.profiles import ProviderProfile
+    from codeweaver.providers.config.providers import ProviderSettings
+    from codeweaver.providers.dependencies.providers import (
+        EmbeddingProvidersDep,
+        SparseEmbeddingProvidersDep,
+        VectorStoreProvidersDep,
+    )
 
     # Create project with many corrupted files
     project_root = tmp_path / "error_project"
@@ -375,17 +447,42 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path, cl
 
     # Configure settings for this test
     async def get_test_settings() -> CodeWeaverSettingsType:
-        from codeweaver.server.config.helpers import get_settings
+        from codeweaver.core.config.loader import get_settings
 
         settings = get_settings()
         settings.project_path = project_root
+        # Explicitly set provider since sync get_settings() never calls _initialize(),
+        # leaving provider=UNSET. This ensures _get_provider_settings() doesn't fail.
+        settings.provider = ProviderSettings.model_construct(
+            **ProviderProfile.TESTING.as_provider_settings()
+        )
         return settings
 
-    clean_container.override(CodeWeaverSettingsType, get_test_settings)
+    mock_embed = AsyncMock(spec=EmbeddingProvider)
+    mock_embed.model_name = "mock-dense-model"
+    mock_embed.embed_documents = AsyncMock(return_value=[[0.1] * 256])
+    mock_sparse = AsyncMock(spec=SparseEmbeddingProvider)
+    mock_sparse.model_name = "mock-sparse-model"
+    mock_sparse.embed_documents = AsyncMock(return_value=[{"indices": [0], "values": [0.1]}])
+    mock_store = AsyncMock(spec=VectorStoreProvider)
+    mock_store.collection_name = "test_collection"
+    mock_store.upsert = AsyncMock()
+    mock_store.delete_by_file = AsyncMock()
 
+    clean_container.override(CodeWeaverSettingsType, get_test_settings)
+    # Override the collection-type deps directly using TypeAliasType keys so the
+    # container's _resolve_dependency() intercepts them before calling the real factories.
+    clean_container.override(EmbeddingProvidersDep, (mock_embed,))
+    clean_container.override(SparseEmbeddingProvidersDep, (mock_sparse,))
+    clean_container.override(VectorStoreProvidersDep, (mock_store,))
+
+    # Resolve settings first, then store directly in _singletons so that the sync
+    # container[T] access path used by _global_settings() can find it without going
+    # through the override mechanism (which bypasses singleton caching).
+    test_settings = await clean_container.resolve(CodeWeaverSettingsType)
+    clean_container._singletons[CodeWeaverSettingsType] = test_settings
     # Resolve Indexer via DI
     indexer = await clean_container.resolve(IndexingService)
-    # indexer._providers_initialized = True
 
     # Capture stderr
     import io
@@ -419,6 +516,10 @@ async def test_health_shows_degraded_status(initialize_test_settings, clean_cont
     When: Query /health/ endpoint
     Then: Status = degraded, circuit_breaker_state = open
     """
+    import codeweaver.core.dependencies
+    import codeweaver.engine.dependencies
+    import codeweaver.server.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
+
     from codeweaver.core import SessionStatistics
     from codeweaver.providers import (
         EmbeddingProvider,
@@ -466,17 +567,37 @@ async def test_health_shows_degraded_status(initialize_test_settings, clean_cont
     mock_stats.get_timing_statistics.return_value = {"queries": [0.1, 0.2]}
     mock_stats.failover_statistics = None
 
-    # Apply overrides
+    from codeweaver.core.dependencies.services import StatisticsDep
+    from codeweaver.engine import IndexingService
+    from codeweaver.engine.dependencies import FailoverServiceDep, IndexingServiceDep
+    from codeweaver.providers.dependencies.providers import (
+        EmbeddingProvidersDep,
+        RerankingProvidersDep,
+        SparseEmbeddingProvidersDep,
+        VectorStoreProvidersDep,
+    )
+
+    # HealthService also needs IndexingService and FailoverService, which transitively
+    # need project_path. Override them with mocks to avoid DI cascade.
+    mock_indexer = MagicMock(spec=IndexingService)
+    mock_indexer.stats = MagicMock()
+    mock_indexer.stats.files_indexed = 0
+    mock_indexer.stats.files_discovered = 0
+    mock_indexer.stats.files_failed = 0
+    mock_failover = MagicMock()
+
+    # Apply overrides using TypeAliasType keys so the container's _resolve_dependency()
+    # intercepts them before calling the real factories.
+    # Note: MagicMock instances are callable, so we must wrap them in lambdas to prevent
+    # the container from trying to call them with injection.
     overrides = {
-        tuple[EmbeddingProvider, ...]: lambda: (mock_dense,),
-        tuple[SparseEmbeddingProvider, ...]: lambda: (mock_sparse,),
-        tuple[RerankingProvider, ...]: lambda: (mock_rerank,),
-        tuple[VectorStoreProvider, ...]: lambda: (mock_vector,),
-        tuple[EmbeddingProvider, ...]: lambda: (mock_dense,),
-        tuple[SparseEmbeddingProvider, ...]: lambda: (mock_sparse,),
-        tuple[RerankingProvider, ...]: lambda: (mock_rerank,),
-        tuple[VectorStoreProvider, ...]: lambda: (mock_vector,),
-        SessionStatistics: lambda: mock_stats,
+        EmbeddingProvidersDep: (mock_dense,),
+        SparseEmbeddingProvidersDep: (mock_sparse,),
+        RerankingProvidersDep: (mock_rerank,),
+        VectorStoreProvidersDep: (mock_vector,),
+        StatisticsDep: lambda: mock_stats,
+        IndexingServiceDep: lambda: mock_indexer,
+        FailoverServiceDep: lambda: mock_failover,
     }
 
     with clean_container.use_overrides(overrides):
@@ -560,28 +681,62 @@ async def test_graceful_shutdown_with_checkpoint(
     """
     # Create test project
 
+    import codeweaver.core.dependencies
+    import codeweaver.engine.dependencies
+    import codeweaver.providers.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
+
     from codeweaver.engine import CheckpointManager, IndexingService
+    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider, VectorStoreProvider
+    from codeweaver.providers.config.profiles import ProviderProfile
+    from codeweaver.providers.config.providers import ProviderSettings
+    from codeweaver.providers.dependencies.providers import (
+        EmbeddingProvidersDep,
+        SparseEmbeddingProvidersDep,
+        VectorStoreProvidersDep,
+    )
 
     project_root = tmp_path / "test_project"
+    project_root.mkdir()
     (project_root / "test.py").write_text("def test(): pass")
 
     # Configure settings for this test
     async def get_test_settings() -> CodeWeaverSettingsType:
-        from codeweaver.server.config.helpers import get_settings
+        from codeweaver.core.config.loader import get_settings
 
         settings = get_settings()
         settings.project_path = project_root
+        # Explicitly set provider since sync get_settings() never calls _initialize(),
+        # leaving provider=UNSET. This ensures _get_provider_settings() doesn't fail.
+        settings.provider = ProviderSettings.model_construct(
+            **ProviderProfile.TESTING.as_provider_settings()
+        )
         return settings
 
-    clean_container.override(CodeWeaverSettingsType, get_test_settings)
+    mock_embed = AsyncMock(spec=EmbeddingProvider)
+    mock_embed.model_name = "mock-dense-model"
+    mock_embed.embed_documents = AsyncMock(return_value=[[0.1] * 256])
+    mock_sparse = AsyncMock(spec=SparseEmbeddingProvider)
+    mock_sparse.model_name = "mock-sparse-model"
+    mock_sparse.embed_documents = AsyncMock(return_value=[{"indices": [0], "values": [0.1]}])
+    mock_store = AsyncMock(spec=VectorStoreProvider)
+    mock_store.collection_name = "test_collection"
+    mock_store.upsert = AsyncMock()
+    mock_store.delete_by_file = AsyncMock()
 
+    clean_container.override(CodeWeaverSettingsType, get_test_settings)
+    # Override the collection-type deps directly using TypeAliasType keys so the
+    # container's _resolve_dependency() intercepts them before calling the real factories.
+    clean_container.override(EmbeddingProvidersDep, (mock_embed,))
+    clean_container.override(SparseEmbeddingProvidersDep, (mock_sparse,))
+    clean_container.override(VectorStoreProvidersDep, (mock_store,))
+
+    # Resolve settings first, then store directly in _singletons so that the sync
+    # container[T] access path used by _global_settings() can find it without going
+    # through the override mechanism (which bypasses singleton caching).
+    test_settings = await clean_container.resolve(CodeWeaverSettingsType)
+    clean_container._singletons[CodeWeaverSettingsType] = test_settings
     # Resolve Indexer via DI
     indexer = await clean_container.resolve(IndexingService)
-    # indexer._providers_initialized = True
-
-    # Start indexing
-    # Note: we need to ensure walker settings are present on the indexer instance
-    # indexer._walker_settings = {"path": str(project_root)}
 
     await indexer.index_project(force_reindex=True)
 
@@ -596,9 +751,11 @@ async def test_graceful_shutdown_with_checkpoint(
     )
     checkpoint_file = checkpoint_mgr.checkpoint_file
 
-    # Note: Checkpoint may not exist if indexing completed
-    # This test validates the mechanism exists
-    assert checkpoint_file.parent.exists()
+    # Note: Checkpoint may not exist if indexing completed before a checkpoint was written.
+    # Validate that the CheckpointManager was constructed successfully and the checkpoint
+    # path is within the expected directory.
+    assert checkpoint_file.parent == checkpoint_dir.resolve()
+    assert checkpoint_file.name.startswith("checkpoint_test_project-")
 
 
 @pytest.mark.integration
@@ -614,6 +771,9 @@ async def test_error_logging_structured(clean_container):
     import logging
 
     from io import StringIO
+
+    import codeweaver.core.dependencies
+    import codeweaver.engine.dependencies
 
     # Capture log output with proper formatting
     log_stream = StringIO()
@@ -648,7 +808,21 @@ async def test_error_logging_structured(clean_container):
         # Create temporary directory with a file that will cause processing errors
         import tempfile
 
+        import codeweaver.providers.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
+
         from codeweaver.engine import IndexingService
+        from codeweaver.providers import (
+            EmbeddingProvider,
+            SparseEmbeddingProvider,
+            VectorStoreProvider,
+        )
+        from codeweaver.providers.config.profiles import ProviderProfile
+        from codeweaver.providers.config.providers import ProviderSettings
+        from codeweaver.providers.dependencies.providers import (
+            EmbeddingProvidersDep,
+            SparseEmbeddingProvidersDep,
+            VectorStoreProvidersDep,
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             test_path = Path(tmpdir)
@@ -658,18 +832,42 @@ async def test_error_logging_structured(clean_container):
 
             # Configure settings for this test
             async def get_test_settings() -> CodeWeaverSettingsType:
-                from codeweaver.server.config.helpers import get_settings
+                from codeweaver.core.config.loader import get_settings
 
                 settings = get_settings()
                 settings.project_path = test_path
+                # Explicitly set provider since sync get_settings() never calls _initialize(),
+                # leaving provider=UNSET. This ensures _get_provider_settings() doesn't fail.
+                settings.provider = ProviderSettings.model_construct(
+                    **ProviderProfile.TESTING.as_provider_settings()
+                )
                 return settings
 
-            clean_container.override(CodeWeaverSettingsType, get_test_settings)
+            mock_embed = AsyncMock(spec=EmbeddingProvider)
+            mock_embed.model_name = "mock-dense-model"
+            mock_embed.embed_documents = AsyncMock(return_value=[[0.1] * 256])
+            mock_sparse = AsyncMock(spec=SparseEmbeddingProvider)
+            mock_sparse.model_name = "mock-sparse-model"
+            mock_sparse.embed_documents = AsyncMock(return_value=[{"indices": [0], "values": [0.1]}])
+            mock_store = AsyncMock(spec=VectorStoreProvider)
+            mock_store.collection_name = "test_collection"
+            mock_store.upsert = AsyncMock()
+            mock_store.delete_by_file = AsyncMock()
 
+            clean_container.override(CodeWeaverSettingsType, get_test_settings)
+            # Override the collection-type deps directly using TypeAliasType keys so the
+            # container's _resolve_dependency() intercepts them before calling the real factories.
+            clean_container.override(EmbeddingProvidersDep, (mock_embed,))
+            clean_container.override(SparseEmbeddingProvidersDep, (mock_sparse,))
+            clean_container.override(VectorStoreProvidersDep, (mock_store,))
+
+            # Resolve settings first, then store directly in _singletons so that the sync
+            # container[T] access path used by _global_settings() can find it without going
+            # through the override mechanism (which bypasses singleton caching).
+            test_settings = await clean_container.resolve(CodeWeaverSettingsType)
+            clean_container._singletons[CodeWeaverSettingsType] = test_settings
             # Resolve Indexer via DI
             indexer = await clean_container.resolve(IndexingService)
-            # indexer._providers_initialized = True
-            # indexer._walker_settings = {"path": str(test_path)}
 
             await indexer.index_project(force_reindex=True)
 

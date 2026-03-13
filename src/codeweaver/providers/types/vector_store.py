@@ -320,6 +320,24 @@ class CollectionMetadata(BasedModel):
 
     version: Annotated[str, Field(description="Metadata schema version")] = "1.5.0"
 
+    # Vector configuration (optional, used for dimension validation)
+    vector_config: Annotated[
+        dict[str, Any] | None,
+        Field(
+            description="Vector configuration mapping name to VectorParams. "
+            "Used to validate dimension compatibility when switching configurations.",
+            default=None,
+        ),
+    ] = None
+
+    sparse_config: Annotated[
+        dict[str, Any] | None,
+        Field(
+            description="Sparse vector configuration mapping name to SparseVectorParams.",
+            default=None,
+        ),
+    ] = None
+
     def to_collection(self) -> dict[str, Any]:
         """Convert to a dictionary that is the argument for collection creation."""
         # Return collection creation params without metadata (metadata is stored separately)
@@ -375,6 +393,9 @@ class CollectionMetadata(BasedModel):
             self._validate_family_compatibility(other)
             return
 
+        # Dimension validation: check if vector_config dimensions match
+        self._validate_dimensions_from_config(other)
+
         # Legacy validation (no family metadata) - strict model matching
         # Error on model switch - this corrupts search results
         # Only raise if both have models and they differ (allow None for backwards compatibility)
@@ -392,6 +413,44 @@ class CollectionMetadata(BasedModel):
                     "current_provider": other.provider,
                     "collection_model": other.dense_model,
                     "current_model": self.dense_model,
+                    "collection": self.project_name,
+                },
+            )
+
+    def _get_dense_dimension(self) -> int | None:
+        """Extract the dense vector dimension from vector_config."""
+        if not self.vector_config:
+            return None
+        for params in self.vector_config.values():
+            size = getattr(params, "size", None)
+            if isinstance(size, int):
+                return size
+        return None
+
+    def _validate_dimensions_from_config(self, other: CollectionMetadata) -> None:
+        """Validate that vector dimensions match between two CollectionMetadata instances.
+
+        Raises:
+            DimensionMismatchError: If the dense vector dimensions differ.
+        """
+        from codeweaver.core import DimensionMismatchError
+
+        self_dim = self._get_dense_dimension()
+        other_dim = other._get_dense_dimension()
+
+        if self_dim is not None and other_dim is not None and self_dim != other_dim:
+            raise DimensionMismatchError(
+                f"Vector dimension mismatch: existing collection uses {other_dim}-dimensional "
+                f"embeddings, but current configuration produces {self_dim}-dimensional embeddings. "
+                f"You cannot mix different embedding dimensions in the same collection.",
+                suggestions=[
+                    "Option 1: Revert to the original embedding configuration",
+                    "Option 2: Delete the existing collection and re-index with new dimensions",
+                    "Option 3: Create a new collection with a different name",
+                ],
+                details={
+                    "existing_dimension": other_dim,
+                    "current_dimension": self_dim,
                     "collection": self.project_name,
                 },
             )

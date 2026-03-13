@@ -41,30 +41,19 @@ async def test_full_pipeline_index_then_search(
     indexed_test_project, actual_vector_store, clean_container
 ):
     """Validate complete workflow: index fresh codebase, then search it."""
-    from codeweaver.providers import VectorStoreProvider
-    from codeweaver.server import CodeWeaverSettings, get_settings
     from codeweaver.server.agent_api import IntentType, find_code
 
-    # Override settings and vector store in container
-    settings = get_settings()
-    settings.project_path = indexed_test_project
-
-    overrides = {
-        CodeWeaverSettings: lambda: settings,
-        VectorStoreProvider: lambda: actual_vector_store,
-    }
-
-    with clean_container.use_overrides(overrides):
-        # Search for specific functionality in the indexed codebase
-        search_response = await find_code(
-            query="authentication user login", intent=IntentType.UNDERSTAND
-        )
+    # Search for specific functionality in the indexed codebase.
+    # Settings and vector store are already configured by indexed_test_project fixture.
+    search_response = await find_code(
+        query="authentication user login", intent=IntentType.UNDERSTAND
+    )
 
     # Validate search found the code we indexed
     assert len(search_response.matches) > 0
 
     # Validate correct file was found
-    result_files = [r.file_path.name for r in search_response.matches[:3]]
+    result_files = [r.file.path.name for r in search_response.matches[:3]]
     assert "auth.py" in result_files
 
 
@@ -77,8 +66,6 @@ async def test_incremental_indexing_updates_search_results(
 ):
     """Validate that adding new files updates search results."""
     from codeweaver.engine import IndexingService
-    from codeweaver.providers import VectorStoreProvider
-    from codeweaver.server import CodeWeaverSettings, get_settings
     from codeweaver.server.agent_api import IntentType, find_code
 
     # Add a new file with distinct content
@@ -94,27 +81,17 @@ def process_payment(amount: float, card_token: str) -> str:
     return "txn_123"
 ''')
 
-    # Configure settings
-    settings = get_settings()
-    settings.project_path = indexed_test_project
+    # Re-index using the indexer already configured by indexed_test_project fixture
+    indexer = await clean_container.resolve(IndexingService)
+    await indexer.index_project(force_reindex=True)
 
-    overrides = {
-        CodeWeaverSettings: lambda: settings,
-        VectorStoreProvider: lambda: actual_vector_store,
-    }
-
-    with clean_container.use_overrides(overrides):
-        # Re-index
-        indexer = await clean_container.resolve(IndexingService)
-        await indexer.index_project(force_reindex=True)
-
-        # Search for new file's content
-        response = await find_code(
-            query="payment processing credit card Stripe", intent=IntentType.UNDERSTAND
-        )
+    # Search for new file's content
+    response = await find_code(
+        query="payment processing credit card Stripe", intent=IntentType.UNDERSTAND
+    )
 
     # Validate new file appears in results
-    result_files = [r.file_path.name for r in response.matches]
+    result_files = [r.file.path.name for r in response.matches]
     assert "payments.py" in result_files
 
 
@@ -126,9 +103,26 @@ async def test_pipeline_handles_large_codebase(tmp_path, actual_vector_store, cl
     """Validate pipeline handles larger codebase (~20 files) efficiently."""
     import time
 
+    import codeweaver.core.dependencies
+    import codeweaver.engine.dependencies
+    import codeweaver.server.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
+
+    from codeweaver.core.config.loader import get_settings_async
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+    from codeweaver.core.types.sentinel import UNSET
     from codeweaver.engine import IndexingService
     from codeweaver.providers import VectorStoreProvider
-    from codeweaver.server import CodeWeaverSettings, get_settings
+    from codeweaver.providers.config.categories.vector_store import (
+        MemoryVectorStoreProviderSettings,
+    )
+    from codeweaver.providers.config.clients.vector_store import QdrantClientOptions
+    from codeweaver.providers.config.profiles import ProviderProfile
+    from codeweaver.providers.config.providers import ProviderSettings
+    from codeweaver.providers.dependencies.providers import (
+        PrimaryVectorStoreProviderDep,
+        VectorStoreProvidersDep,
+    )
+    from codeweaver.server import CodeWeaverState
     from codeweaver.server.agent_api import IntentType, find_code
 
     # Create a larger test codebase
@@ -141,16 +135,39 @@ async def test_pipeline_handles_large_codebase(tmp_path, actual_vector_store, cl
         module_name = f"module_{i:02d}"
         (large_codebase / f"{module_name}.py").write_text(f"def {module_name}_function(): pass")
 
-    # Configure settings
-    settings = get_settings()
-    settings.project_path = large_codebase
+    project_path = large_codebase.resolve()
 
-    overrides = {
-        CodeWeaverSettings: lambda: settings,
-        VectorStoreProvider: lambda: actual_vector_store,
-    }
+    async def get_test_settings() -> CodeWeaverSettingsType:
+        settings = await get_settings_async()
+        settings.project_path = project_path
+        settings.project_name = f"test_large_{project_path.name}"
+        if settings.provider is UNSET:
+            profile_settings = ProviderProfile.TESTING.as_provider_settings()
+            profile_settings["vector_store"] = (
+                MemoryVectorStoreProviderSettings(
+                    project_name=f"test_large_{project_path.name}",
+                    client_options=QdrantClientOptions(location=":memory:"),
+                ),
+            )
+            settings.provider = ProviderSettings.model_construct(**profile_settings)
+        return settings
 
-    with clean_container.use_overrides(overrides):
+    clean_container.override(CodeWeaverSettingsType, get_test_settings)
+    clean_container.override(VectorStoreProvider, actual_vector_store)
+    clean_container.override(VectorStoreProvidersDep, (actual_vector_store,))
+    clean_container.override(PrimaryVectorStoreProviderDep, actual_vector_store)
+
+    # Store settings in singletons for sync access
+    test_settings = await clean_container.resolve(CodeWeaverSettingsType)
+    clean_container._singletons[CodeWeaverSettingsType] = test_settings
+
+    # Initialize global state
+    state = await clean_container.resolve(CodeWeaverState)
+    from codeweaver.server import server
+
+    server._state = state
+
+    try:
         start_time = time.time()
         indexer = await clean_container.resolve(IndexingService)
         await indexer.index_project(force_reindex=True)
@@ -159,9 +176,12 @@ async def test_pipeline_handles_large_codebase(tmp_path, actual_vector_store, cl
         # Search
         response = await find_code(query="module function", intent=IntentType.UNDERSTAND)
 
-    assert response is not None
-    assert indexing_time < 30.0
-    assert len(response.matches) > 0
+        assert response is not None
+        assert indexing_time < 30.0
+        assert len(response.matches) > 0
+    finally:
+        server._state = None
+        clean_container.clear_overrides()
 
 
 @pytest.mark.integration
@@ -173,32 +193,21 @@ async def test_pipeline_handles_file_updates(
 ):
     """Validate that modifying files updates their embeddings."""
     from codeweaver.engine import IndexingService
-    from codeweaver.providers import VectorStoreProvider
-    from codeweaver.server import CodeWeaverSettings, get_settings
     from codeweaver.server.agent_api import IntentType, find_code
 
     # Modify auth.py significantly
     auth_file = Path(indexed_test_project) / "auth.py"
     auth_file.write_text("def oauth2_authenticate(): pass")
 
-    # Configure settings
-    settings = get_settings()
-    settings.project_path = indexed_test_project
+    # Re-index using the indexer already configured by indexed_test_project fixture
+    indexer = await clean_container.resolve(IndexingService)
+    await indexer.index_project(force_reindex=True)
 
-    overrides = {
-        CodeWeaverSettings: lambda: settings,
-        VectorStoreProvider: lambda: actual_vector_store,
-    }
-
-    with clean_container.use_overrides(overrides):
-        indexer = await clean_container.resolve(IndexingService)
-        await indexer.index_project(force_reindex=True)
-
-        # Search should now find OAuth content
-        response_after = await find_code(query="OAuth2 JWT token", intent=IntentType.UNDERSTAND)
+    # Search should now find OAuth content
+    response_after = await find_code(query="OAuth2 JWT token", intent=IntentType.UNDERSTAND)
 
     # Validate updated content is found
-    result_files = [r.file_path.name for r in response_after.matches[:3]]
+    result_files = [r.file.path.name for r in response_after.matches[:3]]
     assert "auth.py" in result_files
 
 
@@ -208,9 +217,26 @@ async def test_pipeline_handles_file_updates(
 @pytest.mark.timeout(600)  # 10 minutes for real embedding generation + indexing
 async def test_pipeline_coordination_with_errors(tmp_path, actual_vector_store, clean_container):
     """Validate pipeline handles partial failures gracefully."""
+    import codeweaver.core.dependencies
+    import codeweaver.engine.dependencies
+    import codeweaver.server.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
+
+    from codeweaver.core.config.loader import get_settings_async
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+    from codeweaver.core.types.sentinel import UNSET
     from codeweaver.engine import IndexingService
     from codeweaver.providers import VectorStoreProvider
-    from codeweaver.server import CodeWeaverSettings, get_settings
+    from codeweaver.providers.config.categories.vector_store import (
+        MemoryVectorStoreProviderSettings,
+    )
+    from codeweaver.providers.config.clients.vector_store import QdrantClientOptions
+    from codeweaver.providers.config.profiles import ProviderProfile
+    from codeweaver.providers.config.providers import ProviderSettings
+    from codeweaver.providers.dependencies.providers import (
+        PrimaryVectorStoreProviderDep,
+        VectorStoreProvidersDep,
+    )
+    from codeweaver.server import CodeWeaverState
     from codeweaver.server.agent_api import IntentType, find_code
 
     # Create codebase with mix of good and problematic files
@@ -221,22 +247,48 @@ async def test_pipeline_coordination_with_errors(tmp_path, actual_vector_store, 
     (mixed_codebase / "good.py").write_text("def working_function(): return 'success'")
     (mixed_codebase / "bad.py").write_text("def broken_function(")
 
-    # Configure settings
-    settings = get_settings()
-    settings.project_path = mixed_codebase
+    project_path = mixed_codebase.resolve()
 
-    overrides = {
-        CodeWeaverSettings: lambda: settings,
-        VectorStoreProvider: lambda: actual_vector_store,
-    }
+    async def get_test_settings() -> CodeWeaverSettingsType:
+        settings = await get_settings_async()
+        settings.project_path = project_path
+        settings.project_name = f"test_mixed_{project_path.name}"
+        if settings.provider is UNSET:
+            profile_settings = ProviderProfile.TESTING.as_provider_settings()
+            profile_settings["vector_store"] = (
+                MemoryVectorStoreProviderSettings(
+                    project_name=f"test_mixed_{project_path.name}",
+                    client_options=QdrantClientOptions(location=":memory:"),
+                ),
+            )
+            settings.provider = ProviderSettings.model_construct(**profile_settings)
+        return settings
 
-    with clean_container.use_overrides(overrides):
+    clean_container.override(CodeWeaverSettingsType, get_test_settings)
+    clean_container.override(VectorStoreProvider, actual_vector_store)
+    clean_container.override(VectorStoreProvidersDep, (actual_vector_store,))
+    clean_container.override(PrimaryVectorStoreProviderDep, actual_vector_store)
+
+    # Store settings in singletons for sync access
+    test_settings = await clean_container.resolve(CodeWeaverSettingsType)
+    clean_container._singletons[CodeWeaverSettingsType] = test_settings
+
+    # Initialize global state
+    state = await clean_container.resolve(CodeWeaverState)
+    from codeweaver.server import server
+
+    server._state = state
+
+    try:
         indexer = await clean_container.resolve(IndexingService)
         await indexer.index_project(force_reindex=True)
 
         response = await find_code(query="function", intent=IntentType.UNDERSTAND)
 
-    assert response is not None
+        assert response is not None
+    finally:
+        server._state = None
+        clean_container.clear_overrides()
 
 
 # =============================================================================
@@ -255,25 +307,14 @@ async def test_search_performance_with_real_providers(
     """Validate search performance meets requirements with real providers."""
     import time
 
-    from codeweaver.providers import VectorStoreProvider
-    from codeweaver.server import CodeWeaverSettings, get_settings
     from codeweaver.server.agent_api import IntentType, find_code
 
-    # Configure settings
-    settings = get_settings()
-    settings.project_path = indexed_test_project
-
-    overrides = {
-        CodeWeaverSettings: lambda: settings,
-        VectorStoreProvider: lambda: actual_vector_store,
-    }
-
-    with clean_container.use_overrides(overrides):
-        start_time = time.time()
-        response = await find_code(
-            query="authentication database API configuration", intent=IntentType.UNDERSTAND
-        )
-        search_time = time.time() - start_time
+    # Settings and vector store are already configured by indexed_test_project fixture.
+    start_time = time.time()
+    response = await find_code(
+        query="authentication database API configuration", intent=IntentType.UNDERSTAND
+    )
+    search_time = time.time() - start_time
 
     assert len(response.matches) > 0
     assert search_time < 2.0
@@ -291,9 +332,26 @@ async def test_indexing_performance_with_real_providers(
     """Validate indexing performance is acceptable for real-world usage."""
     import time
 
+    import codeweaver.core.dependencies
+    import codeweaver.engine.dependencies
+    import codeweaver.server.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
+
+    from codeweaver.core.config.loader import get_settings_async
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+    from codeweaver.core.types.sentinel import UNSET
     from codeweaver.engine import IndexingService
     from codeweaver.providers import VectorStoreProvider
-    from codeweaver.server import CodeWeaverSettings, get_settings
+    from codeweaver.providers.config.categories.vector_store import (
+        MemoryVectorStoreProviderSettings,
+    )
+    from codeweaver.providers.config.clients.vector_store import QdrantClientOptions
+    from codeweaver.providers.config.profiles import ProviderProfile
+    from codeweaver.providers.config.providers import ProviderSettings
+    from codeweaver.providers.dependencies.providers import (
+        PrimaryVectorStoreProviderDep,
+        VectorStoreProvidersDep,
+    )
+    from codeweaver.server import CodeWeaverState
     from codeweaver.server.agent_api import IntentType, find_code
 
     # Create 50-file codebase
@@ -304,16 +362,39 @@ async def test_indexing_performance_with_real_providers(
     for i in range(50):
         (perf_codebase / f"module_{i}.py").write_text(f"def function_{i}(): pass")
 
-    # Configure settings
-    settings = get_settings()
-    settings.project_path = perf_codebase
+    project_path = perf_codebase.resolve()
 
-    overrides = {
-        CodeWeaverSettings: lambda: settings,
-        VectorStoreProvider: lambda: actual_vector_store,
-    }
+    async def get_test_settings() -> CodeWeaverSettingsType:
+        settings = await get_settings_async()
+        settings.project_path = project_path
+        settings.project_name = f"test_perf_{project_path.name}"
+        if settings.provider is UNSET:
+            profile_settings = ProviderProfile.TESTING.as_provider_settings()
+            profile_settings["vector_store"] = (
+                MemoryVectorStoreProviderSettings(
+                    project_name=f"test_perf_{project_path.name}",
+                    client_options=QdrantClientOptions(location=":memory:"),
+                ),
+            )
+            settings.provider = ProviderSettings.model_construct(**profile_settings)
+        return settings
 
-    with clean_container.use_overrides(overrides):
+    clean_container.override(CodeWeaverSettingsType, get_test_settings)
+    clean_container.override(VectorStoreProvider, actual_vector_store)
+    clean_container.override(VectorStoreProvidersDep, (actual_vector_store,))
+    clean_container.override(PrimaryVectorStoreProviderDep, actual_vector_store)
+
+    # Store settings in singletons for sync access
+    test_settings = await clean_container.resolve(CodeWeaverSettingsType)
+    clean_container._singletons[CodeWeaverSettingsType] = test_settings
+
+    # Initialize global state
+    state = await clean_container.resolve(CodeWeaverState)
+    from codeweaver.server import server
+
+    server._state = state
+
+    try:
         start_time = time.time()
         indexer = await clean_container.resolve(IndexingService)
         await indexer.index_project(force_reindex=True)
@@ -321,5 +402,8 @@ async def test_indexing_performance_with_real_providers(
 
         response = await find_code(query="function", intent=IntentType.UNDERSTAND)
 
-    assert response is not None
-    assert indexing_time < 60.0
+        assert response is not None
+        assert indexing_time < 60.0
+    finally:
+        server._state = None
+        clean_container.clear_overrides()

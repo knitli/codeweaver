@@ -11,7 +11,32 @@ various criteria such as test file inclusion and language focus.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from codeweaver.core import CodeChunk, SearchResult
+
+
+def _is_test_file(file_path: Path) -> bool:
+    """Check if a file is a test file using filename and directory name heuristics.
+
+    Checks only the filename and immediate parent directory name to avoid
+    false positives when the project itself is located under a path containing
+    the word "test" (e.g., pytest temp directories like
+    /tmp/pytest-of-user/pytest-123/test_my_project/test_codebase/auth.py).
+
+    Args:
+        file_path: Path to check
+
+    Returns:
+        True if the file appears to be a test file
+    """
+    name = file_path.name.lower()
+    # Filename heuristics: test_*.py, *_test.py, *_spec.py, *_tests.py
+    if name.startswith("test_") or name.endswith(("_test.py", "_tests.py", "_spec.py")):
+        return True
+    # Check if immediately inside a test directory
+    parent_name = file_path.parent.name.lower()
+    return parent_name in ("test", "tests", "spec", "specs", "__tests__")
 
 
 def filter_test_files(candidates: list[SearchResult]) -> list[SearchResult]:
@@ -27,7 +52,7 @@ def filter_test_files(candidates: list[SearchResult]) -> list[SearchResult]:
         This is a basic implementation using path name heuristics.
         Future versions will use repo metadata to properly tag test files.
     """
-    return [c for c in candidates if not (c.file_path and "test" in str(c.file_path).lower())]
+    return [c for c in candidates if not (c.file_path and _is_test_file(c.file_path))]
 
 
 def filter_by_languages(
@@ -74,13 +99,15 @@ def apply_filters(
     # we don't need to filter anything
     if not focus_languages and include_tests:
         return candidates
-    # if include_tests is True, only filter by languages
+    # if include_tests is True, only filter by languages (if any)
     if include_tests:
-        # the empty tuple is for the type checker which hasn't figured out we already know we have focus_languages
-        return filter_by_languages(candidates, focus_languages=(focus_languages or ()))
-    return filter_test_files(
-        filter_by_languages(candidates, focus_languages=(focus_languages or ()))
-    )
+        if not focus_languages:
+            return candidates
+        return filter_by_languages(candidates, focus_languages=focus_languages)
+    # include_tests is False: always filter test files; optionally filter by language
+    if not focus_languages:
+        return filter_test_files(candidates)
+    return filter_test_files(filter_by_languages(candidates, focus_languages=focus_languages))
 
 
 __all__ = ("apply_filters", "filter_by_languages", "filter_test_files")

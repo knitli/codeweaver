@@ -145,8 +145,10 @@ async def _check_index_status(
         if hasattr(vector_store, "_initialize"):
             await vector_store._initialize()
 
-        # Check collection
-        collection_name = vector_store.collection
+        # Check collection - use collection_name (QdrantBaseProvider) with fallback to collection
+        collection_name = getattr(vector_store, "collection_name", None) or getattr(
+            vector_store, "collection", None
+        )
         if not collection_name:
             return False, 0
 
@@ -167,6 +169,18 @@ def _get_indexer(indexer: IndexingServiceDep = INJECTED) -> IndexingService | No
     return indexer
 
 
+async def _resolve_indexer_from_container() -> IndexingService | None:
+    """Resolve IndexingService from the DI container."""
+    try:
+        from codeweaver.core.di.container import get_container
+        from codeweaver.engine import IndexingService
+
+        container = get_container()
+        return await container.resolve(IndexingService)
+    except Exception:
+        return None
+
+
 async def _ensure_index_ready(
     context: Context | None = None,
     vector_store: VectorStoreProvider | None = None,
@@ -176,7 +190,7 @@ async def _ensure_index_ready(
 
     If indexing is already complete or in progress, this is a no-op.
     """
-    indexer = indexer or _get_indexer()
+    indexer = indexer or await _resolve_indexer_from_container()
     # Check if index exists by querying vector store for any chunks
     # This is more robust than relying on manifest which might be out of sync
     if indexer._vector_store:

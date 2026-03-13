@@ -18,34 +18,13 @@ Uses DI container with real services (inmemory vector store).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
-
-
-if TYPE_CHECKING:
-    pass
 
 
 # ===========================================================================
 # Fixtures: DI Container Setup
 # ===========================================================================
-
-
-@pytest.fixture
-def test_container():
-    """Create test DI container with real services.
-
-    Uses inmemory vector store and test settings.
-    """
-    from codeweaver.core.di.container import Container
-
-    return Container()
-
-    # TODO: Configure for testing
-    # - Use inmemory vector store
-    # - Use test settings
-    # - Mock external providers (APIs, etc.)
 
 
 @pytest.fixture
@@ -57,12 +36,13 @@ def test_project_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-async def migration_service(test_container):
+async def migration_service(clean_container):
     """Get real MigrationService from DI container."""
-    # TODO: Implement DI resolution
-    # from codeweaver.engine.dependencies import MigrationServiceDep
-    # return await test_container.resolve(MigrationServiceDep)
-    pytest.skip("DI integration not yet implemented")
+    import codeweaver.engine.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
+
+    from codeweaver.engine.services.migration_service import MigrationService
+
+    return await clean_container.resolve(MigrationService)
 
 
 # ===========================================================================
@@ -80,7 +60,7 @@ class TestQuantizationFlow:
 
     async def test_quantization_float32_to_int8(self, migration_service) -> None:
         """Test complete quantization flow: float32 -> int8."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Create collection with float32 vectors
         # Execute: Run quantization migration
@@ -89,7 +69,7 @@ class TestQuantizationFlow:
 
     async def test_quantization_float32_to_binary(self, migration_service) -> None:
         """Test complete quantization flow: float32 -> binary."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Create collection with float32 vectors
         # Execute: Run binary quantization
@@ -98,7 +78,7 @@ class TestQuantizationFlow:
 
     async def test_quantization_preserves_search_quality(self, migration_service) -> None:
         """Test that quantization preserves search quality (recall >80%)."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Collection with known query/result pairs
         # Execute: Quantize
@@ -120,7 +100,7 @@ class TestDimensionReductionFlow:
 
     async def test_dimension_reduction_2048_to_1024(self, migration_service) -> None:
         """Test complete dimension reduction: 2048 -> 1024."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Collection with 2048-dim vectors
         # Execute: Reduce to 1024
@@ -129,7 +109,7 @@ class TestDimensionReductionFlow:
 
     async def test_dimension_reduction_with_hybrid_vectors(self, migration_service) -> None:
         """Test dimension reduction preserves sparse component."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Hybrid vectors (dense + sparse)
         # Execute: Reduce dense dimension
@@ -138,7 +118,7 @@ class TestDimensionReductionFlow:
 
     async def test_dimension_reduction_accuracy_impact(self, migration_service) -> None:
         """Test dimension reduction accuracy impact matches empirical data."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: voyage-code-3 vectors 2048-dim
         # Execute: Reduce to 512
@@ -161,7 +141,7 @@ class TestMigrationWithResume:
 
     async def test_resume_from_25_percent_completion(self, migration_service) -> None:
         """Test resume from 25% completion point."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Start migration
         # Simulate: Failure at 25%
@@ -170,7 +150,7 @@ class TestMigrationWithResume:
 
     async def test_resume_from_50_percent_completion(self, migration_service) -> None:
         """Test resume from 50% completion point."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Start migration
         # Simulate: Failure at 50%
@@ -179,7 +159,7 @@ class TestMigrationWithResume:
 
     async def test_resume_from_90_percent_completion(self, migration_service) -> None:
         """Test resume from 90% completion point."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Start migration
         # Simulate: Failure at 90%
@@ -188,7 +168,7 @@ class TestMigrationWithResume:
 
     async def test_resume_with_different_worker_count(self, migration_service) -> None:
         """Test resume with different number of workers."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Start with 4 workers
         # Simulate: Failure
@@ -197,7 +177,7 @@ class TestMigrationWithResume:
 
     async def test_checkpoint_corruption_handling(self, migration_service) -> None:
         """Test handling of corrupted checkpoint file."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Start migration
         # Simulate: Corrupt checkpoint file
@@ -220,7 +200,7 @@ class TestDataIntegrityValidation:
 
     async def test_validation_layer_1_with_real_vectors(self, migration_service) -> None:
         """Test Layer 1 (vector count) with real vector store."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Create collection with known count
         # Execute: Migrate
@@ -228,7 +208,7 @@ class TestDataIntegrityValidation:
 
     async def test_validation_layer_2_with_real_payloads(self, migration_service) -> None:
         """Test Layer 2 (payload checksums) with real payloads."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Collection with complex payloads
         # Execute: Migrate
@@ -236,7 +216,7 @@ class TestDataIntegrityValidation:
 
     async def test_validation_layer_3_with_real_vectors(self, migration_service) -> None:
         """Test Layer 3 (semantic equivalence) with real vectors."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Collection with known vectors
         # Execute: Migrate
@@ -244,7 +224,7 @@ class TestDataIntegrityValidation:
 
     async def test_validation_layer_4_with_real_search(self, migration_service) -> None:
         """Test Layer 4 (search quality) with real search."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Collection with known query/result pairs
         # Execute: Migrate
@@ -252,7 +232,7 @@ class TestDataIntegrityValidation:
 
     async def test_validation_detects_count_mismatch(self, migration_service) -> None:
         """Test that validation detects vector count mismatch."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Simulate migration with missing vector
         # Execute: Validate
@@ -260,7 +240,7 @@ class TestDataIntegrityValidation:
 
     async def test_validation_detects_payload_corruption(self, migration_service) -> None:
         """Test that validation detects payload corruption."""
-        pytest.skip("Integration test - implementation pending")
+        pytest.skip("Test body not yet written - MigrationService is implemented, test logic needs to be added")
 
         # Setup: Simulate corrupted payload
         # Execute: Validate
@@ -282,7 +262,7 @@ class TestCLIIntegration:
 
     async def test_cli_migrate_dimension_command(self, test_project_dir: Path) -> None:
         """Test CLI migrate dimension command."""
-        pytest.skip("CLI integration test - implementation pending")
+        pytest.skip("Test body not yet written - CLI migrate commands exist, test logic needs to be added")
 
         # Execute: codeweaver migrate dimension --new-dimension 1024
         # Verify: Migration completes
@@ -290,7 +270,7 @@ class TestCLIIntegration:
 
     async def test_cli_migrate_quantize_command(self, test_project_dir: Path) -> None:
         """Test CLI migrate quantize command."""
-        pytest.skip("CLI integration test - implementation pending")
+        pytest.skip("Test body not yet written - CLI migrate commands exist, test logic needs to be added")
 
         # Execute: codeweaver migrate quantize --datatype int8
         # Verify: Quantization completes
@@ -298,7 +278,7 @@ class TestCLIIntegration:
 
     async def test_cli_migrate_resume_command(self, test_project_dir: Path) -> None:
         """Test CLI migrate resume command."""
-        pytest.skip("CLI integration test - implementation pending")
+        pytest.skip("Test body not yet written - CLI migrate commands exist, test logic needs to be added")
 
         # Setup: Start migration
         # Simulate: Interrupt
@@ -307,7 +287,7 @@ class TestCLIIntegration:
 
     async def test_cli_migrate_rollback_command(self, test_project_dir: Path) -> None:
         """Test CLI migrate rollback command."""
-        pytest.skip("CLI integration test - implementation pending")
+        pytest.skip("Test body not yet written - CLI migrate commands exist, test logic needs to be added")
 
         # Setup: Complete migration
         # Execute: codeweaver migrate rollback
@@ -330,7 +310,7 @@ class TestMigrationPerformance:
 
     async def test_10k_vectors_migration_time(self, migration_service) -> None:
         """Test migration time for 10k vectors."""
-        pytest.skip("Performance benchmark - implementation pending")
+        pytest.skip("Test body not yet written - benchmark logic needs to be added")
 
         # Setup: 10k vectors
         # Execute: Migrate
@@ -339,7 +319,7 @@ class TestMigrationPerformance:
 
     async def test_parallel_speedup_measurement(self, migration_service) -> None:
         """Test parallel speedup with 4 workers."""
-        pytest.skip("Performance benchmark - implementation pending")
+        pytest.skip("Test body not yet written - benchmark logic needs to be added")
 
         # Execute: Migrate with 1 worker
         # Measure: Time T1
@@ -349,7 +329,7 @@ class TestMigrationPerformance:
 
     async def test_memory_usage_tracking(self, migration_service) -> None:
         """Test memory usage during migration."""
-        pytest.skip("Performance benchmark - implementation pending")
+        pytest.skip("Test body not yet written - benchmark logic needs to be added")
 
         # Setup: Large collection
         # Execute: Migrate
@@ -372,7 +352,7 @@ class TestSuccessCriteria:
 
     async def test_migration_throughput_exceeds_1k_per_minute(self, migration_service) -> None:
         """Test migration throughput >1k chunks/min."""
-        pytest.skip("Success criteria test - implementation pending")
+        pytest.skip("Test body not yet written - success criteria logic needs to be added")
 
         # Success Criteria: Migration throughput >1k chunks/min
         # Setup: 10k vectors
@@ -382,7 +362,7 @@ class TestSuccessCriteria:
 
     async def test_parallel_speedup_exceeds_3_5x(self, migration_service) -> None:
         """Test parallel speedup >3.5x with 4 workers."""
-        pytest.skip("Success criteria test - implementation pending")
+        pytest.skip("Test body not yet written - success criteria logic needs to be added")
 
         # Success Criteria: Parallel speedup >3.5x
         # Execute: Single worker + 4 workers
@@ -391,7 +371,7 @@ class TestSuccessCriteria:
 
     async def test_resume_success_rate_100_percent(self, migration_service) -> None:
         """Test resume success rate 100%."""
-        pytest.skip("Success criteria test - implementation pending")
+        pytest.skip("Test body not yet written - success criteria logic needs to be added")
 
         # Success Criteria: Resume success rate 100%
         # Execute: Multiple resume scenarios
@@ -399,7 +379,7 @@ class TestSuccessCriteria:
 
     async def test_data_integrity_zero_corruptions(self, migration_service) -> None:
         """Test data integrity validation catches all corruptions."""
-        pytest.skip("Success criteria test - implementation pending")
+        pytest.skip("Test body not yet written - success criteria logic needs to be added")
 
         # Success Criteria: Data integrity 0 corruptions
         # Execute: Multiple migrations
@@ -407,7 +387,7 @@ class TestSuccessCriteria:
 
     async def test_search_quality_exceeds_80_percent(self, migration_service) -> None:
         """Test search quality >80% recall@10."""
-        pytest.skip("Success criteria test - implementation pending")
+        pytest.skip("Test body not yet written - success criteria logic needs to be added")
 
         # Success Criteria: Search quality >80% recall@10
         # Execute: Migrate

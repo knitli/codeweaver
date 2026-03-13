@@ -144,6 +144,22 @@ class DiscoveredFile(BasedModel):
         object.__setattr__(self, "source_id", kwargs.get("source_id", uuid7()))
         # Don't call super().__init__() for frozen models with manual attribute setting
 
+    def __getstate__(self) -> dict[str, Any]:
+        """Support pickling for ProcessPoolExecutor by serializing instance attributes."""
+        return {
+            "path": self.path,
+            "ext_category": self.ext_category,
+            "project_path": self.project_path,
+            "source_id": self.source_id,
+            "_file_hash": self._file_hash,
+            "_git_branch": self._git_branch,
+        }
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore state when unpickling."""
+        for key, value in state.items():
+            object.__setattr__(self, key, value)
+
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 

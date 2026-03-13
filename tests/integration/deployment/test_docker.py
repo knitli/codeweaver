@@ -20,6 +20,7 @@ NOTE: Multiple tests here look for license information in files. They *must* be 
 from __future__ import annotations
 
 import contextlib
+import shutil
 import socket
 import subprocess
 import time
@@ -29,6 +30,11 @@ import pytest
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.docker]
+
+docker_available = pytest.mark.skipif(
+    shutil.which("docker") is None,
+    reason="Docker not available in this environment",
+)
 
 
 def run_command(
@@ -112,6 +118,7 @@ class TestDockerfile:
             pytest.skip("Docker not available for Dockerfile linting")
 
     @pytest.mark.slow
+    @docker_available
     def test_docker_build_succeeds(self, repo_root):
         """Test that Docker image builds successfully."""
         result = run_command(
@@ -125,6 +132,7 @@ class TestDockerfile:
         assert result.stdout.strip(), "Docker image not found after build"
 
     @pytest.mark.slow
+    @docker_available
     def test_docker_image_has_entrypoint(self, repo_root):
         """Verify Docker image has proper entrypoint."""
         # Build image first
@@ -138,6 +146,7 @@ class TestDockerfile:
         assert "codeweaver" in result.stdout, "Entrypoint does not include codeweaver command"
 
     @pytest.mark.slow
+    @docker_available
     def test_docker_image_version(self, repo_root):
         """Test that codeweaver --version works in container."""
         # Build image first
@@ -170,6 +179,7 @@ class TestDockerCompose:
         compose_file = repo_root / "docker-compose.yml"
         assert compose_file.exists(), "docker-compose.yml not found"
 
+    @docker_available
     def test_docker_compose_syntax(self, repo_root):
         """Validate docker-compose.yml syntax."""
         result = run_command(
@@ -178,6 +188,7 @@ class TestDockerCompose:
 
         assert result.returncode == 0, "docker-compose.yml has syntax errors"
 
+    @docker_available
     def test_docker_compose_defines_required_services(self, repo_root):
         """Verify docker-compose defines required services."""
         result = run_command(
@@ -191,6 +202,7 @@ class TestDockerCompose:
 
     @pytest.mark.slow
     @pytest.mark.network
+    @docker_available
     def test_docker_compose_services_start(self, repo_root, tmp_path):
         """Test that docker-compose services can start."""
         # Generate unique project name and find free ports for test isolation
@@ -276,6 +288,7 @@ LOG_LEVEL=DEBUG
     @pytest.mark.slow
     @pytest.mark.flaky
     @pytest.mark.network
+    @docker_available
     def test_qdrant_health_endpoint(self, repo_root, tmp_path):
         """Test that Qdrant health endpoint is accessible."""
         # Generate unique project name and find free ports for test isolation

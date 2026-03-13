@@ -21,6 +21,7 @@ async def test_di_resolution():
 
     # We need to make sure server dependencies are registered.
     # Importing the module should do it.
+    import codeweaver.server.dependencies  # noqa: F401
 
     container = get_container()
 

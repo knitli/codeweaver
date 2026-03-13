@@ -84,7 +84,7 @@ async def _create_cw_state(
     return CodeWeaverState(
         initialized=False,
         project_path=project_path,
-        config_path=settings.config_path,
+        config_path=getattr(settings, "config_file", None),
         settings=settings,
         statistics=statistics,
         indexer=indexer,

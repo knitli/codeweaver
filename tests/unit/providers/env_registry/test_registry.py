@@ -128,8 +128,8 @@ class TestProviderEnvRegistry:
         assert len(result) == 2
         assert parent in result
         assert child in result
-        # Parent should come before child
-        assert result.index(parent) < result.index(child)
+        # Child should come before parent (the queried provider is index 0)
+        assert result.index(child) < result.index(parent)
 
     def test_no_inheritance(self) -> None:
         """Test provider without inheritance."""

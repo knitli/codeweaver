@@ -40,7 +40,7 @@ def _try_to_resolve_settings() -> bool:
     try:
         from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 
-        container.resolve(CodeWeaverSettingsType)
+        container[CodeWeaverSettingsType]
     except Exception:
         return False
     else:

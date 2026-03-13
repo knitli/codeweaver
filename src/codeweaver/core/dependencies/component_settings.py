@@ -22,12 +22,13 @@ if TYPE_CHECKING:
 
 
 def _global_settings() -> CodeWeaverSettingsType:
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
     from codeweaver.core.dependencies.utils import ensure_settings_initialized
     from codeweaver.core.di.container import get_container
 
     ensure_settings_initialized()
     container = get_container()
-    return container.resolve("CodeWeaverSettingsType")
+    return container[CodeWeaverSettingsType]
 
 
 @dependency_provider(
@@ -83,7 +84,7 @@ import contextlib
 
 async def _get_canonical_project_path() -> DirectoryPath:
     await asyncio.sleep(0)  # Yield control to the event loop
-    with contextlib.suppress(ImportError):
+    with contextlib.suppress(Exception):
         settings = _global_settings()
         if settings and settings.project_path:
             return settings.project_path
@@ -98,9 +99,10 @@ type ResolvedProjectPathDep = Annotated[DirectoryPath, depends(_get_canonical_pr
 
 async def _get_canonical_project_name() -> str:
     await asyncio.sleep(0)  # Yield control to the event loop
-    settings = _global_settings()
-    if settings.project_name:
-        return settings.project_name
+    with contextlib.suppress(Exception):
+        settings = _global_settings()
+        if settings and settings.project_name:
+            return settings.project_name
     return (await _get_canonical_project_path()).name
 
 

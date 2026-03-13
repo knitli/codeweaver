@@ -36,7 +36,13 @@ async def _get_state() -> CwMcpHttpState | None:
     from codeweaver.server.mcp.state import CwMcpHttpState
 
     container = get_container()
-    return await container.resolve(CwMcpHttpState)
+    try:
+        return await container.resolve(CwMcpHttpState)
+    except Exception:
+        # CwMcpHttpState may not be available in all contexts (e.g., test environments
+        # without a running MCP HTTP server). Gracefully return None so data tool
+        # registration is skipped rather than propagating a resolution error.
+        return None
 
 
 async def register_data_tool(tool: Tool[Any], state: CwMcpHttpState | None = None) -> None:

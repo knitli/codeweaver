@@ -576,22 +576,28 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             query_params = vector.to_hybrid_query(
                 query_options=args, kwargs={"collection_name": collection_name}
             )
-            import logging
 
-            logger = logging.getLogger(__name__)
-            logger.info("Hybrid query dict keys: %s", query_params.keys())
-            logger.info("Query type: %s", type(query_params.get("query")))
-            prefetch = query_params.get("prefetch", [])
-            prefetch_len = len(prefetch) if isinstance(prefetch, list) else 0
-            logger.info("Prefetch length: %s", prefetch_len)
-            if isinstance(prefetch, list) and prefetch:
-                for i, p in enumerate(prefetch):
-                    logger.info(
-                        "Prefetch[%d]: query type=%s, using=%s",
-                        i,
-                        type(p.query),
-                        getattr(p, "using", None),
-                    )
+            # BM25/IDF collections require querying with Document (text), not SparseVector.
+            # Qdrant computes BM25 vectors internally from the text at both index and query
+            # time. Sending a pre-computed SparseVector won't match the internal IDF index.
+            if self.caps and self.caps.idf is not None:
+                from qdrant_client.http.models import Prefetch as QdrantPrefetch
+
+                prefetch_params = {
+                    k: v
+                    for k, v in args.items()
+                    if k in ("limit", "score_threshold", "filter", "params") and v is not None
+                }
+                sparse_prefetch = QdrantPrefetch(
+                    query=Document(text=vector.query, model="qdrant/bm25"),
+                    using="sparse",
+                    **prefetch_params,
+                )
+                # Replace the sparse prefetch (index 1) with the Document-based one
+                prefetch = query_params.get("prefetch", [])
+                if isinstance(prefetch, list) and len(prefetch) > 1:
+                    query_params["prefetch"] = [prefetch[0], sparse_prefetch]
+
             response = await self.client.query_points(**query_params)
         else:
             response = await self.client.query_points(

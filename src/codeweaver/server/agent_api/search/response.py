@@ -35,6 +35,10 @@ def get_indexer_state_info(
         - indexing_state: "complete", "in_progress", "not_started", or "unknown"
         - index_coverage: Percentage of files indexed (0-100), or None if unavailable
     """
+    from codeweaver.core.di.dependency import is_depends_marker
+
+    if is_depends_marker(state):
+        return ("unknown", None)
     if state.indexer is None:
         return ("not_started", None)
 

@@ -192,19 +192,21 @@ async def _embed_sparse(
 
 
 def _normalize_dense_embedding(embedding: Any) -> RawEmbeddingVectors | None:
-    """Normalize dense embedding to list[list[float]] format.
+    """Normalize dense embedding to a flat vector (Sequence[float]) for a single query.
 
     Args:
-        embedding: Raw embedding from provider
+        embedding: Raw embedding from provider — either a flat list or a batch list-of-lists.
 
     Returns:
-        Normalized embedding or None if invalid
+        A single flat embedding vector (Sequence[float] | Sequence[int]), or None if invalid.
     """
     if not embedding:
         return None
+    # Batch format: [[0.04, ...], ...] — extract the first (only) embedding.
     if isinstance(embedding, list) and len(embedding) > 0 and isinstance(embedding[0], list):
-        return embedding
-    return [embedding]
+        return embedding[0]
+    # Already flat: [0.04, ...]
+    return embedding
 
 
 def _normalize_sparse_embedding(result: Any) -> CodeWeaverSparseEmbedding | None:
@@ -224,24 +226,51 @@ def _normalize_sparse_embedding(result: Any) -> CodeWeaverSparseEmbedding | None
         Normalized CodeWeaverSparseEmbedding or None if invalid format
     """
     if isinstance(result, CodeWeaverSparseEmbedding):
-        return result
+        # Ensure fields are plain Python lists (not numpy arrays).
+        return CodeWeaverSparseEmbedding(
+            indices=_to_list(result.indices),
+            values=[float(x) for x in _to_list(result.values)],
+        )
     if isinstance(result, list) and len(result) > 0:
         return _transform_to_sparse_embedding(result)
     if isinstance(result, dict) and "indices" in result and ("values" in result):
-        return CodeWeaverSparseEmbedding(**result)
+        return CodeWeaverSparseEmbedding(
+            indices=_to_list(result["indices"]),
+            values=[float(x) for x in _to_list(result["values"])],
+        )
     logger.warning("Unexpected sparse embedding format: %s", type(result))
     return None
+
+
+def _to_list(v: Any) -> list:
+    """Convert any sequence-like (including numpy arrays) to a plain Python list."""
+    if isinstance(v, list):
+        return v
+    try:
+        return v.tolist()  # numpy arrays
+    except AttributeError:
+        return list(v)
 
 
 def _transform_to_sparse_embedding(result):
     """Transform list result to CodeWeaverSparseEmbedding."""
     item = result[0]
     if isinstance(item, CodeWeaverSparseEmbedding):
-        return item
+        # Ensure fields are plain Python lists (not numpy arrays).
+        return CodeWeaverSparseEmbedding(
+            indices=_to_list(item.indices),
+            values=[float(x) for x in _to_list(item.values)],
+        )
     if isinstance(item, dict) and "indices" in item and ("values" in item):
-        return CodeWeaverSparseEmbedding(**item)
+        return CodeWeaverSparseEmbedding(
+            indices=_to_list(item["indices"]),
+            values=[float(x) for x in _to_list(item["values"])],
+        )
     if isinstance(item, list) and len(result) == 2 and isinstance(result[1], list):
-        return CodeWeaverSparseEmbedding(indices=result[0], values=result[1])
+        return CodeWeaverSparseEmbedding(
+            indices=_to_list(result[0]),
+            values=[float(x) for x in _to_list(result[1])],
+        )
     logger.warning("Unexpected sparse embedding format in list: %s", type(item))
     return None
 
@@ -468,7 +497,7 @@ async def _try_rerank_with_provider(
                     "extra": {"phase": "reranking", "trying_next": False},
                 },
             )
-            return (chunks_for_reranking, None)
+            return (None, None)
         await log_to_client_or_fallback(
             context,
             "warning",
@@ -513,7 +542,7 @@ async def _try_rerank_with_provider(
                 },
             )
             if idx == total_providers - 1:
-                return (chunks_for_reranking, None)
+                return (None, None)
             return (None, None)
         enriched_results = [
             RerankingResult(

@@ -71,8 +71,8 @@ def _assemble_configured_capabilities(
         sparse_resolver.resolve(config.model_name or config.sparse_embedding_config.model_name)
         for config in sparse_configs
     )
-    dense_conf_caps = zip(dense_configs, dense_caps, strict=True)
-    sparse_conf_caps = zip(sparse_configs, sparse_caps, strict=True)
+    dense_conf_caps = zip(dense_caps, dense_configs, strict=True)
+    sparse_conf_caps = zip(sparse_caps, sparse_configs, strict=True)
 
     return tuple(
         ConfiguredCapability(*conf_tup) for conf_tup in (*dense_conf_caps, *sparse_conf_caps)
@@ -89,12 +89,16 @@ async def _create_all_configured_capabilities() -> tuple[ConfiguredCapability, .
 
     settings = await _resolve_type_from_container(ProviderSettings)
     dense_configs = (
-        settings.embedding if isinstance(settings.embedding, tuple) else (settings.embedding,)
+        settings.embedding
+        if isinstance(settings.embedding, tuple)
+        else ((settings.embedding,) if settings.embedding is not None else ())
     )
     sparse_configs = (
         settings.sparse_embedding
         if isinstance(settings.sparse_embedding, tuple)
-        else (settings.sparse_embedding,)
+        else (
+            (settings.sparse_embedding,) if settings.sparse_embedding is not None else ()
+        )
     )
     dense_resolver = await _resolve_type_from_container(EmbeddingCapabilityResolver)
     sparse_resolver = await _resolve_type_from_container(SparseEmbeddingCapabilityResolver)

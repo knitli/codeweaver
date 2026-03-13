@@ -132,6 +132,10 @@ class CwMcpHttpState(BasedModel):
             "host", LOCALHOST
         )
 
+    def _telemetry_keys(self) -> None:
+        """No sensitive keys to anonymize for server state telemetry."""
+        return
+
     @classmethod
     def from_app(cls, app: FastMCP[Any], **kwargs: Any) -> CwMcpHttpState:
         """Create state from app setup with the app and optional kwargs."""

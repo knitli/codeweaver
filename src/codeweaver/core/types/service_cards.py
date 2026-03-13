@@ -949,6 +949,24 @@ async def _start_instance_in_thread(
     return await asyncio.to_thread(cls, *args, **kwargs)
 
 
+async def _start_cross_encoder_in_thread(
+    get_cls_fn: Any, card: ServiceCard, *args: Any, **kwargs: Any
+) -> Any:
+    """Handler for fastembed cross encoder: call factory to get class, then instantiate.
+
+    The cross encoder service card uses `get_cross_encoder` (a factory function) as
+    client_cls. This handler first calls the factory (with no args) to get the
+    enhanced TextCrossEncoder class, then instantiates it with the provided kwargs.
+
+    Empty list values (e.g. device_ids=[]) are removed from kwargs to avoid
+    IndexError in fastembed's OnnxTextCrossEncoder when it tries device_ids[0].
+    """
+    cls = get_cls_fn()  # get_cross_encoder() -> type[TextCrossEncoder]
+    # Filter out empty list values that would cause IndexError in fastembed
+    filtered_kwargs = {k: v for k, v in kwargs.items() if not (isinstance(v, list) and len(v) == 0)}
+    return await asyncio.to_thread(cls, *args, **filtered_kwargs)
+
+
 def _build_local_provider_cards() -> list[ServiceCard]:
     """Build service cards for local-only providers (Fastembed, Sentence Transformers).
 
@@ -971,7 +989,7 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             "sparse_embedding",
             lateimport(
                 "codeweaver.providers.embedding.providers.fastembed",
-                "FastEmbedSparseEmbeddingProvider",
+                "FastEmbedSparseProvider",
             ),
             lateimport(
                 "codeweaver.providers.embedding.fastembed_extensions", "get_sparse_embedder"
@@ -987,7 +1005,7 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             ),
             lateimport("codeweaver.providers.embedding.fastembed_extensions", "get_cross_encoder"),
             "fastembed",
-            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
+            metadata=ServiceMetadata(client_handler=_start_cross_encoder_in_thread),
         ),
         # Sentence Transformers - embedding, sparse_embedding, reranking
         service_card_factory(
@@ -1242,7 +1260,10 @@ def _build_data_provider_cards() -> list[ServiceCard]:
             lateimport("tavily", "AsyncTavilyClient"),
             "tavily",
             metadata=ServiceMetadata(
-                provider_handler=lambda provider_cls, card, api_key: provider_cls(api_key=api_key)
+                # provider_cls is tavily_search_tool; called with (client, **extra_kwargs)
+                provider_handler=lambda provider_cls, card, client=None, **kwargs: provider_cls(
+                    client
+                )
             ),
         ),
         service_card_factory(
@@ -1252,7 +1273,10 @@ def _build_data_provider_cards() -> list[ServiceCard]:
             lateimport("ddgs.ddgs", "DDGS"),
             "duckduckgo",
             metadata=ServiceMetadata(
-                provider_handler=lambda provider_cls, card: provider_cls(max_results=15)
+                # provider_cls is duck_duck_go_search_tool; called with (client, **extra_kwargs)
+                provider_handler=lambda provider_cls, card, client=None, **kwargs: provider_cls(
+                    client, max_results=15
+                )
             ),
         ),
         service_card_factory(

@@ -256,7 +256,14 @@ class ChunkGovernor(BasedModel):
         Returns:
             A ChunkGovernor instance.
         """
+        # ChunkerSettings is imported under TYPE_CHECKING to avoid circular imports, so
+        # pydantic's defer_build cannot resolve it during class definition. Rebuild the
+        # model here (once) before the first instantiation, supplying ChunkerSettings in
+        # the namespace so pydantic can complete the schema.
+        from codeweaver.engine.config import ChunkerSettings as _ChunkerSettings
         from codeweaver.providers import RerankingModelCapabilities
+
+        cls.model_rebuild(_types_namespace={"ChunkerSettings": _ChunkerSettings})
 
         capabilities = _get_capabilities()
         if len(capabilities) == 2:

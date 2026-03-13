@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Literal, cast
 
 from anyio import Path as AsyncPath
+from pydantic import PrivateAttr
 
 from codeweaver.core import (
     CodeChunk,
@@ -52,6 +53,14 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
 
     _provider: ClassVar[Literal[Provider.MEMORY]] = Provider.MEMORY
     config: MemoryVectorStoreProviderSettings
+
+    # Private attributes initialized by _init_provider(); declared here for Pydantic PrivateAttr access
+    _auto_persist: bool = PrivateAttr(default=False)
+    _persist_path: Path | None = PrivateAttr(default=None)
+    _periodic_task: asyncio.Task | None = PrivateAttr(default=None)
+    _shutdown: bool = PrivateAttr(default=False)
+    _collection_metadata: dict = PrivateAttr(default_factory=dict)
+    _collection_metadata_lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
 
     @property
     def base_url(self) -> str | None:

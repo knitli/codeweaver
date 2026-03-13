@@ -168,22 +168,39 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
     )
 
     @override
-    def _initialize(self, caps: SparseEmbeddingModelCapabilities | None = None) -> None:
-        """Initialize the FastEmbed client."""
-        # 1. Set _caps from parameter, not from self
-        self.caps = caps
+    def _initialize(
+        self,
+        impl_deps: Any = None,
+        custom_deps: Any = None,
+        caps: SparseEmbeddingModelCapabilities | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the FastEmbed sparse client."""
+        # impl_deps and custom_deps are ignored for FastEmbed sparse provider;
+        # caps may be passed as a keyword argument via **kwargs from the base class.
+        # 1. Set caps using object.__setattr__ because pydantic model isn't fully initialized yet
+        object.__setattr__(self, "caps", caps)
 
-        # 2. Configure model name in kwargs if not already set
+        # 2. Configure model name in kwargs if not already set.
+        # caps may be None if not yet resolved (base class sets it after _initialize);
+        # fall back to model_name already in embed_options or from self.config.
         if "model_name" not in self.embed_options:
-            model = caps.name  # Use caps parameter, not self.caps
-            self.embed_options["model_name"] = model
+            if caps is not None:
+                model = caps.name
+            elif hasattr(self, "config") and hasattr(self.config, "model_name"):
+                model = self.config.model_name
+            else:
+                model = None
+            if model:
+                self.embed_options["model_name"] = model
             # Note: model_name should NOT be in query_options - it's only for client init
 
         # 3. Initialize client if it's still a class (not an instance)
-        # The _client class variable is set to the class type, so we need to instantiate it
+        # The _client class variable is set to the class type, so we need to instantiate it.
+        # Use object.__setattr__ because pydantic model isn't fully initialized yet.
         if isinstance(self.client, type):
             client_options = self.embed_options.get("client_options") or self.embed_options
-            self.client = self.client(**client_options)
+            object.__setattr__(self, "client", self.client(**client_options))
 
         # 4. Remove model_name from runtime kwargs - it was only needed for initialization
         self.embed_options.pop("model_name", None)

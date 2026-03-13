@@ -24,16 +24,8 @@ import pytest
 from watchfiles.main import Change
 
 from codeweaver.core import get_container
-
-# TODO: Update to use DI system for settings reset (container.override pattern)
-from codeweaver.core.config.settings_type import CodeWeaverSettingsType  # , reset_settings
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.engine import IndexingService
-
-
-# Mark all tests in this module as skipped until reset_settings is replaced with DI
-pytestmark = pytest.mark.skip(
-    reason="Needs update to use DI system (container.override) instead of obsolete reset_settings"
-)
 
 
 # Test fixture: Small Python project
@@ -137,27 +129,88 @@ def test_project_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-async def indexer(test_project_path: Path, clean_container) -> IndexingService:
-    """Create indexer instance for test project using DI container."""
-    from codeweaver.server.config.helpers import get_settings, reset_settings
+async def indexer(test_project_path: Path, di_overrides) -> IndexingService:
+    """Create indexer instance for test project using DI container.
 
-    # Define a factory that returns settings with the test project path
-    async def get_test_settings() -> CodeWeaverSettingsType:
-        # Get fresh settings instance
+    Uses di_overrides fixture (from conftest.py) to inject mock providers, then
+    overrides settings with the test project path before resolving IndexingService.
+    """
+    import codeweaver.core.dependencies
+    import codeweaver.engine.dependencies
+    import codeweaver.server.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
 
-        reset_settings()
-        settings = get_settings()
-        # Ensure we don't load existing config files that might point elsewhere
-        settings.project_path = test_project_path
-        settings.project_name = f"test_project_{test_project_path.name}"
-        return settings
+    from codeweaver.core.config.loader import get_settings_async
 
-    # Override CodeWeaverSettings in the container
-    clean_container.override(CodeWeaverSettingsType, get_test_settings)
+    # di_overrides is the clean_container with mock providers already applied
+    container = di_overrides
+
+    # Ensure all @dependency_provider-registered factories are loaded
+    container._load_providers()
+
+    # The DI system uses depends() type aliases (e.g. TokenizerDep, PrimaryVectorStoreProviderDep)
+    # which bypass base-type overrides. We must override the Dep aliases directly.
+    from unittest.mock import AsyncMock, MagicMock
+
+    from codeweaver_tokenizers import Tokenizer
+
+    from codeweaver.providers import (
+        EmbeddingCapabilityGroup,
+        EmbeddingProvider,
+        RerankingProvider,
+        SparseEmbeddingProvider,
+        VectorStoreProvider,
+    )
+    from codeweaver.providers.dependencies.capabilities import (
+        EmbeddingCapabilityGroupDep,
+        TokenizerDep,
+    )
+    from codeweaver.providers.dependencies.providers import (
+        PrimaryEmbeddingProviderDep,
+        PrimarySparseEmbeddingProviderDep,
+        PrimaryVectorStoreProviderDep,
+    )
+    from tests.conftest import MockTokenizer
+
+    mock_tokenizer = MockTokenizer()
+    mock_cap_group = MagicMock(spec=EmbeddingCapabilityGroup)
+    mock_cap_group.dense = None
+    mock_cap_group.sparse = None
+    mock_embedding = AsyncMock(spec=EmbeddingProvider)
+    mock_sparse = AsyncMock(spec=SparseEmbeddingProvider)
+    mock_vector_store = AsyncMock(spec=VectorStoreProvider)
+    mock_reranking = AsyncMock(spec=RerankingProvider)
+
+    # Override base types (container returns directly for non-callable overrides)
+    # For Dep aliases (Annotated with depends()), the container detects callable overrides
+    # and tries to call them. We provide no-arg factory lambdas for those.
+    container.override(Tokenizer, mock_tokenizer)
+    container.override(EmbeddingCapabilityGroup, mock_cap_group)
+    container.override(EmbeddingProvider, mock_embedding)
+    container.override(SparseEmbeddingProvider, mock_sparse)
+    container.override(VectorStoreProvider, mock_vector_store)
+    container.override(RerankingProvider, mock_reranking)
+    # Dep alias overrides need no-arg factory functions (lambdas), since the container
+    # treats callable overrides as factories and calls them with injection
+    container.override(TokenizerDep, lambda: mock_tokenizer)
+    container.override(EmbeddingCapabilityGroupDep, lambda: mock_cap_group)
+    container.override(PrimaryEmbeddingProviderDep, lambda: mock_embedding)
+    container.override(PrimarySparseEmbeddingProviderDep, lambda: mock_sparse)
+    container.override(PrimaryVectorStoreProviderDep, lambda: mock_vector_store)
+
+    # Build test settings with the test project path
+    settings = await get_settings_async()
+    settings.project_path = test_project_path
+    settings.project_name = f"test_project_{test_project_path.name}"
+
+    # Pre-populate the singleton cache so _global_settings() → container[CodeWeaverSettingsType]
+    # works synchronously during DI resolution of ResolvedProjectPathDep etc.
+    container._singletons[CodeWeaverSettingsType] = settings
+    # Also register the override so DI type resolution returns the same instance
+    container.override(CodeWeaverSettingsType, settings)
 
     # Resolve indexer from container - this will now use the overridden settings
     # and properly initialize all dependencies (chunking_service, etc.)
-    return await clean_container.resolve(IndexingService)
+    return await container.resolve(IndexingService)
 
 
 @pytest.mark.integration
@@ -274,23 +327,78 @@ async def test_indexing_error_recovery(test_project_path: Path):
     When: Indexing encounters error
     Then: Error logged, indexing continues with remaining files
     """
-    # Add a "corrupted" file (binary content)
-    corrupted_file = test_project_path / "corrupted.bin"
+    # Add a "corrupted" file (binary content written into a .py file so it gets discovered)
+    # Using .py extension so the file passes extension filtering and gets discovered/attempted
+    corrupted_file = test_project_path / "corrupted.py"
     corrupted_file.write_bytes(b"\x00\x01\x02\xff\xfe\xfd")
 
     # Resolve indexer from container with overridden settings
-    from codeweaver.server.config.settings import get_settings, reset_settings
+    from unittest.mock import AsyncMock, MagicMock
 
-    reset_settings()
+    from codeweaver_tokenizers import Tokenizer
+
+    import codeweaver.core.dependencies
+    import codeweaver.engine.dependencies
+    import codeweaver.server.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
+
+    from codeweaver.core.config.loader import get_settings_async
+    from codeweaver.providers import (
+        EmbeddingCapabilityGroup,
+        EmbeddingProvider,
+        RerankingProvider,
+        SparseEmbeddingProvider,
+        VectorStoreProvider,
+    )
+    from tests.conftest import MockTokenizer
+
     container = get_container()
+    container._load_providers()
 
-    async def get_test_settings() -> CodeWeaverSettingsType:
-        settings = get_settings()
-        settings.project_path = test_project_path
-        settings.project_name = f"test_project_recovery_{test_project_path.name}"
-        return settings
+    # Inject mock providers so DI resolution doesn't require real API keys/services
+    # Override the Dep aliases directly, since depends() bypasses base-type overrides
+    from codeweaver.providers.dependencies.capabilities import (
+        EmbeddingCapabilityGroupDep,
+        TokenizerDep,
+    )
+    from codeweaver.providers.dependencies.providers import (
+        PrimaryEmbeddingProviderDep,
+        PrimarySparseEmbeddingProviderDep,
+        PrimaryVectorStoreProviderDep,
+    )
 
-    container.override(CodeWeaverSettingsType, get_test_settings)
+    mock_tokenizer = MockTokenizer()
+    mock_cap_group = MagicMock(spec=EmbeddingCapabilityGroup)
+    mock_cap_group.dense = None
+    mock_cap_group.sparse = None
+    mock_embedding = AsyncMock(spec=EmbeddingProvider)
+    mock_sparse = AsyncMock(spec=SparseEmbeddingProvider)
+    mock_vector_store_instance = AsyncMock(spec=VectorStoreProvider)
+    mock_reranking = AsyncMock(spec=RerankingProvider)
+
+    container.override(Tokenizer, mock_tokenizer)
+    container.override(EmbeddingCapabilityGroup, mock_cap_group)
+    container.override(EmbeddingProvider, mock_embedding)
+    container.override(SparseEmbeddingProvider, mock_sparse)
+    container.override(VectorStoreProvider, mock_vector_store_instance)
+    container.override(RerankingProvider, mock_reranking)
+    # Dep alias overrides use lambdas since container calls callable overrides as factories
+    container.override(TokenizerDep, lambda: mock_tokenizer)
+    container.override(EmbeddingCapabilityGroupDep, lambda: mock_cap_group)
+    container.override(PrimaryEmbeddingProviderDep, lambda: mock_embedding)
+    container.override(PrimarySparseEmbeddingProviderDep, lambda: mock_sparse)
+    container.override(PrimaryVectorStoreProviderDep, lambda: mock_vector_store_instance)
+
+    # Build test settings with the test project path
+    settings = await get_settings_async()
+    settings.project_path = test_project_path
+    settings.project_name = f"test_project_recovery_{test_project_path.name}"
+
+    # Pre-populate the singleton cache so _global_settings() → container[CodeWeaverSettingsType]
+    # works synchronously during DI resolution of ResolvedProjectPathDep etc.
+    container._singletons[CodeWeaverSettingsType] = settings
+    # Also register the override so DI type resolution returns the same instance
+    container.override(CodeWeaverSettingsType, settings)
+
     indexer = await container.resolve(IndexingService)
 
     # Run indexing

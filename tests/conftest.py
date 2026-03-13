@@ -172,18 +172,45 @@ def di_overrides(
 
     This fixture applies mock providers to the DI container, ensuring that
     components resolved via DI use these mocks instead of real providers.
+
+    Overrides both the singleton interfaces (EmbeddingProvider, etc.) AND the
+    collection type aliases (EmbeddingProvidersDep, etc.) so that factories
+    injected via DI receive mocks rather than attempting real provider instantiation.
     """
+    from unittest.mock import MagicMock
+
+    from codeweaver.core.config.telemetry import TelemetrySettings
     from codeweaver.providers import (
         EmbeddingProvider,
         RerankingProvider,
         SparseEmbeddingProvider,
         VectorStoreProvider,
     )
+    from codeweaver.providers.dependencies.providers import (
+        AgentProviderDep,
+        EmbeddingProvidersDep,
+        RerankingProvidersDep,
+        SparseEmbeddingProvidersDep,
+        VectorStoreProvidersDep,
+    )
 
     clean_container.override(EmbeddingProvider, mock_embedding_provider)
     clean_container.override(SparseEmbeddingProvider, mock_sparse_provider)
     clean_container.override(VectorStoreProvider, mock_vector_store)
     clean_container.override(RerankingProvider, mock_reranking_provider)
+    # Also override the collection type aliases so factories that inject via
+    # EmbeddingProvidersDep / SparseEmbeddingProvidersDep / etc. receive mocks
+    # instead of trying to instantiate real providers from settings.
+    clean_container.override(EmbeddingProvidersDep, (mock_embedding_provider,))
+    clean_container.override(SparseEmbeddingProvidersDep, (mock_sparse_provider,))
+    clean_container.override(VectorStoreProvidersDep, (mock_vector_store,))
+    clean_container.override(RerankingProvidersDep, (mock_reranking_provider,))
+    # Agent is optional in SearchPackage; provide a lightweight mock so the
+    # factory can proceed without real API credentials.
+    clean_container.override(AgentProviderDep, MagicMock())
+    # Provide a default TelemetrySettings so find_code can resolve it without
+    # requiring a full CodeWeaverSettingsType initialization chain.
+    clean_container.override(TelemetrySettings, TelemetrySettings())
 
     return clean_container
 

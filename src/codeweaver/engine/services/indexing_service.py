@@ -215,7 +215,7 @@ class IndexingService:
         """Producer: Walks filesystem and identifies files needing indexing."""
         from queue import Queue as SyncQueue
 
-        walker_settings = self._settings.to_settings()
+        walker_settings = self._settings._as_settings(project_path=self._project_path)
         loop = asyncio.get_running_loop()
 
         # Thread-safe queue for streaming paths from discovery thread

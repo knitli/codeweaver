@@ -28,8 +28,6 @@ from codeweaver.core.types.aliases import (
 from codeweaver.core.utils import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
 
 
-print(f"DEBUG: lateimport is {lateimport} type: {type(lateimport)}")
-
 if TYPE_CHECKING:
     from lateimport import LateImport
 

@@ -95,9 +95,17 @@ class Span(NamedTuple):
     def _telemetry_keys(self) -> None:
         return None
 
+    def _source_id_hex(self) -> str:
+        """Return hex string for source_id, handling both UUID and str types.
+
+        The chunker may pass source_id as a UUID7HexT (str subtype) or as a UUID.
+        This normalizes both to a hex string for comparison.
+        """
+        return self.source_id if isinstance(self.source_id, str) else self.source_id.hex
+
     def __hash__(self) -> NonNegativeInt:
         """Return a hash of the span."""
-        return hash((self.start, self.end, self.source_id))
+        return hash((self.start, self.end, self._source_id_hex()))
 
     def __str__(self) -> str:
         """Return a string representation of the span."""
@@ -153,7 +161,7 @@ class Span(NamedTuple):
 
     def __xor__(self, other: Span) -> tuple[Span, ...] | None:  # Symmetric Difference
         """Return the symmetric difference between two spans."""
-        if self.source_id.hex != other.source_id.hex or not self & other:
+        if self._source_id_hex() != other._source_id_hex() or not self & other:
             return (self, other)
         diff1 = self - other
         diff2 = other - self
@@ -167,20 +175,20 @@ class Span(NamedTuple):
     @override
     def __le__(self, other: Span) -> bool:
         """Check if this span is a subset of another span."""
-        if self.source_id.hex != other.source_id.hex:
+        if self._source_id_hex() != other._source_id_hex():
             return False
         return self.start >= other.start and self.end <= other.end
 
     @override
     def __ge__(self, other: Span) -> bool:
         """Check if this span is a superset of another span."""
-        if self.source_id.hex != other.source_id.hex:
+        if self._source_id_hex() != other._source_id_hex():
             return False
         return self.start <= other.start and self.end >= other.end
 
     def __eq__(self, other: object) -> bool:  # Equality
         """Check if two spans are equal."""
-        if not isinstance(other, Span) or self.source_id.hex != other.source_id.hex:
+        if not isinstance(other, Span) or self._source_id_hex() != other._source_id_hex():
             return False
         return self.start == other.start and self.end == other.end
 
@@ -311,6 +319,16 @@ class Span(NamedTuple):
             or self.start - ONE_LINE == other.end
         )
 
+    def __reduce__(self) -> tuple[Any, ...]:
+        """Return pickling instructions.
+
+        Required because __iter__ is overridden to yield line numbers
+        rather than the 3 NamedTuple fields, causing the default
+        NamedTuple ``__reduce__`` (which calls ``tuple(self)``) to
+        produce the wrong number of arguments on unpickling.
+        """
+        return (self.__class__, (self.start, self.end, self.source_id))
+
     def serialize_for_cli(self) -> str:
         """Serialize the span for CLI output."""
         return f"{self.start}-{self.end} ({self.source_id})"
@@ -362,7 +380,7 @@ class SpanGroup(BasedModel):
     @property
     def sources(self) -> frozenset[str]:
         """Get the source_ids of the span group."""
-        return frozenset(span.source_id.hex for span in self.spans)
+        return frozenset(span._source_id_hex() for span in self.spans)
 
     @classmethod
     def from_simple_spans(

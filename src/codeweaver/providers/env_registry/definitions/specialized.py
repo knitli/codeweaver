@@ -71,7 +71,7 @@ EXA = [
 # HUGGINGFACE_INFERENCE - API key + log level
 HUGGINGFACE_INFERENCE = [
     ProviderEnvConfig(
-        provider="huggingface-inference",
+        provider="hf-inference",
         clients=("hf_inference",),
         note="Hugging Face allows for setting many configuration options by environment variable. See [the Hugging Face documentation](https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables) for more details.",
         api_key=EnvVarConfig(
@@ -137,7 +137,7 @@ BEDROCK = [
 # COHERE - API key + base URL
 COHERE = [
     simple_api_key_provider(
-        "tavily",
+        "cohere",
         client="cohere",
         api_key_env="COHERE_API_KEY",
         base_url_env="CO_API_URL",
@@ -257,21 +257,31 @@ QDRANT = [
     )
 ]
 
-# X_AI
+# X_AI - OpenAI-compatible provider (xAI / Grok)
 X_AI = [
-    simple_api_key_provider(
-        "x-ai",
-        client="x_ai",
-        api_key_env="XAI_API_KEY",
+    ProviderEnvConfig(
+        provider="x-ai",
+        clients=("x_ai",),
         note="These variables are for the X.AI (xAI) service.",
-        additional_vars={
-            "management_api_key": EnvVarConfig(
-                env="XAI_MANAGEMENT_KEY",
-                description="Management API key for X.AI service",
-                is_secret=True,
-                variable_name="management_api_key",
+        api_key=EnvVarConfig(
+            env="XAI_API_KEY",
+            description="Your X.AI API Key",
+            is_secret=True,
+            variable_name="api_key",
+        ),
+        other=httpx_env_vars()
+        | frozenset([
+            (
+                "management_api_key",
+                EnvVarConfig(
+                    env="XAI_MANAGEMENT_KEY",
+                    description="Management API key for X.AI service",
+                    is_secret=True,
+                    variable_name="management_api_key",
+                ),
             )
-        },
+        ]),
+        inherits_from="openai",
     )
 ]
 

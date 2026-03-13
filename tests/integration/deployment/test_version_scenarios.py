@@ -51,7 +51,7 @@ def test_version_scenarios():
     Since we cannot easily manipulate git state in tests,
     this test validates the current state matches expected patterns.
     """
-    project_root = Path(__file__).parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent.parent
 
     # Get current git state
     tag_result = subprocess.run(
@@ -125,7 +125,7 @@ def test_version_scenarios():
 @pytest.mark.integration
 def test_version_consistency_across_formats():
     """Verify version is consistent across wheel and sdist."""
-    project_root = Path(__file__).parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent.parent
     dist_dir = project_root / "dist"
 
     if dist_dir.exists():

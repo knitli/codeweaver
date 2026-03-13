@@ -165,8 +165,13 @@ class CodeChunk(BasedModel):
     ] = datetime.now(UTC).timestamp()
     chunk_id: Annotated[
         UUID7,
-        Field(kw_only=True, description="""Unique identifier for the code chunk""", frozen=True),
-    ] = uuid7()
+        Field(
+            kw_only=True,
+            description="""Unique identifier for the code chunk""",
+            frozen=True,
+            default_factory=uuid7,
+        ),
+    ]
     metadata: Metadata = Field(
         default_factory=lambda data: Metadata(
             chunk_id=data["chunk_id"],

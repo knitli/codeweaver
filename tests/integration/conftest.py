@@ -363,22 +363,104 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
     return _shared_memory_vector_store
 
 
+async def _reset_vector_store_collection(store: MemoryVectorStoreProvider) -> None:
+    """Delete and recreate the shared vector store collection to ensure a clean state."""
+    if store and store.client and store.collection_name:
+        with contextlib.suppress(Exception):
+            await store.client.delete_collection(store.collection_name)
+        if hasattr(store, "_known_collections"):
+            store._known_collections.clear()
+        with contextlib.suppress(Exception):
+            await store._ensure_collection(store.collection_name)
+
+
+def _reset_embedding_caches() -> None:
+    """Reset embedding registry and cache manager state between tests.
+
+    Clears the global EmbeddingRegistry singleton and removes embedding-related
+    DI singletons (EmbeddingRegistry, EmbeddingCacheManager, EmbeddingProvider,
+    SparseEmbeddingProvider, IndexingService) so the next test starts with fresh
+    instances. Without this, the hash-based deduplication in EmbeddingCacheManager
+    carries over between tests: re-indexed chunks with new UUIDs but same content
+    are "deduplicated away" with no embeddings registered, causing upsert to fail.
+
+    Key subtlety: EmbeddingRegistry.__init__ calls container.register() to register
+    itself as a lambda factory. Over multiple tests, stale lambdas accumulate in
+    _factories[EmbeddingRegistry] and _get_factory() returns the last one (the stale
+    old instance). We must prune these lambda factories so _get_main_registry() is
+    the sole factory, ensuring that each resolution calls get_embedding_registry()
+    which returns the freshly-reset _main_registry.
+    """
+    import contextlib
+
+    from codeweaver.core import get_container
+    from codeweaver.providers.embedding.registry import reset_embedding_registry
+
+    # Reset the module-level global registry so next call creates a fresh instance
+    reset_embedding_registry()
+
+    container = get_container()
+
+    with contextlib.suppress(Exception):
+        from codeweaver.providers.embedding.registry import EmbeddingRegistry
+
+        # Remove the singleton so the next resolve calls the factory (not cache)
+        container._singletons.pop(EmbeddingRegistry, None)
+
+        # Prune stale lambda factories registered by EmbeddingRegistry.__init__.
+        # Keep only named factories (like _get_main_registry from @dependency_provider).
+        # The lambda entries point to old registry instances and shadow the proper factory.
+        if EmbeddingRegistry in container._factories:
+            container._factories[EmbeddingRegistry] = [
+                (f, tags)
+                for f, tags in container._factories[EmbeddingRegistry]
+                if getattr(f, "__name__", None) != "<lambda>"
+            ]
+
+    with contextlib.suppress(Exception):
+        from codeweaver.providers.embedding.cache_manager import EmbeddingCacheManager
+
+        container._singletons.pop(EmbeddingCacheManager, None)
+
+    # Remove embedding provider singletons (they hold a reference to cache_manager).
+    with contextlib.suppress(Exception):
+        from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider
+
+        container._singletons.pop(EmbeddingProvider, None)
+        container._singletons.pop(SparseEmbeddingProvider, None)
+
+    # Remove IndexingService singleton (it holds references to embedding providers).
+    with contextlib.suppress(Exception):
+        from codeweaver.engine import IndexingService
+
+        container._singletons.pop(IndexingService, None)
+
+    # Also clear tagged singletons that may hold embedding provider instances.
+    with contextlib.suppress(Exception):
+        keys_to_remove = [
+            k
+            for k in container._tagged_singletons
+            if any(tag in k[1] for tag in ("embedding", "sparse_embedding"))
+        ]
+        for k in keys_to_remove:
+            container._tagged_singletons.pop(k, None)
+
+
 @pytest.fixture(autouse=True)
 async def cleanup_shared_vector_store(
     actual_vector_store: MemoryVectorStoreProvider,
 ) -> AsyncGenerator[None, None]:
-    """Automatically clean up the shared vector store after each test."""
+    """Automatically clean up the shared vector store before and after each test."""
+    # Clean embedding caches before test to prevent deduplication poisoning from
+    # previous tests (EmbeddingCacheManager._hash_stores persists across tests
+    # as a DI singleton, causing re-indexed chunks to be skipped without embedding).
+    _reset_embedding_caches()
+    # Clean vector store before test to ensure no stale data from previous runs
+    await _reset_vector_store_collection(actual_vector_store)
     yield
-    # Use public attributes to check for initialization without raising ProviderError
-    if actual_vector_store and actual_vector_store.client and actual_vector_store.collection_name:
-        with contextlib.suppress(Exception):
-            # Delete collection to start fresh
-            await actual_vector_store.client.delete_collection(actual_vector_store.collection_name)
-            # Clear known collections cache
-            if hasattr(actual_vector_store, "_known_collections"):
-                actual_vector_store._known_collections.clear()
-            # Recreate collection for next test
-            await actual_vector_store._ensure_collection(actual_vector_store.collection_name)
+    # Clean after test to start fresh for the next test
+    await _reset_vector_store_collection(actual_vector_store)
+    _reset_embedding_caches()
 
 
 @pytest.fixture
@@ -1010,7 +1092,7 @@ async def initialized_cw_state(
 
 
 @pytest.fixture
-async def indexed_test_project(known_test_codebase, clean_container):
+async def indexed_test_project(known_test_codebase, clean_container, actual_vector_store):
     """Create pre-indexed test project with configured settings.
 
     This fixture:
@@ -1020,6 +1102,10 @@ async def indexed_test_project(known_test_codebase, clean_container):
     4. Ensures global state is correctly initialized
     5. Yields the project path for tests
     """
+    import codeweaver.core.dependencies
+    import codeweaver.engine.dependencies
+    import codeweaver.server.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
+
     from codeweaver.core.config.loader import get_settings_async
     from codeweaver.core.config.settings_type import CodeWeaverSettingsType
     from codeweaver.engine import IndexingService
@@ -1030,15 +1116,58 @@ async def indexed_test_project(known_test_codebase, clean_container):
 
     # Define a factory that returns settings with the test project path
     async def get_test_settings() -> CodeWeaverSettingsType:
+        from codeweaver.core.types.sentinel import UNSET
+        from codeweaver.providers.config.categories.vector_store import (
+            MemoryVectorStoreProviderSettings,
+        )
+        from codeweaver.providers.config.profiles import ProviderProfile
+        from codeweaver.providers.config.providers import ProviderSettings
+
         # codeweaver.test.toml is already loaded via CODEWEAVER_TEST_MODE="true"
         settings = await get_settings_async()
         settings.project_path = project_path
         settings.project_name = f"test_real_{project_path.name}"
+        # get_settings_async() uses CodeWeaverSettings(**kwargs) which never calls
+        # _initialize(), leaving provider=UNSET. Set it explicitly so downstream
+        # DI factories (_get_provider_settings) don't fail.
+        if settings.provider is UNSET:
+            profile_settings = ProviderProfile.TESTING.as_provider_settings()
+            # Replace disk-based Qdrant with in-memory to avoid cross-test lock conflicts.
+            # The TESTING profile uses path=backup-None which causes RuntimeError when
+            # multiple tests compete for the same Qdrant storage folder.
+            from codeweaver.providers.config.clients.vector_store import QdrantClientOptions
+
+            profile_settings["vector_store"] = (
+                MemoryVectorStoreProviderSettings(
+                    project_name=f"test_real_{project_path.name}",
+                    client_options=QdrantClientOptions(location=":memory:"),
+                ),
+            )
+            settings.provider = ProviderSettings.model_construct(**profile_settings)
         # get_settings() returns BaseCodeWeaverSettings, but in test mode it's actually CodeWeaverSettings
         return settings
 
     # Apply overrides to container
     clean_container.override(CodeWeaverSettingsType, get_test_settings)
+
+    # Override vector store providers to use the shared actual_vector_store.
+    # Without this, _create_vector_store_providers() creates a new in-memory
+    # Qdrant instance from settings (separate from actual_vector_store), so
+    # indexed data is invisible to the search path which uses actual_vector_store.
+    from codeweaver.providers import VectorStoreProvider
+    from codeweaver.providers.dependencies.providers import (
+        PrimaryVectorStoreProviderDep,
+        VectorStoreProvidersDep,
+    )
+
+    clean_container.override(VectorStoreProvider, actual_vector_store)
+    clean_container.override(VectorStoreProvidersDep, (actual_vector_store,))
+    clean_container.override(PrimaryVectorStoreProviderDep, actual_vector_store)
+
+    # Resolve settings and store in _singletons for sync access via _global_settings()
+    # (container[T] only checks _singletons, not overrides)
+    test_settings = await clean_container.resolve(CodeWeaverSettingsType)
+    clean_container._singletons[CodeWeaverSettingsType] = test_settings
 
     # Resolve state via container to ensure it's initialized with correct settings
     state = await clean_container.resolve(CodeWeaverState)

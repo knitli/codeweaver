@@ -410,7 +410,7 @@ class ConfigChangeAnalyzer:
                 (1024, 512): 0.51,  # 74.87% → 74.69% (int8)
             }
             if (old_dim, new_dim) in impact_map:
-                return f"~{impact_map[(old_dim, new_dim)]:.1f}% (empirical)"
+                return f"~{impact_map[(old_dim, new_dim)]:.2f}% (empirical)"
 
         # Generic Matryoshka estimate
         if caps and hasattr(caps, "supports_matryoshka") and caps.supports_matryoshka:
@@ -658,12 +658,20 @@ class ConfigChangeAnalyzer:
         from codeweaver.providers.config.categories import AsymmetricEmbeddingProviderSettings
 
         if isinstance(config, AsymmetricEmbeddingProviderSettings):
-            return (
+            dim = (
                 config.embed_provider.embedding_config.dimension
                 if config.embed_provider.embedding_config
                 else None
             )
-        return config.embedding_config.dimension if config.embedding_config else None
+        else:
+            # Try nested embedding_config first, fall back to direct dimension attribute
+            embedding_config = getattr(config, "embedding_config", None)
+            dim = getattr(embedding_config, "dimension", None) if embedding_config else None
+            if not isinstance(dim, int):
+                # Fall back to direct attribute (e.g. for mock objects or simple configs)
+                direct_dim = getattr(config, "dimension", None)
+                dim = direct_dim if isinstance(direct_dim, int) else None
+        return dim if isinstance(dim, int) else None
 
     def _is_valid_quantization(self, old_dtype: str, new_dtype: str) -> bool:
         """Check if quantization is valid (can only reduce precision)."""

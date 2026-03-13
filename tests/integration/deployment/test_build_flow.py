@@ -28,7 +28,7 @@ def test_build_and_validate_flow():
 
     This validates the complete build system is working correctly.
     """
-    project_root = Path(__file__).parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent.parent
     dist_dir = project_root / "dist"
 
     # Step 1: Clean dist directory
@@ -90,7 +90,7 @@ def test_build_and_validate_flow():
 @pytest.mark.integration
 def test_incremental_build():
     """Verify incremental builds work correctly (rebuild without changes)."""
-    project_root = Path(__file__).parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent.parent
     dist_dir = project_root / "dist"
 
     # Clean start
@@ -123,7 +123,7 @@ def test_incremental_build():
 @pytest.mark.integration
 def test_build_with_clean_flag():
     """Verify uv build --clear properly removes old artifacts."""
-    project_root = Path(__file__).parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent.parent
     dist_dir = project_root / "dist"
 
     # Clean and build

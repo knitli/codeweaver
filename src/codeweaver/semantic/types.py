@@ -256,8 +256,10 @@ class SemanticMetadata(BasedModel):
         Field(description="""The programming language of the code chunk"""),
     ]
     # Use SkipValidation to avoid forward reference resolution issues at import time
-    # The actual validation will happen during model_rebuild() with proper namespace
-    thing: SkipValidation[Any]  # AstThing[SgNode] after model_rebuild()
+    # The actual validation will happen during model_rebuild() with proper namespace.
+    # Default None allows round-trip serialization: AST nodes can't be JSON-serialized
+    # so thing is excluded from payloads (exclude_none=True) and must be None on reload.
+    thing: SkipValidation[Any] = None  # AstThing[SgNode] after model_rebuild()
     positional_connections: Any = ()  # tuple[AstThing[SgNode], ...]
     symbol: Annotated[
         str | None,

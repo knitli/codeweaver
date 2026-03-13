@@ -149,15 +149,17 @@ def _create_codeweaver_config(
     # Save to TOML file using the robust settings method
     settings.save_to_file(config_path)
 
-    # pydantic_settings in test mode excludes init_settings from sources, so any provider data
-    # passed to model_validate() is dropped. pydantic v2's C-level serializer also ignores
-    # object.__setattr__ changes. Fix: merge provider data directly into the saved TOML.
+    # pydantic_settings in test mode excludes init_settings from sources, so fields passed to
+    # model_validate() may be dropped when serialized. Fix: merge missing fields into saved TOML.
+    import tomli
+    import tomli_w
+
+    existing = tomli.loads(config_path.read_text()) if config_path.exists() else {}
+    needs_write = False
+
     from codeweaver.core.types.sentinel import UNSET
 
     if settings.provider is UNSET:
-        import tomli
-        import tomli_w
-
         from codeweaver.core.config.core_settings import _clean_for_toml
         from codeweaver.providers.config.providers import ProviderSettings
 
@@ -165,9 +167,14 @@ def _create_codeweaver_config(
         provider_dump = provider_settings.model_dump(
             mode="json", exclude_none=True, exclude_computed_fields=True
         )
-        provider_clean = _clean_for_toml(provider_dump)
-        existing = tomli.loads(config_path.read_text()) if config_path.exists() else {}
-        existing["provider"] = provider_clean
+        existing["provider"] = _clean_for_toml(provider_dump)
+        needs_write = True
+
+    if "project_path" not in existing:
+        existing["project_path"] = str(project_path.resolve())
+        needs_write = True
+
+    if needs_write:
         config_path.write_text(tomli_w.dumps(existing))
 
     display.print_success(f"Created configuration file: {config_path}")

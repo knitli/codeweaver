@@ -120,7 +120,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     ]
 
     config: Annotated[
-        RerankingConfigT,
+        RerankingProviderSettings | RerankingConfigT,
         Field(description="Configuration for the reranking model, including all request options."),
     ]
 

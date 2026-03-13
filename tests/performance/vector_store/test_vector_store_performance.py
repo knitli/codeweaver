@@ -22,6 +22,7 @@ import time
 
 from collections.abc import AsyncGenerator
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -32,13 +33,12 @@ from codeweaver.core import (
     ChunkKind,
     CodeChunk,
     ExtCategory,
-    Provider,
     SearchStrategy,
     SemanticSearchLanguage,
     Span,
     StrategizedQuery,
 )
-from codeweaver.providers import MemoryConfig, MemoryVectorStoreProvider, QdrantVectorStoreProvider
+from codeweaver.providers import MemoryVectorStoreProvider, QdrantVectorStoreProvider
 
 
 pytestmark = [pytest.mark.async_test, pytest.mark.performance, pytest.mark.slow]
@@ -52,14 +52,16 @@ def create_test_chunk(
     dense_dim: int = 384,
     sparse_indices: int = 50,
 ) -> CodeChunk:
-    """Create a test CodeChunk with embeddings."""
-    from codeweaver.core import uuid7
+    """Create a test CodeChunk with embeddings registered in the global registry."""
+    from uuid import UUID
+
+    from codeweaver.core import BatchKeys, ChunkEmbeddings, EmbeddingBatchInfo, uuid7
+    from codeweaver.providers import get_embedding_registry
 
     chunk_id = uuid7()
-    [0.1] * dense_dim
-    _ = models.SparseVector(indices=list(range(sparse_indices)), values=[0.5] * sparse_indices)
+    dense_vector = [0.1] * dense_dim
 
-    return CodeChunk(
+    chunk = CodeChunk(
         chunk_id=chunk_id,
         file_path=Path(file_path),
         ext_category=ExtCategory(kind=ChunkKind.CODE, language=SemanticSearchLanguage.PYTHON),
@@ -68,6 +70,24 @@ def create_test_chunk(
         content=content,
         chunk_name=f"test_function_{chunk_index}",
     )
+
+    # Register dummy dense embedding in the registry so upsert() can find it
+    dense_batch_id = uuid7()
+    dense_info = EmbeddingBatchInfo.create_dense(
+        batch_id=cast(UUID, dense_batch_id),
+        batch_index=0,
+        chunk_id=chunk_id,
+        model="test-dense-model",
+        embeddings=dense_vector,
+        dimension=dense_dim,
+    )
+    dense_batch_key = BatchKeys(id=cast(UUID, dense_batch_id), idx=0, sparse=False)
+    chunk = chunk.set_batch_keys(dense_batch_key)
+
+    registry = get_embedding_registry()
+    registry[chunk_id] = ChunkEmbeddings(chunk=chunk).add(dense_info)
+
+    return chunk
 
 
 def create_test_chunks(count: int, files: int = 1, dense_dim: int = 384) -> list[CodeChunk]:
@@ -260,22 +280,18 @@ async def test_memory_persistence_performance(chunk_count: int, vector_store_fac
     Contract requirement: 1-3.5s for 10k chunks persist (relaxed for CI/WSL environments).
     Restore should complete in under 4s.
     """
-    from codeweaver.providers.config import CollectionConfig, MemoryVectorStoreProviderSettings
-    from codeweaver.providers.embedding.capabilities.resolver import EmbeddingCapabilityResolver
-
     with tempfile.TemporaryDirectory() as tmpdir:
-        settings = MemoryVectorStoreProviderSettings(
-            collection=CollectionConfig(collection_name="perf_test"),
-            in_memory_config=MemoryConfig(persist_path=Path(tmpdir), auto_persist=False),
+        persist_path = Path(tmpdir) / "perf_test.json"
+
+        # Create store via factory (ensures correct caps/collection configuration)
+        store = await vector_store_factory(
+            MemoryVectorStoreProvider,
+            config_overrides={
+                "persist_path": persist_path,
+                "auto_persist": False,
+                "collection_name": "perf_test",
+            },
         )
-        # Create store and populate
-        store = MemoryVectorStoreProvider(
-            _provider=Provider.MEMORY,
-            config=settings,
-            caps=EmbeddingCapabilityResolver().resolve("minishlab/potion-base-8M"),
-            client=settings.get_client(),
-        )
-        await store._initialize()
 
         chunks = create_test_chunks(count=chunk_count, files=10)
         await store.upsert(chunks)
@@ -286,8 +302,8 @@ async def test_memory_persistence_performance(chunk_count: int, vector_store_fac
         persist_duration = time.perf_counter() - start
 
         # Check file was created
-        assert settings.collection.persist_path.exists()
-        file_size_mb = settings.collection.persist_path.stat().st_size / (1024 * 1024)
+        assert persist_path.exists()
+        file_size_mb = persist_path.stat().st_size / (1024 * 1024)
 
         print(f"\nPersist {chunk_count} chunks:")
         print(f"  Duration: {persist_duration:.3f}s")
@@ -299,7 +315,7 @@ async def test_memory_persistence_performance(chunk_count: int, vector_store_fac
         new_store = await vector_store_factory(
             MemoryVectorStoreProvider,
             config_overrides={
-                "persist_path": settings.collection.persist_path,
+                "persist_path": persist_path,
                 "auto_persist": False,
                 "collection_name": "perf_test",  # Reuse same collection name/config
             },

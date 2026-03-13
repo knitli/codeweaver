@@ -258,7 +258,7 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
                 "Use from_settings_async() for full initialization."
             )
 
-        walker = rignore.Walker(**(index_settings.to_settings()))
+        walker = rignore.Walker(**(index_settings._as_settings(project_path=project_path)))
         return cls(base_path=None, walker=walker, settings=None)
 
     @classmethod
@@ -283,7 +283,7 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
             await index_settings.set_inc_exc(project_path)
             logger.debug("inc_exc patterns initialized for project: %s", project_path)
 
-        walker = rignore.Walker(**(index_settings.to_settings()))
+        walker = rignore.Walker(**(index_settings._as_settings(project_path=project_path)))
         return cls(base_path=None, walker=walker, settings=None)
 
     @property

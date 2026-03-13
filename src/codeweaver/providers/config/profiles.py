@@ -401,6 +401,8 @@ def _testing_profile(
             if HAS_ST
             else FastEmbedEmbeddingConfig(model_name=ModelName(embedding_model)),
         ),
+        # Testing profile runs entirely locally — no agent provider requiring external API keys.
+        "agent": (),
     }
     backup_settings["reranking"] = (
         (

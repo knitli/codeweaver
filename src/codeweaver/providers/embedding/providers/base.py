@@ -73,6 +73,7 @@ from codeweaver.core.constants import (
 )
 from codeweaver.core.types import ModelNameT
 from codeweaver.providers.config import EmbeddingConfigT, EmbeddingProviderSettings
+from codeweaver.providers.config.categories.sparse_embedding import SparseEmbeddingProviderSettings
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
@@ -177,7 +178,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     ]
 
     config: Annotated[
-        EmbeddingProviderSettings,
+        EmbeddingProviderSettings | SparseEmbeddingProviderSettings,
         Field(description="Configuration for the embedding model, including all request options."),
     ]
 
@@ -289,7 +290,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         object.__setattr__(
             self,
             "model_options",
-            embedding_config.model if embedding_config and embedding_config.model else {},
+            getattr(embedding_config, "model", None) or {},
         )
 
         # Phase 4: Use centralized cache manager instead of per-instance stores
@@ -310,8 +311,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self._initialize(impl_deps, custom_deps, **kwargs)
         object.__setattr__(self, "caps", caps)
         object.__setattr__(self, "registry", registry)
+        # Use self.client (not the original `client` arg) so that _initialize() can replace
+        # a class with an instantiated client (e.g. FastEmbedSparseProvider instantiates
+        # the SparseTextEmbedding class inside _initialize()).
         super().__init__(
-            client=client,
+            client=self.client,
             config=config,
             caps=caps,
             registry=registry,
@@ -851,6 +855,20 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         statistics: StatisticsDep = INJECTED,
     ) -> None:
         """Update token statistics for the embedding provider."""
+        # If statistics is still the DI sentinel (not injected by the container),
+        # resolve it lazily from the container so direct method calls also work.
+        from codeweaver.core.di.dependency import DependsPlaceholder, _InjectedProxy
+
+        if isinstance(statistics, (DependsPlaceholder, _InjectedProxy)):
+            try:
+                from codeweaver.core.di.container import get_container
+                from codeweaver.core.statistics import SessionStatistics
+
+                statistics = get_container()[SessionStatistics]  # ty:ignore[assignment]
+            except Exception:
+                # Statistics not available; skip token tracking silently.
+                return
+
         if token_count is not None:
             statistics.add_token_usage(embedding_generated=token_count)
         elif from_docs and all(isinstance(doc, str) for doc in from_docs):
@@ -1083,7 +1101,18 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     def _process_output(self, output_data: Any) -> list[list[float]] | list[list[int]]:
         """Handle output data from embedding."""
-        return self._output_transformer(output_data)
+        # Retrieve the transformer as an unbound function from the class hierarchy
+        # to avoid Python's descriptor protocol binding `self` as the first argument.
+        transformer = vars(type(self)).get("_output_transformer")
+        if transformer is None:
+            # Walk MRO to find the transformer
+            for cls in type(self).__mro__:
+                if "_output_transformer" in vars(cls):
+                    transformer = vars(cls)["_output_transformer"]
+                    break
+        if transformer is not None:
+            return transformer(output_data)
+        return self._output_transformer(output_data)  # ty:ignore[return-value]
 
     async def _get_loop(self) -> asyncio.AbstractEventLoop | None:
         try:

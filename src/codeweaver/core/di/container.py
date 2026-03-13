@@ -88,13 +88,23 @@ class Container[T]:
         """Unwrap Annotated type hints to get the underlying type.
 
         Uses pydantic's annotated_type() for robust handling of Annotated types.
+        Also handles TypeAliasType (PEP 695 `type X = ...` syntax) by first
+        unwrapping the alias to its __value__ before resolving the inner type.
 
         Args:
-            annotation: The type annotation, possibly Annotated.
+            annotation: The type annotation, possibly Annotated or a TypeAliasType.
 
         Returns:
             The unwrapped type, or the original annotation if not Annotated.
         """
+        # Handle TypeAliasType (Python 3.12+ `type X = ...` syntax).
+        # TypeAliasType is not itself Annotated, but its __value__ may be.
+        # e.g. `type SettingsDep = Annotated[CodeWeaverSettingsType, Depends(...)]`
+        # → annotation.__value__ = Annotated[CodeWeaverSettingsType, Depends(...)]
+        # → annotated_type(...)  = CodeWeaverSettingsType
+        if isinstance(annotation, TypeAliasType):
+            annotation = annotation.__value__
+
         # Use pydantic's annotated_type() which handles edge cases better
         unwrapped = annotated_type(annotation)
         return unwrapped if unwrapped is not None else annotation
@@ -166,22 +176,30 @@ class Container[T]:
         )
 
     def _load_providers(self) -> None:
-        """Load providers from the global registry on first access.
+        """Load providers from the global registry on first access and on subsequent calls.
 
         This method is called lazily on first `resolve()` call to ensure all
         dependency_provider decorators have been processed during module imports.
+        It also picks up any providers registered after the initial load (e.g., from
+        modules imported later in the process, such as server dependencies imported
+        inside test fixtures or application startup code).
 
-        Thread-safe via the _providers_loaded flag - only runs once.
+        The `_providers_loaded` flag is kept for backward compatibility but no longer
+        prevents incremental loading of newly-registered interfaces.
         """
-        if self._providers_loaded:
-            return
-
         from codeweaver.core.di.utils import get_all_providers
 
         # New API returns dict[type, list[tuple[Callable, ProviderMetadata]]]
         providers_map = get_all_providers()
 
+        # On first load, register all providers. On subsequent calls, only register
+        # interfaces not yet present in _factories (incremental loading).
+        new_count = 0
         for interface, providers_list in providers_map.items():
+            if self._providers_loaded and interface in self._factories:
+                # Already loaded this interface — skip to avoid duplicate registration
+                continue
+
             for factory, metadata in providers_list:
                 # Map scope to singleton flag
                 # - "singleton" -> singleton=True (app lifetime cache)
@@ -207,9 +225,13 @@ class Container[T]:
                     metadata.is_generator,
                     metadata.is_async_generator,
                 )
+                new_count += 1
 
-        self._providers_loaded = True
-        logger.debug("Loaded providers from registry (total interfaces: %d)", len(providers_map))
+        if not self._providers_loaded:
+            self._providers_loaded = True
+            logger.debug("Loaded providers from registry (total interfaces: %d)", len(providers_map))
+        elif new_count:
+            logger.debug("Incrementally loaded %d new provider(s) from registry", new_count)
 
     def register(
         self,
