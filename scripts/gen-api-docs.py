@@ -12,9 +12,15 @@
 Generate API documentation MDX files from Python source code.
 """
 
-import sys
 from pathlib import Path
-from griffe import GriffeLoader, load_extensions, Parser, Alias, Function
+
+from griffe import Alias, GriffeLoader, Parser, load_extensions
+
+
+def escape_mdx(text: str) -> str:
+    """Escape characters that would break MDX parsing in plain text."""
+    return text.replace('<', '&lt;').replace('>', '&gt;')
+
 
 def get_signature(obj):
     try:
@@ -25,7 +31,7 @@ def get_signature(obj):
                 target = obj.target
             except Exception:
                 return "()"
-        
+
         if hasattr(target, "signature"):
             sig = str(target.signature)
             # Remove messy internal Griffe representation if present
@@ -43,7 +49,7 @@ def main() -> None:
     docs_output.mkdir(parents=True, exist_ok=True)
 
     print("Loading codeweaver package with Griffe...")
-    
+
     # Correct way to load extensions in Griffe
     try:
         extensions = load_extensions(["griffe_pydantic"])
@@ -52,11 +58,11 @@ def main() -> None:
         extensions = None
 
     loader = GriffeLoader(
-        search_paths=[str(src_path)], 
+        search_paths=[str(src_path)],
         extensions=extensions,
         docstring_parser=Parser.google,
     )
-    
+
     # Load specific modules
     modules_to_document = [
         "codeweaver.core.config.core_settings",
@@ -71,11 +77,11 @@ def main() -> None:
         try:
             # We try to load without resolving everything to prevent early failures
             module = loader.load(mod_name)
-            
+
             rel_path = mod_name.replace("codeweaver.", "").replace(".", "/")
             output_path = docs_output / f"{rel_path}.mdx"
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             md = [
                 "---",
                 f"title: {module.name}",
@@ -84,25 +90,26 @@ def main() -> None:
                 "",
                 f"# {module.name}",
                 "",
-                module.docstring.value if module.docstring else "",
+                escape_mdx(module.docstring.value) if module.docstring else "",
                 ""
             ]
-            
+
             for name, member in sorted(module.members.items()):
-                if name.startswith("_"): continue
-                
+                if name.startswith("_"):
+                    continue
+
                 try:
                     if member.is_class:
                         md.append(f"## Class: `{name}`")
                         md.append("")
-                        md.append(member.docstring.value if member.docstring else "")
+                        md.append(escape_mdx(member.docstring.value) if member.docstring else "")
                         md.append("")
-                        
+
                         # Pydantic support check
                         is_pydantic = False
                         if hasattr(member, "extra") and "pydantic" in member.extra:
                             is_pydantic = True
-                        
+
                         if is_pydantic:
                             md.append("### Fields")
                             md.append("")

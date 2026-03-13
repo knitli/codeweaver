@@ -746,8 +746,18 @@ def _release_qdrant_file_locks() -> None:
     gc.collect()
     for obj in gc.get_objects():
         try:
-            flock = getattr(obj, "_flock_file", None)
-            if flock is not None and not flock.closed:
+            # Use object.__getattribute__ to access the raw instance __dict__
+            # directly, bypassing __getattr__. This prevents MagicMock objects
+            # from creating cascading child mocks on every getattr call, which
+            # would cause exponential object accumulation across tests.
+            try:
+                inst_dict = object.__getattribute__(obj, "__dict__")
+            except AttributeError:
+                continue  # slots-only or C-extension type — no _flock_file
+            flock = inst_dict.get("_flock_file")
+            if flock is None:
+                continue
+            if not flock.closed:
                 try:
                     portalocker.unlock(flock)
                 except Exception:
