@@ -323,7 +323,9 @@ class TestCheckpointManagerCompatibility:
             project_path=Path("/test/project"),
             files_discovered=10,
             files_indexed=5,
-            settings_hash=get_blake_hash(b"test_settings"),  # Avoid calling get_checkpoint_settings_map() which requires DI
+            settings_hash=get_blake_hash(
+                b"test_settings"
+            ),  # Avoid calling get_checkpoint_settings_map() which requires DI
         )
 
         await checkpoint_manager.save(checkpoint)
@@ -391,9 +393,7 @@ class TestCheckpointManagerCompatibility:
             from codeweaver.providers.config.providers import ProviderSettings
 
             mock_provider_settings = ProviderSettings.model_construct(
-                embedding=None,
-                sparse_embedding=None,
-                vector_store=(MagicMock(provider="qdrant"),),
+                embedding=None, sparse_embedding=None, vector_store=(MagicMock(provider="qdrant"),)
             )
 
             mock_settings = MagicMock()

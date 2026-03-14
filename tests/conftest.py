@@ -778,10 +778,21 @@ def reset_di_container() -> Generator[None, None, None]:
 
     reset_container_state()
     reset_embedding_registry()
-    _release_qdrant_file_locks()
     yield
     reset_container_state()
     reset_embedding_registry()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def release_qdrant_locks_at_session_end() -> Generator[None, None, None]:
+    """Release Qdrant file locks once at session end, not between every test.
+
+    _release_qdrant_file_locks() calls gc.collect() which takes ~40ms per call.
+    Running it twice per test at 1500 tests adds ~2 minutes of pure overhead.
+    Qdrant file locks only matter when AsyncQdrantLocal instances are alive,
+    so releasing them once at session teardown is sufficient.
+    """
+    yield
     _release_qdrant_file_locks()
 
 

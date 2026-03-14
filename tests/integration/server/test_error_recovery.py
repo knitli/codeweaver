@@ -848,7 +848,9 @@ async def test_error_logging_structured(clean_container):
             mock_embed.embed_documents = AsyncMock(return_value=[[0.1] * 256])
             mock_sparse = AsyncMock(spec=SparseEmbeddingProvider)
             mock_sparse.model_name = "mock-sparse-model"
-            mock_sparse.embed_documents = AsyncMock(return_value=[{"indices": [0], "values": [0.1]}])
+            mock_sparse.embed_documents = AsyncMock(
+                return_value=[{"indices": [0], "values": [0.1]}]
+            )
             mock_store = AsyncMock(spec=VectorStoreProvider)
             mock_store.collection_name = "test_collection"
             mock_store.upsert = AsyncMock()

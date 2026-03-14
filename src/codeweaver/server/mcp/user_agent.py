@@ -20,7 +20,8 @@ from starlette.requests import Request
 
 from codeweaver.core import SemanticSearchLanguage, StatisticsDep
 from codeweaver.core.constants import DEFAULT_MAX_RESULTS, DEFAULT_MAX_TOKENS
-from codeweaver.core.di.dependency import INJECTED
+from codeweaver.core.di import get_container
+from codeweaver.core.di.dependency import INJECTED, is_depends_marker
 from codeweaver.server.agent_api import FindCodeResponseSummary, IntentType, find_code
 from codeweaver.server.dependencies import CodeWeaverStateDep
 
@@ -29,12 +30,38 @@ _logger = logging.getLogger(__name__)
 
 
 def _get_state(state: CodeWeaverStateDep = INJECTED):
-    """Get the current CodeWeaver state."""
+    """Get the current CodeWeaver state.
+
+    When called outside the DI container (e.g. directly in tests or tool calls),
+    falls back to the container's singleton cache so the already-resolved
+    CodeWeaverState is returned rather than the raw INJECTED sentinel.
+    """
+    if is_depends_marker(state):
+        from codeweaver.server.server import CodeWeaverState
+
+        container = get_container()
+        try:
+            return container[CodeWeaverState]
+        except KeyError:
+            # State not yet resolved; return None so callers can guard against it
+            return None
     return state
 
 
 def _get_statistics(stats: StatisticsDep = INJECTED):
-    """Get the current session statistics."""
+    """Get the current session statistics.
+
+    When called outside the DI container, falls back to the container's
+    singleton cache so the already-resolved SessionStatistics is returned.
+    """
+    if is_depends_marker(stats):
+        from codeweaver.core.statistics import SessionStatistics
+
+        container = get_container()
+        try:
+            return container[SessionStatistics]
+        except KeyError:
+            return None
     return stats
 
 
@@ -68,6 +95,7 @@ async def find_code_tool(
     Raises:
         QueryError: If search fails unexpectedly
     """
+    statistics = _get_statistics()
     try:
         # Call the real find_code implementation
         # Convert focus_languages from SemanticSearchLanguage to str tuple
@@ -79,10 +107,9 @@ async def find_code_tool(
             if focus_languages
             else None
         )
-        statistics = _get_statistics()
 
         state = _get_state()
-        if state.failover_manager and context:
+        if state is not None and state.failover_manager and context:
             state.failover_manager.set_context(context)
 
         response = await find_code(
@@ -98,16 +125,17 @@ async def find_code_tool(
             # Context is only available when called via MCP and will raise ValueError otherwise.
             # Track successful request in statistics
             if (
-                context
+                statistics is not None
+                and context
                 and hasattr(context, "request_context")
                 and (request_context := context.request_context)
             ):
                 request_context: RequestContext[ServerSession, Any, Request]
                 request_id = request_context.request_id
-                statistics().add_successful_request(request_id)
+                statistics.add_successful_request(request_id)
 
         # Add failover metadata if failover manager exists
-        if state.failover_manager:
+        if state is not None and state.failover_manager:
             failover_metadata = {
                 "failover": {
                     "enabled": state.failover_manager.backup_enabled,
@@ -122,8 +150,8 @@ async def find_code_tool(
 
     except Exception as e:
         # Track failed request
-        if context:
-            statistics().log_request_from_context(context, successful=False)
+        if context and statistics is not None:
+            statistics.log_request_from_context(context, successful=False)
 
         # Log the error
         _logger.exception("find_code failed")

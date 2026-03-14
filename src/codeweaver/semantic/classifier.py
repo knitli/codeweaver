@@ -315,27 +315,31 @@ class GrammarClassificationResult(BasedModel):
             # we adjust confidence based on the disparity of classification simple_ranks -- wide disparity means less confidence
             # we first compare true ranks, then the classification's simple_rank (a 1 to n for each classification)
             adjustment += cls._adjust_for_disparity(results, max_confidence_result)
-            return max_confidence_result._replace(
-                evidence=evidence,
-                adjustment=adjustment,
-                alternate_classifications={
-                    result.classification: result.evidence
-                    for result in results
-                    if result.classification != max_confidence_result.classification
-                },
+            return max_confidence_result.model_copy(
+                update={
+                    "evidence": evidence,
+                    "adjustment": adjustment,
+                    "alternate_classifications": {
+                        result.classification: result.evidence
+                        for result in results
+                        if result.classification != max_confidence_result.classification
+                    },
+                }
             )
         if len([result for result in results if result != max_confidence_result]) > 1:
             # we adjust confidence based on the disparity of classification simple_ranks -- wide disparity means less confidence
             # we first compare true ranks, then the classification's simple_rank (a 1 to n for each classification)
             adjustment = cls._adjust_for_disparity(results, max_confidence_result)
             results = [result for result in results if result != max_confidence_result]
-            return max_confidence_result._replace(
-                adjustment=adjustment,
-                alternate_classifications={
-                    result.classification: result.evidence
-                    for result in results
-                    if result.classification != max_confidence_result.classification
-                },
+            return max_confidence_result.model_copy(
+                update={
+                    "adjustment": adjustment,
+                    "alternate_classifications": {
+                        result.classification: result.evidence
+                        for result in results
+                        if result.classification != max_confidence_result.classification
+                    },
+                }
             )
         return max_confidence_result
 

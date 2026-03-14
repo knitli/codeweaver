@@ -272,7 +272,9 @@ def inject_failure_during_transition() -> Generator[None, None, None]:
     """
     # Mock implementation - will raise exception during transition
     # Use __name__ to get the correct module path (works with --import-mode=importlib)
-    with patch(f"{__name__}.transition", side_effect=RuntimeError("Simulated failure during transition")):
+    with patch(
+        f"{__name__}.transition", side_effect=RuntimeError("Simulated failure during transition")
+    ):
         yield
 
 

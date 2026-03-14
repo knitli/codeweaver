@@ -210,8 +210,7 @@ async def test_search_returns_relevant_code_chunks(indexed_test_project):
     # should return at least one chunk containing actual code constructs.
     contents = [r.content.content for r in top_results if r.content]
     assert any(
-        any(keyword in content for keyword in ["def ", "class ", "import "])
-        for content in contents
+        any(keyword in content for keyword in ["def ", "class ", "import "]) for content in contents
     ), (
         f"No search results contain Python code constructs (def/class/import). "
         f"Top result content: {contents[0][:200] if contents else 'none'}. "

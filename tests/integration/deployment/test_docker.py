@@ -32,8 +32,7 @@ import pytest
 pytestmark = [pytest.mark.integration, pytest.mark.docker]
 
 docker_available = pytest.mark.skipif(
-    shutil.which("docker") is None,
-    reason="Docker not available in this environment",
+    shutil.which("docker") is None, reason="Docker not available in this environment"
 )
 
 

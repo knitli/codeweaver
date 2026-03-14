@@ -52,14 +52,7 @@ def test_install_from_testpypi():
         local_version = None
 
     check = subprocess.run(
-        [
-            "pip",
-            "index",
-            "versions",
-            "--index-url",
-            "https://test.pypi.org/simple/",
-            "code-weaver",
-        ],
+        ["pip", "index", "versions", "--index-url", "https://test.pypi.org/simple/", "code-weaver"],
         capture_output=True,
         text=True,
         check=False,

@@ -163,10 +163,23 @@ class ThingRegistry:
 
         self._tokens[token.language][token.name] = token
         if token.language == SemanticSearchLanguage.JAVASCRIPT:
+            # Exclude computed fields (classification, classification_confidence) to prevent
+            # triggering classify_thing() while the registry is still being populated.
+            # These fields are computed on demand from the registry itself, so attempting
+            # to serialize them during registration causes circular lookups on an
+            # incomplete registry and produces incorrect results.
             self._tokens[SemanticSearchLanguage.JSX][token.name] = Token.model_construct(
                 token.model_fields_set,
                 **(
-                    token.model_dump(mode="python", exclude={"language", "categories"})
+                    token.model_dump(
+                        mode="python",
+                        exclude={
+                            "language",
+                            "categories",
+                            "classification",
+                            "classification_confidence",
+                        },
+                    )
                     | {"language": SemanticSearchLanguage.JSX}
                 ),
             )
@@ -199,6 +212,10 @@ class ThingRegistry:
                                 "direct_connections",
                                 "positional_connections",
                                 "categories",
+                                # Exclude computed fields to prevent triggering classify_thing()
+                                # while the registry is still being populated.
+                                "classification",
+                                "classification_confidence",
                             },
                         )
                         | {"language": SemanticSearchLanguage.JSX}

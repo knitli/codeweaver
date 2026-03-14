@@ -64,7 +64,9 @@ def load_provider_settings_from_toml(toml_file: Path) -> ProviderSettings:
     return ProviderSettings.model_validate(provider_data)
 
 
-def _get_asymmetric_config(settings: ProviderSettings) -> AsymmetricEmbeddingProviderSettings | None:
+def _get_asymmetric_config(
+    settings: ProviderSettings,
+) -> AsymmetricEmbeddingProviderSettings | None:
     """Extract first asymmetric embedding config from settings.embedding."""
     from codeweaver.providers.config.categories.embedding import AsymmetricEmbeddingProviderSettings
 
@@ -89,11 +91,7 @@ def _make_asymmetric_provider_data(
     def _make_embed_config(prov: str, model: str) -> dict:
         if prov == "voyage":
             cfg = VoyageEmbeddingConfig(model_name=model)
-            return {
-                "provider": prov,
-                "model_name": model,
-                "embedding_config": cfg.model_dump(),
-            }
+            return {"provider": prov, "model_name": model, "embedding_config": cfg.model_dump()}
         # fastembed/sentence_transformers have default factories
         return {"provider": prov, "model_name": model}
 
@@ -770,6 +768,12 @@ class TestConfigurationSerialization:
         serialized = original_config.model_dump()
         restored = AsymmetricEmbeddingProviderSettings.model_validate(serialized)
 
-        assert str(restored.embed_provider.model_name) == str(original_config.embed_provider.model_name)
-        assert str(restored.query_provider.model_name) == str(original_config.query_provider.model_name)
-        assert restored.validate_family_compatibility == original_config.validate_family_compatibility
+        assert str(restored.embed_provider.model_name) == str(
+            original_config.embed_provider.model_name
+        )
+        assert str(restored.query_provider.model_name) == str(
+            original_config.query_provider.model_name
+        )
+        assert (
+            restored.validate_family_compatibility == original_config.validate_family_compatibility
+        )

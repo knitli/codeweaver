@@ -48,10 +48,7 @@ def test_install_from_pypi():
         local_version = None
 
     check = subprocess.run(
-        ["pip", "index", "versions", "code-weaver"],
-        capture_output=True,
-        text=True,
-        check=False,
+        ["pip", "index", "versions", "code-weaver"], capture_output=True, text=True, check=False
     )
     if check.returncode != 0 or "code-weaver" not in check.stdout:
         pytest.skip("code-weaver not found on PyPI — package may not be published yet")
