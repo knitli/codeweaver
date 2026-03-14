@@ -25,4 +25,5 @@ jobs:
     with:
       repo_name: codeweaver
       cla_document_url: https://github.com/knitli/codeweaver/blob/main/CONTRIBUTORS_LICENSE_AGREEMENT.md
-    secrets: inherit
+    secrets:
+      CLA_ACCESS_TOKEN: ${{ secrets.CLA_ACCESS_TOKEN }}
