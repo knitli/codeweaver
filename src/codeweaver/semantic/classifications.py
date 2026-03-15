@@ -27,15 +27,15 @@ from pydantic import (
 from pydantic.dataclasses import dataclass
 from pydantic_core import ArgsKwargs, core_schema
 
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types import (
-    DATACLASS_CONFIG,
+from codeweaver.core import (
     BaseDataclassEnum,
     BasedModel,
     BaseEnum,
     BaseEnumData,
     DataclassSerializationMixin,
+    SemanticSearchLanguage,
 )
+from codeweaver.core.constants import ONE, ONE_POINT_ZERO, ZERO, ZERO_POINT_ZERO
 
 
 if TYPE_CHECKING:
@@ -55,53 +55,89 @@ class ImportanceScoresDict(TypedDict):
 
     discovery: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for discovery context; finding relevant code", ge=0.0, le=1.0),
+        Field(
+            description="Weight for discovery context; finding relevant code",
+            ge=ZERO_POINT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
     comprehension: Annotated[
         NonNegativeFloat,
         Field(
-            description="Weight for comprehension context; understanding behavior", ge=0.0, le=1.0
+            description="Weight for comprehension context; understanding behavior",
+            ge=ZERO_POINT_ZERO,
+            le=ONE_POINT_ZERO,
         ),
     ]
     modification: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for modification context; safe editing points", ge=0.0, le=1.0),
+        Field(
+            description="Weight for modification context; safe editing points",
+            ge=ZERO_POINT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
     debugging: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for debugging context; tracing execution", ge=0.0, le=1.0),
+        Field(
+            description="Weight for debugging context; tracing execution",
+            ge=ZERO_POINT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
     documentation: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for documentation context; explaining code", ge=0.0, le=1.0),
+        Field(
+            description="Weight for documentation context; explaining code",
+            ge=ZERO_POINT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
 
 
-@dataclass(frozen=True, config=DATACLASS_CONFIG)
+@dataclass(frozen=True)
 class ImportanceScores(DataclassSerializationMixin):
     """Multi-dimensional importance scoring for AI assistant contexts."""
 
     discovery: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for discovery context; finding relevant code", ge=0.0, le=1.0),
+        Field(
+            description="Weight for discovery context; finding relevant code",
+            ge=ZERO_POINT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
     comprehension: Annotated[
         NonNegativeFloat,
         Field(
-            description="Weight for comprehension context; understanding behavior", ge=0.0, le=1.0
+            description="Weight for comprehension context; understanding behavior",
+            ge=ZERO_POINT_ZERO,
+            le=ONE_POINT_ZERO,
         ),
     ]
     modification: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for modification context; safe editing points", ge=0.0, le=1.0),
+        Field(
+            description="Weight for modification context; safe editing points",
+            ge=ZERO_POINT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
     debugging: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for debugging context; tracing execution", ge=0.0, le=1.0),
+        Field(
+            description="Weight for debugging context; tracing execution",
+            ge=ZERO_POINT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
     documentation: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for documentation context; explaining code", ge=0.0, le=1.0),
+        Field(
+            description="Weight for documentation context; explaining code",
+            ge=ZERO_POINT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
 
     @classmethod
@@ -119,14 +155,16 @@ class ImportanceScores(DataclassSerializationMixin):
         """Calculate weighted importance score for given AI assistant context."""
         return self.validate_python(
             data={
-                "discovery": min(max(self.discovery * context_weights["discovery"], 0), 1),
+                "discovery": min(max(self.discovery * context_weights["discovery"], ZERO), ONE),
                 "comprehension": min(
-                    max(self.comprehension * context_weights["comprehension"], 0), 1
+                    max(self.comprehension * context_weights["comprehension"], ZERO), ONE
                 ),
-                "modification": min(max(self.modification * context_weights["modification"], 0), 1),
-                "debugging": min(max(self.debugging * context_weights["debugging"], 0), 1),
+                "modification": min(
+                    max(self.modification * context_weights["modification"], ZERO), ONE
+                ),
+                "debugging": min(max(self.debugging * context_weights["debugging"], ZERO), ONE),
                 "documentation": min(
-                    max(self.documentation * context_weights["documentation"], 0), 1
+                    max(self.documentation * context_weights["documentation"], ZERO), ONE
                 ),
             }
         )
@@ -860,11 +898,11 @@ class SemanticClass(str, BaseEnum):
         if isinstance(category, dict):
             category["language"] = language
             category = ThingClass.model_validate(category)
-        if not category.language_specific:
+        if not cast(ThingClass, category).language_specific:
             raise ValueError("Only language-specific categories can be added.")
-        member_name = f"{language.name.upper()}_{category.name}"
+        member_name = f"{language.name.upper()}_{cast(ThingClass, category).name}"
         new_member = cls.add_member(member_name, textcase.snake(member_name))
-        category = category.model_copy(update={"name": new_member})
+        category = cast(ThingClass, category).model_copy(update={"name": new_member})
         cls._update_categories(category)
         cls._update_rank_map(category)
         return new_member
@@ -903,14 +941,14 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
     Values are `BaseAgentTask` dataclass instances.
     """
 
-    DEBUG = (
+    DEBUG = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.2, comprehension=0.3, modification=0.1, debugging=0.35, documentation=0.05
         ),
-        ("debugging", "debugger", "debug"),
+        ("debugging", "debugger", "debug", "fix", "troubleshoot", "bugfix"),
         "Predefined task for debugging code.",
     )
-    DEFAULT = (
+    DEFAULT = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.05,
             comprehension=0.05,
@@ -918,57 +956,85 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
             debugging=0.05,
             documentation=0.05,
         ),
-        ("default",),
+        ("default", "general", "normal", "standard", "typical"),
         "Default task with balanced context weights.",
     )
-    DOCUMENT = (
+    DOCUMENT = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.2, comprehension=0.2, modification=0.1, debugging=0.05, documentation=0.45
         ),
         ("document", "documentation", "doc", "docs", "docstrings"),
         "Predefined task for documenting code.",
     )
-    IMPLEMENT = (
+    IMPLEMENT = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.3, comprehension=0.3, modification=0.2, debugging=0.1, documentation=0.1
         ),
-        ("implement", "implementation", "implementing", "create"),
+        ("implement", "implementation", "implementing", "create", "build", "develop"),
         "Predefined task for implementing code.",
     )
-    LOCAL_EDIT = (
+    LOCAL_EDIT = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.4, comprehension=0.3, modification=0.2, debugging=0.05, documentation=0.05
         ),
-        ("local_edit", "editing", "edit", "modify", "modification", "local_change", "change"),
+        (
+            "local_edit",
+            "editing",
+            "edit",
+            "modify",
+            "modification",
+            "local_change",
+            "change",
+            "update",
+        ),
         "Predefined task for local code edits.",
     )
-    REFACTOR = (
+    REFACTOR = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.15, comprehension=0.25, modification=0.45, debugging=0.1, documentation=0.05
         ),
-        ("refactor", "refactoring", "restructure", "restructuring", "improve", "reorganize"),
+        (
+            "refactor",
+            "refactoring",
+            "restructure",
+            "restructuring",
+            "improve",
+            "reorganize",
+            "optimize",
+        ),
         "Predefined task for refactoring code.",
     )
-    REVIEW = (
+    REVIEW = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.25, comprehension=0.35, modification=0.15, debugging=0.15, documentation=0.1
         ),
         ("review", "code_review", "audit", "code_audit", "inspect", "inspection", "qa"),
         "Predefined task for reviewing code.",
     )
-    SEARCH = (
+    SEARCH = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.5, comprehension=0.2, modification=0.15, debugging=0.1, documentation=0.05
         ),
-        ("search", "find", "lookup", "explore", "investigate"),
-        "Predefined task for searching code.",
+        ("search", "find", "lookup", "explore", "investigate", "where", "locate"),
+        "Predefined task for searching code, such as for definitions, references, or explanations.",
     )
-    TEST = (
+    TEST = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.5, comprehension=0.2, modification=0.2, debugging=0.4, documentation=0.1
         ),
-        ("test", "testing", "unittest", "tests", "write_tests", "test_code"),
-        "Predefined task for testing code or writing tests (discovery).",
+        (
+            "test",
+            "testing",
+            "unittest",
+            "tests",
+            "write_tests",
+            "test_code",
+            "fixtures",
+            "mocks",
+            "stubs",
+            "test_cases",
+        ),
+        "Predefined task for testing code or writing tests.",
     )
 
     def _telemetry_keys(self) -> None:
@@ -984,7 +1050,7 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
     @property
     def profile(self) -> ImportanceScoresDict:
         """Get the context weight profile for this task."""
-        return self.value._profile  # type: ignore
+        return self.value._profile
 
 
 # =============================================================================
@@ -1009,20 +1075,20 @@ def _validate_categories(
             value.args[1],
             MappingProxyType(
                 nxt(
-                    dict(value.args[2])  # type: ignore
+                    dict(value.args[2])
                     if isinstance(value.args[2], MappingProxyType)
                     else value.args[2]
                 )
             ),
-        )  # type: ignore
+        )
     if isinstance(value, MappingProxyType) and all(
         isinstance(k, SemanticClass) and isinstance(v, ThingClass)
-        for k, v in value.items()  # type: ignore
-        if k and v  # type: ignore
+        for k, v in value.items()
+        if k and v
     ):
-        return value  # type: ignore
+        return value
     if isinstance(value, MappingProxyType | dict):
-        return MappingProxyType(nxt(dict(value) if isinstance(value, MappingProxyType) else value))  # type: ignore
+        return MappingProxyType(nxt(dict(value) if isinstance(value, MappingProxyType) else value))
     if isinstance(value, str | bytes | bytearray):
         return _validate_categories(nxt(value), nxt, _info)
     raise ValueError("Invalid type for core_categories")
@@ -1033,8 +1099,7 @@ def _validate_categories(
 # =============================================================================
 
 
-@dataclass(config=DATACLASS_CONFIG)
-class UsageMetrics(DataclassSerializationMixin):
+class UsageMetrics(BasedModel):
     """Metrics on real-world usage of semantic categories."""
 
     category_usage_counts: Counter[SemanticClass]
@@ -1052,8 +1117,8 @@ class UsageMetrics(DataclassSerializationMixin):
     @property
     def usage_frequencies(self) -> dict[SemanticClass, NonNegativeFloat]:
         """Calculate usage frequency for each category."""
-        if self.total_use == 0:
-            return dict.fromkeys(self.category_usage_counts, 0.0)
+        if self.total_use == ZERO:
+            return dict.fromkeys(self.category_usage_counts, ZERO_POINT_ZERO)
         return {
             cat: (count / self.total_use) * 100.0
             for cat, count in self.category_usage_counts.items()
@@ -1064,8 +1129,7 @@ class UsageMetrics(DataclassSerializationMixin):
         self.category_usage_counts.update(categories)
 
 
-@dataclass(config=DATACLASS_CONFIG)
-class ScoreValidation(DataclassSerializationMixin):
+class ScoreValidation(BasedModel):
     """Validation results for importance score accuracy."""
 
     def _telemetry_keys(self) -> None:
@@ -1102,7 +1166,13 @@ class ScoreValidation(DataclassSerializationMixin):
 
 __all__ = (
     "AgentTask",
-    # "ScoreValidation", not implemented yet
+    "BaseAgentTask",
+    "ImportanceRank",
+    "ImportanceScores",
+    "ImportanceScoresDict",
+    "ScoreValidation",
     "SemanticClass",
+    "SemanticClassDict",
+    "ThingClass",
     "UsageMetrics",
 )

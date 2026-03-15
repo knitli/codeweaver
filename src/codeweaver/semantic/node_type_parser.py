@@ -257,9 +257,10 @@ from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, ove
 from pydantic import DirectoryPath, Field
 from pydantic_core import from_json
 
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types.aliases import CategoryNameT, ThingName
-from codeweaver.core.types.models import RootedRoot
+from codeweaver.core import INJECTED, CategoryNameT, RootedRoot, SemanticSearchLanguage, ThingName
+from codeweaver.core.constants import ZERO
+from codeweaver.core.utils import has_package
+from codeweaver.semantic.dependencies import ThingRegistryDep
 from codeweaver.semantic.types import NodeTypeDTO
 
 
@@ -331,7 +332,7 @@ logger = logging.getLogger()
 #  - source_thing: the `type` of the containing node
 #  - is_file: maps from `root`
 #  - can_appear_anywhere: maps from `extra` (marks Things that can appear
-#    as children of any node)
+#    as children of any node; in nearly all instances, comments.)
 #
 # * Translation Algorithm:
 #  - We use a lazy registry pattern to manage Things and Categories, so they can hold references to each other while being constructed and immutable.
@@ -343,6 +344,11 @@ logger = logging.getLogger()
 #
 # * Approach: DTO classes for JSON structure, then conversion functions to keep pydantic validation
 # cleanly separated from parsing logic. We'll use NamedTuple for DTOs to keep them lightweight, but allow for methods if needed (unlike TypedDict).
+#
+# * Static at runtime
+#
+# In practice, CodeWeaver generates this data at build time and saves it as a pickle cache (python object) in `codeweaver.semantic.data`. This avoids the need for runtime parsing and speeds up startup.
+# We keep this capability within the code, vice in build generation, because we plan to use it dynamically in the future for new languages at runtime.
 # ===========================================================================
 
 
@@ -357,7 +363,7 @@ def _get_types_files_in_directory(directory: DirectoryPath | None = None) -> lis
     """
     if directory is None:
         # Use importlib.resources to access package data
-        data_dir = files("codeweaver.data") / "node_types"
+        data_dir = files("codeweaver.semantic.data") / "node_types"
         if not data_dir.is_dir():
             return []
         return [
@@ -458,8 +464,8 @@ class NodeTypeFileLoader:
 
         # If using package resources, load directly
         if self.directory is None:
-            data_dir = files("codeweaver.data") / "node_types"
-            filename = f"{language.value}-node-types.json"
+            data_dir = files("codeweaver.semantic.data") / "node_types"
+            filename = f"{language.variable}-node-types.json"
             resource = data_dir / filename
             return from_json(resource.read_bytes()) if resource.is_file() else None
         # Otherwise use file path
@@ -588,7 +594,7 @@ class NodeTypeParser:
         """
         try:
             # Try to load cache from package resources
-            cache_resource = files("codeweaver.data") / "node_types_cache.pkl"
+            cache_resource = files("codeweaver.semantic.data") / "node_types_cache.pkl"
             if not cache_resource.is_file():
                 logger.debug("Node types cache not found, will parse from JSON files")
                 return False
@@ -608,6 +614,13 @@ class NodeTypeParser:
                 return False
 
             type(self)._registration_cache = cache_data["registration_cache"]
+            # Clear any stale cached_property values from pickled instances.
+            # classification_result may have been computed and cached during cache generation
+            # before GrammarClassificationResult was fully initialized, leaving broken empty
+            # instances. Clearing it ensures fresh computation on next access.
+            for lang_cache in type(self)._registration_cache.values():
+                for obj in (*lang_cache.get("tokens", []), *lang_cache.get("composites", [])):
+                    obj.__dict__.pop("classification_result", None)
             type(self)._cache_loaded = True
             logger.debug("Loaded node types from cache")
 
@@ -686,7 +699,7 @@ class NodeTypeParser:
         self._languages = frozenset(languages or iter(SemanticSearchLanguage)) | self._languages
         for language in languages or self._languages:
             # no tokens, no grammar
-            if len(self._registration_cache[language]["tokens"]) == 0 and (
+            if len(self._registration_cache[language]["tokens"]) == ZERO and (
                 array := self._loader.get_node(language)
             ):
                 _ = self._parse_node_array(array)
@@ -700,18 +713,25 @@ class NodeTypeParser:
     def cache_complete(self) -> bool:
         """Check if the internal cache is fully populated for all specified languages."""
         return all(
-            len(type(self)._registration_cache[lang]["tokens"]) > 0
-            and len(type(self)._registration_cache[lang]["composites"]) > 0
+            len(type(self)._registration_cache[lang]["tokens"]) > ZERO
+            and len(type(self)._registration_cache[lang]["composites"]) > ZERO
             for lang in self._languages
         )
 
-    def _register_everything(self) -> None:
+    def _register_everything(self, registry: ThingRegistryDep = INJECTED) -> None:
         """Register all Things and Categories in the internal mapping."""
+        # Resolve the registry dependency
+        from codeweaver.core.di.dependency import DependsPlaceholder, _InjectedProxy
+
+        if isinstance(registry, (_InjectedProxy, DependsPlaceholder)):
+            # No DI container active, get the singleton registry
+            from codeweaver.semantic.ast_grep import AstThing
+
+            registry = AstThing._thing_registry()
+
         if not type(self)._registration_cache:
             _ = self.parse_all_nodes()
-        from codeweaver.semantic.registry import get_registry
 
-        registry = get_registry()
         for language in self._languages:
             for thing in self._flattened_nodes_for_language(language):
                 registry.register_thing(thing)
@@ -786,7 +806,7 @@ class NodeTypeParser:
     def _build_thing(self, node_dto: NodeTypeDTO, thing: type[ThingType]) -> ThingType:
         """Build a Thing (Token or CompositeThing) from a NodeTypeDTO and register it."""
         category_names = self._get_node_categories(node_dto)
-        return thing.from_node_dto(node_dto, category_names=category_names)  # type: ignore
+        return thing.from_node_dto(node_dto, category_names=category_names)
 
     def _parse_node_array(self, node_array: NodeArray) -> list[ThingOrCategoryType]:
         """Parse and translate a single node types file into internal representation.
@@ -824,14 +844,12 @@ class NodeTypeParser:
             )
         return self._flattened_nodes_for_language(node_array.language)
 
-    def _validate(self) -> None:
+    def _validate(self, registry: ThingRegistryDep = INJECTED) -> None:
         """Validate the internal state of the parser."""
         from codeweaver.semantic.grammar import CompositeThing, Token
-        from codeweaver.semantic.registry import get_registry
 
-        registry = get_registry()
         for language in self._languages:
-            if len(self._registration_cache[language]["composites"]) > 0:
+            if len(self._registration_cache[language]["composites"]) > ZERO:
                 for thing in self._flattened_nodes_for_language(language):
                     if thing not in registry:
                         raise ValueError(f"Thing {thing.name} not registered in registry.")
@@ -877,13 +895,11 @@ def get_things(
 # sourcery skip: avoid-builtin-shadow
 if __name__ == "__main__":
     has_rich = False
-    from importlib.util import find_spec
-
-    if find_spec("rich"):
+    if has_package("rich"):
         from rich.console import Console
 
         console = Console(markup=True)
-        print = console.print  # type: ignore  # noqa: A001
+        print = console.print  # noqa: A001
         has_rich = True
     parser = NodeTypeParser()
     all_things = parser.parse_all_nodes()
@@ -892,20 +908,20 @@ if __name__ == "__main__":
         all_things,
         key=lambda x: (
             x.language.as_title,
-            x.is_composite if hasattr(x, "is_composite") else False,  # type: ignore
+            x.is_composite if hasattr(x, "is_composite") else False,
             x.name,
         ),
     ):
         print(
-            f" - [bold dark_orange]{thing.language.as_title}[/bold dark_orange]: [cyan]{thing.name}[/cyan] [green]({thing.kind if hasattr(thing, 'kind') else 'Category'})[/green]"  # type: ignore
+            f" - [bold dark_orange]{thing.language.as_title}[/bold dark_orange]: [cyan]{thing.name}[/cyan] [green]({thing.kind if hasattr(thing, 'kind') else 'Category'})[/green]"
             if has_rich
-            else f" - {thing.language.as_title}: {thing.name} ({thing.kind if True else 'Category'})"  # type: ignore
+            else f" - {thing.language.as_title}: {thing.name} ({thing.kind if isinstance(thing, Token | CompositeThing) else 'Category'})"
         )
     print(
         f"[magenta]Total: {len(all_things)} Things and Categories[/magenta]"
         if has_rich
         else f"Total: {len(all_things)} Things and Categories"
-    )  # type: ignore
+    )
 
 
 __all__ = ("NodeArray", "NodeTypeFileLoader", "NodeTypeParser", "get_things")

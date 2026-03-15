@@ -13,15 +13,16 @@ SPDX-License-Identifier: MIT OR Apache-2.0
   <img alt="CodeWeaver logo" src="docs/assets/codeweaver-primary.webp" height="150px" width="150px">
 </picture>
 
-# CodeWeaver
+# CodeWeaver Alpha 6
 
-### Semantic code search for Claude, Gemini, ChatGPT — across 166+ languages
+### Exquisite Context for Agents — Infrastructure that is Extensible, Predictable, and Resilient.
 
 [![Python Version][badge_python]][link_python]
 [![License][badge_license]][link_license]
 [![Alpha Release][badge_release]][link_release]
 [![MCP Compatible][badge_mcp]][link_mcp]
 
+[Documentation][nav_docs] •
 [Installation][nav_install] •
 [Features][nav_features] •
 [Comparison][nav_comparison]
@@ -34,12 +35,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 **CodeWeaver gives Claude and other AI agents precise context from your codebase.** Not keyword grep. Not whole-file dumps. Actual structural understanding through hybrid semantic search.
 
-You, or Claude, or your intern, can ask questions like:
-- *"Where do we handle OAuth tokens?"*
-- *"Find all API endpoint definitions"*
-- *"Show me error handling in the payment flow"*
-
-CodeWeaver returns the exact functions, classes, and code blocks — even in unfamiliar languages or massive repositories.
+CodeWeaver Alpha 6 transforms from a "Search Tool" into **Professional Context Infrastructure**. With 100% Dependency Injection (DI) and a Pydantic-driven configuration system, it provides the reliability and extensibility required for industrial-grade AI deployments.
 
 **Example:**
 ```
@@ -50,10 +46,10 @@ Without CodeWeaver:
 With CodeWeaver:
   You: "Where do we validate OAuth tokens?"
   Claude gets: The exact 3 functions across 2 files, with surrounding context
-  Result: Precise answers, focused context, actual understanding
+  Result: Precise answers, focused context, 60-80% token reduction
 ```
 
-> ⚠️ **Alpha Release**: This works, but it's early. [Use it, break it, help shape it][issues].
+> ⚠️ **Alpha Release**: CodeWeaver is in active development. [Use it, break it, help shape it][issues].
 
 ---
 
@@ -61,23 +57,13 @@ With CodeWeaver:
 
 ### Quick Reference Matrix
 
-| Feature | CodeWeaver | Serena | Cursor | Copilot Workspace | Sourcegraph Cody | Continue.dev | Bloop | Aider |
-|---------|-----------|--------|--------|-------------------|------------------|--------------|-------|-------|
-| **Approach** | Semantic search | Symbol lookup (LSP) | Semantic | Semantic | Keyword | Semantic | Semantic | Repo maps |
-| **Tool Count** | **1** | **20+** | N/A | N/A | N/A | N/A | N/A | N/A |
-| **Prompt Overhead** | **~500 tokens** | **~16,000 tokens** | N/A | N/A | N/A | N/A | N/A | N/A |
-| **Search Speed** | Moderate (embeddings) | **Very fast (LSP)** | Moderate | Server-side | Fast | Moderate | Fast | On-demand |
-| **Embedding Providers** | **17** | 0 (no embeddings) | 1-2 | 1 | 0 (deprecated) | 4-5 | 1 | 0 |
-| **Language Support** | **166+** | ~30 (LSP required) | ~50-100 | All (text) | All | ~165 | Unknown | ~165+ |
-| **Requires Language Server** | ❌ No | ✅ Yes | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No |
-| **Symbol Precision** | ⚠️ Semantic match | **✅ Exact symbols** | ⚠️ Semantic | ⚠️ Semantic | ⚠️ Keyword | ⚠️ Semantic | ⚠️ Semantic | ✅ Exact |
-| **Concept Search** | **✅ Yes** | ❌ Symbols only | ✅ Yes | ✅ Yes | ⚠️ Limited | ✅ Yes | ✅ Yes | ❌ No |
-| **Editing Capabilities** | ❌ No | **✅ Yes (9 tools)** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes | ❌ No | ✅ Yes |
-
-**Notes**:
-- **Serena tool count**: Varies by context (20+ in claude-code, up to 35 total available)
-- **Serena prompt overhead**: Measured with 21 active tools in claude-code context (~16,000 tokens)
-- **Language counts**: CodeWeaver supports 166+ unique languages (27 with AST parsing, 139 with intelligent delimiter-based chunking)
+| Feature | CodeWeaver Alpha 6 | Legacy Search Tools |
+| :--- | :--- | :--- |
+| **Search Type** | Hybrid (Semantic + AST + Keyword) | Keyword Only |
+| **Context Quality** | **Exquisite** / High-Precision | Noisy / Irrelevant |
+| **Extensibility** | **DI-Driven** (Zero-Code Provider Swap) | Hardcoded |
+| **Reliability** | **Resilient** (Automatic Local Fallback) | Fails on API Timeout |
+| **Token Usage** | **Optimized** (60–80% Reduction) | Wasted on Noise |
 
 📊 [See detailed competitive analysis →][competitive_analysis]
 
@@ -90,55 +76,25 @@ With CodeWeaver:
 Using the [CLI](#cli) with [uv][uv_tool]:
 ```bash
 # Add CodeWeaver to your project
-uv add --prerelease allow --dev code-weaver
+uv add code-weaver
 
-# Initialize config and MCP setup
-cw init
+# Initialize with a profile (recommended uses Voyage AI)
+cw init --profile recommended
 
 # Verify setup
 cw doctor
 
-# Start the server
-cw server
+# Start the background daemon
+cw start
 ```
 
-> **📝 Note**: `cw init` defaults to CodeWeaver's `recommended` profile:
-> - 🔑 [Voyage AI API key][voyage_ai] (generous free tier)
-> - 🗄️ [Qdrant instance][qdrant] (cloud or local, both free options)
+> **📝 Note**: `cw init` supports different **Profiles**:
+> - `recommended`: High-precision search (Voyage AI + Qdrant)
+> - `quickstart`: 100% local, private, and free (FastEmbed + Local Qdrant)
 >
-> **Want full offline?** Use `cw init --profile quickstart` for local-only operation.
+> **Want full offline?** See the [Local-Only Guide][nav_docs].
 
 🐳 **Prefer Docker?** [See Docker setup guide →][docker_guide]
-
-### MCP Configuration
-
-To watch and handle your files, CodeWeaver always runs an HTTP server. You can connect to that or use your typical `stdio` setup:
-
-`cw init` adds CodeWeaver to your project's `.mcp.json`:
-```json
-{
-  "mcpServers": {
-    "codeweaver": {
-      "type": "stdio",
-      "cmd": "uv",
-      "args": ["run", "codeweaver", "server"],
-      "env": {"VOYAGE_API_KEY": "your-key-here"}
-    }
-  }
-}
-```
-
-**or with http:**
-```json
-{
-  "mcpServers": {
-    "codeweaver": {
-      "type": "http",
-      "url": "http://127.0.0.1:9328"
-    }
-  }
-}
-```
 
 ---
 
@@ -148,61 +104,40 @@ To watch and handle your files, CodeWeaver always runs an HTTP server. You can c
 <tr>
 <td width="50%">
 
-### 🔍 Smart Search
+### 🔍 Exquisite Context
 - **Hybrid search** (sparse + dense vectors)
 - **AST-level understanding** (27 languages)
-- **Semantic relationships**
+- **Reciprocal Rank Fusion (RRF)**
 - **Language-aware chunking** (166+ languages)
 
 </td>
 <td width="50%">
 
-### 🌐 Language Support
-- **27 languages** with full AST/semantic parsing
-- **166+ languages** with language-aware chunking
-- **Cross-language normalization**
-- **Family heuristics** for smart fallback
-
-</td>
-</tr>
-<tr>
-<td>
-
-### 🔄 Resilient & Offline
-- **Full offline operation** with local models
-- **Automatic failover** to backup vector store
+### 🛡️ Industrial Resilience
+- **Automatic local fallback** (FastEmbed)
+- **Circuit breaker pattern** for APIs
 - **Works airgapped** (no cloud required)
-- **Graceful degradation** with health monitoring
-
-</td>
-<td>
-
-### 🔌 Provider Flexibility
-- **17 embedding providers**
-- **50+ embedding models**
-- **Sparse & dense** embedding model support
-- **5 reranking providers**
-- [See full provider list →][providers_list]
+- **Pydantic-driven validation** at boot-time
 
 </td>
 </tr>
 <tr>
 <td>
 
-### ⚙️ Configuration
-- **~15 config sources** (TOML/YAML/JSON/ENV)
-- **Cloud secret stores** (AWS/Azure/GCP)
-- **Hierarchical merging**
-- **Profiles** for common setups
+### 🧩 Universal Extensibility
+- **100% DI-driven architecture**
+- **17+ integrated providers**
+- **Custom provider API**
+- **Zero-code provider swapping**
 
 </td>
 <td>
 
 ### 🛠️ Developer Experience
 - **Live indexing** with file watching
-- **Move detection** (no re-indexing duplicates)
-- **Full CLI** (`cw` / `codeweaver`)
-- **Health & metrics** endpoints
+- **Diagnostic tool** (`cw doctor`)
+- **Multiple CLI aliases** (`cw` / `codeweaver`)
+- **Selectable profiles** for easy setup
 
 </td>
 </tr>
@@ -210,25 +145,20 @@ To watch and handle your files, CodeWeaver always runs an HTTP server. You can c
 
 ---
 
-## 💭 Philosophy
+## 💭 Philosophy: Context is Oxygen
 
-### The Bigger Picture
+AI agents face **too much irrelevant context**, causing token waste, missed patterns, and hallucinations. CodeWeaver addresses this with one focused capability: **structural + semantic code understanding that you control.**
 
-I started building CodeWeaver because I believe AI agents need better context infrastructure. Right now:
-
-- Agents re-read the same huge files repeatedly
-- They get shallow, text-based context instead of structural understanding
-- They are mostly given tools built for humans, not for how they actually work
-- You don't control what context they see or how they get it
-
-CodeWeaver addresses this with one focused capability: structural + semantic code understanding that you control and can deploy however you want.
-
-**Is this solving a big problem?** We think so. But we're in alpha; we're probably not there yet. We also need real-world usage to prove it. That's where you come in. Use it, make it better. Worst case -- it's a good tool, best case -- you get better results and cut costs on AI.
+- **Curation over Collection:** Give agents exactly what they need, nothing more.
+- **Privacy-First:** Your code stays local if you want it to.
+- **Infrastructure over Tooling:** Built to be the reliable foundation for your AI stack.
 
 📖 [Read the detailed rationale →][why_codeweaver]
 
 ---
 <div align="center">
+
+**Official Documentation: [docs.knitli.com/codeweaver/](https://docs.knitli.com/codeweaver/)**
 
 **Built with ❤️ by [Knitli][knitli_site]**
 

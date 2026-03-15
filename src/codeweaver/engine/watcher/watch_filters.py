@@ -12,23 +12,29 @@ import logging
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, ClassVar, Unpack, cast, overload
+from typing import TYPE_CHECKING, Any, ClassVar, Unpack, cast, overload
 
 import rignore
 import watchfiles
 
+from pydantic import DirectoryPath
 from watchfiles import Change, DefaultFilter
 
-from codeweaver.config.indexer import RignoreSettings
-from codeweaver.config.types import CodeWeaverSettingsDict
-from codeweaver.core.file_extensions import (
+from codeweaver.core import (
     CODE_FILES_EXTENSIONS,
     CONFIG_FILE_LANGUAGES,
     DEFAULT_EXCLUDED_DIRS,
     DOC_FILES_EXTENSIONS,
+    INJECTED,
+    ConfigLanguage,
+    ResolvedProjectPathDep,
+    SemanticSearchLanguage,
 )
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.types import DictView, Unset
+from codeweaver.engine.config import RignoreSettings
+
+
+if TYPE_CHECKING:
+    from codeweaver.engine.dependencies import IndexerSettingsDep
 
 
 logger = logging.getLogger(__name__)
@@ -37,7 +43,7 @@ logger = logging.getLogger(__name__)
 class ExtensionFilter(DefaultFilter):
     """Filter files by extension on top of the default directory/path ignores."""
 
-    __slots__ = ("extensions",)
+    __slots__ = ("_ignore_paths", "extensions")
 
     def __init__(
         self,
@@ -52,7 +58,9 @@ class ExtensionFilter(DefaultFilter):
         """
         self._ignore_paths = ignore_paths
         self.extensions: tuple[str, ...] = (
-            extensions if isinstance(extensions, tuple) else tuple(extensions)
+            cast(tuple[str, ...], extensions)
+            if isinstance(extensions, tuple)
+            else tuple(extensions)
         )
         super().__init__()
 
@@ -77,8 +85,8 @@ class DefaultExtensionFilter(ExtensionFilter):
     ) -> None:
         """Initialize the default extension filter with sensible defaults."""
         self._ignore_paths = ignore_paths
-        self.extensions: tuple[str, ...] = (
-            extensions if isinstance(extensions, tuple) else tuple(extensions)
+        self.extensions: tuple[str, ...] = cast(
+            tuple[str, ...], extensions if isinstance(extensions, tuple) else tuple(extensions)
         )
         super().__init__(extensions=extensions, ignore_paths=ignore_paths)
 
@@ -151,17 +159,17 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
     _allowed_complete: bool
 
     @overload
-    def __init__(self, *, base_path: None, settings: None, walker: rignore.Walker) -> None: ...
+    def __init__(self, *, base_path: None, walker: Walker, settings: None = None) -> None: ...
     @overload
     def __init__(
-        self, *, base_path: Path, walker: None = None, **settings: Unpack[RignoreSettings]
-    ) -> None: ...
-    def __init__(  # type: ignore
         self,
         *,
-        base_path: Path | None = None,
-        walker: Walker | None = None,
-        settings: RignoreSettings | None = None,
+        base_path: ResolvedProjectPathDep = INJECTED,
+        walker: None = None,
+        **settings: Unpack[RignoreSettings],
+    ) -> None: ...
+    def __init__(
+        self, *, base_path: DirectoryPath | None, walker: Walker, settings: RignoreSettings
     ) -> None:
         """Initialize the IgnoreFilter with either rignore settings or a pre-configured walker."""
         if not walker and not (settings and base_path):
@@ -173,14 +181,6 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         if walker:
             self._walker = walker
         else:
-            if settings is None:
-                raise ValueError(
-                    "You must provide either settings or a walker. We need to know what to ignore!"
-                )
-            if base_path is None:
-                raise ValueError(
-                    "You must provide a base path if you don't provide a walker instance."
-                )
             self._walker = rignore.walk(path=base_path, **cast(dict[str, Any], settings))  # type: ignore
         self._allowed = set()
         self._allowed_complete = False
@@ -196,6 +196,8 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
                 return self._walkable(p, is_new=True, delete=False)
             case Change.modified:
                 return self._walkable(p, is_new=False, delete=False)
+            case _:
+                return False
 
     def _walkable(self, path: Path, *, is_new: bool = False, delete: bool = False) -> bool:
         """Check if a path is walkable (not ignored) using the rignore walker.
@@ -230,8 +232,10 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
 
     @classmethod
     def from_settings(
-        cls, settings: DictView[CodeWeaverSettingsDict] | None = None
-    ) -> IgnoreFilter[rignore.Walker]:
+        cls,
+        project_path: ResolvedProjectPathDep = INJECTED,
+        index_settings: IndexerSettingsDep = INJECTED,
+    ) -> IgnoreFilter[Walker]:
         """Create an IgnoreFilter instance from settings (sync version).
 
         Note: This method cannot set inc_exc patterns asynchronously.
@@ -239,22 +243,12 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         manually configure the walker's inc_exc patterns after creation.
 
         Args:
-            settings: Optional settings dictionary
+            project_path: The resolved project path dependency
+            index_settings: The resolved indexer settings dependency
 
         Returns:
             Configured IgnoreFilter instance (may need async initialization)
         """
-        from codeweaver.common.utils.git import get_project_path
-        from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
-        from codeweaver.config.settings import get_settings_map
-
-        settings = settings or get_settings_map()
-        index_settings = (
-            settings["indexer"]
-            if isinstance(settings["indexer"], IndexerSettings)
-            else IndexerSettings.model_validate(DefaultIndexerSettings)
-        )
-
         # Note: inc_exc setting is skipped in sync version
         # The walker will be created with default settings
         # For proper inc_exc patterns, use from_settings_async()
@@ -264,20 +258,15 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
                 "Use from_settings_async() for full initialization."
             )
 
-        walker = rignore.Walker(
-            **(index_settings.to_settings())  # type: ignore
-        )
-        return cls(
-            walker=walker,
-            base_path=get_project_path()
-            if isinstance(settings["project_path"], Unset)
-            else settings["project_path"],
-        )
+        walker = rignore.Walker(**(index_settings._as_settings(project_path=project_path)))
+        return cls(base_path=None, walker=walker, settings=None)
 
     @classmethod
     async def from_settings_async(
-        cls, settings: DictView[CodeWeaverSettingsDict] | None = None
-    ) -> IgnoreFilter[rignore.Walker]:
+        cls,
+        project_path: ResolvedProjectPathDep = INJECTED,
+        index_settings: IndexerSettingsDep = INJECTED,
+    ) -> IgnoreFilter[Walker]:
         """Create an IgnoreFilter instance from settings with full async initialization.
 
         This method properly awaits all async operations including inc_exc pattern setting.
@@ -289,39 +278,16 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         Returns:
             Fully initialized IgnoreFilter instance
         """
-        from codeweaver.common.utils.git import get_project_path
-        from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
-        from codeweaver.config.settings import get_settings_map
-
-        settings = settings or get_settings_map()
-        index_settings = (
-            settings["indexer"]
-            if isinstance(settings["indexer"], IndexerSettings)
-            else IndexerSettings.model_validate(DefaultIndexerSettings)
-        )
-
         # Properly await inc_exc initialization
         if not index_settings.inc_exc_set:
-            project_path = (
-                get_project_path()
-                if isinstance(settings["project_path"], Unset)
-                else settings["project_path"]
-            )
             await index_settings.set_inc_exc(project_path)
             logger.debug("inc_exc patterns initialized for project: %s", project_path)
 
-        walker = rignore.Walker(
-            **(index_settings.to_settings())  # type: ignore
-        )
-        return cls(
-            walker=walker,
-            base_path=get_project_path()
-            if isinstance(settings["project_path"], Unset)
-            else settings["project_path"],
-        )
+        walker = rignore.Walker(**(index_settings._as_settings(project_path=project_path)))
+        return cls(base_path=None, walker=walker, settings=None)
 
     @property
-    def walker(self) -> rignore.Walker:
+    def walker(self) -> Walker:
         """Return the underlying rignore walker used by this filter."""
         return self._walker
 

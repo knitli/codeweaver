@@ -15,11 +15,11 @@ from itertools import chain
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types.aliases import (
+from codeweaver.core import (
     CategoryNameT,
     Role,
     RoleT,
+    SemanticSearchLanguage,
     ThingNameT,
     ThingOrCategoryNameT,
 )
@@ -83,11 +83,11 @@ class ThingRegistry:
         ) = {}, {}, {}, {}, {}
         for lang in SemanticSearchLanguage:
             # pylance complains because the defaultdict isn't the TypedDict
-            self._tokens[lang] = defaultdict(dict)  # type: ignore
-            self._composite_things[lang] = defaultdict(dict)  # type: ignore
-            self._categories[lang] = defaultdict(dict)  # type: ignore
-            self._direct_connections[lang] = defaultdict(dict)  # type: ignore
-            self._positional_connections[lang] = defaultdict(dict)  # type: ignore
+            self._tokens[lang] = defaultdict(dict)
+            self._composite_things[lang] = defaultdict(dict)
+            self._categories[lang] = defaultdict(dict)
+            self._direct_connections[lang] = defaultdict(dict)
+            self._positional_connections[lang] = defaultdict(dict)
 
         self._contents = self._tokens, self._composite_things, self._categories
         self._connections = self._direct_connections, self._positional_connections
@@ -166,7 +166,17 @@ class ThingRegistry:
             self._tokens[SemanticSearchLanguage.JSX][token.name] = Token.model_construct(
                 token.model_fields_set,
                 **(
-                    token.model_dump(mode="python", exclude={"language", "categories"})
+                    token.model_dump(
+                        mode="python",
+                        exclude={
+                            "language",
+                            "categories",
+                            # Exclude computed fields to prevent triggering classify_thing()
+                            # while the registry is still being populated.
+                            "classification",
+                            "classification_confidence",
+                        },
+                    )
                     | {"language": SemanticSearchLanguage.JSX}
                 ),
             )
@@ -189,7 +199,7 @@ class ThingRegistry:
             from codeweaver.semantic.grammar import CompositeThing
 
             self._composite_things[SemanticSearchLanguage.JSX][thing.name] = (
-                CompositeThing.model_construct(  # type: ignore
+                CompositeThing.model_construct(
                     thing.model_fields_set,
                     **(
                         thing.model_dump(
@@ -199,6 +209,10 @@ class ThingRegistry:
                                 "direct_connections",
                                 "positional_connections",
                                 "categories",
+                                # Exclude computed fields to prevent triggering classify_thing()
+                                # while the registry is still being populated.
+                                "classification",
+                                "classification_confidence",
                             },
                         )
                         | {"language": SemanticSearchLanguage.JSX}
@@ -251,7 +265,7 @@ class ThingRegistry:
         assert isinstance(connection, DirectConnection)  # noqa: S101
         if connection.source_thing not in self._direct_connections[connection.language]:
             self._direct_connections[connection.language][connection.source_thing] = []
-        self._direct_connections[connection.language][connection.source_thing].append(connection)  # type: ignore
+        self._direct_connections[connection.language][connection.source_thing].append(connection)
         logger.debug("Registered %s", connection)
         if connection.language == SemanticSearchLanguage.JAVASCRIPT:
             js_connection = DirectConnection.model_construct(
@@ -280,7 +294,7 @@ class ThingRegistry:
                 ] = []
             self._direct_connections[SemanticSearchLanguage.JSX][js_connection.source_thing].append(
                 js_connection
-            )  # type: ignore
+            )
             logger.debug("Registered %s", js_connection)
 
     def register_connections(
@@ -338,7 +352,7 @@ class ThingRegistry:
                     for con_name, conns in content.items()
                     if con_name == source
                 ),
-                [],  # type: ignore
+                [],
             )
         )
 
@@ -455,9 +469,6 @@ class ThingRegistry:
         )
 
 
-_registry: ThingRegistry | None = None
-
-
 def build_models() -> None:
     """Build models to populate the registry."""
     from codeweaver.semantic.grammar import (
@@ -475,25 +486,4 @@ def build_models() -> None:
         _ = model.model_rebuild()
 
 
-def get_registry() -> ThingRegistry:
-    """Get the ThingRegistry instance."""
-    global _registry
-    if _registry is None:
-        _registry = ThingRegistry()
-        # we need to make sure NodeTypeParser isn't the caller, because that would cause infinite recursion
-        # And it will call this function to get the registry to populate it
-        import inspect
-
-        caller = inspect.stack()[1]
-        if "NodeTypeParser" in caller.filename or "node_type_parser" in caller.filename:
-            return _registry
-        if not any(_registry.has_language(lang) for lang in SemanticSearchLanguage):
-            from codeweaver.semantic.node_type_parser import NodeTypeParser
-
-            parser = NodeTypeParser()
-            build_models()
-            _ = parser.parse_all_nodes()
-    return _registry
-
-
-__all__ = ("ThingRegistry", "get_registry")
+__all__ = ("ThingRegistry", "build_models")

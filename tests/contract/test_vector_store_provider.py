@@ -14,8 +14,8 @@ from typing import get_type_hints
 
 import pytest
 
-from codeweaver.agent_api.find_code.results import SearchResult
-from codeweaver.providers.vector_stores.base import VectorStoreProvider
+from codeweaver.core import SearchResult
+from codeweaver.providers import VectorStoreProvider
 
 
 pytestmark = [pytest.mark.unit, pytest.mark.validation]

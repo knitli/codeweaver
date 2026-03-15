@@ -15,7 +15,7 @@ from cyclopts import App
 from pydantic import FilePath
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.exceptions import CodeWeaverError
+from codeweaver.core import CodeWeaverError
 
 
 _display: StatusDisplay = get_display()
@@ -91,7 +91,7 @@ async def server(
     """
     display = StatusDisplay()
     error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
-    from codeweaver.common.utils import is_wsl_vscode
+    from codeweaver.core import is_wsl_vscode
 
     if is_wsl_vscode():
         display.print_warning(
@@ -135,4 +135,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-__all__ = ("app", "server")
+__all__ = ()

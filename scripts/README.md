@@ -484,6 +484,59 @@ Finds codeblocks in Markdown files with no language specified and adds 'plaintex
 
 ## Model & Data
 
+### convert_voyage_nano_to_onnx.py
+
+**Location:** `scripts/convert_voyage_nano_to_onnx.py`
+
+Converts the VoyageAI voyage-4-nano model to ONNX format for use with FastEmbed.
+
+**Installation:**
+```bash
+pip install -r scripts/requirements-conversion.txt
+```
+
+**Basic Usage:**
+```bash
+# Convert model (saves to ./voyage-4-nano-onnx)
+python scripts/convert_voyage_nano_to_onnx.py
+
+# Validate existing ONNX model only (skip conversion)
+python scripts/convert_voyage_nano_to_onnx.py --validate-only
+
+# Convert and upload to HuggingFace
+python scripts/convert_voyage_nano_to_onnx.py \
+    --upload \
+    --hf-repo knitli/voyage-4-nano-onnx
+
+# Custom output directory
+python scripts/convert_voyage_nano_to_onnx.py \
+    --output-dir ./models/voyage-nano-onnx
+
+# Skip validation (faster, but not recommended)
+python scripts/convert_voyage_nano_to_onnx.py --skip-validation
+```
+
+**What it does:**
+1. Downloads voyage-4-nano from HuggingFace
+2. Converts to ONNX format using Optimum
+3. Validates conversion by comparing embeddings (ensures >0.99 similarity)
+4. Creates HuggingFace model card with usage examples
+5. Optionally uploads to HuggingFace Hub
+
+**Output:**
+- `model.onnx` - ONNX model file
+- `tokenizer.json` - Fast tokenizer
+- `config.json` - Model configuration
+- `README.md` - Model card for HuggingFace
+
+**Next Steps After Conversion:**
+1. Review the generated model card
+2. Upload to HuggingFace (if not done via --upload)
+3. Add model entry to FastEmbed registry
+4. Submit PR to [qdrant/fastembed](https://github.com/qdrant/fastembed)
+
+**Dependencies:** See `scripts/requirements-conversion.txt`
+
 ### mteb-to-codeweaver.py
 
 **Location:** `scripts/model-data/mteb-to-codeweaver.py`

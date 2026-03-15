@@ -8,17 +8,14 @@
 from __future__ import annotations
 
 from types import MappingProxyType
-from typing import TYPE_CHECKING
 
+from codeweaver.core import Provider, dependency_provider
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
-from codeweaver.providers.provider import Provider
-
-
-if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 MODEL_MAP: MappingProxyType[Provider, tuple[str, ...]] = MappingProxyType({
+    # Cohere SDK:
     Provider.AZURE: ("embed-english-v3.0", "embed-multilingual-v3.0", "embed-v4.0"),
     Provider.COHERE: (
         "embed-english-v3.0",
@@ -26,7 +23,13 @@ MODEL_MAP: MappingProxyType[Provider, tuple[str, ...]] = MappingProxyType({
         "embed-multilingual-light-v3.0",
         "embed-v4.0",
     ),
-    Provider.BEDROCK: ("cohere.embed-english-v3.0", "cohere.embed-multilingual-v3.0"),
+    # Bedrock SDK:
+    Provider.BEDROCK: (
+        "cohere.embed-english-v3.0",
+        "cohere.embed-multilingual-v3.0",
+        "cohere.embed-v4:0",
+    ),
+    # OpenAI SDK:
     Provider.GITHUB: ("cohere/Cohere-embed-v3-english", "cohere/Cohere-embed-v3-multilingual"),
     Provider.HEROKU: ("cohere-embed-multilingual",),  # this is v3.0, they just don't say it.
     Provider.LITELLM: ("cohere/embed-english-v3.0", "cohere/embed-multilingual-v3.0"),
@@ -46,10 +49,13 @@ def _get_shared_cohere_embedding_capabilities() -> PartialCapabilities:
     }
 
 
-def get_cohere_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
-    """Get the capabilities for cohere embedding models."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+class CohereEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for Cohere embedding models."""
 
+
+@dependency_provider(CohereEmbeddingCapabilities, scope="singleton", collection=True)
+def get_cohere_embedding_capabilities() -> tuple[CohereEmbeddingCapabilities, ...]:
+    """Get the capabilities for cohere embedding models."""
     shared_caps = _get_shared_cohere_embedding_capabilities()
     base_capabilities: dict[str, PartialCapabilities] = {
         "embed-english-v3.0": {
@@ -81,7 +87,7 @@ def get_cohere_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...
             "context_window": 128_000,
         },
     }
-    output_models: list[EmbeddingModelCapabilities] = []
+    output_models: list[CohereEmbeddingCapabilities] = []
     for model, caps in base_capabilities.items():
         for provider, models in MODEL_MAP.items():
             if provider == Provider.GITHUB and model in (
@@ -93,13 +99,13 @@ def get_cohere_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...
                 model = models[0]
             if model in models:
                 output_models.append(
-                    EmbeddingModelCapabilities.model_validate({
+                    CohereEmbeddingCapabilities.model_validate({
                         **caps,
                         "name": model,
                         "provider": provider,
                     })
                 )
-    return tuple(EmbeddingModelCapabilities.model_validate(m) for m in output_models)
+    return tuple(output_models)
 
 
-__all__ = ("get_cohere_embedding_capabilities",)
+__all__ = ("CohereEmbeddingCapabilities", "get_cohere_embedding_capabilities")

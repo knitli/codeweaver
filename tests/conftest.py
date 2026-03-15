@@ -3,28 +3,36 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-
+# sourcery skip: require-parameter-annotation
 """Global pytest configuration and fixtures for CodeWeaver tests."""
 
 import contextlib
 
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
 from pathlib import Path
-from types import AsyncGeneratorType, GeneratorType
-from typing import Any, cast
+from types import AsyncGeneratorType
+from typing import TYPE_CHECKING, Any, cast
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
 
-from pydantic.types import UUID7
+from pydantic import UUID7
 from qdrant_client import AsyncQdrantClient
 
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.metadata import ChunkKind, ExtKind
+from codeweaver.core import (
+    ChunkKind,
+    CodeChunk,
+    ConfigLanguage,
+    ExtCategory,
+    SemanticSearchLanguage,
+)
 
 from .qdrant_test_manager import QdrantTestManager
 
+
+if TYPE_CHECKING:
+    from codeweaver.core.di.container import Container
 
 # ===========================================================================
 # *                    Mock Tokenizer for Network-Isolated Tests
@@ -77,11 +85,11 @@ class MockTokenizer:
     @staticmethod
     def encoders() -> Sequence[str]:
         """List mock encoder names."""
-        return ["mock", "cl100k_base", "gpt2"]
+        return ["mock", "o200k_base", "gpt2"]
 
 
 def _mock_get_tokenizer(tokenizer: str, model: str) -> MockTokenizer:
-    """Mock replacement for codeweaver.tokenizers.get_tokenizer."""
+    """Mock replacement for codeweaver_tokenizers.get_tokenizer."""
     return MockTokenizer(model)
 
 
@@ -91,6 +99,121 @@ def _mock_get_tokenizer(tokenizer: str, model: str) -> MockTokenizer:
 # Note: Qdrant configuration now handled by qdrant_test_manager fixture
 # See tests/qdrant_test_manager.py for details
 
+# ===========================================================================
+# *                    Mock Provider Fixtures
+# ===========================================================================
+
+
+@pytest.fixture
+def mock_embedding_provider() -> AsyncMock:
+    """Provide a mock embedding provider that returns test embeddings."""
+    mock_provider = AsyncMock()
+    mock_provider.model_name = "mock-dense-model"
+    mock_provider.provider_name = "mock-provider"
+    mock_provider.embed_query = AsyncMock(return_value=[[0.1] * 384])
+    mock_provider.embed_documents = AsyncMock(return_value=[[0.1] * 384, [0.2] * 384])
+    mock_provider.initialize_async = AsyncMock()
+    return mock_provider
+
+
+@pytest.fixture
+def mock_sparse_provider() -> AsyncMock:
+    """Provide a mock sparse embedding provider."""
+    mock_provider = AsyncMock()
+    mock_provider.model_name = "mock-sparse-model"
+    mock_provider.provider_name = "mock-sparse-provider"
+    mock_provider.embed_query = AsyncMock(
+        return_value=[{"indices": [1, 2, 3], "values": [0.1, 0.2, 0.3]}]
+    )
+    mock_provider.embed_documents = AsyncMock(
+        return_value=[
+            {"indices": [1, 2, 3], "values": [0.1, 0.2, 0.3]},
+            {"indices": [4, 5, 6], "values": [0.4, 0.5, 0.6]},
+        ]
+    )
+    mock_provider.initialize_async = AsyncMock()
+    return mock_provider
+
+
+@pytest.fixture
+def mock_vector_store() -> AsyncMock:
+    """Provide a mock vector store provider."""
+    mock_store = AsyncMock()
+    mock_store.collection = "mock_collection"
+    mock_store.client = MagicMock()
+    mock_store.client.retrieve = AsyncMock(return_value=[])
+    mock_store.client.scroll = AsyncMock(return_value=([], None))
+    mock_store.client.update_vectors = AsyncMock()
+    mock_store.initialize = AsyncMock()
+    mock_store._initialize = AsyncMock()
+    mock_store.upsert = AsyncMock()
+    mock_store.search = AsyncMock(return_value=[])
+    mock_store.delete_by_file = AsyncMock()
+    return mock_store
+
+
+@pytest.fixture
+def mock_reranking_provider() -> AsyncMock:
+    """Provide a mock reranking provider."""
+    mock_provider = AsyncMock()
+    mock_provider.rerank = AsyncMock(return_value=[])
+    return mock_provider
+
+
+@pytest.fixture
+def di_overrides(
+    clean_container,
+    mock_embedding_provider,
+    mock_sparse_provider,
+    mock_vector_store,
+    mock_reranking_provider,
+) -> Any:
+    """Apply standard mock overrides to the DI container.
+
+    This fixture applies mock providers to the DI container, ensuring that
+    components resolved via DI use these mocks instead of real providers.
+
+    Overrides both the singleton interfaces (EmbeddingProvider, etc.) AND the
+    collection type aliases (EmbeddingProvidersDep, etc.) so that factories
+    injected via DI receive mocks rather than attempting real provider instantiation.
+    """
+    from unittest.mock import MagicMock
+
+    from codeweaver.core.config.telemetry import TelemetrySettings
+    from codeweaver.providers import (
+        EmbeddingProvider,
+        RerankingProvider,
+        SparseEmbeddingProvider,
+        VectorStoreProvider,
+    )
+    from codeweaver.providers.dependencies.providers import (
+        AgentProviderDep,
+        EmbeddingProvidersDep,
+        RerankingProvidersDep,
+        SparseEmbeddingProvidersDep,
+        VectorStoreProvidersDep,
+    )
+
+    clean_container.override(EmbeddingProvider, mock_embedding_provider)
+    clean_container.override(SparseEmbeddingProvider, mock_sparse_provider)
+    clean_container.override(VectorStoreProvider, mock_vector_store)
+    clean_container.override(RerankingProvider, mock_reranking_provider)
+    # Also override the collection type aliases so factories that inject via
+    # EmbeddingProvidersDep / SparseEmbeddingProvidersDep / etc. receive mocks
+    # instead of trying to instantiate real providers from settings.
+    clean_container.override(EmbeddingProvidersDep, (mock_embedding_provider,))
+    clean_container.override(SparseEmbeddingProvidersDep, (mock_sparse_provider,))
+    clean_container.override(VectorStoreProvidersDep, (mock_vector_store,))
+    clean_container.override(RerankingProvidersDep, (mock_reranking_provider,))
+    # Agent is optional in SearchPackage; provide a lightweight mock so the
+    # factory can proceed without real API credentials.
+    clean_container.override(AgentProviderDep, MagicMock())
+    # Provide a default TelemetrySettings so find_code can resolve it without
+    # requiring a full CodeWeaverSettingsType initialization chain.
+    clean_container.override(TelemetrySettings, TelemetrySettings())
+
+    return clean_container
+
 
 # ===========================================================================
 # *                    Fixtures
@@ -99,7 +222,7 @@ def _mock_get_tokenizer(tokenizer: str, model: str) -> MockTokenizer:
 
 @pytest.fixture(autouse=True)
 def mock_tokenizer_for_unit_tests(
-    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, clean_container: "Container"
 ) -> None:
     """Auto-patch the tokenizer for unit tests that are marked as mock_only.
 
@@ -111,33 +234,41 @@ def mock_tokenizer_for_unit_tests(
     should_mock = "mock_only" in markers or ("unit" in markers and "network" not in markers)
 
     if should_mock:
-        # Patch get_tokenizer to return our mock in all modules that use it
-        modules_to_patch = [
-            "codeweaver.tokenizers.get_tokenizer",
-            "codeweaver.providers.embedding.providers.base.get_tokenizer",
-            "codeweaver.providers.reranking.providers.base.get_tokenizer",
-            "codeweaver.providers.reranking.capabilities.base.get_tokenizer",
-        ]
+        from codeweaver_tokenizers import Tokenizer
+
+        # 1. DI Override (Preferred)
+        clean_container.override(Tokenizer, MockTokenizer())
+
+        # 2. Monkeypatch fallback for legacy non-DI code
+        modules_to_patch = ["codeweaver_tokenizers.get_tokenizer", "codeweaver.providers"]
         for module_path in modules_to_patch:
-            try:
+            with contextlib.suppress(AttributeError):
                 monkeypatch.setattr(module_path, _mock_get_tokenizer)
-            except AttributeError:
-                # Module or attribute not loaded yet, skip
-                pass
 
 
 @pytest.fixture
-def initialize_test_settings() -> GeneratorType:
+def mock_tokenizer(clean_container: "Container") -> MockTokenizer:
+    """Explicitly provide a mock tokenizer and override it in DI container."""
+    from codeweaver_tokenizers import Tokenizer
+
+    mock = MockTokenizer()
+    clean_container.override(Tokenizer, mock)
+    return mock
+
+
+@pytest.fixture
+def initialize_test_settings() -> Generator[None, None, None]:
     """Initialize settings for test environment.
 
     This fixture ensures that the global settings are properly initialized
     with minimal required configuration for tests. It resets settings after
     the test to avoid cross-test contamination.
     """
-    from codeweaver.config.settings import get_settings, reset_settings
+    from codeweaver.core.config.loader import get_settings
+    from codeweaver.core.di import reset_container_state
 
-    # Reset any existing settings
-    reset_settings()
+    # Reset container to force fresh settings
+    reset_container_state()
 
     # Initialize settings by calling get_settings() which will create
     # the global instance with defaults, including the "providers" key
@@ -146,8 +277,8 @@ def initialize_test_settings() -> GeneratorType:
 
     yield
 
-    # Cleanup: reset settings after test
-    reset_settings()
+    # Cleanup: reset container after test
+    reset_container_state()
 
 
 @pytest.fixture
@@ -181,20 +312,18 @@ def temp_test_file(tmp_path: Path) -> Path:
 
 
 @pytest.fixture(autouse=True)
-def clear_semantic_chunker_stores() -> GeneratorType:
-    """Clear SemanticChunker class-level deduplication stores before each test.
+def clear_collection_name_cache() -> Generator[None, None, None]:
+    """Clear all class-level deduplication stores before each test.
 
-    This prevents test interference where chunks from one test are marked as
-    duplicates in subsequent tests. The stores are class-level by design for
-    production use (cross-file deduplication within a session), but need to be
-    reset between test runs for isolation.
+    This prevents test interference where chunks or embeddings from one test are
+    marked as duplicates in subsequent tests.
     """
-    from codeweaver.engine.chunker.semantic import SemanticChunker
+    from codeweaver.core import generate_collection_name
 
-    SemanticChunker.clear_deduplication_stores()
+    generate_collection_name.cache_clear()
     yield
-    # Optional: Clear again after test for extra safety
-    SemanticChunker.clear_deduplication_stores()
+    # Clear again after test for extra safety
+    generate_collection_name.cache_clear()
 
 
 # ===========================================================================
@@ -311,6 +440,117 @@ async def qdrant_test_collection(
         yield client, collection
 
 
+@pytest.fixture
+def vector_store_factory(request) -> Any:
+    """Factory fixture to create configured vector store providers.
+
+    Handles creation of settings, client, and capabilities for DI-compliant instantiation.
+    """
+
+    async def _factory(provider_cls, config_overrides=None, embedding_caps=None):
+        from uuid import uuid4
+
+        from pydantic import AnyUrl
+
+        from codeweaver.core.di import get_container
+        from codeweaver.providers import (
+            CollectionConfig,
+            ConfiguredCapability,
+            EmbeddingCapabilityGroup,
+            EmbeddingModelCapabilities,
+            EmbeddingProviderSettings,
+            MemoryVectorStoreProvider,
+            MemoryVectorStoreProviderSettings,
+            Provider,
+            QdrantClientOptions,
+            QdrantVectorStoreProvider,
+            QdrantVectorStoreProviderSettings,
+            VectorStoreProvider,
+        )
+        from codeweaver.providers.dependencies.providers import _instantiate_provider_from_settings
+
+        config_overrides = config_overrides or {}
+
+        # Default caps if not provided
+        if embedding_caps is None:
+            from codeweaver.providers import FastEmbedEmbeddingConfig
+
+            dense_caps = EmbeddingModelCapabilities(
+                name="BAAI/bge-small-en-v1.5",
+                default_dimension=384,
+                default_dtype="float32",
+                preferred_metrics=("cosine", "dot"),
+            )
+            # Create proper embedding config for the provider settings
+            embedding_config = FastEmbedEmbeddingConfig(
+                tag="fastembed", provider=Provider.FASTEMBED, model_name="BAAI/bge-small-en-v1.5"
+            )
+            # Mock settings to satisfy ConfiguredCapability
+            mock_settings = EmbeddingProviderSettings(
+                provider=Provider.FASTEMBED,
+                model_name="BAAI/bge-small-en-v1.5",
+                embedding_config=embedding_config,
+            )
+            configured_dense = ConfiguredCapability(capability=dense_caps, config=mock_settings)
+            embedding_caps = EmbeddingCapabilityGroup(dense=configured_dense, sparse=None)
+
+        container = get_container()
+        container.override(EmbeddingCapabilityGroup, embedding_caps)
+
+        if provider_cls is QdrantVectorStoreProvider:
+            try:
+                qdrant_test_manager = request.getfixturevalue("qdrant_test_manager")
+            except (pytest.FixtureLookupError, Exception):
+                pytest.skip("QdrantTestManager required for QdrantVectorStoreProvider tests")
+
+            collection_name = config_overrides.get("collection_name")
+            if not collection_name:
+                collection_name = qdrant_test_manager.create_collection_name("factory-test")
+                # Create collection if we generated the name (assumes default vector size if not specified)
+                # If config_overrides has vector sizes, user might want to create it themselves, but for convenience:
+                dense_size = config_overrides.get("dense_vector_size", 768)
+                sparse_size = config_overrides.get("sparse_vector_size", None)
+                await qdrant_test_manager.create_collection(
+                    collection_name, dense_vector_size=dense_size, sparse_vector_size=sparse_size
+                )
+
+            url = config_overrides.get("url", qdrant_test_manager.url)
+
+            settings = QdrantVectorStoreProviderSettings(
+                provider=Provider.QDRANT,
+                client_options=QdrantClientOptions(url=AnyUrl(url)),
+                collection=CollectionConfig(collection_name=collection_name),
+                batch_size=config_overrides.get("batch_size", 64),
+            )
+            provider = await _instantiate_provider_from_settings(settings, VectorStoreProvider)
+            await provider._initialize()
+            return provider
+
+        if provider_cls is MemoryVectorStoreProvider:
+            collection_name = config_overrides.get("collection_name", f"mem-test-{uuid4().hex[:8]}")
+            persist_path = config_overrides.get("persist_path")
+
+            in_memory_config = {
+                "collection_name": collection_name,
+                "auto_persist": config_overrides.get("auto_persist", False),
+            }
+            if persist_path:
+                in_memory_config["persist_path"] = persist_path
+
+            settings = MemoryVectorStoreProviderSettings(
+                provider=Provider.MEMORY,
+                in_memory_config=in_memory_config,
+                client_options=QdrantClientOptions(location=":memory:"),
+            )
+            provider = await _instantiate_provider_from_settings(settings, VectorStoreProvider)
+            await provider._initialize()
+            return provider
+
+        raise ValueError(f"Unknown provider class: {provider_cls}")
+
+    return _factory
+
+
 # ===========================================================================
 # *                    Embedding Test Utilities
 # ===========================================================================
@@ -344,21 +584,25 @@ def create_test_chunk_with_embeddings(
         CodeChunk with embeddings registered in the global registry
     """
 
-    from codeweaver.common.utils.utils import uuid7
-    from codeweaver.core.chunks import BatchKeys, CodeChunk
-    from codeweaver.core.spans import Span
-    from codeweaver.providers.embedding.registry import get_embedding_registry
-    from codeweaver.providers.embedding.types import ChunkEmbeddings, EmbeddingBatchInfo
+    from codeweaver.core import (
+        BatchKeys,
+        ChunkEmbeddings,
+        CodeChunk,
+        EmbeddingBatchInfo,
+        Span,
+        uuid7,
+    )
+    from codeweaver.providers import get_embedding_registry
 
     # Create the base chunk
     chunk = CodeChunk(
         chunk_id=chunk_id,
-        ext_kind=ExtKind.from_language(language, ChunkKind.CODE),  # ty:ignore[invalid-argument-type]
+        ext_category=ExtCategory.from_language(language, ChunkKind.CODE),
         chunk_name=chunk_name,
         file_path=file_path,
-        language=language,  # ty:ignore[invalid-argument-type]
+        language=language,
         content=content,
-        line_range=Span(start=line_start, end=line_end, _source_id=chunk_id),
+        line_range=Span(start=line_start, end=line_end, source_id=chunk_id),
     )
 
     registry = get_embedding_registry()
@@ -385,10 +629,10 @@ def create_test_chunk_with_embeddings(
         chunk = chunk.set_batch_keys(dense_batch_key)
 
     if sparse_embedding:
-        # Convert sparse dict format to SparseEmbedding object
-        from codeweaver.providers.embedding.types import SparseEmbedding
+        # Convert sparse dict format to CodeWeaverSparseEmbedding object
+        from codeweaver.providers import CodeWeaverSparseEmbedding
 
-        sparse_emb = SparseEmbedding(
+        sparse_emb = CodeWeaverSparseEmbedding(
             indices=sparse_embedding.get("indices", []), values=sparse_embedding.get("values", [])
         )
         sparse_info = EmbeddingBatchInfo.create_sparse(
@@ -404,7 +648,13 @@ def create_test_chunk_with_embeddings(
 
     # Register in the embedding registry
     if dense_info or sparse_info:
-        registry[chunk_id] = ChunkEmbeddings(sparse=sparse_info, dense=dense_info, chunk=chunk)
+        # Create ChunkEmbeddings with the chunk, then add embeddings
+        chunk_embeddings = ChunkEmbeddings(chunk=chunk)
+        if dense_info:
+            chunk_embeddings = chunk_embeddings.add(dense_info)
+        if sparse_info:
+            chunk_embeddings = chunk_embeddings.add(sparse_info)
+        registry[chunk_id] = chunk_embeddings
 
     return chunk
 
@@ -481,11 +731,90 @@ def cli_api_keys(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     return keys
 
 
-@pytest.fixture(autouse=True)
-def reset_cli_settings_cache() -> GeneratorType:
-    """Reset settings cache between CLI tests."""
-    from codeweaver.config.settings import reset_settings
+def _release_qdrant_file_locks() -> None:
+    """Release any open Qdrant local storage file locks from GC-pending objects.
 
-    reset_settings()
+    Qdrant's AsyncQdrantLocal holds a portalocker file lock that is only released
+    when close() is called or the file descriptor is garbage collected. When the
+    DI container clears its singletons without calling close(), the lock may stay
+    held until GC runs. This forces deterministic cleanup between tests.
+    """
+    import gc
+
+    import portalocker
+
+    gc.collect()
+    for obj in gc.get_objects():
+        try:
+            # Use object.__getattribute__ to access the raw instance __dict__
+            # directly, bypassing __getattr__. This prevents MagicMock objects
+            # from creating cascading child mocks on every getattr call, which
+            # would cause exponential object accumulation across tests.
+            try:
+                inst_dict = object.__getattribute__(obj, "__dict__")
+            except AttributeError:
+                continue  # slots-only or C-extension type — no _flock_file
+            flock = inst_dict.get("_flock_file")
+            if flock is None:
+                continue
+            if not flock.closed:
+                try:
+                    portalocker.unlock(flock)
+                except Exception:
+                    pass
+                try:
+                    flock.close()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+
+@pytest.fixture(autouse=True)
+def reset_di_container() -> Generator[None, None, None]:
+    """Reset DI container between tests to ensure isolation."""
+    from codeweaver.core import reset_container_state
+    from codeweaver.providers.embedding.registry import reset_embedding_registry
+
+    reset_container_state()
+    reset_embedding_registry()
     yield
-    reset_settings()
+    reset_container_state()
+    reset_embedding_registry()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def release_qdrant_locks_at_session_end() -> Generator[None, None, None]:
+    """Release Qdrant file locks once at session end, not between every test.
+
+    _release_qdrant_file_locks() calls gc.collect() which takes ~40ms per call.
+    Running it twice per test at 1500 tests adds ~2 minutes of pure overhead.
+    Qdrant file locks only matter when AsyncQdrantLocal instances are alive,
+    so releasing them once at session teardown is sufficient.
+    """
+    yield
+    _release_qdrant_file_locks()
+
+
+@pytest.fixture
+def clean_container() -> Generator["Container", None, None]:
+    """Provides a fresh DI container with all overrides cleared.
+
+    Usage:
+        def test_something(clean_container):
+            clean_container.override(...)
+    """
+    from codeweaver.core import get_container
+
+    container = get_container()
+    container.clear_overrides()
+    yield container
+    container.clear_overrides()
+
+
+@pytest.fixture
+def test_project_path(tmp_path: Path) -> Path:
+    """Create a test project path for CLI testing."""
+    project = tmp_path / "test_project"
+    project.mkdir()
+    return project

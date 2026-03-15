@@ -8,17 +8,19 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+
+from codeweaver.core import dependency_provider
+from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
-if TYPE_CHECKING:
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+class JinaaiRerankingCapabilities(RerankingModelCapabilities):
+    """Capabilities for JinaAI reranking models."""
 
 
-def get_jinaai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
+@dependency_provider(JinaaiRerankingCapabilities, scope="singleton", collection=True)
+def get_jinaai_reranking_capabilities() -> Sequence[JinaaiRerankingCapabilities]:
     """Get the JinaAI reranking model capabilities."""
-    from codeweaver.providers.provider import Provider
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+    from codeweaver.core import Provider
 
     capabilities = {
         "jinaai/jina-reranking-v2-base-multilingual": {
@@ -38,11 +40,24 @@ def get_jinaai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
             "tokenizer_model": "jinaai/jina-reranking-m0",
             "supports_custom_prompt": False,
         },
+        "jinaai/jina-reranker-v1-tiny-en": {
+            "provider": Provider.FASTEMBED,
+            "max_input": 8192,
+            "context_window": 8192,
+            "tokenizer": "tokenizers",
+            "tokenizer_model": "jinaai/jina-reranker-v1-tiny-en",
+            "supports_custom_prompt": False,
+        },
     }
     return [
-        RerankingModelCapabilities.model_validate({**cap, "name": name})
+        JinaaiRerankingCapabilities.model_validate({**cap, "name": name})
         for name, cap in capabilities.items()
+    ] + [
+        JinaaiRerankingCapabilities.model_validate(
+            capabilities["jinaai/jina-reranker-v1-tiny-en"]
+            | {"provider": Provider.SENTENCE_TRANSFORMERS}
+        )
     ]
 
 
-__all__ = ("get_jinaai_reranking_capabilities",)
+__all__ = ("JinaaiRerankingCapabilities", "get_jinaai_reranking_capabilities")

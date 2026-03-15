@@ -1,0 +1,622 @@
+---
+title: di
+description: API reference for codeweaver.core.di
+---
+
+# di
+
+Dependency Injection for CodeWeaver.
+
+Provides a FastAPI-inspired declarative injection system.
+
+## Registering Providers
+
+To register a provider function or class with the DI container, use the `@dependency_provider` decorator:
+
+```python "Registering a Provider Function"
+from codeweaver.core.di import dependency_provider
+
+
+@dependency_provider(ServiceProvider)
+def service_factory() -&gt; ServiceProvider:
+    return ServiceProvider()
+```
+
+```python "Registering a Provider Class (Self-Registration)"
+from codeweaver.core.di import dependency_provider
+
+
+@dependency_provider(scope="singleton")
+class ServiceProvider:
+    def __init__(self):
+        self.value = 42
+```
+
+The `@dependency_provider` decorator automatically registers your factory with the global DI container.
+No additional setup needed - just decorate and inject!
+
+## Creating a Type Alias for Dependency Injection
+
+Create a type alias for cleaner, more maintainable code:
+
+```python "Creating a Type Alias"
+from typing import TYPE_CHECKING, Annotated
+
+from codeweaver.core.di import INJECTED
+
+if TYPE_CHECKING:
+    from someplace import ServiceProvider
+
+# Simple type alias (relies on auto-resolution)
+type ServiceDep = ServiceProvider
+
+# Or with explicit Depends marker for custom behavior
+from codeweaver.core.di import depends
+
+type ServiceDepWithScope = Annotated[ServiceProvider, depends(scope="request")]
+```
+
+## Using Your Dependency in Functions
+
+Use the `INJECTED` sentinel to mark parameters for dependency injection:
+
+```python "Using Dependencies"
+from typing import TYPE_CHECKING
+from codeweaver.core.di import INJECTED
+
+if TYPE_CHECKING:
+    from someplace import ServiceProvider
+
+
+async def my_function(service: ServiceProvider = INJECTED) -&gt; None:
+    # service will be injected automatically by the DI container
+    # The type annotation tells the container what to inject
+    ...
+```
+
+The container automatically:
+1. Discovers all `@dependency_provider` registrations
+2. Resolves dependencies recursively
+3. Manages singleton/request/function scopes
+4. Handles async factories and generators
+
+## Class: `Container`
+
+Dependency container for managing component lifecycles and resolution.
+
+Supports:
+- Factory and singleton registration
+- Recursive dependency resolution via Depends markers
+- Testing overrides
+- Async startup/shutdown hooks
+- Auto-discovery of providers via dependency_provider decorator
+
+### Method: `add_shutdown_hook`
+
+```python
+add_shutdown_hook()
+```
+
+Add a shutdown hook.
+
+### Method: `add_startup_hook`
+
+```python
+add_startup_hook()
+```
+
+Add a startup hook.
+
+### Method: `clear`
+
+```python
+clear()
+```
+
+Clear all registered dependencies and state.
+
+### Method: `clear_overrides`
+
+```python
+clear_overrides()
+```
+
+Clear all registered overrides.
+
+### Method: `clear_request_cache`
+
+```python
+clear_request_cache()
+```
+
+Clear the request-scoped dependency cache.
+
+Should be called at the end of each request to clean up request-scoped instances.
+
+### Method: `lifespan`
+
+```python
+lifespan()
+```
+
+Context manager for container lifecycle with cleanup support.
+
+Usage:
+    async with container.lifespan():
+        # Container ready with cleanup tracking
+        instance = await container.resolve(SomeType)
+    # All generators cleaned up
+
+### Method: `override`
+
+```python
+override()
+```
+
+Override a dependency, primarily for testing.
+
+Args:
+    interface: The type to override.
+    instance: The instance or factory to use instead.
+
+### Method: `register`
+
+```python
+register()
+```
+
+Register a dependency.
+
+Args:
+    interface: The type or interface to register.
+    factory: The factory function or class. If None, the interface itself is used.
+    singleton: Whether to cache the instance.
+    tags: Optional tags to categorize this provider.
+    scope: Optional scope (singleton, request, function). If not provided, inferred from singleton flag.
+
+### Method: `reset_state`
+
+```python
+reset_state()
+```
+
+Reset container state for testing, keeping auto-discovered providers.
+
+Clears singletons, overrides, hooks, and request cache, but preserves
+the factory registry and the providers_loaded flag to avoid
+expensive re-discovery cycles in unit tests.
+
+### Method: `resolve`
+
+```python
+resolve()
+```
+
+Resolve a dependency with circular dependency detection.
+
+Args:
+    interface: The type to resolve.
+    _resolution_stack: Internal parameter for tracking resolution chain.
+        DO NOT pass this manually - it's managed automatically.
+    tags: Optional tags to filter providers. If provided, resolves the provider
+          that has ALL specified tags.
+
+Returns:
+    The resolved instance.
+
+Raises:
+    CircularDependencyError: If a circular dependency is detected.
+
+### Method: `use_overrides`
+
+```python
+use_overrides()
+```
+
+Context manager to temporarily apply multiple overrides.
+
+Args:
+    overrides: A dictionary mapping interfaces to their override instances/factories.
+
+Yields:
+    The container instance with overrides applied.
+
+## Class: `Depends`
+
+Dependency marker, inspired by FastAPI.
+
+Marks a parameter for dependency injection by the DI container.
+
+## Basic Usage (Auto-Resolution)
+
+The simplest approach is to use the INJECTED sentinel with a type annotation:
+
+```python "Simple Auto-Resolution"
+from codeweaver.core.di import INJECTED, dependency_provider
+
+
+@dependency_provider(scope="singleton")
+class ServiceProvider:
+    def __init__(self):
+        self.value = 42
+
+
+async def my_function(service: ServiceProvider = INJECTED) -&gt; None:
+    # service is automatically injected based on the type annotation
+    print(service.value)
+```
+
+## Advanced Usage (Explicit Factory)
+
+For more control, use the Depends marker with an explicit factory:
+
+```python "Explicit Factory with Depends"
+from typing import Annotated
+from codeweaver.core.di import Depends, INJECTED, dependency_provider
+
+
+@dependency_provider(ServiceProvider)
+async def service_factory() -&gt; ServiceProvider:
+    # Custom initialization logic here
+    return ServiceProvider()
+
+
+async def my_function(
+    service: Annotated[ServiceProvider, Depends(service_factory)] = INJECTED,
+) -&gt; None:
+    print(service.value)
+```
+
+## Scope Control
+
+Control caching behavior with the `scope` parameter:
+
+```python "Scope Control"
+from typing import Annotated
+from codeweaver.core.di import depends, INJECTED
+
+# Singleton: one instance per application lifetime
+type SingletonService = Annotated[Service, depends(scope="singleton")]
+
+# Request: one instance per request
+type RequestService = Annotated[Service, depends(scope="request")]
+
+# Function: new instance every time (no caching)
+type FunctionService = Annotated[Service, depends(scope="function")]
+
+
+async def handler(
+    singleton: SingletonService = INJECTED,
+    request: RequestService = INJECTED,
+    fresh: FunctionService = INJECTED,
+) -&gt; None: ...
+```
+
+## Type Aliases for Clean Code
+
+Create type aliases to avoid repeating Annotated everywhere:
+
+```python "Type Aliases"
+from typing import TYPE_CHECKING, Annotated
+from codeweaver.core.di import INJECTED, depends
+
+if TYPE_CHECKING:
+    from someplace import ServiceProvider
+
+# Simple alias (uses default singleton scope)
+type ServiceDep = ServiceProvider
+
+# Or with explicit behavior
+type RequestScopedService = Annotated[ServiceProvider, depends(scope="request")]
+
+
+async def my_function(service: RequestScopedService = INJECTED) -&gt; None:
+    # service will be injected with request scope
+    ...
+```
+
+## Class: `DependsPlaceholder`
+
+Indicates that a parameter's value should be injected by the DI container.
+
+Supports type-safe usage via subscript syntax to satisfy type checkers while
+maintaining sentinel behavior at runtime.
+
+Usage:
+    # Type-safe with subscript (recommended):
+    async def my_function(
+        embedding: Annotated[EmbeddingProvider, Depends(get_embedding)] = INJECTED
+    ) -&gt; None:
+        # embedding will be injected by the container
+        ...
+
+    # Or with type alias:
+    async def my_function(
+        embedding: EmbeddingDep = INJECTED
+    ) -&gt; None:
+        ...
+
+## Class: `ProviderMetadata`
+
+Metadata about a registered provider.
+
+Attributes:
+    scope: The lifecycle scope (singleton, request, or function)
+    is_generator: Whether the provider is a generator function (for cleanup)
+    is_async_generator: Whether the provider is an async generator (for cleanup)
+    module: Optional module name for scoped registration
+    tags: Optional tags for categorizing providers (e.g. "backup")
+
+### Method: `from_provider`
+
+```python
+from_provider()
+```
+
+Create ProviderMetadata from a factory function.
+
+Args:
+    scope: The lifecycle scope.
+    factory: The provider function or class.
+    module: Optional module name.
+    tags: Optional tags.
+
+Returns:
+    An instance of ProviderMetadata.
+
+## Class: `ResolutionResult`
+
+Result of dependency resolution with error tracking.
+
+Used when collect_errors=True to aggregate multiple dependency
+resolution errors instead of failing fast on the first error.
+
+Attributes:
+    values: Successfully resolved parameter values by name
+    errors: List of dependency injection errors encountered
+
+## Function: `dependency_provider`
+
+```python
+dependency_provider()
+```
+
+Decorator that registers a function or class as the provider for a specific type.
+
+This decorator binds a factory function (or class) to the type it produces.
+When the DI system needs an instance of `cls`, it will use the decorated
+function or class to create it.
+
+Supports three usage patterns in sync and async contexts:
+
+1. Function registration (explicit type):
+    ```python
+    dependency_provider(MyService, scope="singleton")
+
+
+    async def create_my_service() -&gt; MyService:
+        return MyService()
+    ```
+
+2. Class registration (self-registration):
+    Note: In this case, the class *must* implement __call__.
+    ```python
+    dependency_provider(scope="request")
+
+
+    class MyService:
+        def __init__(self, config: Config):
+            self.config = config
+    ```
+
+3. Collection registration (returns multiple instances):
+    ```python
+    dependency_provider(MyCapability, scope="singleton", collection=True)
+
+
+    def get_capabilities() -&gt; Sequence[MyCapability]:
+        return (MyCapability(...), MyCapability(...))
+    ```
+
+Args:
+    cls: The type (class) that the decorated function provides.
+    scope: The lifecycle scope - "singleton" (app lifetime, default),
+           "request" (per request), or "function" (per call, no caching).
+    module: Optional module name for scoped registration.
+    tags: Optional tags for categorizing providers.
+    collection: If True, the factory returns a Sequence[T] instead of T.
+               Use this when registering a provider that returns multiple instances.
+
+Returns:
+    When used as `dependency_provider(SomeType)`: Returns a decorator function.
+    When used as `dependency_provider` on a class: Returns the class unchanged.
+
+Example:
+    ```python
+    # Singleton factory function
+    dependency_provider(DatabaseConnection, scope="singleton")
+
+
+    async def get_db() -&gt; DatabaseConnection:
+        return DatabaseConnection()
+
+
+    # Request-scoped service
+    dependency_provider(RequestContext, scope="request")
+
+
+    async def get_context() -&gt; RequestContext:
+        return RequestContext()
+
+
+    # Function-scoped (no caching)
+    dependency_provider(TempFile, scope="function")
+
+
+    async def create_temp() -&gt; TempFile:
+        return TempFile()
+
+
+    # Generator with cleanup
+    dependency_provider(ResourcePool, scope="singleton")
+
+
+    async def get_pool() -&gt; AsyncIterator[ResourcePool]:
+        pool = ResourcePool()
+        await pool.connect()
+        yield pool
+        await pool.disconnect()
+
+
+    # Class self-registration (no cls argument)
+    dependency_provider(scope="singleton")
+
+
+    class SimpleService:
+        def __init__(self):
+            self.value = 42
+
+
+    # Collection provider (returns multiple instances)
+    dependency_provider(Capability, scope="singleton", collection=True)
+
+
+    def get_all_capabilities() -&gt; Sequence[Capability]:
+        return (
+            Capability(name="feature1"),
+            Capability(name="feature2"),
+            Capability(name="feature3"),
+        )
+    ```
+
+## Function: `depends`
+
+```python
+depends()
+```
+
+Helper function to create a Depends marker.
+
+## Function: `get_all_provider_metadata`
+
+```python
+get_all_provider_metadata()
+```
+
+Retrieve metadata for all registered providers.
+
+Returns:
+    A dictionary mapping types to lists of ProviderMetadata.
+    Each type may have multiple providers registered with different tags.
+
+## Function: `get_all_providers`
+
+```python
+get_all_providers()
+```
+
+Retrieve all registered providers with their metadata.
+
+Returns:
+    A dictionary mapping types to lists of (factory, metadata) tuples.
+    Each type may have multiple providers registered with different tags.
+
+## Function: `get_container`
+
+```python
+get_container()
+```
+
+Get or create the global default container.
+
+On first call, this will:
+1. Create a new Container instance
+2. Load providers from dependency_provider decorator registry (lazy, on first resolve)
+
+Returns:
+    The global container instance.
+
+## Function: `get_provider`
+
+```python
+get_provider()
+```
+
+Retrieve a registered provider function for a specific type, optionally filtered by tags.
+
+Args:
+    cls: The type for which to retrieve the provider.
+    tags: Optional set of tags to filter providers. If provided, only returns
+          providers that have ALL specified tags.
+
+Returns:
+    The callable (factory function or class) registered to provide instances
+    of `cls`. If multiple providers match the tags, returns the last registered one.
+
+Raises:
+    KeyError: If no provider has been registered for the given type, or no provider
+              matches the specified tags.
+
+## Function: `get_provider_metadata`
+
+```python
+get_provider_metadata()
+```
+
+Retrieve metadata for a registered provider, optionally filtered by tags.
+
+Args:
+    cls: The type for which to retrieve metadata.
+    tags: Optional set of tags to filter providers. If provided, returns metadata
+          for the provider that has ALL specified tags.
+
+Returns:
+    The ProviderMetadata for the given type, or None if not registered.
+    If multiple providers match the tags, returns the last registered one.
+
+## Function: `is_depends_marker`
+
+```python
+is_depends_marker()
+```
+
+Check if a value is a DI injection marker or sentinel.
+
+Handles Depends markers, DependsPlaceholder sentinels, and the INJECTED proxy.
+
+## Function: `is_provider_registered`
+
+```python
+is_provider_registered()
+```
+
+Check if a provider is registered for a specific type, optionally filtered by tags.
+
+Args:
+    cls: The type to check for a registered provider.
+    tags: Optional set of tags to filter providers. If provided, checks if any
+          provider has ALL specified tags.
+
+Returns:
+    True if a provider is registered for the given type (and matches tags if specified),
+    False otherwise.
+
+## Function: `reset_container`
+
+```python
+reset_container()
+```
+
+Reset the global default container.
+
+## Function: `reset_container_state`
+
+```python
+reset_container_state()
+```
+
+Reset the global container state (singletons/overrides) for testing.
+
+Unlike `reset_container()`, this does not clear auto-discovered factories,
+making it much faster for test suites that need clean state but don't
+need to reload the entire provider ecosystem.

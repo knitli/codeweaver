@@ -14,23 +14,19 @@ import pytest
 
 
 @pytest.fixture
-def mock_confirm(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
-    """Mock rich.prompt.Confirm for CLI tests.
+def mock_confirm(clean_container) -> MagicMock:
+    """Mock UserInteraction for CLI tests.
 
-    Returns a mock Confirm object that automatically returns True for all confirmations.
-    Tests can override by setting mock_confirm.ask.return_value to False.
-
-    Patches module-level imports of Confirm to avoid stdin access issues during testing
-    when pytest captures output. Only patches locations where Confirm is imported at
-    module level, not inside functions.
+    Returns a mock Interaction object that automatically returns True for all confirmations.
+    Tests can override by setting mock_confirm.confirm.return_value to False.
     """
-    mock = MagicMock()
-    mock.ask.return_value = True
+    from codeweaver.cli.ui import UserInteraction
 
-    # Patch the module-level import in init.py (imported at line 27)
-    monkeypatch.setattr("codeweaver.cli.commands.init.Confirm", mock)
-    # Also patch the base location to catch any other imports
-    monkeypatch.setattr("rich.prompt.Confirm", mock)
+    mock = MagicMock()
+    mock.confirm.return_value = True
+
+    # Override in DI container
+    clean_container.override(UserInteraction, mock)
 
     return mock
 
@@ -45,9 +41,10 @@ def isolated_test_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     - Resetting CodeWeaver settings between tests
 
     Applied automatically to all unit tests.
-    """
-    from codeweaver.config.settings import reset_settings
 
+    Note: Settings are now managed through DI container, which is reset
+    by the reset_di_container fixture in the root conftest.py.
+    """
     # Create isolated HOME directory
     fake_home = tmp_path / "home"
     fake_home.mkdir(exist_ok=True)
@@ -56,10 +53,4 @@ def isolated_test_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # Enable test mode for CodeWeaver settings
     monkeypatch.setenv("CODEWEAVER_TEST_MODE", "1")
 
-    # Reset settings to prevent cross-test contamination
-    reset_settings()
-
-    yield
-
-    # Cleanup after test
-    reset_settings()
+    return

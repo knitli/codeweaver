@@ -15,19 +15,20 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, TypedDict
 
+from codeweaver.config import environment_variables
 from pydantic import AnyUrl, BaseModel, ConfigDict, Field, RootModel
 
 from codeweaver import __version__
-from codeweaver.config.envs import environment_variables
-from codeweaver.core.file_extensions import ALL_LANGUAGES
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.types.models import EnvFormat
-from codeweaver.providers.capabilities import PROVIDER_CAPABILITIES
-from codeweaver.providers.provider import (
+from codeweaver.core import (
+    ALL_LANGUAGES,
+    PROVIDER_CAPABILITIES,
+    ConfigLanguage,
+    EnvFormat,
     Provider,
     ProviderEnvVarInfo,
     ProviderEnvVars,
-    ProviderKind,
+    ProviderCategory,
+    SemanticSearchLanguage,
 )
 
 
@@ -47,7 +48,7 @@ class McpInputDict(TypedDict):
 def get_settings_env_vars() -> list[McpInputDict]:
     """Get all general codeweaver settings environment variables."""
     return sorted(
-        (McpInputDict(**var.as_mcp_info()) for var in environment_variables().values()),  # type: ignore[misc]
+        (McpInputDict(**var.as_mcp_info()) for var in environment_variables().values()),
         key=lambda v: v["name"],
     )
 
@@ -74,7 +75,7 @@ def get_provider_env_vars() -> dict[Provider, list[McpInputDict]]:
     """Get all provider-specific environment variables."""
     return {
         provider: sorted(
-            (McpInputDict(**var.as_mcp_info()) for var in var_infos),  # type: ignore[misc]
+            (McpInputDict(**var.as_mcp_info()) for var in var_infos),
             key=lambda v: v["name"],
         )
         for provider, var_infos in _all_var_infos().items()
@@ -93,8 +94,8 @@ def set_version(version: str, *, for_docker: bool = False) -> str:
     return version.lstrip('v')
 
 
-def _providers_for_kind(kind: ProviderKind) -> set[Provider]:
-    return {prov for prov in Provider if prov in PROVIDER_CAPABILITIES and kind in PROVIDER_CAPABILITIES[prov]}
+def _providers_for_category(category: ProviderCategory) -> set[Provider]:
+    return {prov for prov in Provider if prov != Provider.NOT_SET and prov in PROVIDER_CAPABILITIES and category in PROVIDER_CAPABILITIES[prov]}
 
 
 def _shared_env_vars() -> dict[str, tuple[ProviderEnvVarInfo, list[Provider]]]:
@@ -158,29 +159,29 @@ def capabilities() -> dict[str, Any]:
         "languages_supported": len(_languages()),
 
         "embedding_providers": [
-            prov.as_title for prov in _providers_for_kind(ProviderKind.EMBEDDING)
+            prov.as_title for prov in _providers_for_category(ProviderCategory.EMBEDDING)
         ],
         "vector_store_providers": [
-            prov.as_title for prov in _providers_for_kind(ProviderKind.VECTOR_STORE)
+            prov.as_title for prov in _providers_for_category(ProviderCategory.VECTOR_STORE)
         ],
         "sparse_embedding_providers": [
-            prov.as_title for prov in _providers_for_kind(ProviderKind.SPARSE_EMBEDDING)
+            prov.as_title for prov in _providers_for_category(ProviderCategory.SPARSE_EMBEDDING)
         ],
         "reranking_providers": [
-            prov.as_title for prov in _providers_for_kind(ProviderKind.RERANKING)
+            prov.as_title for prov in _providers_for_category(ProviderCategory.RERANKING)
         ],
         # add when available:
-        # "agent_providers": [prov.as_title for prov in _providers_for_kind(ProviderKind.AGENT)],
-        # "data_providers": [prov.as_title for prov in _providers_for_kind(ProviderKind.DATA)],
+        # "agent_providers": [prov.as_title for prov in _providers_for_category(ProviderCategory.AGENT)],
+        # "data_providers": [prov.as_title for prov in _providers_for_category(ProviderCategory.DATA)],
     }
 
 
-AGENT_PROVIDERS = _providers_for_kind(ProviderKind.AGENT)
-DATA_PROVIDERS = _providers_for_kind(ProviderKind.DATA)
-EMBEDDING_PROVIDERS = _providers_for_kind(ProviderKind.EMBEDDING)
-SPARSE_EMBEDDING_PROVIDERS = _providers_for_kind(ProviderKind.SPARSE_EMBEDDING)
-RERANKING_PROVIDERS = _providers_for_kind(ProviderKind.RERANKING)
-VECTOR_STORE_PROVIDERS = _providers_for_kind(ProviderKind.VECTOR_STORE)
+AGENT_PROVIDERS = _providers_for_category(ProviderCategory.AGENT)
+DATA_PROVIDERS = _providers_for_category(ProviderCategory.DATA)
+EMBEDDING_PROVIDERS = _providers_for_category(ProviderCategory.EMBEDDING)
+SPARSE_EMBEDDING_PROVIDERS = _providers_for_category(ProviderCategory.SPARSE_EMBEDDING)
+RERANKING_PROVIDERS = _providers_for_category(ProviderCategory.RERANKING)
+VECTOR_STORE_PROVIDERS = _providers_for_category(ProviderCategory.VECTOR_STORE)
 
 
 class Repository(BaseModel):
@@ -539,7 +540,7 @@ def all_env_vars() -> list[McpInputDict]:
     """Get all environment variables, both general and provider-specific."""
     general_vars = get_settings_env_vars()
     generalized_provider_vars = sorted(
-        (McpInputDict(**var.as_mcp_info()) for var in _generalized_provider_env_vars()),  # type: ignore[misc]
+        (McpInputDict(**var.as_mcp_info()) for var in _generalized_provider_env_vars()),
         key=lambda v: v["name"],
     )
 

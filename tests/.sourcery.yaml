@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# $schema: https://www.schemastore.org/sourcery_yaml_schema.json
+rule_settings:
+  enable:
+    - default
+    - gpsg
+  disable:
+    - dont-self-assign-variables
+    - do-not-use-staticmethod
+    - avoid-global-variables
+    - docstrings-for-functions
+    - don't-import-test-modules
+    - name-type-suffix
+  rule_types:
+    - refactoring
+    - comment

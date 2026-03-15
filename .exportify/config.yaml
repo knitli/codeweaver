@@ -1,0 +1,547 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# yaml-language-server: $schema=https://raw.githubusercontent.com/knitli/exportify/main/src/exportify/schemas/exportify-config.schema.json
+
+# Exportify Configuration
+# This file defines the rules for determining which symbols should be exported
+# from __init__.py files using the lazy loading pattern.
+#
+# Rules are evaluated in priority order (highest first). The first matching rule
+# determines the export decision. If no rule matches, the symbol is not exported
+# (no_decision action).
+
+schema_version: "1.0"
+
+# ---------------------------------------------------------------------------
+# Output style
+# ---------------------------------------------------------------------------
+# Default output style for all generated __init__.py files.
+#   lazy   (default) — generates a __getattr__-based lazy import pattern; symbols
+#                      are imported only when first accessed.
+#   barrel — generates direct "from .submodule import X" re-exports; compatible
+#             with tools that do not support lazy loading.
+#
+output_style: lazy
+
+# ---------------------------------------------------------------------------
+# Per-package output style overrides
+# ---------------------------------------------------------------------------
+# Override the output style for specific packages and their subpackages.
+# The most-specific matching ancestor wins.
+#
+# overrides:
+#   "mypackage.compat":
+#     output_style: barrel
+#   "mypackage.legacy":
+#     output_style: barrel
+
+# ---------------------------------------------------------------------------
+# Project settings
+# ---------------------------------------------------------------------------
+# Explicit project identification. Not required — exportify auto-detects these
+# values from pyproject.toml or directory layout — but providing them ensures
+# consistent, deterministic behavior across environments and exportify versions.
+#
+# project:
+#   project_name: "mypackage"
+#   project_path: "."          # Path to project root (default: auto-detect)
+#   source_path: "src"         # Path to source root containing packages (default: auto-detect)
+#   additional_source_paths:   # Extra source roots for monorepos / multi-package projects
+#     - "packages/pkg_a/src"
+#     - "packages/pkg_b/src"
+
+project:
+  project_name: "codeweaver"
+  project_path: "." # Path to project root (default: auto-detect)
+  source_path: "src" # Path to source root containing packages (default: auto-detect)
+  additional_source_paths: []
+
+# ---------------------------------------------------------------------------
+# Exclude paths
+# ---------------------------------------------------------------------------
+# Glob patterns for files/directories to skip during discovery.
+# Patterns are matched against the path relative to each source root.
+# Supports ** for recursive matching.
+#
+# exclude_paths:
+#   - "**/_vendor/**"          # Skip vendored third-party code
+#   - "**/tests/**"            # Skip test directories
+#   - "**/migrations/**"       # Skip generated migration files
+#   - "mypackage/legacy/**"    # Skip a specific sub-package entirely
+
+# ---------------------------------------------------------------------------
+# SPDX license headers
+# ---------------------------------------------------------------------------
+# When enabled, every generated __init__.py will include SPDX comment headers.
+#
+# spdx:
+#   enabled: true
+#   copyright: "2026 Your Name or Company."
+#   license: "MIT OR Apache-2.0"
+
+spdx:
+  enabled: true
+  copyright: "2026 Knitli Inc."
+  license: "MIT OR Apache-2.0"
+
+# ---------------------------------------------------------------------------
+# Metadata (informational only — not interpreted by exportify)
+# ---------------------------------------------------------------------------
+# Arbitrary key/value pairs; useful for documenting configuration intent.
+#
+# metadata:
+#   description: "Export rules for mypackage"
+#   owner: "platform-team"
+
+# ---------------------------------------------------------------------------
+# Export rules
+# ---------------------------------------------------------------------------
+# Rules are evaluated highest-priority-first; the first match wins.
+# Priority bands:
+#   1000      — absolute exclusions (private members, dunders)
+#   950       — Import and Variable Exclusions (exclude non-aliased)
+#   900       — stdlib / infrastructure exclusions
+#   800       — test / development exclusions
+#   600       — explicit re-export rules (aliased imports)
+#   300–400   — propagation overrides / project-specific rules
+#   100–200   — primary export rules (classes, functions, constants)
+#   0         — defaults and fallbacks
+rules:
+  # ===================================================================
+  # Priority 1000: Explicit exclusions
+  # These rules run first to prevent unwanted exports
+  # ===================================================================
+  - name: ExcludeStdlibImports
+    priority: 1000
+    description: >-
+      Exclude stdlib imports from being re-exported. Standard library symbols
+      imported into a module (e.g. TYPE_CHECKING, MappingProxyType, Path) are
+      almost never intended as public re-exports.
+    match:
+      all_of:
+        - member_type: imported
+        - is_stdlib: true
+    action: exclude
+
+  - name: IncludeDunderMetadata
+    priority: 999
+    description: Always include project metadata dunder symbols (e.g. __version__, __author__) at root level
+    match:
+      name_pattern: ^__version__$|^__about__$|^__description__$|^__author__$|^__email__$|^__license__$|^__copyright__$|^__credits__$|^__maintainer__$|^__status__$|^__url__$
+      # root init or version/about files only
+      module_pattern: ^__init__$|^_?_?version_?_?$|^_?_?about_?_?$|^_?_?metadata_?_?$|^_?_?info_?_?$
+    action: include
+
+  - name: ExcludeDunderSymbols
+    priority: 998
+    description: Skip dunder symbols except __all__ which is managed separately
+    match:
+      name_pattern: ^__.*__$
+    action: exclude
+
+  - name: ExcludePrivateSymbols
+    priority: 998
+    description: Skip all private symbols (names starting with underscore)
+    match:
+      name_pattern: ^_.*$ # any name starting with an underscore
+    action: exclude
+  - name: ExcludeMain
+    priority: 998
+    description: Skip __main__ modules to prevent circular imports and unintended exports
+    match:
+      any_of:
+        - module_exact: __main__
+        - name_exact: main
+    action: exclude
+
+  - name: IncludeCLIApp
+    priority: 956
+    description: Include CLI app classes for visibility in public API
+    match:
+      all_of:
+        - module_pattern: .*\.cli(\.__main__)?$
+        - name_exact: app
+    action: include
+    propagate: parent
+
+  - name: ExcludeCLICommands
+    priority: 955
+    description: Exclude CLI commands from exports
+    match:
+      module_pattern: .*\.cli\.commands(\..*)?$
+    action: exclude
+  # ===================================================================
+  # Priority 250: Import and Variable Exclusions
+  # ===================================================================
+  - name: ExcludeNonAliasedImports
+    priority: 250
+    description: >-
+      Exclude non-aliased imported symbols from re-export. When a symbol is
+      imported without an alias (e.g. `from .models import BasedModel`), it is
+      almost certainly for internal use only — not to be re-exported. Aliased
+      imports (handled by ExportImportedSymbols at 600) are the explicit signal
+      that a symbol is intended for public re-export.
+    match:
+      all_of:
+        - member_type: imported
+        - provenance: imported
+    action: exclude
+
+  - name: EnsureCodeWeaverTypesPropagateToRoot
+    priority: 915
+    description: Ensure core types propagate to root for visibility in public API
+    match:
+      name_pattern: ^CodeWeaver.*$
+    action: include
+    propagate: root
+
+  # ===================================================================
+  # Priority 900: Special component exclusions
+  # Prevent self-referential or infrastructure issues
+  # ===================================================================
+  - name: ExcludeLateImportComponents
+    priority: 900
+    description: Never lazily export lateimport components (prevents circular dependency)
+    match:
+      any_of:
+        - name_pattern: ^lateimport$|^LateImport$|^create_late_getattr$
+        - module_pattern: .*\.lateimport\..*
+        - module_pattern: .*\.lateimport$
+    action: exclude
+
+  - name: ExcludeCapabilitiesConstants
+    priority: 900
+    description: Never lazily export capabilities constants (prevents circular dependency)
+    match:
+      all_of:
+        - member_type: constant
+        - module_pattern: .*\.capabilities\..*
+    action: exclude
+
+  # ===================================================================
+  # Priority 800: Framework infrastructure
+  # Exclude testing and development support code
+  # ===================================================================
+  - name: ExcludeTestFixtures
+    priority: 800
+    description: Skip pytest fixtures and test utilities
+    match:
+      any_of:
+        - name_pattern: ^fixture_.*
+        - name_pattern: ^pytest_.*
+        - module_pattern: .*\.tests?\..*
+    action: exclude
+
+  - name: ExcludeDevOnlyFunctions
+    priority: 800
+    description: Skip functions marked as development-only
+    match:
+      all_of:
+        - member_type: function
+        - name_pattern: ^dev_.*
+    action: exclude
+
+  # ===================================================================
+  # Priority 600: Import handling
+  # Determine which imported symbols to re-export
+  # ===================================================================
+  - name: ExportImportedSymbols
+    priority: 600
+    description: Export imported symbols (aliased)
+    match:
+      # export all aliased imports
+      all_of:
+        - member_type: imported
+        - provenance: alias_imported
+    action: include
+    propagate: root
+
+  # ===================================================================
+  # Priority 500: Project-Specific Exclusions
+  # Project-specific rules to exclude certain symbols that would otherwise be included by general rules. These should be used sparingly and only when necessary to handle edge cases that don't fit general patterns.
+  # ===================================================================
+
+  # ===================================================================
+  # Priority 400: Project-Specific Inclusions
+  # These rules are for symbols that don't fit general patterns but should be included
+  # ===================================================================
+
+  - name: EnsureINJECTEDPropagateToRoot
+    priority: 430
+    description: Ensure INJECTED propagates to root for visibility in public API
+    match:
+      member_type: constant
+      name_exact: INJECTED
+    action: include
+    propagate: root
+
+  - name: IncludePydanticAIReexports
+    priority: 425
+    description: Include KnownAgentName for visibility in public API
+    match:
+      module_pattern: .*providers\.agent(\.capabilities)?$
+      any_of:
+        - name_exact: KnownAgentModelName
+        - name_exact: KnownAgentName
+        - name_exact: AgentModelCapabilities
+        - name_exact: AgentModelCapabilitiesT
+
+      name_exact: KnownAgentModelName
+    action: include
+    propagate: root
+
+  - name: IncludePydanticAIImports
+    priority: 425
+    description: Include Pydantic AI imports (core part of public API)
+    match:
+      all_of:
+        - module_pattern: .*providers\.config(\.sdk(\.agent)?)?$
+        - name_pattern: ^.*AgentModelConfig$
+    action: include
+    propagate: root
+
+  - name: IncludeAllProviderTypes
+    priority: 425
+    description: Include all provider-related types for visibility in public API
+    match:
+      all_of:
+        - module_pattern: .*providers\.config.*$
+        - name_pattern: ^[A-Z][A-Za-z0-9_]*(T(ype)?|Settings|Config)$
+    action: include
+    propagate: root
+
+  - name: IncludeSpecialTypeConstants
+    priority: 425
+    description: Include special type constants for visibility in public API
+    match:
+      all_of:
+        - module_pattern: .*core\.types(\..*)?$
+        - name_pattern: ^(UNSET|MISSING|DATACLASS_CONFIG|BASEDMODEL_CONFIG|FROZEN_BASEDMODEL_CONFIG|LANGUAGE_TO_FAMILY)$
+    action: include
+    propagate: root
+
+  - name: IncludeMcpMiddlewareClasses
+    priority: 425
+    description: Include MCP middleware classes for visibility in public API
+    match:
+      all_of:
+        - module_pattern: .*server\.mcp.*$
+        - name_pattern: ^.*Middleware$
+    action: include
+    propagate: root
+
+  - name: SpecialUtilitiesPropagateToRoot
+    priority: 420
+    description: Special utilities propagate to package root
+    match:
+      member_type: function
+      any_of:
+        - module_pattern: .*di$|.*di\.(depends|utils|container)$
+          name_pattern: ^depends$|^dependency_provider$|^get_container$|^is_depends_marker$
+        - module_pattern: .*server.*
+          name_pattern: ^find_code$|^lifetime$|^background_services_lifespan$|^http_lifespan$|^create_http_server$|^create_stdio_server$|.*_tool$|^find_code_tool_definition$
+        - module_pattern: .*providers\.config$|.*providers\.config\..*
+          name_exact: get_profile
+        - module_pattern: .*providers|.*providers\..*
+          name_exact: get_provider_registry
+        - module_pattern: .*providers\.data.*$
+          name_pattern: .*_tools?$
+        - module_pattern: .*engine\.chunker.*$
+          name_pattern: ^chunk_files_parallel$|^detect_language_family$|^expand_pattern$|^get_family_patterns$|^detect_family_characteristics$
+        - name_exact: get_settings
+          module_pattern: .*core.*
+        - name_exact: capture_search_event
+          module_pattern: .*core.*
+    action: include
+    propagate: root
+
+  - name: CoreUtilsPropagateToRoot
+    priority: 415
+    description: Core utilities propagate to package root
+    match:
+      all_of:
+        - member_type: function
+        - module_pattern: .*core\.utils$|.*core\.utils\..*
+        - name_pattern: ^[a-z][a-z0-9_]+$ # only snake_case functions
+    action: include
+    propagate: root
+
+  - name: SpecialVariablesPropagateToRoot
+    priority: 410
+    description: Special variables propagate to package root
+    match:
+      all_of:
+        - member_type: variable
+        - any_of:
+            - name_pattern: ^Default.*$
+            - name_pattern: .*ConfigT?$
+    action: include
+    propagate: root
+
+  - name: IncludeMcpMiddleware
+    priority: 405
+    description: Include MCP middleware components (core part of public API)
+    match:
+      all_of:
+        - member_type: class
+        - module_pattern: .*server\.mcp.*$
+        - name_pattern: ^.*Middleware$
+    action: include
+    propagate: root
+  # ===================================================================
+  # Priority 300: Propagation rules
+  # ===================================================================
+
+  # Propagate PascalCase public variables to root (usually defaults and config variables that are intended for public use but aren't technically constants)
+
+  - name: PropagatePublicVariablesToRoot
+    priority: 330
+    description: Propagate public variables (PascalCase module-level assignments) to root
+    match:
+      all_of:
+        - member_type: variable
+        - name_pattern: ^[A-Z][A-Za-z0-9]+$
+    action: include
+    propagate: root
+
+  - name: PropagateExceptionsToRoot
+    priority: 330
+    description: Core types and exceptions propagate to package root
+    match:
+      any_of:
+        - module_pattern: .*\.exceptions$
+        - name_pattern: .*Error$
+        - name_pattern: .*Exception$
+    action: include
+    propagate: root
+
+  - name: PropagateUtilityFunctionsToRoot
+    priority: 320
+    description: Utility functions (e.g. helpers, validators) propagate to root
+    match:
+      all_of:
+        - member_type: function
+        - module_pattern: .*\.(utils|helpers|utilities|validators|common|shared)(\..*)?$
+        - name_pattern: ^[a-z0-9_]+$ # only snake_case public functions
+    action: include
+    propagate: root
+
+  - name: ExportDefinedClasses
+    priority: 310
+    description: Export classes defined in this module
+    match:
+      all_of:
+        - member_type: class
+        - name_pattern: ^[A-Z][A-Za-z0-9]+$ # only PascalCase classes
+    action: include
+    propagate: root
+
+  - name: ExportSpecialConstants
+    priority: 310
+    description: Export constants in constants.py to root
+    match:
+      all_of:
+        - member_type: constant
+        - any_of:
+            - module_pattern: .*\.(constants|file_extensions)$
+    action: include
+    propagate: root
+
+  - name: ExportTypeAliases
+    priority: 310
+    description: Export type aliases (both Python 3.12+ and pre-3.12 style). Intentionally excludes single letter type variables (e.g. T, V) which are conventionally not re-exported at package level.
+    match:
+      member_type: type_alias
+      name_pattern: ^[A-Z][A-Za-z0-9]+$
+    action: include
+    propagate: root
+
+  - name: ExportDIRelatedClasses
+    priority: 300
+    description: Export DI-related infrastructure (e.g. providers, factories) to root
+    match:
+      all_of:
+        - member_type: class
+        - module_pattern: .*\.(di|providers?|factories?|dependencies)(\..*)?$
+        - name_pattern: ^[A-Z][A-Za-z0-9]+$ # only PascalCase classes
+    action: include
+    propagate: root
+
+  - name: ExportDIRelatedFunctions
+    priority: 300
+    description: Export DI-related functions (e.g. provider getters) to root
+    match:
+      all_of:
+        - member_type: function
+        - module_pattern: .*\.(di|providers?|factories?|dependencies)(\..*)?$
+        - name_pattern: ^[a-z][a-z0-9_]+$ # only snake_case functions
+    action: include
+    propagate: root
+
+  - name: ExportDIConstants
+    priority: 300
+    description: Export DI-related constants (e.g. provider keys) to root
+    match:
+      all_of:
+        - member_type: constant
+        - module_pattern: .*\.(di|providers?|factories?|dependencies)(\..*)?$
+        - name_pattern: ^[A-Z][A-Z0-9_]+$ # only SCREAMING_SNAKE_CASE constants
+    action: include
+    propagate: root
+
+  - name: ExportDITypeAliases
+    priority: 300
+    description: Export DI-related type aliases to root
+    match:
+      all_of:
+        - member_type: type_alias
+        - module_pattern: .*\.(di|providers?|factories?|dependencies)(\..*)?$
+        - name_pattern: ^[A-Z][A-Za-z0-9]+(Deps|Depend.*)$ # only PascalCase type aliases with names ending in "Deps" or "Dependency/Dependencies"
+    action: include
+    propagate: root
+
+  # ===================================================================
+  # Priority 200: General defined symbols
+  # These are fallback rules for symbols defined in the module itself.
+  # ===================================================================
+
+  - name: ExportDefinedConstants
+    priority: 200
+    description: Export constants (SCREAMING_SNAKE_CASE variables) to parent only if not already handled by ExportSpecialConstants
+    match:
+      all_of:
+        - member_type: constant
+        - name_pattern: ^[A-Z0-9_]+$
+    action: include
+    propagate: parent
+
+  - name: ExportDefinedFunctions
+    priority: 200
+    description: Export functions defined in this module (including async)
+    match:
+      all_of:
+        - member_type: function
+        - name_pattern: ^[a-z0-9_]+$ # only snake_case public functions
+    action: include
+    propagate: parent
+
+  - name: ExportPublicVariables
+    priority: 200
+    description: Exclude public variables (snake_case module-level assignments)
+    match:
+      member_type: variable
+      name_pattern: ^[a-z0-9_]+$
+    action: exclude
+    propagate: none
+
+  # ===================================================================
+  # Priority 0: Default fallback behaviors
+  # ===================================================================
+  - name: DefaultNoDecision
+    priority: 0
+    description: "Default: no decision (symbol not exported)"
+    match:
+      name_pattern: .* # Matches everything
+    action: no_decision

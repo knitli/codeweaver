@@ -10,16 +10,15 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
+from codeweaver_tokenizers.base import Tokenizer
 from pydantic import ConfigDict, Field, NonNegativeInt, PositiveInt
 
-from codeweaver.core.types.models import BasedModel
-from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
-from codeweaver.providers.provider import Provider
-from codeweaver.tokenizers.base import Tokenizer
+from codeweaver.core import BasedModel, Provider
+from codeweaver.core import ValidationError as CodeWeaverValidationError
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
 
 class RerankingModelCapabilities(BasedModel):
@@ -79,7 +78,7 @@ class RerankingModelCapabilities(BasedModel):
         # Set defaults before calling super().__init__()
         if "tokenizer" not in data:
             data["tokenizer"] = "tiktoken"
-            data["tokenizer_model"] = "cl100k_base"
+            data["tokenizer_model"] = "o200k_base"
         if "other" not in data:
             data["other"] = {}
 
@@ -92,11 +91,11 @@ class RerankingModelCapabilities(BasedModel):
     @property
     def token_processor(self) -> Tokenizer[Any]:
         """Return the tokenizer for the model."""
-        from codeweaver.tokenizers import get_tokenizer
+        from codeweaver_tokenizers import get_tokenizer
 
         if self.tokenizer and self.tokenizer_model:
             return get_tokenizer(self.tokenizer, self.tokenizer_model)
-        return get_tokenizer("tiktoken", "cl100k_base")
+        return get_tokenizer("tiktoken", "o200k_base")
 
     @property
     def available(self) -> bool:

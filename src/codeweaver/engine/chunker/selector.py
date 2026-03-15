@@ -1,7 +1,8 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Intelligent chunker selection based on file language and capabilities.
 
 This module implements the ChunkerSelector which routes files to the appropriate
@@ -15,11 +16,12 @@ prevent state contamination across chunking operations.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 
 from typing import TYPE_CHECKING, Any
 
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
+from codeweaver.core import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.engine.chunker.base import BaseChunker
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.exceptions import ParseError
@@ -27,11 +29,8 @@ from codeweaver.engine.chunker.semantic import SemanticChunker
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import CodeChunk, DiscoveredFile
     from codeweaver.engine.chunker.base import ChunkGovernor
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -50,7 +49,7 @@ class ChunkerSelector:
         Basic usage with file discovery:
 
         >>> from codeweaver.engine.chunker.base import ChunkGovernor
-        >>> from codeweaver.core.discovery import DiscoveredFile
+        >>> from codeweaver.core import DiscoveredFile
         >>> from pathlib import Path
         >>>
         >>> governor = ChunkGovernor(capabilities=(...))
@@ -73,14 +72,16 @@ class ChunkerSelector:
         4. Return fresh chunker instance (never reused across files)
     """
 
-    def __init__(self, governor: ChunkGovernor) -> None:
+    def __init__(self, governor: ChunkGovernor, tokenizer: Any | None = None) -> None:
         """Initialize selector with chunk governor.
 
         Args:
             governor: ChunkGovernor instance for resource management and
                 configuration. Passed to created chunker instances.
+            tokenizer: Optional tokenizer for accurate token counting.
         """
         self.governor = governor
+        self.tokenizer = tokenizer
 
     def select_for_file_path(self, file_path: Any) -> BaseChunker:
         """Select best chunker for given file path (convenience method).
@@ -101,7 +102,7 @@ class ChunkerSelector:
         """
         from pathlib import Path
 
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         file_path = file_path if isinstance(file_path, Path) else Path(file_path)
         if discovered_file := DiscoveredFile.from_path(file_path):
@@ -132,46 +133,48 @@ class ChunkerSelector:
 
         Examples:
             >>> from pathlib import Path
-            >>> from codeweaver.core.discovery import DiscoveredFile
+            >>> from codeweaver.core import DiscoveredFile
             >>>
             >>> file = DiscoveredFile.from_path(Path("example.py"))
             >>> chunker1 = selector.select_for_file(file)
             >>> chunker2 = selector.select_for_file(file)
             >>> assert chunker1 is not chunker2  # Fresh instances
         """
-        # Check file size limit if settings are available
         if self.governor.settings is not None:
             max_size_bytes = self.governor.settings.performance.max_file_size_mb * 1024 * 1024
             try:
-                file_size = file.path.stat().st_size
+                file_size = file.absolute_path.stat().st_size
                 if file_size > max_size_bytes:
                     logger.warning(
                         "File %s exceeds max size limit (%d MB > %d MB). Skipping chunking.",
-                        file.path,
+                        file.absolute_path,
                         file_size / (1024 * 1024),
                         self.governor.settings.performance.max_file_size_mb,
                         extra={
-                            "file_path": str(file.path),
+                            "file_path": str(file.absolute_path),
                             "file_size_mb": file_size / (1024 * 1024),
                             "max_size_mb": self.governor.settings.performance.max_file_size_mb,
                         },
                     )
-                    # Return empty chunker or raise exception
-                    # For now, return semantic chunker which will handle it gracefully
             except OSError as e:
                 logger.warning(
                     "Could not stat file %s: %s",
-                    file.path,
+                    file.absolute_path,
                     e,
-                    extra={"file_path": str(file.path), "error": str(e)},
+                    extra={"file_path": str(file.absolute_path), "error": str(e)},
                 )
-
+        is_large_file = False
+        with contextlib.suppress(OSError, AttributeError):
+            if file.absolute_path.stat().st_size > 500 * 1024:
+                is_large_file = True
         language = self._detect_language(file)
-
-        # Try semantic first for supported languages
-        if isinstance(language, SemanticSearchLanguage):
+        if isinstance(language, SemanticSearchLanguage) and (not is_large_file):
             try:
-                return SemanticChunker(self.governor, language)
+                semantic_chunker = SemanticChunker(self.governor, language, self.tokenizer)
+                language_name = (
+                    language.variable if hasattr(language, "variable") else str(language)
+                )
+                fallback = DelimiterChunker(self.governor, language=language_name)
             except (ParseError, NotImplementedError) as e:
                 logger.warning(
                     "Semantic chunking unavailable for %s: %s. Using delimiter fallback.",
@@ -179,13 +182,13 @@ class ChunkerSelector:
                     e,
                     extra={"file_path": str(file.path), "language": str(language)},
                 )
-        # Delimiter fallback for unsupported languages
+            else:
+                return GracefulChunker(primary=semantic_chunker, fallback=fallback)
         language_repr = (
             language.variable
             if isinstance(language, SemanticSearchLanguage | ConfigLanguage)
             else language
         )
-        # Ensure language_repr is always a string
         if isinstance(language_repr, ConfigLanguage):
             language_repr = language_repr.variable
         logger.info(
@@ -223,16 +226,14 @@ class ChunkerSelector:
             >>> selector._detect_language(file_xyz)
             'xyz'
         """
-        ext = file.path.suffix
-
-        # SemanticSearchLanguage.from_extension returns None for unknown
-        return (
-            file.ext_kind.language.variable
-            if isinstance(file.ext_kind.language, SemanticSearchLanguage | ConfigLanguage)
-            else str(file.ext_kind.language)
-            if file.ext_kind
-            else ext.lstrip(".").lower()
-        )
+        if file.ext_category:
+            return (
+                file.ext_category.language
+                if isinstance(file.ext_category.language, (SemanticSearchLanguage, ConfigLanguage))
+                else str(file.ext_category.language)
+            )
+        ext = file.absolute_path.suffix
+        return ext.lstrip(".").lower()
 
 
 class GracefulChunker(BaseChunker):
@@ -289,45 +290,34 @@ class GracefulChunker(BaseChunker):
         file: DiscoveredFile | None = None,
         context: dict[str, Any] | None = None,
     ) -> list[CodeChunk]:
-        """Try primary chunker, fall back on error.
-
-        Attempts to chunk content using the primary chunker. If any exception
-        occurs, logs a warning and retries with the fallback chunker.
-
-        Args:
-            content: Source code content to chunk
-            file: Optional DiscoveredFile with metadata and source_id
-            context: Optional additional context for chunking
-
-        Returns:
-            List of CodeChunk objects from either primary or fallback chunker
-
-        Raises:
-            Any exception raised by the fallback chunker. Primary exceptions
-            are caught and logged but not propagated.
-
-        Examples:
-            >>> from codeweaver.core.discovery import DiscoveredFile
-            >>> from pathlib import Path
-            >>> content = "def foo(): pass"
-            >>> file = DiscoveredFile.from_path(Path("test.py"))
-            >>> chunks = graceful_chunker.chunk(content, file=file)
-            >>> # Returns chunks from primary if successful, fallback on error
-        """
+        """Try primary chunker, fall back on error."""
         try:
             return self.primary.chunk(content, file=file, context=context)
         except Exception as e:
-            logger.warning(
-                "Primary chunker failed: %s. Using fallback.",
-                e,
-                extra={
-                    "file_path": str(file.path) if file else None,
-                    "primary_chunker": type(self.primary).__name__,
-                    "fallback_chunker": type(self.fallback).__name__,
-                    "error_type": type(e).__name__,
-                },
-                exc_info=True,
-            )
+            from codeweaver.engine.chunker.exceptions import ChunkLimitExceededError
+
+            error_msg = str(e).splitlines()[0] if str(e) else type(e).__name__
+            if isinstance(e, ChunkLimitExceededError):
+                logger.info(
+                    "Switching to fallback chunker for %s: %s",
+                    file.path if file else "<unknown>",
+                    error_msg,
+                )
+            else:
+                logger.warning(
+                    "Primary chunker (%s) failed for %s: %s. Using fallback (%s).",
+                    type(self.primary).__name__,
+                    file.path if file else "<unknown>",
+                    error_msg,
+                    type(self.fallback).__name__,
+                    extra={
+                        "file_path": str(file.path) if file else None,
+                        "primary_chunker": type(self.primary).__name__,
+                        "fallback_chunker": type(self.fallback).__name__,
+                        "error_type": type(e).__name__,
+                    },
+                )
+            logger.debug("Primary chunker failure details:", exc_info=True)
             return self.fallback.chunk(content, file=file, context=context)
 
 

@@ -1,13 +1,7 @@
-#!/usr/bin/env -S uv run -s
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["rignore", "cyclopts", "pydantic-core", "reuse"]
-# ///
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# sourcery skip: avoid-global-variables
 # ruff: noqa: S603
 """Update licenses for files in the repository."""
 
@@ -21,14 +15,22 @@ from functools import cache, partial
 from pathlib import Path
 from typing import Annotated, NamedTuple
 
+import reuse.comment
 import rignore
 
 from cyclopts import App, Group, Parameter, validators
 from pydantic_core._pydantic_core import from_json
+from reuse.comment import EXTENSION_COMMENT_STYLE_MAP, CppCommentStyle, TSXCommentStyle
 
 
+EXTENSION_COMMENT_STYLE_MAP = EXTENSION_COMMENT_STYLE_MAP | {
+    ".astro": TSXCommentStyle,
+    ".pkl": CppCommentStyle,
+    ".jsonc": CppCommentStyle,
+}
+reuse.comment.globals()["EXTENSION_COMMENT_STYLE_MAP"] = EXTENSION_COMMENT_STYLE_MAP
+__version__ = "0.2.4"
 BASE_PATH = Path(__file__).parent.parent.parent
-__version__ = "0.1.4"
 CONTRIBUTORS_GROUP = Group(
     "Contributors",
     default_parameter=Parameter(negative=()),
@@ -53,6 +55,32 @@ app = App(
 )
 
 
+def is_right_pkl(path: Path) -> bool:
+    """Check if a .pkl file is binary (python pkl) or if it's a config file."""
+    if path.suffix != ".pkl":
+        return False
+    if path.name in (
+        "hk.pkl",
+        "hk.local.pkl",
+        "fileGroups.pkl",
+        "helpers.pkl",
+        "toolchain.pkl",
+        "workspace.pkl",
+        "tasks.pkl",
+    ):
+        return True
+    try:
+        content = path.read_bytes()
+    except Exception:
+        return False
+    else:
+        return not bool(
+            content.translate(
+                None, bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(32, 256)) - {127})
+            )
+        )
+
+
 def run_command(cmd: list[str], paths: list[Path]) -> None:
     """Run a command with the given paths."""
     if not paths:
@@ -73,7 +101,6 @@ def years() -> str:
 
 CODE_LICENSE = "MIT OR Apache-2.0"
 NON_CODE_LICENSE = "MIT OR Apache-2.0"
-
 BASE_CMD = [
     "reuse",
     "annotate",
@@ -85,12 +112,12 @@ BASE_CMD = [
     "--fallback-dot-license",
     "--skip-existing",
 ]
-REUSE_PATH = shutil.which("reuse")
+REUSE_PATH = str(shutil.which("reuse") or "")
 if not REUSE_PATH:
     print("Reuse is not installed or not found in PATH. Please install it to use this script.")
     sys.exit(1)
 CHECK_CMD = [REUSE_PATH, "lint", "-j"]
-"""Outputs a JSON report of non-compliant files."""
+"Outputs a JSON report of non-compliant files."
 NON_CODE_EXTS = {
     "login",
     "astro",
@@ -152,7 +179,7 @@ NON_CODE_EXTS = {
     "zshenv",
     "zshrc",
 }
-"""Extensions (without leading dots) considered non-code files for license purposes. Some of these *are* code, but they're helpers/support files and we treat them as non-code for license purposes (more lenient license in most knitli libraries)."""
+"Extensions (without leading dots) considered non-code files for license purposes. Some of these *are* code, but they're helpers/support files and we treat them as non-code for license purposes (more lenient license in most knitli libraries)."
 DEFAULT_CONTRIBUTORS = ["Adam Poulemanos <adam@knit.li>"]
 
 
@@ -192,11 +219,12 @@ def get_staged_files() -> list[Path]:
             print("Git is not installed or not found in PATH.")
             sys.exit(1)
         result = subprocess.run(
-            [git_path, "diff", "--cached", "--name-only"],
+            ["diff", "--cached", "--name-only"],  # noqa: S607
+            executable=git_path,
             capture_output=True,
             text=True,
             check=True,
-        )  # ty:ignore[no-matching-overload]
+        )
         print(result.stdout.strip())
         staged_files = result.stdout.strip().splitlines()
     except subprocess.CalledProcessError as e:
@@ -219,14 +247,14 @@ def filter_path(paths: tuple[Path] | None = None, path: Path | None = None) -> b
 def get_files_with_missing() -> list[Path] | None:
     """Get files with missing licenses."""
     try:
-        result = subprocess.run(
-            CHECK_CMD, capture_output=True, text=True
-        )  # reuse returns a non-zero exit code if there are non-compliant files, so we don't use check=True  # ty:ignore[no-matching-overload]
+        result = subprocess.run(CHECK_CMD, capture_output=True, text=True)
         output = from_json.loads(result.stdout.strip("%\n "))
         missing_files: list[str] = []
         if (non_compliant_report := output.get("non_compliant", {})) and (
-            missing_files := non_compliant_report.get("missing_copyright_info", [])
-            + non_compliant_report.get("missing_licensing_info", [])
+            missing_files := (
+                non_compliant_report.get("missing_copyright_info", [])
+                + non_compliant_report.get("missing_licensing_info", [])
+            )
         ):
             print(f"Found {len(missing_files)} files with missing licenses.")
     except subprocess.CalledProcessError as e:
@@ -306,10 +334,8 @@ def pre_commit() -> bool:
 
 def get_contributor() -> str:
     """Get a contributor from the user."""
-    # first check if we're in an interactive shell
     if not sys.stdin.isatty():
         pre_commit()
-    # if we are, prompt for the contributor
     if contributor := input(
         "What's your name and email? (e.g. 'Adam Poulemanos <adam@knit.li>' (the default)): "
     ).strip():
@@ -317,8 +343,7 @@ def get_contributor() -> str:
             return contributor
         if "@" in contributor and "@" in contributor.split(" ")[-1]:
             parts = contributor.split(" ")
-            return f"{''.join(parts[:-1])} <{parts[-1]}>"  # name email
-        # assume they just provided a name; which is fine.
+            return f"{''.join(parts[:-1])} <{parts[-1]}>"
         return contributor
     raise ValueError(
         "No contributor provided. Please provide a name and email in the format 'Name <email>'."

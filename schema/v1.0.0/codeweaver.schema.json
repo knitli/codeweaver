@@ -172,7 +172,7 @@
       "title": "AuthSettings",
       "type": "object"
     },
-    "AWSProviderSettings": {
+    "BedrockProviderSettings": {
       "description": "Settings for AWS provider. You need to provide these settings if you are using Bedrock, and you need to provide them for each Bedrock model you use. It might be repetitive, but a lot of people have different credentials for different models/services.",
       "properties": {
         "aws_access_key_id": {
@@ -230,7 +230,7 @@
         "region_name",
         "model_arn"
       ],
-      "title": "AWSProviderSettings",
+      "title": "BedrockProviderSettings",
       "type": "object"
     },
     "AzureCohereProviderSettings": {
@@ -859,8 +859,8 @@
       "title": "EndpointSettingsDict",
       "type": "object"
     },
-    "FastembedGPUProviderSettings": {
-      "description": "Special settings for Fastembed-GPU provider. These settings only apply if you are using a Fastembed provider, installed the `codeweaver[fastembed-gpu]` extra, have a CUDA-capable GPU, and have properly installed and configured the ONNX GPU runtime. You can provide these settings with your CodeWeaver embedding provider settings, or rerank provider settings. If you're using fastembed-gpu for both, we'll assume you are using the same settings for both if we find one of them. Important: You cannot have both `fastembed` and `fastembed-gpu` installed at the same time. They conflict with each other. Make sure to uninstall `fastembed` if you want to use `fastembed-gpu`.",
+    "FastEmbedGPUProviderSettings": {
+      "description": "Special settings for FastEmbed-GPU provider. These settings only apply if you are using a FastEmbed provider, installed the `codeweaver[fastembed-gpu]` extra, have a CUDA-capable GPU, and have properly installed and configured the ONNX GPU runtime. You can provide these settings with your CodeWeaver embedding provider settings, or rerank provider settings. If you're using fastembed-gpu for both, we'll assume you are using the same settings for both if we find one of them. Important: You cannot have both `fastembed` and `fastembed-gpu` installed at the same time. They conflict with each other. Make sure to uninstall `fastembed` if you want to use `fastembed-gpu`.",
       "properties": {
         "cuda": {
           "anyOf": [
@@ -890,7 +890,7 @@
           "title": "Provider settings"
         }
       },
-      "title": "FastembedGPUProviderSettings",
+      "title": "FastEmbedGPUProviderSettings",
       "type": "object"
     },
     "FastMcpServerSettings": {
@@ -1791,10 +1791,10 @@
     "ProviderSpecificSettings": {
       "anyOf": [
         {
-          "$ref": "#/$defs/FastembedGPUProviderSettings"
+          "$ref": "#/$defs/FastEmbedGPUProviderSettings"
         },
         {
-          "$ref": "#/$defs/AWSProviderSettings"
+          "$ref": "#/$defs/BedrockProviderSettings"
         },
         {
           "$ref": "#/$defs/AzureOpenAIProviderSettings"

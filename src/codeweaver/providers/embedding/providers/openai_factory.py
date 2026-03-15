@@ -15,74 +15,23 @@ import asyncio
 import os
 
 from collections.abc import Callable, Sequence
-from typing import Any, Self, cast
+from typing import Any, ClassVar, Self, cast
 
-from pydantic import AnyHttpUrl, create_model
+from pydantic import create_model
+from triton.runtime.cache import CacheManager
 
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.exceptions import ConfigurationError, ProviderError
-from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
+from codeweaver.core import INJECTED, CodeChunk, ConfigurationError, Provider, ProviderError, TypeIs
+from codeweaver.core import ValidationError as CodeWeaverValidationError
+from codeweaver.core.types import ModelName
+from codeweaver.providers.config import EmbeddingProviderSettings
+from codeweaver.providers.config.sdk import OpenAIEmbeddingConfig
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
-from codeweaver.providers.provider import Provider
-
-
-def ensure_v1(url: str) -> str:
-    """Ensure the URL ends with /v1."""
-    return url if url.rstrip("/").endswith("/v1") else f"{url.rstrip('/')}/v1"
-
-
-def try_for_heroku_endpoint(kwargs: Any) -> str:
-    """Try to identify the Heroku endpoint."""
-    if "base_url" in kwargs:
-        return ensure_v1(kwargs["base_url"])
-    if "api_base" in kwargs:
-        return ensure_v1(kwargs["api_base"])
-    if (
-        env_set := os.getenv("INFERENCE_URL")
-        or os.getenv("HEROKU_INFERENCE_URL")
-        or os.getenv("OPENAI_API_BASE")
-    ):
-        return ensure_v1(env_set)
-    return ""
-
-
-def parse_endpoint(endpoint: str, region: str | None = None) -> str:
-    """Parse the Azure endpoint URL."""
-    if endpoint.startswith("http"):
-        if endpoint.endswith("v1"):
-            return endpoint
-        endpoint = endpoint.split("//", 1)[1].split(".")[0]
-        region = region or endpoint.split(".")[1]
-        return f"https://{endpoint}.{region}.inference.ai.azure.com/v1"
-    endpoint = endpoint.split(".")[0]
-    region = region or endpoint.split(".")[1]
-    return f"https://{endpoint}.{region}.inference.ai.azure.com/v1"
-
-
-def try_for_azure_endpoint(kwargs: Any) -> str:
-    """Try to identify the Azure endpoint.
-
-    Azure uses this format: `https://<endpoint>.<region_name>.inference.ai.azure.com/v1`,
-    But because people often conflate `endpoint` and `url`, we try to be flexible.
-    """
-    endpoint, region = kwargs.get("endpoint"), kwargs.get("region_name")
-    if endpoint and region:
-        if not endpoint.startswith("http") or "azure" not in endpoint:
-            # URL looks right
-            return f"{endpoint}.{region}.inference.ai.azure.com/v1"
-        return parse_endpoint(endpoint, region)
-    if endpoint and (region := os.getenv("AZURE_OPENAI_REGION")):
-        return f"https://{endpoint}.{region}.inference.ai.azure.com/v1"
-    if region and (endpoint := os.getenv("AZURE_OPENAI_ENDPOINT")):
-        return parse_endpoint(endpoint, region)
-    if "base_url" in kwargs:
-        return ensure_v1(kwargs["base_url"])
-    if "api_base" in kwargs:
-        return ensure_v1(kwargs["api_base"])
-    if env_set := os.getenv("AZURE_OPENAI_ENDPOINT") or os.getenv("AZURE_API_BASE"):
-        return parse_endpoint(env_set, region or os.getenv("AZURE_OPENAI_REGION"))
-    return ""
+from codeweaver.providers.embedding.providers.base import (
+    EmbeddingCustomDeps,
+    EmbeddingImplementationDeps,
+    EmbeddingProvider,
+    EmbeddingRegistry,
+)
 
 
 try:
@@ -94,74 +43,92 @@ except ImportError as _import_error:
     ) from _import_error
 
 
+def _is_embedding_model_capabilities(obj: Any) -> TypeIs[EmbeddingModelCapabilities]:
+    """Appease the type checking gods for capability resolution."""
+    return isinstance(obj, EmbeddingModelCapabilities)
+
+
+def _raise_configuration_error(model_name: str, provider: Provider, resolved_type: Any) -> None:
+    raise ConfigurationError(
+        f"Could not resolve embedding model capabilities for model '{model_name}' and provider '{provider}'",
+        details={
+            "model_name": model_name,
+            "provider": str(provider),
+            "resolved_type": type(resolved_type).__name__,
+        },
+        suggestions=[
+            "Ensure the model name is correct",
+            "Check that the provider supports the specified model",
+            "Verify that the capabilities resolver is functioning properly",
+        ],
+    )
+
+
 class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
     """A class for producing embedding provider classes for OpenAI compatible providers."""
 
     @classmethod
     def get_provider_class(
         cls,
-        model_name: str,
+        model_name: ModelName,
         provider: Provider,
-        capabilities: EmbeddingModelCapabilities,
-        *,
-        base_url: str | None = None,
-        provider_kwargs: Any = None,
-        client: AsyncOpenAI | None = None,
+        config: EmbeddingProviderSettings,
+        client: AsyncOpenAI,
+        registry: EmbeddingRegistry,
+        cache_manager: CacheManager | None = None,
+        caps: EmbeddingModelCapabilities | None = None,
+        initialize_method: Callable[
+            [
+                OpenAIEmbeddingBase,
+                EmbeddingImplementationDeps | None,
+                EmbeddingCustomDeps | None,
+                Any,
+            ],
+            None,
+        ]
+        | None = None,
     ) -> type[Self]:
         """
         Create a new embedding provider class for the specified model and provider.
         """
         name = f"{str(provider).title()}EmbeddingProvider"
-        caps: EmbeddingModelCapabilities = capabilities
 
         def make_init(
-            base: type,
-            model_name: str,
-            provider: Provider,
-            base_url: str | None,
-            provider_kwargs: Any,
-            client: AsyncOpenAI | None = None,
+            _base: type,
+            _provider: Provider,
+            _client: AsyncOpenAI,
+            _config: EmbeddingProviderSettings,
+            _registry: EmbeddingRegistry,
+            _caps: EmbeddingModelCapabilities | None = None,
+            _impl_deps: EmbeddingImplementationDeps = INJECTED,
+            _custom_deps: EmbeddingCustomDeps = INJECTED,
+            _cache_manager: CacheManager | None = None,
         ) -> Callable[..., None]:
             """
             Construct an __init__ method for our newborn provider class.
             """
 
-            def __init__(self: EmbeddingProvider[AsyncOpenAI], *args: Any, **kwargs: Any) -> None:  # noqa: N807  # it's an __init__! It has to be __init__
+            def __init__(  # noqa: N807
+                self: EmbeddingProvider[AsyncOpenAI],
+                provider: Provider = _provider,
+                client: AsyncOpenAI = _client,
+                registry: EmbeddingRegistry = _registry,
+                caps: EmbeddingModelCapabilities | None = _caps,
+                **kwargs: Any,
+            ) -> None:  # it's an __init__! It has to be __init__
                 """
                 Initialize the embedding provider.
                 """
-                # 1. Prepare kwargs before calling parent
-                kwargs.setdefault("model", model_name)
-                if base_url is not None:
-                    kwargs.setdefault("base_url", base_url)
-                if provider_kwargs:
-                    kwargs.setdefault("provider_kwargs", provider_kwargs)
-                if provider == Provider.OLLAMA:
-                    kwargs.setdefault("api_key", "ollama")
-
-                # 2. Initialize client if not provided (use nonlocal to access outer scope)
-                client_instance = client
-                if client_instance is None:
-                    from openai import AsyncOpenAI
-
-                    client_kwargs: dict[str, Any] = {
-                        "api_key": kwargs.get(
-                            "api_key", "ollama" if provider == Provider.OLLAMA else None
-                        )
-                    }
-                    if base_url:
-                        client_kwargs["base_url"] = base_url
-                    # Support connection pooling via http_client injection
-                    if "http_client" in kwargs:
-                        client_kwargs["http_client"] = kwargs.pop("http_client")
-                    client_instance = AsyncOpenAI(**client_kwargs)
-
-                # 3. Call parent __init__ FIRST with proper arguments
-                # Base class expects (client, caps, kwargs) as per line 171-176 of base.py
-                cls.__init__(self, client=client_instance, caps=caps, kwargs=kwargs)
-
+                cls.provider = provider
+                cls.__init__(
+                    self,  # ty:ignore[invalid-argument-type]
+                    client=client,
+                    config=config,
+                    caps=caps,
+                    registry=registry,
+                    **kwargs,
+                )
                 # 4. Set provider-specific attributes AFTER parent initialization
-                cls._provider = provider
 
             return __init__
 
@@ -169,9 +136,24 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         # Because this is a BaseModel, we need to set __init__ on the parent class
         # so that it's there *before* pydantic does its thing so it can account for it.
         # there are other ways to do this, but this is the simplest.
-        parent_cls.__init__ = make_init(
-            cls, model_name, provider, base_url, provider_kwargs or {}, client=client
+        if not _is_embedding_model_capabilities(caps):
+            raise ConfigurationError(
+                "Capabilities must be an instance of EmbeddingModelCapabilities",
+                details={"provided_type": type(caps).__name__},
+                suggestions=[
+                    "Ensure the capabilities resolver returns the correct type",
+                    "Check the implementation of the capabilities resolver",
+                ],
+            )
+        object.__setattr__(
+            parent_cls,
+            "__init__",
+            make_init(
+                cls, provider, _client=client, _config=config, _registry=registry, _caps=caps
+            ),
         )
+        if initialize_method:
+            object.__setattr__(parent_cls, "_initialize", initialize_method)
 
         # Create the new provider class with proper field definitions
         new_class = create_model(
@@ -180,94 +162,80 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             __base__=parent_cls,
             __module__="codeweaver.providers.embedding.providers.openai_factory",
             __validators__=None,
-            client=(AsyncOpenAI, ...),
+            client=(AsyncOpenAI, client),
             _provider=(Provider, provider),
-            caps=(EmbeddingModelCapabilities, capabilities),
+            config=(OpenAIEmbeddingConfig, config),
+            registry=(EmbeddingRegistry, registry),
+            caps=(EmbeddingModelCapabilities, caps),
         )
 
         # Set metadata attributes that aren't Pydantic fields
         new_class._default_model_name = model_name
         new_class._default_provider = provider
-        new_class._default_base_url = base_url
-        new_class._default_provider_kwargs = provider_kwargs or {}
-
+        new_class._default_config = config or {}
+        new_class._default_registry = registry
         return new_class
 
-    _client: AsyncOpenAI
-    _provider: Provider
-    _caps: EmbeddingModelCapabilities
+    client: AsyncOpenAI
+    provider: ClassVar[Provider]
 
-    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
-        """Initialize the OpenAI embedding provider."""
-        self._shared_kwargs = {"model": self.model_name, "encoding_format": "float", "timeout": 30}
-        self.valid_client_kwargs = (
-            "model",
-            "encoding_format",
-            "timeout",
-            "dimensions",
-            "user",
-            "extra_headers",
-            "extra_query",
-            "extra_body",
-        )
-        self.doc_kwargs = {
-            k: v
-            for k, v in (self._shared_kwargs | (self.doc_kwargs or {})).items()
-            if k in self.valid_client_kwargs
-        }
-        self.query_kwargs = {
-            k: v
-            for k, v in (self._shared_kwargs | (self.query_kwargs or {})).items()
-            if k in self.valid_client_kwargs
-        }
+    def _initialize(
+        self,
+        impl_deps: EmbeddingImplementationDeps = None,
+        custom_deps: EmbeddingCustomDeps = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the OpenAI client."""
+        # Nothing to initialize here - options are set in model_post_init
 
     @property
     def base_url(self) -> str:
         """Get the base URL for the OpenAI client."""
-        expected_url = self._base_urls()[type(self)._provider]
-        return cast(str, str(self.client.base_url) if self.client.base_url else expected_url)
+        return (
+            self.client._base_url  # type: ignore[attr-defined]
+            if hasattr(self.client, "_base_url") and self.client._base_url
+            else os.getenv("OPENAI_API_BASE_URL", "https://api.openai.com/v1")
+        )
 
     @property
     def dimension(self) -> int:
         """Get the dimension of the embeddings."""
-        return self.doc_kwargs.get("dimensions") or self.caps.default_dimension or 1024  # type: ignore
+        return self.embed_options.get("dimensions") or self.caps.default_dimension or 1024
 
-    def _report(self, response: CreateEmbeddingResponse, texts: Sequence[str]) -> None:
+    def _report(
+        self,
+        response: CreateEmbeddingResponse,
+        texts: Sequence[str],
+        loop: asyncio.AbstractEventLoop | None = None,
+    ) -> None:
         """Report token usage statistics.
 
         Note: This sync method is only called from async contexts.
         """
         try:
-            loop = asyncio.get_running_loop()
+            loop = loop or asyncio.get_running_loop()
             if response.usage and (token_count := response.usage.total_tokens):
-                _ = loop.run_in_executor(
-                    None, lambda: self._update_token_stats(token_count=token_count)
+                _ = loop.call_soon_threadsafe(
+                    lambda: self._update_token_stats(token_count=token_count)
                 )
             else:
-                _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=texts))
+                _ = loop.call_soon_threadsafe(lambda: self._update_token_stats(from_docs=texts))
         except RuntimeError:
             # No running loop - shouldn't happen in normal usage since called from async methods
             # Fall back to synchronous execution
             if response.usage and (token_count := response.usage.total_tokens):
-                self._update_token_stats(token_count=token_count)
+                self._fire_and_forget(
+                    lambda: self._update_token_stats(token_count=token_count), loop=loop
+                )
             else:
-                self._update_token_stats(from_docs=texts)
+                self._fire_and_forget(lambda: self._update_token_stats(from_docs=texts), loop=loop)
 
     async def _get_vectors(
-        self, texts: Sequence[str], **kwargs: Any
+        self, texts: Sequence[str], *, is_query: bool = False, **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Get vectors for a sequence of texts."""
-        response = await self.client.embeddings.create(
-            input=cast(list[str], texts),
-            **(  # ty: ignore[invalid-argument-type]
-                self.doc_kwargs
-                | (
-                    {k: v for k, v in kwargs.items() if k in self.valid_client_kwargs}
-                    if kwargs
-                    else {}
-                )
-            ),
-        )
+        kwargs = (self.query_options if is_query else self.embed_options) | kwargs
+        response = await self.client.embeddings.create(input=cast(list[str], texts), **kwargs)
         if not response or not response.data:
             raise ProviderError(
                 "OpenAI embeddings endpoint returned empty response",
@@ -285,7 +253,8 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                     "Review API rate limits and quotas",
                 ],
             )
-        self._report(response, cast(list[str], texts))
+        loop = await self._get_loop()
+        self._report(response, cast(list[str], texts), loop=loop)
         results = sorted(response.data, key=lambda x: x.index)
         return [result.embedding for result in results]
 
@@ -305,26 +274,16 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                     "Convert documents to CodeChunk format before embedding",
                 ],
             )
+        await asyncio.sleep(0)
         texts = self.chunks_to_strings(documents)
+        await asyncio.sleep(0)
         return await self._get_vectors(cast(list[str], texts), **kwargs)
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
-        return await self._get_vectors(query, **kwargs)
-
-    def _base_urls(self) -> dict[Provider, AnyHttpUrl | str]:
-        return {
-            Provider.FIREWORKS: "https://api.fireworks.ai/inference/v1",
-            Provider.GROQ: "https://api.groq.com/openai/v1",
-            Provider.OPENAI: "https://api.openai.com/v1",
-            Provider.TOGETHER: "https://api.together.xyz/v1",
-            Provider.OLLAMA: self.doc_kwargs.get(
-                "endpoint", self.doc_kwargs.get("api_base", "http://localhost:11434/v1")
-            ),
-            Provider.HEROKU: try_for_heroku_endpoint(self.doc_kwargs or {}),
-            Provider.AZURE: try_for_azure_endpoint(self.doc_kwargs or {}),
-        }  # ty: ignore[invalid-return-type]
+        await asyncio.sleep(0)
+        return await self._get_vectors(query, is_query=True, **kwargs)
 
 
 __all__ = ("OpenAIEmbeddingBase",)

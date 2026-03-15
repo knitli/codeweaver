@@ -1,5 +1,4 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
@@ -7,62 +6,116 @@
 
 from __future__ import annotations
 
-from importlib import import_module
 from types import MappingProxyType
+
+# === MANAGED EXPORTS ===
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
 from typing import TYPE_CHECKING
+
+from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
     from codeweaver.providers.reranking.providers.base import (
-        QueryType,
         RerankingProvider,
-        RerankingResult,
+        default_reranking_input_transformer,
+        default_reranking_output_transformer,
     )
-    from codeweaver.providers.reranking.providers.bedrock import BedrockRerankingProvider
-    from codeweaver.providers.reranking.providers.cohere import CohereRerankingProvider
+    from codeweaver.providers.reranking.providers.bedrock import (
+        VALID_REGION_PATTERN,
+        VALID_REGIONS,
+        BaseBedrockModel,
+        BedrockInlineDocumentSource,
+        BedrockRerankConfiguration,
+        BedrockRerankingProvider,
+        BedrockRerankingResult,
+        BedrockRerankModelConfiguration,
+        BedrockRerankRequest,
+        BedrockRerankResultItem,
+        BedrockTextQuery,
+        DocumentSource,
+        RerankConfiguration,
+        bedrock_reranking_input_transformer,
+        bedrock_reranking_output_transformer,
+    )
+    from codeweaver.providers.reranking.providers.cohere import (
+        CohereRerankingProvider,
+        cohere_reranking_output_transformer,
+    )
     from codeweaver.providers.reranking.providers.fastembed import FastEmbedRerankingProvider
     from codeweaver.providers.reranking.providers.sentence_transformers import (
         SentenceTransformersRerankingProvider,
+        preprocess_for_qwen,
     )
-    from codeweaver.providers.reranking.providers.voyage import VoyageRerankingProvider
-
+    from codeweaver.providers.reranking.providers.types import RerankingResult
+    from codeweaver.providers.reranking.providers.voyage import (
+        VoyageRerankingProvider,
+        voyage_reranking_output_transformer,
+    )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "QueryType": (__spec__.parent, "base"),
-    "RerankingProvider": (__spec__.parent, "base"),
-    "RerankingResult": (__spec__.parent, "base"),
+    "VALID_REGION_PATTERN": (__spec__.parent, "bedrock"),
+    "VALID_REGIONS": (__spec__.parent, "bedrock"),
+    "BaseBedrockModel": (__spec__.parent, "bedrock"),
+    "BedrockInlineDocumentSource": (__spec__.parent, "bedrock"),
+    "BedrockRerankConfiguration": (__spec__.parent, "bedrock"),
     "BedrockRerankingProvider": (__spec__.parent, "bedrock"),
+    "BedrockRerankingResult": (__spec__.parent, "bedrock"),
+    "BedrockRerankModelConfiguration": (__spec__.parent, "bedrock"),
+    "BedrockRerankRequest": (__spec__.parent, "bedrock"),
+    "BedrockRerankResultItem": (__spec__.parent, "bedrock"),
+    "BedrockTextQuery": (__spec__.parent, "bedrock"),
     "CohereRerankingProvider": (__spec__.parent, "cohere"),
+    "DocumentSource": (__spec__.parent, "bedrock"),
     "FastEmbedRerankingProvider": (__spec__.parent, "fastembed"),
+    "RerankConfiguration": (__spec__.parent, "bedrock"),
+    "RerankingProvider": (__spec__.parent, "base"),
+    "RerankingResult": (__spec__.parent, "types"),
     "SentenceTransformersRerankingProvider": (__spec__.parent, "sentence_transformers"),
     "VoyageRerankingProvider": (__spec__.parent, "voyage"),
+    "bedrock_reranking_input_transformer": (__spec__.parent, "bedrock"),
+    "bedrock_reranking_output_transformer": (__spec__.parent, "bedrock"),
+    "cohere_reranking_output_transformer": (__spec__.parent, "cohere"),
+    "default_reranking_input_transformer": (__spec__.parent, "base"),
+    "default_reranking_output_transformer": (__spec__.parent, "base"),
+    "preprocess_for_qwen": (__spec__.parent, "sentence_transformers"),
+    "voyage_reranking_output_transformer": (__spec__.parent, "voyage"),
 })
 
-
-def __getattr__(name: str) -> object:
-    """Dynamically import submodules and classes for the reranking providers package."""
-    if name in _dynamic_imports:
-        module_name, submodule_name = _dynamic_imports[name]
-        module = import_module(f"{module_name}.{submodule_name}")
-        result = getattr(module, name)
-        globals()[name] = result  # Cache in globals for future access
-        return result
-    if globals().get(name) is not None:
-        return globals()[name]
-    raise AttributeError(f"module {__name__} has no attribute {name}")
-
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
+    "VALID_REGIONS",
+    "VALID_REGION_PATTERN",
+    "BaseBedrockModel",
+    "BedrockInlineDocumentSource",
+    "BedrockRerankConfiguration",
+    "BedrockRerankModelConfiguration",
+    "BedrockRerankRequest",
+    "BedrockRerankResultItem",
     "BedrockRerankingProvider",
+    "BedrockRerankingResult",
+    "BedrockTextQuery",
     "CohereRerankingProvider",
+    "DocumentSource",
     "FastEmbedRerankingProvider",
-    "QueryType",
+    "RerankConfiguration",
     "RerankingProvider",
     "RerankingResult",
     "SentenceTransformersRerankingProvider",
     "VoyageRerankingProvider",
+    "bedrock_reranking_input_transformer",
+    "bedrock_reranking_output_transformer",
+    "cohere_reranking_output_transformer",
+    "default_reranking_input_transformer",
+    "default_reranking_output_transformer",
+    "preprocess_for_qwen",
+    "voyage_reranking_output_transformer",
 )
 
 
 def __dir__() -> list[str]:
+    """List available attributes for the package."""
     return list(__all__)

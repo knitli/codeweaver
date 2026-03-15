@@ -34,7 +34,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/python-node-types.json",
-  "src/codeweaver/data/node_types/python-node-types.json"
+  "src/codeweaver/semantic/data/node_types/python-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2016 Max Brunsfeld"
@@ -44,7 +44,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/javascript-node-types.json",
-  "src/codeweaver/data/node_types/javascript-node-types.json"
+  "src/codeweaver/semantic/data/node_types/javascript-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2014 Max Brunsfeld"
@@ -55,8 +55,8 @@ SPDX-License-Identifier = "MIT"
 path = [
   "data/node_types/typescript-node-types.json",
   "data/node_types/tsx-node-types.json",
-  "src/codeweaver/data/node_types/typescript-node-types.json",
-  "src/codeweaver/data/node_types/tsx-node-types.json",
+  "src/codeweaver/semantic/data/node_types/typescript-node-types.json",
+  "src/codeweaver/semantic/data/node_types/tsx-node-types.json",
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2017 Max Brunsfeld"
@@ -66,7 +66,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/go-node-types.json",
-  "src/codeweaver/data/node_types/go-node-types.json"
+  "src/codeweaver/semantic/data/node_types/go-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2014 Max Brunsfeld"
@@ -76,7 +76,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/rust-node-types.json",
-  "src/codeweaver/data/node_types/rust-node-types.json"
+  "src/codeweaver/semantic/data/node_types/rust-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2017 Maxim Sokolov"
@@ -86,7 +86,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/c-node-types.json",
-  "src/codeweaver/data/node_types/c-node-types.json"
+  "src/codeweaver/semantic/data/node_types/c-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2014 Max Brunsfeld"
@@ -96,7 +96,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/cpp-node-types.json",
-  "src/codeweaver/data/node_types/cpp-node-types.json"
+  "src/codeweaver/semantic/data/node_types/cpp-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2014 Max Brunsfeld"
@@ -106,7 +106,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/csharp-node-types.json",
-  "src/codeweaver/data/node_types/csharp-node-types.json"
+  "src/codeweaver/semantic/data/node_types/csharp-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2014 Max Brunsfeld"
@@ -116,7 +116,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/java-node-types.json",
-  "src/codeweaver/data/node_types/java-node-types.json"
+  "src/codeweaver/semantic/data/node_types/java-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2014 Max Brunsfeld"
@@ -126,7 +126,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/ruby-node-types.json",
-  "src/codeweaver/data/node_types/ruby-node-types.json"
+  "src/codeweaver/semantic/data/node_types/ruby-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2016 Rob Rix"
@@ -137,8 +137,8 @@ SPDX-License-Identifier = "MIT"
 path = [
   "data/node_types/php-node-types.json",
   "data/node_types/php_sparse-node-types.json",
-  "src/codeweaver/data/node_types/php-node-types.json",
-  "src/codeweaver/data/node_types/php_sparse-node-types.json"
+  "src/codeweaver/semantic/data/node_types/php-node-types.json",
+  "src/codeweaver/semantic/data/node_types/php_sparse-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = [
@@ -151,7 +151,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/bash-node-types.json",
-  "src/codeweaver/data/node_types/bash-node-types.json"
+  "src/codeweaver/semantic/data/node_types/bash-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2017 Max Brunsfeld"
@@ -161,7 +161,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/html-node-types.json",
-  "src/codeweaver/data/node_types/html-node-types.json"
+  "src/codeweaver/semantic/data/node_types/html-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2017 Max Brunsfeld"
@@ -171,7 +171,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/css-node-types.json",
-  "src/codeweaver/data/node_types/css-node-types.json"
+  "src/codeweaver/semantic/data/node_types/css-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2017 Max Brunsfeld"
@@ -181,7 +181,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/json-node-types.json",
-  "src/codeweaver/data/node_types/json-node-types.json"
+  "src/codeweaver/semantic/data/node_types/json-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2014 Max Brunsfeld"
@@ -191,7 +191,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/yaml-node-types.json",
-  "src/codeweaver/data/node_types/yaml-node-types.json"
+  "src/codeweaver/semantic/data/node_types/yaml-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2019 tree-sitter contributors"
@@ -201,7 +201,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/haskell-node-types.json",
-  "src/codeweaver/data/node_types/haskell-node-types.json"
+  "src/codeweaver/semantic/data/node_types/haskell-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2014 Max Brunsfeld"
@@ -211,7 +211,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/scala-node-types.json",
-  "src/codeweaver/data/node_types/scala-node-types.json"
+  "src/codeweaver/semantic/data/node_types/scala-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2018 Max Brunsfeld and GitHub"
@@ -221,7 +221,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/kotlin-node-types.json",
-  "src/codeweaver/data/node_types/kotlin-node-types.json"
+  "src/codeweaver/semantic/data/node_types/kotlin-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2019 fwcd"
@@ -231,7 +231,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/swift-node-types.json",
-  "src/codeweaver/data/node_types/swift-node-types.json"
+  "src/codeweaver/semantic/data/node_types/swift-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2021 alex-pinkus"
@@ -241,7 +241,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/elixir-node-types.json",
-  "src/codeweaver/data/node_types/elixir-node-types.json"
+  "src/codeweaver/semantic/data/node_types/elixir-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2021 The Elixir Team"
@@ -251,7 +251,7 @@ SPDX-License-Identifier = "Apache-2.0"
 [[annotations]]
 path = [
   "data/node_types/lua-node-types.json",
-  "src/codeweaver/data/node_types/lua-node-types.json"
+  "src/codeweaver/semantic/data/node_types/lua-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2021 Munif Tanjim"
@@ -261,7 +261,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/nix-node-types.json",
-  "src/codeweaver/data/node_types/nix-node-types.json"
+  "src/codeweaver/semantic/data/node_types/nix-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2019 Charles Strahan"
@@ -271,7 +271,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/solidity-node-types.json",
-  "src/codeweaver/data/node_types/solidity-node-types.json"
+  "src/codeweaver/semantic/data/node_types/solidity-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2020 Joran Honig"
@@ -281,7 +281,7 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = [
   "data/node_types/hcl-node-types.json",
-  "src/codeweaver/data/node_types/hcl-node-types.json"
+  "src/codeweaver/semantic/data/node_types/hcl-node-types.json"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2021 Michael Hoffman"

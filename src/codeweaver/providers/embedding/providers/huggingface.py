@@ -13,18 +13,17 @@ from __future__ import annotations
 import logging
 
 from collections.abc import Iterator, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import Any, ClassVar, Literal
 
 import numpy as np
 
-from codeweaver.exceptions import ConfigurationError
+from codeweaver.core import CodeChunk, ConfigurationError, Provider
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
-from codeweaver.providers.provider import Provider
-
-
-if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+from codeweaver.providers.embedding.providers.base import (
+    EmbeddingCustomDeps,
+    EmbeddingImplementationDeps,
+    EmbeddingProvider,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +32,7 @@ logger = logging.getLogger(__name__)
 def huggingface_hub_input_transformer(chunks: Sequence[CodeChunk]) -> Iterator[str]:
     """Input transformer for Hugging Face Hub models."""
     # The hub client only takes a single string at a time, so we'll just use a generator here
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
     return CodeChunk.dechunkify(chunks)
 
@@ -43,18 +42,6 @@ def huggingface_hub_output_transformer(
 ) -> list[list[float]] | list[list[int]]:
     """Output transformer for Hugging Face Hub models."""
     return [out.tolist() for out in output]
-
-
-def huggingface_hub_embed_kwargs(**kwargs: Any) -> dict[str, Any]:
-    """Keyword arguments for Hugging Face Hub models."""
-    kwargs = kwargs or {}
-    return {"normalize": True, "prompt_name": "passage", **kwargs}
-
-
-def huggingface_hub_query_kwargs(**kwargs: Any) -> dict[str, Any]:
-    """Keyword arguments for the query embedding method."""
-    kwargs = kwargs or {}
-    return {"normalize": True, "prompt_name": "query", **kwargs}
 
 
 try:
@@ -71,23 +58,19 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
     """HuggingFace embedding provider."""
 
     client: AsyncInferenceClient
-    _provider: Provider = Provider.HUGGINGFACE_INFERENCE
-    caps: EmbeddingModelCapabilities
+    _provider: ClassVar[Literal[Provider.HUGGINGFACE_INFERENCE]] = Provider.HUGGINGFACE_INFERENCE
+    caps: EmbeddingModelCapabilities | None = None
 
     _output_transformer = staticmethod(huggingface_hub_output_transformer)
 
-    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
-        """We don't need to do anything here."""
-        self.doc_kwargs |= {
-            "model": self.caps.name,
-            **huggingface_hub_embed_kwargs(),
-            "prompt_name": "passage",
-        }
-        self.query_kwargs |= {
-            "model": self.caps.name,
-            **huggingface_hub_query_kwargs(),
-            "prompt_name": "query",
-        }
+    def _initialize(
+        self,
+        impl_deps: EmbeddingImplementationDeps = None,
+        custom_deps: EmbeddingCustomDeps = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the HuggingFace embedding client."""
+        # Nothing to initialize here - options are set in model_post_init
 
     @property
     def base_url(self) -> str | None:
@@ -100,8 +83,8 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
         """Embed a sequence of strings into vectors."""
         all_output: Sequence[Sequence[float]] | Sequence[Sequence[int]] = []
         for doc in sequence:
-            output = await self.client.feature_extraction(doc, **kwargs)  # type: ignore
-            all_output.append(output)  # type: ignore
+            output = await self.client.feature_extraction(doc, **kwargs)
+            all_output.append(output)
         return all_output
 
     async def _embed_documents(
@@ -110,7 +93,10 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
         """Embed a list of documents into vectors."""
         transformed_input = self.chunks_to_strings(documents)
         all_output = await self._embed_sequence(transformed_input, **kwargs)
-        self._fire_and_forget(lambda: self._update_token_stats(from_docs=transformed_input))
+        loop = await self._get_loop()
+        self._fire_and_forget(
+            lambda: self._update_token_stats(from_docs=transformed_input), loop=loop
+        )
         return self._process_output(all_output)
 
     async def _embed_query(
@@ -119,16 +105,13 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
         """Embed a query into a vector."""
         query = [query] if isinstance(query, str) else query
         output = await self._embed_sequence(query, **kwargs)
-        self._fire_and_forget(lambda: self._update_token_stats(from_docs=query))
+        loop = await self._get_loop()
+        self._fire_and_forget(lambda: self._update_token_stats(from_docs=query), loop=loop)
         return self._process_output(output)
 
-    @property
-    def dimension(self) -> int:
-        """Get the size of the vector for the collection.
 
-        While some models may support multiple dimensions, the HF Inference API does not.
-        """
-        return self.caps.default_dimension or 1024
-
-
-__all__ = ("HuggingFaceEmbeddingProvider",)
+__all__ = (
+    "HuggingFaceEmbeddingProvider",
+    "huggingface_hub_input_transformer",
+    "huggingface_hub_output_transformer",
+)

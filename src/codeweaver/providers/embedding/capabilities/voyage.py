@@ -5,7 +5,7 @@
 Settings for Voyage AI embedding models.
 
 Voyage AI models are CodeWeaver's recommended embedding models. They're high quality, low latency, and cost-effective (first 200M tokens are free).
-Our default model is currently `voyage-code-3`, which is optimized for code embeddings.
+Our default model is currently `voyage-4-large`, which can be queried with `voyage-4-nano` (see `SentenceTransformersEmbeddingCapabilities` for voyage-4-nano information), as well as every other member of the Voyage-4 family.
 
 Voyage's models provide best-in-class performance, and even more interesting, they maintain that performance when heavily quantized. Performance when quantized to binary 256-dimensions still significantly exceeds openai's `text-embedding-3-large` at **1/384th** the storage size (and cost).
 
@@ -22,14 +22,9 @@ Nevertheless, because we use semantic chunking for most code, you're not likely 
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from codeweaver.core import Provider, dependency_provider
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities, ModelFamily
 from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
-from codeweaver.providers.provider import Provider
-
-
-if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 def _get_shared_capabilities() -> PartialCapabilities:
@@ -50,17 +45,87 @@ def _get_shared_capabilities() -> PartialCapabilities:
     }
 
 
-def get_voyage_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
-    """Get the capabilities for Voyage AI embedding models."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+class Voyage4ModelFamily(ModelFamily):
+    """Voyage-4 model family specification."""
 
-    models = "voyage-3-large", "voyage-3.5", "voyage-3.5-lite", "voyage-code-3", "voyage-context-3"
+    family_id: str = "voyage-4"
+    default_dimension: int = 1024
+    default_dtype: str = "uint8"
+    is_normalized: bool = True
+    preferred_metrics: tuple[str, ...] = ("dot",)
+    member_models: frozenset[str] = frozenset({
+        "voyage-4-large",
+        "voyage-4",
+        "voyage-4-lite",
+        "voyage-4-nano",
+        "voyageai/voyage-4-nano",  # the huggingface name for voyage-4-nano
+        "onnx-community/voyage-4-nano-ONNX",  # the fastembed/ONNX name for voyage-4-nano
+    })
+    asymmetric_query_models: frozenset[str] = frozenset({
+        "voyageai/voyage-4-nano",
+        "voyage-4-nano",
+        "voyage-4-lite",
+        "voyage-4",
+        "onnx-community/voyage-4-nano-ONNX",  # the fastembed/ONNX name for voyage-4-nano
+    })
+    cross_provider_compatible: bool = True
+
+
+VOYAGE_4_FAMILY = Voyage4ModelFamily()
+"""Voyage-4 model family specification.
+
+The Voyage-4 family represents the fourth generation of Voyage AI's embedding models,
+featuring a unified vector space. The models don't suffer a noticeable performance drop
+with uint8 quantization, so we default to that to save on storage and compute costs.
+All models in this family produce embeddings that can be directly compared and stored
+together, enabling flexible model selection and migration strategies.
+
+The most common strategy, which promotes excellent quality and cost savings, is to use `voyage-4-large` or `voyage-4` for embedding generation of your data (your codebase for CodeWeaver), and `voyage-4-nano`
+to query it locally for free.
+
+Key characteristics:
+- Normalized embeddings (unit length) enable efficient dot product similarity
+- Native uint8 output reduces storage by 75% vs float32 with minimal quality loss
+- Cross-model compatibility allows mixing models (e.g., voyage-4-large for docs,
+  voyage-4-nano for queries)
+- voyage-4-nano is specialized for query-time use in asymmetric search scenarios
+
+The family's cross-provider compatibility flag indicates these embeddings maintain
+their properties even when accessed through different API providers (e.g., VoyageAI
+native API vs third-party providers).
+"""
+
+
+class VoyageEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for Voyage AI embedding models."""
+
+
+@dependency_provider(VoyageEmbeddingCapabilities, scope="singleton", collection=True)
+def get_voyage_embedding_capabilities() -> tuple[VoyageEmbeddingCapabilities, ...]:
+    """Get the capabilities for Voyage AI embedding models."""
+    models = (
+        "voyage-3-large",
+        "voyage-3.5",
+        "voyage-3.5-lite",
+        "voyage-code-3",
+        "voyage-context-3",
+        "voyage-4-large",
+        "voyage-4",
+        "voyage-4-lite",
+        "voyage-4-nano",
+        "onnx-community/voyage-4-nano-ONNX",
+    )
     settings = [{**_get_shared_capabilities()} for _ in models]
     for i, model in enumerate(models):
         settings[i]["name"] = model
         settings[i]["version"] = "3" if "3.5" not in model else "3.5"
         settings[i]["tokenizer_model"] = f"{settings[i]['tokenizer_model']}{model}"
-    return tuple(EmbeddingModelCapabilities.model_validate({**s}) for s in settings)
+        settings[i]["version"] = "3" if "3" in model else "4"
+        # Assign model family for voyage-4 models
+        if model.startswith("voyage-4"):
+            settings[i]["model_family"] = VOYAGE_4_FAMILY
+
+    return tuple(VoyageEmbeddingCapabilities.model_validate({**s}) for s in settings)
 
 
-__all__ = ("get_voyage_embedding_capabilities",)
+__all__ = ("Voyage4ModelFamily", "VoyageEmbeddingCapabilities", "get_voyage_embedding_capabilities")

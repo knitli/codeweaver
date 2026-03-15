@@ -9,12 +9,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.embedding.providers.base import EmbeddingErrorInfo
-from codeweaver.providers.embedding.providers.voyage import VoyageEmbeddingProvider
-from codeweaver.providers.provider import Provider
+from codeweaver.core import CodeChunk, ExtCategory, Provider, SemanticSearchLanguage
+from codeweaver.providers import (
+    EmbeddingErrorInfo,
+    EmbeddingModelCapabilities,
+    VoyageEmbeddingProvider,
+)
 
 
 pytestmark = [pytest.mark.unit]
@@ -22,24 +22,20 @@ pytestmark = [pytest.mark.unit]
 
 @pytest.fixture(autouse=True)
 def reset_embedding_registry():
-    """Reset the global embedding registry and hash stores between tests to avoid state pollution."""
-    import codeweaver.providers.embedding.registry as registry_module
+    """Reset the global embedding registry between tests to avoid state pollution.
 
-    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+    Note: EmbeddingCacheManager is now responsible for hash stores and deduplication.
+    This fixture only needs to reset the global registry singleton.
+    """
+    import codeweaver.providers as registry_module
 
     # Reset the global singleton registry
     registry_module._embedding_registry = None
-
-    # Reset the class-level hash stores that handle deduplication
-    EmbeddingProvider._hash_store.clear()
-    EmbeddingProvider._backup_hash_store.clear()
 
     yield
 
     # Clean up after test
     registry_module._embedding_registry = None
-    EmbeddingProvider._hash_store.clear()
-    EmbeddingProvider._backup_hash_store.clear()
 
 
 @pytest.fixture
@@ -74,13 +70,58 @@ def voyage_context_capabilities():
     )
 
 
+@pytest.fixture
+def mock_voyage_config():
+    """Create a config for Voyage embedding provider."""
+    from codeweaver.providers import EmbeddingProviderSettings
+    from codeweaver.providers.config import VoyageEmbeddingConfig
+
+    embedding_config = VoyageEmbeddingConfig(
+        tag="voyage", provider=Provider.VOYAGE, model_name="voyage-3"
+    )
+
+    return EmbeddingProviderSettings(
+        provider=Provider.VOYAGE, model_name="voyage-3", embedding_config=embedding_config
+    )
+
+
+@pytest.fixture
+def mock_embedding_registry():
+    """Create a mock embedding registry."""
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry
+
+    registry = MagicMock(spec=EmbeddingRegistry)
+    registry.get = MagicMock(return_value=None)
+    registry.add = MagicMock()
+    return registry
+
+
+@pytest.fixture
+def mock_cache_manager(mock_embedding_registry):
+    """Create a mock cache manager."""
+    from codeweaver.providers.embedding.cache_manager import EmbeddingCacheManager
+
+    return EmbeddingCacheManager(registry=mock_embedding_registry)
+
+
 class TestVoyageEmbeddingProviderInitialization:
     """Test VoyageEmbeddingProvider initialization."""
 
-    def test_provider_initialization_with_client(self, mock_voyage_client, voyage_capabilities):
+    def test_provider_initialization_with_client(
+        self,
+        mock_cache_manager,
+        mock_voyage_client,
+        mock_voyage_config,
+        mock_embedding_registry,
+        voyage_capabilities,
+    ):
         """Test that provider initializes correctly with a client."""
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
+            cache_manager=mock_cache_manager,
         )
 
         assert provider.client is mock_voyage_client
@@ -89,49 +130,70 @@ class TestVoyageEmbeddingProviderInitialization:
         assert not provider._is_context_model
 
     def test_provider_initialization_with_context_model(
-        self, mock_voyage_client, voyage_context_capabilities
+        self,
+        mock_cache_manager,
+        mock_voyage_client,
+        mock_voyage_config,
+        mock_embedding_registry,
+        voyage_context_capabilities,
     ):
         """Test that context models are detected during initialization."""
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_context_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_context_capabilities,
+            cache_manager=mock_cache_manager,
         )
 
         assert provider._is_context_model
         assert "context" in provider.caps.name
 
-    def test_provider_sets_doc_and_query_kwargs(self, mock_voyage_client, voyage_capabilities):
-        """Test that doc_kwargs and query_kwargs are set correctly."""
+    def test_provider_sets_doc_andquery_options(
+        self,
+        mock_cache_manager,
+        mock_voyage_client,
+        mock_voyage_config,
+        mock_embedding_registry,
+        voyage_capabilities,
+    ):
+        """Test that embed_options and query_options are set correctly."""
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
+            cache_manager=mock_cache_manager,
         )
 
         # Check that model name and output params are set
-        assert provider.doc_kwargs["model"] == "voyage-3"
-        assert provider.doc_kwargs["input_type"] == "document"
-        assert provider.doc_kwargs["output_dimension"] == 1024
-        assert provider.doc_kwargs["output_dtype"] == "float"
+        assert provider.embed_options["model"] == "voyage-3"
+        assert provider.embed_options["input_type"] == "document"
+        assert provider.embed_options["output_dimension"] == 1024
+        # VoyageEmbeddingConfig._get_datatype() returns "uint8" as the default
+        assert provider.embed_options["output_dtype"] == "uint8"
 
-        assert provider.query_kwargs["model"] == "voyage-3"
-        assert provider.query_kwargs["input_type"] == "query"
-        assert provider.query_kwargs["output_dimension"] == 1024
-        assert provider.query_kwargs["output_dtype"] == "float"
+        assert provider.query_options["model"] == "voyage-3"
+        assert provider.query_options["input_type"] == "query"
+        assert provider.query_options["output_dimension"] == 1024
+        # VoyageEmbeddingConfig._get_datatype() returns "uint8" as the default
+        assert provider.query_options["output_dtype"] == "uint8"
 
-    def test_provider_initialization_with_custom_kwargs(
-        self, mock_voyage_client, voyage_capabilities
+    def test_provider_base_url(
+        self,
+        mock_cache_manager,
+        mock_voyage_client,
+        mock_voyage_config,
+        mock_embedding_registry,
+        voyage_capabilities,
     ):
-        """Test that custom kwargs are merged correctly."""
-        custom_kwargs = {"custom_param": "value"}
-        provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=custom_kwargs
-        )
-
-        assert provider.doc_kwargs["custom_param"] == "value"
-        assert provider.query_kwargs["custom_param"] == "value"
-
-    def test_provider_base_url(self, mock_voyage_client, voyage_capabilities):
         """Test that base_url property returns correct value."""
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
+            cache_manager=mock_cache_manager,
         )
 
         assert provider.base_url == "https://api.voyageai.com/v1"
@@ -141,7 +203,14 @@ class TestVoyageEmbeddingProviderEmbedding:
     """Test VoyageEmbeddingProvider embedding operations."""
 
     @pytest.mark.asyncio
-    async def test_embed_documents_success(self, mock_voyage_client, voyage_capabilities):
+    async def test_embed_documents_success(
+        self,
+        mock_cache_manager,
+        mock_voyage_client,
+        mock_voyage_config,
+        mock_embedding_registry,
+        voyage_capabilities,
+    ):
         """Test successful document embedding."""
         # Setup mock response with correct dimension (1024)
         mock_response = MagicMock()
@@ -153,29 +222,35 @@ class TestVoyageEmbeddingProviderEmbedding:
         mock_voyage_client.embed.return_value = mock_response
 
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
+            cache_manager=mock_cache_manager,
         )
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
-        from codeweaver.core.metadata import ChunkKind, ExtKind
-        from codeweaver.core.spans import Span
+        from codeweaver.core import ChunkKind, ExtCategory, Span, uuid7
 
         # Create test chunks
         chunks = [
             CodeChunk(
                 content="test content 1",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(
+                    language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                ),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                line_range=Span(start=1, end=1, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
                 chunk_id=uuid7(),
             ),
             CodeChunk(
                 content="test content 2",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(
+                    language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                ),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=2, end=2, _source_id=uuid7()),
+                line_range=Span(start=2, end=2, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
                 chunk_id=uuid7(),
             ),
@@ -189,8 +264,8 @@ class TestVoyageEmbeddingProviderEmbedding:
         assert len(result) == 2
         assert len(result[0]) == 1024  # ty: ignore[invalid-key]
         assert len(result[1]) == 1024  # ty: ignore[invalid-key]
-        assert result[0][0] == 0.1  # Check first element
-        assert result[1][0] == 0.2  # Check first element
+        assert result[0][0] == 0.1  # ty:ignore[invalid-key]
+        assert result[1][0] == 0.2  # ty:ignore[invalid-key]
 
         # Verify client was called correctly
         mock_voyage_client.embed.assert_called_once()
@@ -201,7 +276,14 @@ class TestVoyageEmbeddingProviderEmbedding:
         assert call_kwargs["model"] == "voyage-3"
 
     @pytest.mark.asyncio
-    async def test_embed_query_success(self, mock_voyage_client, voyage_capabilities):
+    async def test_embed_query_success(
+        self,
+        mock_cache_manager,
+        mock_voyage_client,
+        mock_voyage_config,
+        mock_embedding_registry,
+        voyage_capabilities,
+    ):
         """Test successful query embedding."""
         # Setup mock response
         mock_response = MagicMock()
@@ -210,7 +292,11 @@ class TestVoyageEmbeddingProviderEmbedding:
         mock_voyage_client.embed.return_value = mock_response
 
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
+            cache_manager=mock_cache_manager,
         )
 
         # Call embed_query
@@ -228,7 +314,14 @@ class TestVoyageEmbeddingProviderEmbedding:
         assert call_kwargs["model"] == "voyage-3"
 
     @pytest.mark.asyncio
-    async def test_embed_query_with_multiple_queries(self, mock_voyage_client, voyage_capabilities):
+    async def test_embed_query_with_multiple_queries(
+        self,
+        mock_cache_manager,
+        mock_voyage_client,
+        mock_voyage_config,
+        mock_embedding_registry,
+        voyage_capabilities,
+    ):
         """Test embedding multiple queries at once."""
         # Setup mock response
         mock_response = MagicMock()
@@ -237,7 +330,11 @@ class TestVoyageEmbeddingProviderEmbedding:
         mock_voyage_client.embed.return_value = mock_response
 
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
+            cache_manager=mock_cache_manager,
         )
 
         # Call embed_query with list
@@ -255,7 +352,12 @@ class TestVoyageEmbeddingProviderEmbedding:
 
     @pytest.mark.asyncio
     async def test_context_model_uses_correct_transformer(
-        self, mock_voyage_client, voyage_context_capabilities
+        self,
+        mock_cache_manager,
+        mock_voyage_client,
+        mock_voyage_config,
+        mock_embedding_registry,
+        voyage_context_capabilities,
     ):
         """Test that context models use the correct output transformer."""
         # Setup mock response for context model
@@ -271,37 +373,43 @@ class TestVoyageEmbeddingProviderEmbedding:
             return [[0.1] * 1024, [0.2] * 1024]
 
         # Monkey-patch the transformer for this test
-        import codeweaver.providers.embedding.providers.voyage as voyage_module
+        from codeweaver.providers.embedding.providers import voyage as voyage_module
 
         original_transformer = voyage_module.voyage_context_output_transformer
-        voyage_module.voyage_context_output_transformer = mock_transformer  # ty: ignore[invalid-assignment]
+        voyage_module.voyage_context_output_transformer = mock_transformer
 
         try:
             provider = VoyageEmbeddingProvider(
-                client=mock_voyage_client, caps=voyage_context_capabilities, kwargs=None
+                client=mock_voyage_client,
+                config=mock_voyage_config,
+                registry=mock_embedding_registry,
+                caps=voyage_context_capabilities,
+                cache_manager=mock_cache_manager,
             )
 
             from pathlib import Path
 
-            from codeweaver.common.utils.utils import uuid7
-            from codeweaver.core.metadata import ChunkKind, ExtKind
-            from codeweaver.core.spans import Span
+            from codeweaver.core import ChunkKind, Span, uuid7
 
             # Create test chunks
             chunks = [
                 CodeChunk(
                     content="test content 1",
-                    ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                    ext_category=ExtCategory(
+                        language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                    ),
                     language=SemanticSearchLanguage.PYTHON,
-                    line_range=Span(start=1, end=1, _source_id=uuid7()),
+                    line_range=Span(start=1, end=1, source_id=uuid7()),
                     file_path=Path("/test/file.py"),
                     chunk_id=uuid7(),
                 ),
                 CodeChunk(
                     content="test content 2",
-                    ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                    ext_category=ExtCategory(
+                        language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                    ),
                     language=SemanticSearchLanguage.PYTHON,
-                    line_range=Span(start=2, end=2, _source_id=uuid7()),
+                    line_range=Span(start=2, end=2, source_id=uuid7()),
                     file_path=Path("/test/file.py"),
                     chunk_id=uuid7(),
                 ),
@@ -330,36 +438,47 @@ class TestVoyageEmbeddingProviderErrorHandling:
 
     @pytest.mark.asyncio
     async def test_embed_documents_handles_connection_error(
-        self, mock_voyage_client, voyage_capabilities
+        self,
+        mock_cache_manager,
+        mock_voyage_client,
+        mock_voyage_config,
+        mock_embedding_registry,
+        voyage_capabilities,
     ):
         """Test that connection errors are handled with retry logic."""
         mock_voyage_client.embed.side_effect = ConnectionError("Connection failed")
 
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
+            cache_manager=mock_cache_manager,
         )
 
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
-        from codeweaver.core.metadata import ChunkKind, ExtKind
-        from codeweaver.core.spans import Span
+        from codeweaver.core import ChunkKind, ExtCategory, Span, uuid7
 
         # Create test chunks
         chunks = [
             CodeChunk(
                 content="test content 1",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(
+                    language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                ),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                line_range=Span(start=1, end=1, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
                 chunk_id=uuid7(),
             ),
             CodeChunk(
                 content="test content 2",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(
+                    language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                ),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=2, end=2, _source_id=uuid7()),
+                line_range=Span(start=2, end=2, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
                 chunk_id=uuid7(),
             ),
@@ -373,12 +492,23 @@ class TestVoyageEmbeddingProviderErrorHandling:
         assert "error" in result
 
     @pytest.mark.asyncio
-    async def test_embed_query_handles_timeout_error(self, mock_voyage_client, voyage_capabilities):
+    async def test_embed_query_handles_timeout_error(
+        self,
+        mock_cache_manager,
+        mock_voyage_client,
+        mock_voyage_config,
+        mock_embedding_registry,
+        voyage_capabilities,
+    ):
         """Test that timeout errors are handled with retry logic."""
         mock_voyage_client.embed.side_effect = TimeoutError("Request timed out")
 
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
+            cache_manager=mock_cache_manager,
         )
 
         # Call embed_query - should return error info
@@ -393,17 +523,31 @@ class TestVoyageEmbeddingProviderDimension:
     """Test VoyageEmbeddingProvider dimension property."""
 
     def test_dimension_property_returns_correct_value(
-        self, mock_voyage_client, voyage_capabilities
+        self,
+        mock_cache_manager,
+        mock_voyage_client,
+        mock_voyage_config,
+        mock_embedding_registry,
+        voyage_capabilities,
     ):
         """Test that dimension property returns the correct value."""
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
+            cache_manager=mock_cache_manager,
         )
 
         assert provider.dimension == 1024
 
-    def test_dimension_property_with_custom_dimension(self, mock_voyage_client):
+    def test_dimension_property_with_custom_dimension(
+        self, mock_voyage_client, mock_embedding_registry, mock_cache_manager
+    ):
         """Test dimension property with custom output_dimension."""
+        from codeweaver.providers import EmbeddingProviderSettings
+        from codeweaver.providers.config import VoyageEmbeddingConfig
+
         caps = EmbeddingModelCapabilities(
             name="voyage-3",
             provider=Provider.VOYAGE,
@@ -412,6 +556,25 @@ class TestVoyageEmbeddingProviderDimension:
             tokenizer="tokenizers",
         )
 
-        provider = VoyageEmbeddingProvider(client=mock_voyage_client, caps=caps, kwargs=None)
+        # Create config with explicit dimension in embedding dict to override the 1024 default
+        embedding_config = VoyageEmbeddingConfig(
+            tag="voyage",
+            provider=Provider.VOYAGE,
+            model_name="voyage-3",
+            embedding={"output_dimension": 768},
+            query={"output_dimension": 768},
+        )
+
+        config = EmbeddingProviderSettings(
+            provider=Provider.VOYAGE, model_name="voyage-3", embedding_config=embedding_config
+        )
+
+        provider = VoyageEmbeddingProvider(
+            client=mock_voyage_client,
+            config=config,
+            registry=mock_embedding_registry,
+            caps=caps,
+            cache_manager=mock_cache_manager,
+        )
 
         assert provider.dimension == 768

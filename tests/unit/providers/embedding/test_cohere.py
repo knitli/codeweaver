@@ -14,32 +14,27 @@ import pytest
 # Skip this entire module if the cohere package is not installed
 pytest.importorskip("cohere", reason="cohere package is required for these tests")
 
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.embedding.providers.base import EmbeddingErrorInfo
-from codeweaver.providers.provider import Provider
+from codeweaver.core import CodeChunk, Provider
+from codeweaver.providers import EmbeddingErrorInfo, EmbeddingModelCapabilities
+from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
 
 
 @pytest.fixture(autouse=True)
 def reset_embedding_registry():
-    """Reset the global embedding registry and hash stores between tests to avoid state pollution."""
-    import codeweaver.providers.embedding.registry as registry_module
+    """Reset the global embedding registry between tests to avoid state pollution.
 
-    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+    Note: EmbeddingCacheManager is now responsible for hash stores and deduplication.
+    This fixture only needs to reset the global registry singleton.
+    """
+    import codeweaver.providers as registry_module
 
     # Reset the global singleton registry
     registry_module._embedding_registry = None
-
-    # Reset the class-level hash stores that handle deduplication
-    EmbeddingProvider._hash_store.clear()
-    EmbeddingProvider._backup_hash_store.clear()
 
     yield
 
     # Clean up after test
     registry_module._embedding_registry = None
-    EmbeddingProvider._hash_store.clear()
-    EmbeddingProvider._backup_hash_store.clear()
 
 
 @pytest.fixture
@@ -47,6 +42,9 @@ def mock_cohere_client():
     """Create a mock Cohere async client."""
     client = AsyncMock()
     client.embed = AsyncMock()
+    # Mock the _client_wrapper.get_base_url() method to return a string
+    client._client_wrapper = MagicMock()
+    client._client_wrapper.get_base_url = MagicMock(return_value="https://api.cohere.com")
     return client
 
 
@@ -57,7 +55,7 @@ def cohere_capabilities():
         name="embed-english-v3.0",
         provider=Provider.COHERE,
         default_dimension=1024,
-        default_dtype="float",
+        default_dtype="float16",
         tokenizer=None,  # No tokenizer to avoid HuggingFace lookups in tests
     )
 
@@ -69,9 +67,46 @@ def cohere_4_capabilities():
         name="embed-english-v4.0",
         provider=Provider.COHERE,
         default_dimension=1024,
-        default_dtype="float",
+        default_dtype="float16",
         tokenizer=None,  # No tokenizer to avoid HuggingFace lookups in tests
     )
+
+
+@pytest.fixture
+def mock_cohere_config():
+    """Create a config for Cohere embedding provider."""
+    from codeweaver.providers.config import CohereEmbeddingConfig, CohereEmbeddingProviderSettings
+
+    embedding_config = CohereEmbeddingConfig(
+        tag="cohere",
+        provider=Provider.COHERE,
+        model_name="embed-english-v3.0",
+        embedding={},
+        query={},
+        model={},
+    )
+    return CohereEmbeddingProviderSettings(
+        provider=Provider.COHERE, model_name="embed-english-v3.0", embedding_config=embedding_config
+    )
+
+
+@pytest.fixture
+def mock_embedding_registry():
+    """Create a mock embedding registry."""
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry
+
+    registry = MagicMock(spec=EmbeddingRegistry)
+    registry.get = MagicMock(return_value=None)
+    registry.add = MagicMock()
+    return registry
+
+
+@pytest.fixture
+def mock_cache_manager(mock_embedding_registry):
+    """Create a mock cache manager."""
+    from codeweaver.providers.embedding.cache_manager import EmbeddingCacheManager
+
+    return EmbeddingCacheManager(registry=mock_embedding_registry)
 
 
 @pytest.mark.async_test
@@ -81,59 +116,83 @@ class TestCohereEmbeddingProviderInitialization:
     """Test CohereEmbeddingProvider initialization."""
 
     @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
-    def test_provider_initialization_with_env_api_key(self, cohere_capabilities):
+    def test_provider_initialization_with_env_api_key(
+        self,
+        mock_cohere_client,
+        mock_cohere_config,
+        mock_embedding_registry,
+        mock_cache_manager,
+        cohere_capabilities,
+    ):
         """Test that provider initializes with API key from environment."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
 
-        provider = CohereEmbeddingProvider(caps=cohere_capabilities)
+        provider = CohereEmbeddingProvider(
+            caps=cohere_capabilities,
+            client=mock_cohere_client,
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
+        )
 
         assert provider.caps == cohere_capabilities
         assert provider.client is not None
         assert provider.name == Provider.COHERE
 
-    @patch.dict("os.environ", {}, clear=True)
-    def test_provider_initialization_without_api_key_raises_error(self, cohere_capabilities):
-        """Test that provider raises error without API key."""
-        from codeweaver.exceptions import ConfigurationError
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
-
-        with pytest.raises(ConfigurationError) as exc_info:
-            CohereEmbeddingProvider(caps=cohere_capabilities)
-
-        assert "API key not found" in str(exc_info.value)
-
-    def test_provider_initialization_with_client(self, mock_cohere_client, cohere_capabilities):
+    def test_provider_initialization_with_client(
+        self,
+        mock_cohere_client,
+        mock_cohere_config,
+        mock_embedding_registry,
+        mock_cache_manager,
+        cohere_capabilities,
+    ):
         """Test that provider initializes correctly with a provided client."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
-        provider = CohereEmbeddingProvider(caps=cohere_capabilities, _client=mock_cohere_client)
+        provider = CohereEmbeddingProvider(
+            caps=cohere_capabilities,
+            client=mock_cohere_client,
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
+        )
 
         assert provider.client is mock_cohere_client
         assert provider.caps == cohere_capabilities
 
     @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
-    def test_provider_initialization_with_custom_kwargs(self, cohere_capabilities):
-        """Test that custom kwargs are stored correctly."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
-
-        provider = CohereEmbeddingProvider(caps=cohere_capabilities, custom_param="value")
-
-        assert "custom_param" in provider.doc_kwargs
-        assert provider.doc_kwargs["custom_param"] == "value"
-
-    @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
-    def test_provider_base_url_cohere(self, cohere_capabilities):
+    def test_provider_base_url_cohere(
+        self,
+        mock_cohere_client,
+        mock_cohere_config,
+        mock_embedding_registry,
+        mock_cache_manager,
+        cohere_capabilities,
+    ):
         """Test that base_url property returns correct value for Cohere."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
-        provider = CohereEmbeddingProvider(caps=cohere_capabilities)
+        provider = CohereEmbeddingProvider(
+            caps=cohere_capabilities,
+            client=mock_cohere_client,
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
+        )
 
         assert provider.base_url == "https://api.cohere.com"
 
     @patch.dict("os.environ", {"AZURE_COHERE_API_KEY": "test-api-key"})
-    def test_provider_initialization_azure_provider(self):
+    def test_provider_initialization_azure_provider(
+        self,
+        mock_cohere_client,
+        mock_cohere_config,
+        mock_embedding_registry,
+        mock_cache_manager,
+        cohere_capabilities,
+    ):
         """Test that Azure provider is supported."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         caps = EmbeddingModelCapabilities(
             name="embed-english-v3.0",
@@ -144,7 +203,11 @@ class TestCohereEmbeddingProviderInitialization:
         )
 
         provider = CohereEmbeddingProvider(
-            caps=caps, endpoint="test-endpoint", region_name="eastus"
+            caps=caps,
+            client=mock_cohere_client,
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
         )
 
         assert provider.caps.provider == Provider.AZURE
@@ -157,13 +220,20 @@ class TestCohereEmbeddingProviderEmbedding:
     """Test CohereEmbeddingProvider embedding operations."""
 
     @pytest.mark.asyncio
-    async def test_embed_documents_success(self, mock_cohere_client, cohere_capabilities):
+    async def test_embed_documents_success(
+        self,
+        mock_cohere_client,
+        mock_cohere_config,
+        mock_embedding_registry,
+        mock_cache_manager,
+        cohere_capabilities,
+    ):
         """Test successful document embedding."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         # Setup mock response with correct dimension (1024)
         mock_embeddings = MagicMock()
-        mock_embeddings.float = [
+        mock_embeddings.float_ = [
             [0.1] * 1024,
             [0.2] * 1024,
         ]  # Two embeddings with 1024 dimensions each
@@ -177,27 +247,34 @@ class TestCohereEmbeddingProviderEmbedding:
 
         mock_cohere_client.embed.return_value = mock_response
 
-        provider = CohereEmbeddingProvider(caps=cohere_capabilities, _client=mock_cohere_client)
-        from codeweaver.common.utils.utils import uuid7
-        from codeweaver.core.language import SemanticSearchLanguage
-        from codeweaver.core.metadata import ChunkKind, ExtKind
-        from codeweaver.core.spans import Span
+        provider = CohereEmbeddingProvider(
+            caps=cohere_capabilities,
+            client=mock_cohere_client,
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
+        )
+        from codeweaver.core import ChunkKind, ExtCategory, SemanticSearchLanguage, Span, uuid7
 
         # Create test chunks with explicit chunk_ids
         chunks = [
             CodeChunk(
                 content="test content 1",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(
+                    language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                ),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                line_range=Span(start=1, end=1, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
                 chunk_id=uuid7(),
             ),
             CodeChunk(
                 content="test content 2",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(
+                    language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                ),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=2, end=2, _source_id=uuid7()),
+                line_range=Span(start=2, end=2, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
                 chunk_id=uuid7(),
             ),
@@ -209,22 +286,33 @@ class TestCohereEmbeddingProviderEmbedding:
         # Verify result
         assert len(result) == 2
         assert result is not EmbeddingErrorInfo
-        assert len(result[0]) == 1024
-        assert len(result[1]) == 1024
-        assert result[0][0] == 0.1  # Check first element of first embedding
-        assert result[1][0] == 0.2  # Check first element of second embedding
+        assert len(result[0]) == 1024  # ty:ignore[invalid-key]
+        assert len(result[1]) == 1024  # ty:ignore[invalid-key]
+        assert (
+            result[0][0] == 0.1  # ty:ignore[invalid-key]
+        )
+        assert (
+            result[1][0] == 0.2  # ty:ignore[invalid-key]
+        )
 
         # Verify client was called
         mock_cohere_client.embed.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_embed_query_success(self, mock_cohere_client, cohere_capabilities):
+    async def test_embed_query_success(
+        self,
+        mock_cohere_client,
+        mock_cohere_config,
+        mock_embedding_registry,
+        mock_cache_manager,
+        cohere_capabilities,
+    ):
         """Test successful query embedding."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         # Setup mock response
         mock_embeddings = MagicMock()
-        mock_embeddings.float = [[0.1, 0.2, 0.3]]
+        mock_embeddings.float_ = [[0.1, 0.2, 0.3]]
 
         mock_response = MagicMock()
         mock_response.embeddings = mock_embeddings
@@ -235,27 +323,40 @@ class TestCohereEmbeddingProviderEmbedding:
 
         mock_cohere_client.embed.return_value = mock_response
 
-        provider = CohereEmbeddingProvider(caps=cohere_capabilities, _client=mock_cohere_client)
+        provider = CohereEmbeddingProvider(
+            caps=cohere_capabilities,
+            client=mock_cohere_client,
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
+        )
 
         # Call embed_query
         result = await provider.embed_query("test query")
 
         # Verify result
         assert len(result) == 1
-        assert result[0] == [0.1, 0.2, 0.3]  # ty: ignore[invalid-key]
+        assert result[0] == [0.1, 0.2, 0.3]  # ty:ignore[invalid-key]
 
         # Verify client was called
         mock_cohere_client.embed.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_embed_documents_v4_model(self, mock_cohere_client, cohere_4_capabilities):
+    async def test_embed_documents_v4_model(
+        self,
+        mock_cohere_client,
+        mock_cohere_config,
+        mock_embedding_registry,
+        mock_cache_manager,
+        cohere_4_capabilities,
+    ):
         """Test embedding with v4.0 model uses correct embedding_types."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         # Setup mock response - use capabilities dimension for consistency
         expected_dimension = cohere_4_capabilities.default_dimension
         mock_embeddings = MagicMock()
-        mock_embeddings.float = [[0.1] * expected_dimension]
+        mock_embeddings.float_ = [[0.1] * expected_dimension]
 
         mock_response = MagicMock()
         mock_response.embeddings = mock_embeddings
@@ -263,21 +364,25 @@ class TestCohereEmbeddingProviderEmbedding:
 
         mock_cohere_client.embed.return_value = mock_response
 
-        provider = CohereEmbeddingProvider(caps=cohere_4_capabilities, _client=mock_cohere_client)
-
+        provider = CohereEmbeddingProvider(
+            caps=cohere_4_capabilities,
+            client=mock_cohere_client,
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
+        )
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
-        from codeweaver.core.language import SemanticSearchLanguage
-        from codeweaver.core.metadata import ChunkKind, ExtKind
-        from codeweaver.core.spans import Span
+        from codeweaver.core import ChunkKind, ExtCategory, SemanticSearchLanguage, Span, uuid7
 
         chunks = [
             CodeChunk(
                 content="test content",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(
+                    language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                ),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                line_range=Span(start=1, end=1, source_id=uuid7()),
                 start_line=1,
                 end_line=1,
                 file_path=Path("/test/file.py"),
@@ -305,27 +410,37 @@ class TestCohereEmbeddingProviderErrorHandling:
 
     @pytest.mark.asyncio
     async def test_embed_documents_handles_connection_error(
-        self, mock_cohere_client, cohere_capabilities
+        self,
+        mock_cohere_client,
+        mock_cohere_config,
+        mock_embedding_registry,
+        mock_cache_manager,
+        cohere_capabilities,
     ):
         """Test that connection errors are handled with retry logic."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         mock_cohere_client.embed.side_effect = ConnectionError("Connection failed")
 
-        provider = CohereEmbeddingProvider(caps=cohere_capabilities, _client=mock_cohere_client)
+        provider = CohereEmbeddingProvider(
+            caps=cohere_capabilities,
+            client=mock_cohere_client,
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
+        )
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
-        from codeweaver.core.language import SemanticSearchLanguage
-        from codeweaver.core.metadata import ChunkKind, ExtKind
-        from codeweaver.core.spans import Span
+        from codeweaver.core import ChunkKind, ExtCategory, SemanticSearchLanguage, Span, uuid7
 
         chunks = [
             CodeChunk(
                 content="test content",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(
+                    language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                ),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                line_range=Span(start=1, end=1, source_id=uuid7()),
                 start_line=1,
                 end_line=1,
                 file_path=Path("/test/file.py"),

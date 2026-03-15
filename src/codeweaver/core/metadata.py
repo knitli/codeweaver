@@ -13,23 +13,10 @@ import re
 
 from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Literal,
-    NamedTuple,
-    NotRequired,
-    Required,
-    Self,
-    TypedDict,
-    cast,
-)
+from typing import Annotated, Any, Literal, NamedTuple, NotRequired, Required, TypedDict, cast
 
-from ast_grep_py import SgNode
-from pydantic import UUID7, ConfigDict, Field, PositiveFloat, SkipValidation
+from pydantic import UUID7, Field, PositiveFloat
 
-from codeweaver.common.utils import uuid7
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage, has_semantic_extension
 from codeweaver.core.types.aliases import (
     FileExt,
@@ -39,11 +26,13 @@ from codeweaver.core.types.aliases import (
     LiteralStringT,
 )
 from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
+from codeweaver.core.utils import has_package
 
 
-if TYPE_CHECKING:
-    from codeweaver.semantic.ast_grep import AstThing
+if has_package("codeweaver.semantic"):
+    from codeweaver.semantic.types import SemanticMetadata as SemanticMetadata
+else:
+    SemanticMetadata = Any
 
 
 # ------------------------------------------------
@@ -79,108 +68,6 @@ class ChunkSource(BaseEnum):
     FILE = "file"  # the whole file is the chunk
     SEMANTIC = "semantic"  # semantic chunking, e.g. from AST nodes
     EXTERNAL = "external"  # from internet or similar external sources, not from code files
-
-
-def _set_symbol(data: Any) -> str | None:
-    """Helper function to set the symbol field based on the primary_thing."""
-    from codeweaver.semantic.ast_grep import AstThing
-
-    if (
-        (thing := data.get("thing")) is not None
-        and isinstance(thing, AstThing)
-        and thing.symbol
-        and (0 < len(thing.symbol.strip()) < 20)
-    ):
-        return thing.symbol
-    return None
-
-
-class SemanticMetadata(BasedModel):
-    """Metadata associated with the semantics of a code chunk."""
-
-    model_config = FROZEN_BASEDMODEL_CONFIG | ConfigDict(
-        validate_assignment=True, arbitrary_types_allowed=True
-    )
-
-    language: Annotated[
-        SemanticSearchLanguage | str,
-        Field(description="""The programming language of the code chunk"""),
-    ]
-    thing: Any = None  # AstThing[SgNode] | None - using Any to avoid forward reference issues
-    positional_connections: Any = ()  # tuple[AstThing[SgNode], ...] - using Any to avoid forward reference issues
-    symbol: Annotated[
-        str | None,
-        Field(description="""The symbol represented by the node""", default_factory=_set_symbol),
-    ]
-    thing_id: UUID7 = uuid7()
-    parent_thing_id: UUID7 | None = None
-    is_partial_node: Annotated[
-        bool,
-        Field(
-            description="""Whether the node is a partial node. Partial nodes are created when the node is too large for the context window."""
-        ),
-    ] = False
-
-    def _telemetry_keys(self) -> None:
-        return None  # we'll exclude identifying info in the value types
-
-    def __getstate__(self) -> dict[str, Any]:
-        """Custom pickle support - exclude unpicklable AST nodes."""
-        state = self.__dict__.copy()
-        # Remove unpicklable fields (SgNode and AstThing objects)
-        state["thing"] = None
-        state["positional_connections"] = ()  # Clear AST node references
-        return state
-
-    def __setstate__(self, state: dict[str, Any]) -> None:
-        """Custom pickle support - restore state without AST nodes."""
-        self.__dict__.update(state)
-
-    def _serialize_for_cli(self) -> dict[str, Any]:
-        """Serialize the SemanticMetadata for CLI output."""
-        self_map = self.model_dump(
-            mode="python",
-            round_trip=True,
-            exclude_none=True,
-            # we can exclude language because the parent classes will include it
-            exclude={"model_config", "thing_id", "parent_thing_id", "language"},
-        )
-        return {
-            k: v.serialize_for_cli() if hasattr(v, "serialize_for_cli") else v
-            for k, v in self_map.items()
-        }
-
-    @classmethod
-    def from_parent_meta(
-        cls, child: AstThing[SgNode], parent_meta: SemanticMetadata, **overrides: Any
-    ) -> Self:
-        """Create a SemanticMetadata instance from a parent SemanticMetadata instance."""
-        return cls(
-            language=parent_meta.language,
-            thing=child,
-            positional_connections=tuple(child.positional_connections),
-            thing_id=child.thing_id or uuid7(),
-            parent_thing_id=parent_meta.thing_id,
-            **overrides,
-        )
-
-    @classmethod
-    def from_node(cls, thing: AstThing[SgNode] | SgNode, language: SemanticSearchLanguage) -> Self:
-        """Create a SemanticMetadata instance from an AST node."""
-        from codeweaver.semantic.ast_grep import AstThing
-
-        if isinstance(thing, SgNode):
-            thing = AstThing.from_sg_node(thing, language=language)
-        # Use model_construct to bypass validation since AstThing may not be fully defined yet
-        return cls.model_construct(
-            language=language or thing.language or "",
-            thing=thing,
-            positional_connections=tuple(thing.positional_connections),
-            thing_id=thing.thing_id,
-            symbol=thing.symbol,
-            parent_thing_id=thing.parent_thing_id,
-            is_partial_node=False,  # if we're creating from a full node, it's not partial
-        )
 
 
 class Metadata(TypedDict, total=False):
@@ -235,7 +122,7 @@ class Metadata(TypedDict, total=False):
         ]
     ]
     semantic_meta: NotRequired[
-        SkipValidation[SemanticMetadata | None]  # type: ignore[valid-type]
+        Annotated[SemanticMetadata | None, Field(description="""Semantic metadata""")]
     ]
     context: Annotated[
         dict[str, Any] | None,
@@ -259,15 +146,15 @@ class ExtTestDef(NamedTuple):
         return False if extension != self.extension else self.test(content)
 
 
-BASH_SHEBANG = re.compile(
+BASH_SHEBANG_PATTERN = re.compile(
     r"^#!(/usr|/usr/local)?/bin/(ba|fi|da|k|z|c|tc)?sh|^#!/usr/bin/env ((/bin/|/usr/bin/|/usr/local/bin)?(ba|da|fi|k|z|c|tc)?sh).*",
     re.IGNORECASE | re.DOTALL,
 )
-PYTHON_SHEBANG = re.compile(
+PYTHON_SHEBANG_PATTERN = re.compile(
     r"^(#(/usr/bin/env (-S )?(/usr/bin/|/usr/local/bin/)?(python3?|uv (-s)?).*))",
     re.IGNORECASE | re.DOTALL,
 )
-PERL_SHEBANG = re.compile(
+PERL_SHEBANG_PATTERN = re.compile(
     r"^(#(/usr/bin/env (-S )?(/usr/bin/|/usr/local/bin/)?(perl).*))", re.IGNORECASE | re.DOTALL
 )
 
@@ -276,43 +163,41 @@ EXTENSION_TESTS: tuple[ExtTestDef, ...] = (
     ExtTestDef(
         extension=FileExt(".v"),
         language=LanguageName(cast(LiteralStringT, "coq")),
-        test=lambda content: any(kw in content for kw in ("Proof", "Qed", "Defined", "Admitted")),  # type: ignore # give me a way to type a lambda...
+        test=lambda content: any(kw in content for kw in ("Proof", "Qed", "Defined", "Admitted")),
     ),
     ExtTestDef(
         extension=FileExt(".v"),
         language=LanguageName(cast(LiteralStringT, "verilog")),
-        test=lambda content: any(  # type: ignore
+        test=lambda content: any(
             kw in content for kw in ("module", "endmodule", "assign", "wire", "reg")
         ),
     ),
     ExtTestDef(
         extension=FileExt(".m"),
         language=LanguageName(cast(LiteralStringT, "matlab")),
-        test=lambda content: any(  # type: ignore
-            kw in content for kw in ("function", "end", "parfor", "switch")
-        ),
+        test=lambda content: any(kw in content for kw in ("function", "end", "parfor", "switch")),
     ),
     ExtTestDef(
         extension=FileExt(".m"),
         language=LanguageName(cast(LiteralStringT, "objective-c")),
-        test=lambda content: all(  # type: ignore
+        test=lambda content: all(
             kw not in content for kw in ("switch", "end", "parfor", "function")
         ),
     ),
     ExtTestDef(
         extension=FileExt(""),
         language=LanguageName(cast(LiteralStringT, "bash")),
-        test=lambda content: bool(BASH_SHEBANG.match(content)),  # type: ignore
+        test=lambda content: bool(BASH_SHEBANG_PATTERN.match(content)),
     ),
     ExtTestDef(
         extension=FileExt(""),
         language=LanguageName(cast(LiteralStringT, "python")),
-        test=lambda content: bool(PYTHON_SHEBANG.match(content)),  # type: ignore
+        test=lambda content: bool(PYTHON_SHEBANG_PATTERN.match(content)),
     ),
     ExtTestDef(
         extension=FileExt(""),
         language=LanguageName(cast(LiteralStringT, "perl")),
-        test=lambda content: bool(PERL_SHEBANG.match(content)),  # type: ignore
+        test=lambda content: bool(PERL_SHEBANG_PATTERN.match(content)),
     ),
 )
 
@@ -324,21 +209,31 @@ class ExtLangPair(NamedTuple):
     Not all 'extensions' are actually file extensions, some are file names or special cases, like `Makefile` or `Dockerfile`.
     """
 
-    ext: FileExtensionT
-    """The file extension, including leading dot if it's a file extension. May also be a full file name."""
-
-    language: LanguageNameT | SemanticSearchLanguage | ConfigLanguage
+    ext: Annotated[
+        FileExtensionT,
+        Field(
+            description="The file extension, including leading dot if it's a file extension. May also be a full file name.",
+            title="File Extension",
+        ),
+    ]
+    language: Annotated[
+        LanguageNameT | SemanticSearchLanguage | ConfigLanguage,
+        Field(
+            description="The programming or config language associated with the file extension.",
+            title="Language",
+        ),
+    ]
     """The programming or config language associated with the file extension."""
 
     @property
     def is_actual_ext(self) -> bool:
         """Check if the extension is a valid file extension."""
-        return self.ext.startswith(".")
+        return str(self.ext).startswith(".")
 
     @property
     def is_file_name(self) -> bool:
         """Check if the extension is a file name."""
-        return not self.ext.startswith(".")
+        return not str(self.ext).startswith(".")
 
     @property
     def is_config(self) -> bool:
@@ -393,27 +288,27 @@ class ExtLangPair(NamedTuple):
         """Check if a file extension doesn't fit the usual pattern of a dot followed by alphanumerics."""
         if not self.is_actual_ext or self.is_file_name:
             return True
-        if self.ext.istitle():
+        if str(self.ext).istitle():
             return True
-        return True if self.ext.find(".", 1) != -1 else "." not in str(self.ext)
+        return True if str(self.ext).find(".", 1) != -1 else "." not in str(self.ext)
 
     def is_same(self, filename: str) -> bool:
         """Check if the given filename is the same filetype as the extension."""
         # fast case first for elimination
-        if self.ext.lower() not in filename.lower():
+        if str(self.ext).lower() not in filename.lower():
             return False
         # a couple of these may seem redundant but we're descending in confidence levels here
         if not self.is_weird_extension and filename.endswith(str(self.ext)):
             return True
         if self.is_file_name and filename == self.ext:
             return True
-        return bool(self.is_weird_extension and filename.lower().endswith(self.ext.lower()))
+        return bool(self.is_weird_extension and filename.lower().endswith(str(self.ext).lower()))
 
 
-def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
-    """Determine the ExtKind based on validated data. Validated data here is the partially validated data field dictionary for a CodeChunk during pydantic model validation (i.e. what a default_factory can optionally receive)."""
+def determine_ext_category(validated_data: dict[str, Any]) -> ExtCategory | None:
+    """Determine the ExtCategory based on validated data. Validated data here is the partially validated data field dictionary for a CodeChunk during pydantic model validation (i.e. what a default_factory can optionally receive)."""
     if "file_path" in validated_data and validated_data["file_path"] is not None:
-        return ExtKind.from_file(validated_data["file_path"])
+        return ExtCategory.from_file(validated_data["file_path"])
     if (
         source := (
             validated_data.get("source")
@@ -435,31 +330,31 @@ def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
         language, SemanticSearchLanguage
     ):
         if language == SemanticSearchLanguage.KOTLIN:
-            return ExtKind.from_language(language, ChunkKind.CODE_OR_CONFIG)
+            return ExtCategory.from_language(language, ChunkKind.CODE_OR_CONFIG)
         return (
-            ExtKind.from_language(language, ChunkKind.CODE)
+            ExtCategory.from_language(language, ChunkKind.CODE)
             if language
             not in (
                 SemanticSearchLanguage.JSON,
                 SemanticSearchLanguage.YAML,
                 SemanticSearchLanguage.HCL,
             )
-            else ExtKind.from_language(language, ChunkKind.CONFIG)
+            else ExtCategory.from_language(language, ChunkKind.CONFIG)
         )
 
     if language and isinstance(language, ConfigLanguage):
-        return ExtKind.from_language(
+        return ExtCategory.from_language(
             language.as_semantic_search_language or language, ChunkKind.CONFIG
         )
     from codeweaver.core.file_extensions import CODE_LANGUAGES, DATA_LANGUAGES, DOCS_LANGUAGES
 
     if language and language in {pair.language for pair in DATA_LANGUAGES}:  # type: ignore
-        return ExtKind.from_language(language, ChunkKind.DATA)
+        return ExtCategory.from_language(language, ChunkKind.DATA)
     if language and language in {pair.language for pair in DOCS_LANGUAGES}:  # type: ignore
-        return ExtKind.from_language(language, ChunkKind.DOCS)
+        return ExtCategory.from_language(language, ChunkKind.DOCS)
     if language and language in {pair.language for pair in CODE_LANGUAGES}:  # type: ignore
-        return ExtKind.from_language(language, ChunkKind.CODE)
-    return ExtKind.from_language(language, ChunkKind.OTHER) if language else None
+        return ExtCategory.from_language(language, ChunkKind.CODE)
+    return ExtCategory.from_language(language, ChunkKind.OTHER) if language else None
 
 
 def get_ext_lang_pairs(*, include_data: bool = False) -> Generator[ExtLangPair]:
@@ -485,9 +380,7 @@ def get_semantic_or_config_lang(
     file_path = (
         test_info
         if is_file
-        else Path(str(test_info))
-        if test_info and Path(str(test_info)).exists()
-        else None
+        else (Path(str(test_info)) if test_info and Path(str(test_info)).exists() else None)
     )
     language_name = test_info if test_info and not is_file else None
     if language_name is not None:
@@ -498,6 +391,7 @@ def get_semantic_or_config_lang(
                 return config_lang
         return None
     if file_path:
+        file_path = file_path if isinstance(file_path, Path) else Path(file_path)  # ty:ignore[invalid-argument-type]
         with contextlib.suppress(KeyError, ValueError, AttributeError):
             if semantic_lang := SemanticSearchLanguage.from_extension(
                 FileExt(cast(LiteralStringT, file_path.suffix or file_path.name))
@@ -519,7 +413,7 @@ def get_ext_lang_pair_for_file(
     file_path: Path, *, include_data: bool = False
 ) -> ExtLangPair | None:
     """Get the `ExtLangPair` for a given file path."""
-    if in_tests := ExtKind.resolve_extension_tests(file_path):
+    if in_tests := ExtCategory.resolve_extension_tests(file_path):
         return ExtLangPair(
             ext=FileExt(cast(LiteralStringT, file_path.suffix or file_path.name)),
             language=get_semantic_or_config_lang(in_tests.language) or in_tests.language,  # type: ignore
@@ -578,22 +472,34 @@ def _categorize_language(
     return ChunkKind.DOCS if language in DOCS_LANGUAGES else ChunkKind.OTHER
 
 
-class ExtKind(NamedTuple):
-    """Represents a file extension and its associated kind."""
+class ExtCategory(NamedTuple):
+    """Represents a file extension and its associated category."""
 
-    language: LanguageName | SemanticSearchLanguage | ConfigLanguage
-    kind: ChunkKind
+    language: Annotated[
+        LanguageName | SemanticSearchLanguage | ConfigLanguage,
+        Field(
+            description="The programming or config language associated with the file extension.",
+            title="Language",
+        ),
+    ]
+    kind: Annotated[
+        ChunkKind,
+        Field(
+            description="The kind of chunk represented by the file extension. An enum of chunk kinds.",
+            title="Chunk Kind",
+        ),
+    ]
 
     def __str__(self) -> str:
-        """Return a string representation of the extension kind."""
+        """Return a string representation of the extension category."""
         return f"{self.kind}: {self.language}"
 
     @classmethod
     def from_language(
         cls,
-        language: LanguageName | LiteralStringT | SemanticSearchLanguage | ConfigLanguage,
+        language: (LanguageName | LiteralStringT | SemanticSearchLanguage | ConfigLanguage),
         kind: str | ChunkKind,
-    ) -> ExtKind | None:
+    ) -> ExtCategory | None:
         """Create an ExtKind from a string representation."""
         # Handle SemanticSearchLanguage directly
         if isinstance(language, SemanticSearchLanguage):
@@ -601,7 +507,7 @@ class ExtKind(NamedTuple):
                 return cls(language=language, kind=kind)
             return cls(
                 language=language,
-                kind=ChunkKind.CONFIG if language.is_config_language else ChunkKind.CODE,
+                kind=(ChunkKind.CONFIG if language.is_config_language else ChunkKind.CODE),
             )
 
         # Handle ConfigLanguage with special cases
@@ -628,7 +534,7 @@ class ExtKind(NamedTuple):
         return cls(language=lang_name, kind=ChunkKind.OTHER)
 
     @classmethod
-    def resolve_extension_tests(cls, file: str | Path) -> ExtKind | None:
+    def resolve_extension_tests(cls, file: str | Path) -> ExtCategory | None:
         """
         Resolve the extension tests for a given file path.
         """
@@ -651,9 +557,9 @@ class ExtKind(NamedTuple):
         )
 
     @classmethod
-    def from_file(cls, file: str | Path) -> ExtKind | None:
+    def from_file(cls, file: str | Path) -> ExtCategory | None:
         """
-        Create an ExtKind from a file path.
+        Create an ExtCategory from a file path.
         """
         from codeweaver.core.language import language_from_path
 
@@ -681,7 +587,7 @@ class ExtKind(NamedTuple):
         return None
 
     def serialize_for_cli(self) -> dict[str, Any]:
-        """Serialize the ExtKind for CLI output."""
+        """Serialize the ExtCategory for CLI output."""
         return {
             "language": str(
                 self.language.as_title
@@ -693,12 +599,19 @@ class ExtKind(NamedTuple):
 
 
 __all__ = (
+    "BASH_SHEBANG_PATTERN",
+    "EXTENSION_TESTS",
+    "PERL_SHEBANG_PATTERN",
+    "PYTHON_SHEBANG_PATTERN",
     "ChunkKind",
     "ChunkSource",
-    "ExtKind",
+    "ExtCategory",
+    "ExtLangPair",
+    "ExtTestDef",
     "Metadata",
-    "SemanticMetadata",
-    "determine_ext_kind",
+    "determine_ext_category",
     "get_ext_lang_pair_for_file",
+    "get_ext_lang_pairs",
     "get_language_from_extension",
+    "get_semantic_or_config_lang",
 )

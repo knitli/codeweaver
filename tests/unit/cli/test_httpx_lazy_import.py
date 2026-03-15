@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.unit
-class TestHttpxLazyImport:
+class TestHttpxLateImport:
     """Tests for lazy import of httpx in CLI commands.
 
     These tests verify that CodeWeaver CLI command code does not eagerly
@@ -35,7 +35,7 @@ class TestHttpxLazyImport:
     may import httpx, which is acceptable and beyond our control.
     """
 
-    def test_status_command_lazy_import(self) -> None:
+    def test_status_command_lateimport(self) -> None:
         """Test that status command doesn't eagerly import httpx.
 
         The status command module should not import httpx at module load.
@@ -61,7 +61,7 @@ class TestHttpxLazyImport:
             if httpx_was_loaded:
                 sys.modules["httpx"] = httpx_module
 
-    def test_doctor_command_lazy_import(self) -> None:
+    def test_doctor_command_lateimport(self) -> None:
         """Test that doctor command doesn't eagerly import httpx.
 
         The doctor command already uses lazy imports correctly.

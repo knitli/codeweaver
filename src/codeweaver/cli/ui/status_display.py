@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from rich.console import Console
 from rich.live import Live
@@ -28,6 +28,8 @@ from rich.table import Table
 from rich.text import Text
 
 from codeweaver import __version__
+from codeweaver.core.ui_protocol import ProgressReporter
+from codeweaver.core.utils import get_codeweaver_prefix
 
 
 if TYPE_CHECKING:
@@ -41,7 +43,7 @@ if TYPE_CHECKING:
 class AtomicAwareBarColumn(BarColumn):
     """BarColumn that skips rendering for atomic tasks."""
 
-    def render(self, task: Task) -> RenderableType:  # ty: ignore[invalid-method-override]
+    def render(self, task: Task) -> RenderableType:
         """Render the bar, or empty for atomic tasks."""
         return Text("") if task.fields.get("atomic", False) else super().render(task)
 
@@ -71,6 +73,7 @@ class AtomicAwareSeparatorColumn(ProgressColumn):
     """Separator column that skips rendering for atomic tasks."""
 
     def __init__(self, separator: str = "•") -> None:
+        """Initialize the separator column."""
         super().__init__()
         self._separator = separator
 
@@ -514,7 +517,7 @@ class IndexingProgress:
         self.start()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore[no-untyped-def]
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit - ensures clean terminal state."""
         self.stop()
         # Additional flush to ensure terminal is fully reset
@@ -522,7 +525,7 @@ class IndexingProgress:
             self.console.file.flush()
 
 
-class StatusDisplay:
+class StatusDisplay(ProgressReporter):
     """Clean status display using rich for user-facing output.
 
     This class provides clean, formatted status output that bypasses the logging system
@@ -697,9 +700,8 @@ class StatusDisplay:
             command: Command name (e.g., "index", "search")
             description: Optional command description
         """
-        from codeweaver.common import CODEWEAVER_PREFIX
-
-        self.console.print(f"{CODEWEAVER_PREFIX} {command}", style="bold")
+        prefix = get_codeweaver_prefix()
+        self.console.print(f"{prefix} {command}", style="bold")
         if description:
             self.console.print(f"  {description}")
         self.console.print()
@@ -863,6 +865,45 @@ class StatusDisplay:
         """
         self.console.print(f"↻ Reindexed {files} files, {chunks} chunks ({duration:.1f}s)")
 
+    def report_progress(
+        self, phase: str, current: int, total: int, *, extra: dict[str, Any] | None = None
+    ) -> None:
+        """Implement ProgressReporter.report_progress."""
+        self.print_progress(current, total, phase)
+
+    def report_status(
+        self, message: str, *, level: str = "info", extra: dict[str, Any] | None = None
+    ) -> None:
+        """Implement ProgressReporter.report_status."""
+        if level == "error":
+            self.print_error(message)
+        elif level == "warning":
+            self.print_warning(message)
+        else:
+            self.print_info(message)
+
+    def report_error(
+        self,
+        error: Exception | str,
+        *,
+        recoverable: bool = False,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        """Implement ProgressReporter.report_error."""
+        self.print_error(str(error))
+
+    def start_operation(self, operation: str, *, description: str | None = None) -> None:
+        """Implement ProgressReporter.start_operation."""
+        msg = description or operation
+        self.print_step(f"Starting: {msg}")
+
+    def complete_operation(
+        self, operation: str, *, success: bool = True, message: str | None = None
+    ) -> None:
+        """Implement ProgressReporter.complete_operation."""
+        msg = message or operation
+        self.print_completion(msg, success=success)
+
 
 _display: StatusDisplay | None = None
 
@@ -879,4 +920,12 @@ def get_display() -> StatusDisplay:
     return _display
 
 
-__all__ = ("IndexingProgress", "StatusDisplay", "get_display")
+__all__ = (
+    "AtomicAwareBarColumn",
+    "AtomicAwareCountColumn",
+    "AtomicAwarePercentColumn",
+    "AtomicAwareSeparatorColumn",
+    "IndexingProgress",
+    "StatusDisplay",
+    "get_display",
+)

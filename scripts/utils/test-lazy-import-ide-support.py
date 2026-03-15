@@ -132,17 +132,17 @@ def test_imports_available() -> bool:
         import codeweaver.core
 
         print("  ✓ codeweaver.core module imports")
-        print(f"    - Exports: {len(codeweaver.core.__all__)} items")
+        print(f"    - Exports: {len(codeweaver.core)} items")
 
         import codeweaver.config
 
         print("  ✓ codeweaver.config module imports")
-        print(f"    - Exports: {len(codeweaver.config.__all__)} items")
+        print(f"    - Exports: {len(codeweaver.config)} items")
 
         import codeweaver.common
 
         print("  ✓ codeweaver.common module imports")
-        print(f"    - Exports: {len(codeweaver.common.__all__)} items")
+        print(f"    - Exports: {len(codeweaver.common)} items")
 
     except Exception as e:
         print(f"  ✗ Import failed: {e}")

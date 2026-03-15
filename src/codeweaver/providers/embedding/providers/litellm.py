@@ -23,8 +23,7 @@ from typing import Literal
 
 from pydantic import FutureDate
 
-from codeweaver.core.types import FROZEN_BASEDMODEL_CONFIG, BasedModel, LiteralStringT
-from codeweaver.providers.provider import Provider
+from codeweaver.core import FROZEN_BASEDMODEL_CONFIG, BasedModel, LiteralStringT, Provider
 
 
 class LiteLLMModelSpec(BasedModel):
@@ -128,3 +127,5 @@ LITELLM_OPENAI_PROVIDERS: dict[Provider | LiteralStringT, tuple[LiteralStringT, 
         "voyage/voyage-3.5-lite",
     ),
 }
+
+__all__ = ("LITELLM_OPENAI_PROVIDERS", "LiteLLMModelSpec")

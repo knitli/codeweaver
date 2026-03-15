@@ -147,7 +147,7 @@ def inspect_chunk_metadata(chunks: list[CodeChunk]):
         if "context" in chunk.metadata:
             ctx = chunk.metadata["context"]
             print(f"Classification: {ctx.get('classification')}")
-            print(f"Kind: {ctx.get('kind')}")
+            print(f"Kind: {ctx.get('category')}")
             print(f"Importance: {ctx.get('importance_scores')}")
 ```
 
@@ -447,7 +447,7 @@ for i in range(0, len(file_paths), batch_size):
 for chunk in chunks:
     ctx = chunk.metadata.get("context", {})
     print(f"Classification: {ctx.get('classification')}")
-    print(f"Kind: {ctx.get('kind')}")
+    print(f"Kind: {ctx.get('category')}")
     print(f"Importance: {ctx.get('importance_scores')}")
 ```
 
@@ -506,7 +506,7 @@ custom_delimiters = [
     Delimiter(
         start="<!-- START -->",
         end="<!-- END -->",
-        kind=DelimiterKind.BLOCK,
+        category=DelimiterKind.BLOCK,
         priority=10,
         inclusive=True,
         take_whole_lines=True,
@@ -542,8 +542,8 @@ from codeweaver.common.statistics import get_session_statistics
 statistics = get_session_statistics()
 
 # After chunking operations
-for ext_kind, stats in statistics.file_operations_by_extkind.items():
-    print(f"{ext_kind}: {len(stats)} operations")
+for ext_category, stats in statistics.file_operations_by_extcategory.items():
+    print(f"{ext_category}: {len(stats)} operations")
 ```
 
 ## Best Practices

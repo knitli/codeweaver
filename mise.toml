@@ -2,7 +2,12 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+#:tombi schema.strict = false
+
 experimental_monorepo_root = true
+
+[monorepo]
+config_roots = ["./", "./docs-site", "./packages/*"]
 
 [env]
 MISE_EXPERIMENTAL = "1"
@@ -25,12 +30,18 @@ _.path = [
   "scripts/testing",
   "scripts/utils",
   ".venv/bin",
+  "tools/exportify/",
 ]
 MISE_ENV = '''{% if get_env(name="CI", default="") == "true" %}""{% else %}dev{% endif %}'''
 CW_PREFIX = '''{% if get_env(name="CI", default="") == "true" %}[codeweaver]{% elif get_env(name="TERM", default="xterm-256color") == "*truecolor*" %}\033[38;2;181;108;48;m[codeweaver]\033[0m{% else %}\033[38;5;131m[codeweaver]\033[0m{% endif %}'''
 # this is a bit redundant but it makes it easier to override in CI environments
 MISE_PYTHON_VERSION = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 HK_MISE = "1"
+
+[shell_alias]
+mx = "mise x"
+mr = "mise r"
+start-serena = '''uvx -p 3.13.11 --from git+https://github.com/oraios/serena serena start-mcp-server --project {{ get_env(name="CODEWEAVER_PROJECT_PATH", default=exec(command="pwd")) }} --transport streamable-http --port 9121 --host 127.0.0.1'''
 
 [settings]
 idiomatic_version_file_enable_tools = []
@@ -39,10 +50,13 @@ experimental = true
 [settings.python]
 
 [tools]
+ast-grep = "latest"
+"pipx:ipython" = "latest"
 # most tools are defined in mise.dev.toml to keep CI workflows lightweight
 # Where needed, tools are defined at the task level here, which allows for more granular control
 python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 uv = "latest"
+"pipx:exportify" = "0.2.5"
 
 # Quick note for those unfamiliar with mise:
 #   - despite the namespace, tools prefixed with "pipx:" are installed via "uv" (I assume once upon a time they were installed with pipx before uv came along)
@@ -52,6 +66,7 @@ uv = "latest"
 [tasks.info]
 description = "Print project information"
 run = '''
+echo "running info task"
 echo "${CW_PREFIX} Project: $PROJECT_NAME"
 echo "${CW_PREFIX} Virtual Environment: $VIRTUAL_ENV"
 
@@ -60,6 +75,7 @@ echo "${CW_PREFIX} CodeWeaver Version: $CODEWEAVER_VERSION"
 echo "${CW_PREFIX} Project Path: $CODEWEAVER_PROJECT_PATH"
 '''
 run_windows = '''
+echo "running info task"
 echo [codeweaver] Project: %PROJECT_NAME%
 echo [codeweaver] Virtual Environment: %VIRTUAL_ENV%
 echo [codeweaver] Python Version: %PYTHON_VERSION%
@@ -71,17 +87,30 @@ echo [codeweaver] Project Path: %CODEWEAVER_PROJECT_PATH%
 depends = ["source"]
 tools.uv = "latest"
 run = '''
+echo "running sync task"
 echo "${CW_PREFIX} Syncing dependencies..."
 uv sync --extra full --group dev --group docs --group build --group test
 '''
 run_windows = '''
+echo "running sync task"
 echo [codeweaver] Syncing dependencies...
 uv sync --extra full --group dev --group docs --group build --group test
 '''
 
+[tasks.sync-gpu]
+depends = ["source"]
+tools.uv = "latest"
+run = '''
+echo "running sync-gpu task"
+echo "${CW_PREFIX} Syncing GPU dependencies..."
+uv sync --extra full-gpu --group dev --group docs --group build --group test
+'''
+
 [tasks.source]
 run = '''
+echo "running source task"
 # Source the virtual environment
+
 echo "${CW_PREFIX} Sourcing virtual environment..."
 git rev-parse --show-toplevel || true
 if [ ! -d ".venv" ]; then
@@ -91,6 +120,7 @@ fi
 . .venv/bin/activate || echo "${CW_PREFIX} ⚠️  \033[0;31mFailed to source virtual environment.\033[0m"
 '''
 run_windows = '''
+echo "running source task"
 echo [codeweaver] Sourcing virtual environment...
 git rev-parse --show-toplevel
 .venv\Scripts\activate.bat
@@ -99,31 +129,33 @@ git rev-parse --show-toplevel
 [tasks.setup]
 # Development setup
 run = [
+  "echo \"running setup task\"",
   "echo \"${CW_PREFIX} Setting up development environment for the first time...\"",
   "mise set &>/dev/null",
   "mise trust --all &>/dev/null",
   "mise install &>/dev/null || echo \"${CW_PREFIX} ⚠️  WARNING: mise install failed during setup.\"",
   "mise //:venv &>/dev/null",
-  "mise //:sync &>/dev/null",
   "git config include.path .gitconfig &>/dev/null || true",
   "echo 'src/codeweaver/_version.py' >> .git/info/exclude",
   "echo 'coverage.xml' >> .git/info/exclude",
   "echo 'test-results.xml' >> .git/info/exclude",
   "ln -sf AGENTS.md CLAUDE.md",
+  "ln -sf AGENTS.md GEMINI.md",
   "eval \"$(mise activate \"$ACTIVE_SHELL\")\" &>/dev/null",
 ]
 run_windows = [
+  "echo [codeweaver] Running setup task",
   "echo [codeweaver] Setting up development environment for the first time...",
   "mise set > NUL 2>&1",
   "mise trust --all > NUL 2>&1",
   "mise install > NUL 2>&1 || echo \"[codeweaver] WARNING: mise install failed during setup.\"",
   "mise //:venv > NUL 2>&1",
-  "mise //:sync > NUL 2>&1",
   "git config include.path .gitconfig > NUL 2>&1",
   "echo src/codeweaver/_version.py >> .git\\info\\exclude",
   "echo coverage.xml >> .git\\info\\exclude",
   "echo test-results.xml >> .git\\info\\exclude",
   "mklink CLAUDE.md AGENTS.md > NUL 2>&1",
+  "mklink GEMINI.md AGENTS.md > NUL 2>&1",
   "mise activate cmd",
 ]
 silent = "stdout"
@@ -139,8 +171,10 @@ uv = "latest"
 
 [tasks.cloud-setup]
 run = [
+  "echo \"running cloud-setup task\"",
   "echo \"[codeweaver] Setting up cloud development environment...\"",
   "ln -sf AGENTS.md CLAUDE.md",
+  "ln -sf AGENTS.md GEMINI.md",
   '''if ! command -v mise &>/dev/null; then
       if [ -d "$HOME/.local/share/mise" ] || [ -d "$HOME/.mise" ] || [ -f "$HOME/.local/bin/mise" ]; then
         export PATH="$HOME/.local/bin:$HOME/.mise/bin:$HOME/.local/share/mise/bin:$PATH"
@@ -180,15 +214,17 @@ MISE_YES = "1"
 tools.uv = "latest"
 tools.ast-grep = "latest"
 usage = '''
-arg "[dir]" help="directories to fix" var=#true default="."
+arg "[dir]" help="directory to fix (default: current directory)" default="."
 '''
 run = [
+  "echo \"running fix-python task\"",
   "uvx ruff format \"${usage_dir}\"",
   "uvx ruff check --fix --unsafe-fixes \"${usage_dir}\"",
 ]
 run_windows = [
+  "echo \"running fix-python task\"",
   "uvx ruff format .",
-  "uvx ruff check --fix --unsafe-fixes .",
+  "uvx ruff check --fix --unsafe-fixes ."
 ]
 file = "scripts/code-quality/fix-ruff-patterns.sh"
 sources = ["{src,scripts,tests,mise-tasks}/*.py"]
@@ -196,49 +232,79 @@ sources = ["{src,scripts,tests,mise-tasks}/*.py"]
 [tasks.check]
 tools.hk = "latest"
 tools.pkl = "latest"
+tools."pipx:exportify" = "latest"
 tools."pipx:ty" = "latest"
 tools."pipx:reuse" = "latest"
 tools.ruff = "latest"
 run = '''
+echo "running check task"
 echo "${CW_PREFIX} Running quality checks..."
 hk check
 '''
 run_windows = '''
+echo "running check task"
 echo [codeweaver] Running quality checks...
 hk check
 '''
 
 [tasks.lint]
 tools.uv = "latest"
+usage = '''
+arg "[dir]" help="directory to lint" default="."
+flag "-f --format <format>" {
+  help "Output format"
+  choices "concise" "full" "json" "junit" "github" "gitlab" "pylint" "grouped"
+  default "full"
+}
+flag "--fix" help="Apply auto-fixes"
+'''
 run = '''
-echo "Running linting checks..."
-if [ "$CI" = "true" ]; then
-    uv run ruff check . --output-format=github
-else
-    uv run ruff check .
+echo "running lint task"
+echo "${CW_PREFIX} Running linting checks..."
+
+# Determine output format (CI overrides)
+OUTPUT_FORMAT="${usage_format}"
+if [ "$CI" = "true" ] && [ "${usage_format}" = "full" ]; then
+    OUTPUT_FORMAT="github"
 fi
+
+# Build ruff command
+RUFF_CMD="uv run ruff check \"${usage_dir}\" --output-format=${OUTPUT_FORMAT}"
+if [ "${usage_fix}" = "true" ]; then
+    RUFF_CMD="$RUFF_CMD --fix"
+fi
+
+eval "$RUFF_CMD"
 '''
 run_windows = '''
-echo Running linting checks...
-if "%CI%"=="true" (
-    uv run ruff check . --output-format=github
+echo "running lint task"
+echo [codeweaver] Running linting checks...
+
+set OUTPUT_FORMAT=%usage_format%
+if "%CI%"=="true" if "%usage_format%"=="full" set OUTPUT_FORMAT=github
+
+if "%usage_fix%"=="true" (
+    uv run ruff check "%usage_dir%" --output-format=%OUTPUT_FORMAT% --fix
 ) else (
-    uv run ruff check .
+    uv run ruff check "%usage_dir%" --output-format=%OUTPUT_FORMAT%
 )
 '''
 
 [tasks.format]
 run = '''
+echo "running format task"
 echo "${CW_PREFIX} Running formatting checks..."
 hk fix
 '''
 run_windows = '''
+echo "running format task"
 echo [codeweaver] Running formatting checks...
 hk fix
 '''
 
 [tasks.format.tools]
 "aqua:typos" = "latest"
+"pipx:exportify" = "latest"
 "pipx:reuse" = "latest"
 "aqua:tombi-toml/tombi" = "latest"
 "ubi:astral-sh/ty" = "latest"
@@ -251,17 +317,21 @@ yq = "latest"
 
 [tasks.format-fix]
 run = '''
+echo "running format-fix task"
 echo "${CW_PREFIX} Applying formatting...hold onto your butts 🚬...🦖 "
 # mise -y //:fix-ruff-patterns || {  # there are some bugs to work out
 #    echo "${CW_PREFIX} ⚠️  \033[0;32mRuff pattern fixer encountered issues.\033[0m"}
 uv run ruff format .
+uv run ruff check --fix --unsafe-fixes . || true
 git ls-files "*.yaml" "*.yml" "*.json" 2>/dev/null | xargs -r yq -iP --indent=2 eval "." 2>/dev/null || true
 toml_files="$(git ls-files "*.toml" 2>/dev/null)"
+exportify fix || true
 if [ -n "$toml_files" ]; then
     printf '%s\n' "$toml_files" | xargs -r tombi format 2>/dev/null || true
 fi
 '''
 run_windows = '''
+echo "running format-fix task"
 echo [codeweaver] Applying formatting...hold onto your butts 🚬...🦖
 uv run ruff format .
 for /f "delims=" %%f in ('git ls-files "*.yaml" "*.yml" "*.json" 2^>NUL') do (
@@ -281,25 +351,40 @@ uv = "latest"
 usage = '''
 arg "[dir]" help="python directory to generate a graph for" default="src"
 '''
-run = '''mise x -- ruff analyze graph --target-version py312 --python .venv/bin/python "${usage_dir:-src/}"'''
-run_windows = '''mise x -- ruff analyze graph --target-version py312 --python .venv\Scripts\python.exe .'''
+run = '''
+echo "running graph task"
+mise x -- ruff analyze graph --target-version py312 --python .venv/bin/python "${usage_dir:-src/}"
+'''
+run_windows = '''
+echo "running graph task"
+mise x -- ruff analyze graph --target-version py312 --python .venv\Scripts\python.exe .
+'''
 
 [tasks.tree]
 tools.uv = "latest"
-run = '''uv tree --no-dev --group full'''
+run = '''
+echo "running tree task"
+uv tree --no-dev --group full
+'''
 
 [tasks.venv]
 env.MISE_EXPERIMENTAL = "1"
 tools.uv = "latest"
 run = '''
+echo "running venv task"
 echo "${CW_PREFIX} Setting up Python virtual environment..."
 uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }} --refresh .venv &&
 echo "${CW_PREFIX} ✅ Virtual environment is ready!"
 . .venv/bin/activate || echo "${CW_PREFIX} ⚠️  \033[0;31mFailed to source virtual environment.\033[0m"
 echo "${CW_PREFIX} Running dependency sync..."
-mise //:sync &
+if [ "$CODEWEAVER__DEV__USE_GPU" = "true" ]; then
+  mise //:sync-gpu &
+else
+  mise //:sync &
+fi
 '''
 run_windows = '''
+echo "running venv task"
 echo [codeweaver] Setting up Python virtual environment...
 uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }} --refresh .venv
 if %ERRORLEVEL% equ 0 (
@@ -310,70 +395,246 @@ if %ERRORLEVEL% equ 0 (
     )
 )
 echo [codeweaver] Running dependency sync...
-start /b mise //:sync
+if "%CODEWEAVER__DEV__USE_GPU%"=="true" (
+    start /b mise //:sync-gpu
+) else (
+    start /b mise //:sync
+)
 '''
 
 [tasks.test]
-# Testing
+# Testing with flexible profiles and marker selection
 tools.python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 tools.uv = "latest"
 usage = '''
-args "[dir]" help="directory to test" default="tests/"
-flag "--marks [markers]" help="pytest markers to filter tests" default=""
+arg "[dir]" help="directory to test" default="tests/"
+flag "-m --marks <markers>" help="pytest markers to filter tests"
+flag "-p --profile <profile>" {
+  help "Test profile preset"
+  choices "fast" "integration" "real" "heavy" "all" "skip-list"
+}
+flag "--cov" help="Run with coverage reporting"
 '''
 run = '''
+echo "running test task"
 echo "${CW_PREFIX} Running tests..."
-uv run pytest "${usage_dir}" ${usage_marks:+-m "${usage_marks}"} -v "$@"
+
+# Set markers based on profile
+PYTEST_MARKS="${usage_marks}"
+case "${usage_profile}" in
+  fast)
+    PYTEST_MARKS="unit and not expensive and not requires_models"
+    echo "${CW_PREFIX} Running fast unit tests (CI subset)..."
+    ;;
+  integration)
+    PYTEST_MARKS="integration and not real_providers and not expensive"
+    echo "${CW_PREFIX} Running integration tests..."
+    ;;
+  real)
+    PYTEST_MARKS="real_providers"
+    echo "${CW_PREFIX} Running real provider tests (requires model downloads)..."
+    ;;
+  heavy)
+    PYTEST_MARKS="requires_models or expensive"
+    echo "${CW_PREFIX} Running heavy tests (requires models)..."
+    ;;
+  skip-list)
+    echo "${CW_PREFIX} Listing skipped tests..."
+    uv run pytest --collect-only -m "skip" "$@"
+    exit 0
+    ;;
+  all)
+    echo "${CW_PREFIX} Running ALL tests (including expensive ones)..."
+    ;;
+esac
+
+# Build pytest command
+PYTEST_CMD="uv run pytest \"${usage_dir}\""
+if [ -n "$PYTEST_MARKS" ]; then
+  PYTEST_CMD="$PYTEST_CMD -m \"$PYTEST_MARKS\""
+fi
+if [ "${usage_cov}" = "true" ]; then
+  uv sync --group test --inexact
+  PYTEST_CMD="$PYTEST_CMD --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml"
+fi
+PYTEST_CMD="$PYTEST_CMD -v \"\$@\""
+
+eval "$PYTEST_CMD"
 '''
 run_windows = '''
+echo "running test task"
 echo [codeweaver] Running tests...
-uv run pytest "%usage_dir%" %usage_marks:~-3% -v %*
+set PYTEST_MARKS=%usage_marks%
+if "%usage_profile%"=="fast" (
+    set PYTEST_MARKS=unit and not expensive and not requires_models
+    echo [codeweaver] Running fast unit tests...
+)
+if "%usage_profile%"=="integration" (
+    set PYTEST_MARKS=integration and not real_providers and not expensive
+    echo [codeweaver] Running integration tests...
+)
+if "%usage_profile%"=="real" (
+    set PYTEST_MARKS=real_providers
+    echo [codeweaver] Running real provider tests...
+)
+if "%usage_profile%"=="heavy" (
+    set PYTEST_MARKS=requires_models or expensive
+    echo [codeweaver] Running heavy tests...
+)
+if "%usage_profile%"=="skip-list" (
+    echo [codeweaver] Listing skipped tests...
+    uv run pytest --collect-only -m "skip" %*
+    exit /b 0
+)
+if "%usage_profile%"=="all" (
+    echo [codeweaver] Running ALL tests...
+)
+
+if defined PYTEST_MARKS (
+    set PYTEST_ARGS=-m "%PYTEST_MARKS%"
+) else (
+    set PYTEST_ARGS=
+)
+if "%usage_cov%"=="true" (
+    uv sync --group test --inexact
+    uv run pytest "%usage_dir%" %PYTEST_ARGS% --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v %*
+) else (
+    uv run pytest "%usage_dir%" %PYTEST_ARGS% -v %*
+)
 '''
 
+[tasks.test.env]
+CODEWEAVER_TEST_MODE = "true"
+PYTHONPATH = "src"
+
 [tasks.test-cov]
+env.PYTHONPATH = "src"
 tools.uv = "latest"
 tools.python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 run = '''
+echo "running test-cov task"
 echo "${CW_PREFIX} Running tests with coverage..."
 uv sync --group test --inexact
 uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v "$@"
 '''
 run_windows = '''
+echo "running test-cov task"
 echo [codeweaver] Running tests with coverage...
 uv sync --group test --inexact
 uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v %*
 '''
 
-[tasks.clean]
+[tasks.test-categories]
+description = "Show test counts by category"
+tools.uv = "latest"
+tools.python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 run = '''
-echo "${CW_PREFIX} Cleaning build artifacts..."
-rm -rf dist/ build/ *.egg-info/ .coverage test-results.xml &&
-find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true &&
-find . -type f -name "*.pyc" -delete &&
-echo "${CW_PREFIX} ✅ Build artifacts cleaned!"
+echo "running test-categories task"
+echo "${CW_PREFIX} Test counts by category:"
+echo "${CW_PREFIX} Fast unit tests:"
+uv run pytest --collect-only -q -m "unit and not expensive and not requires_models" | grep -E "(test session|tests collected)" || echo "  No matching tests"
+echo ""
+echo "${CW_PREFIX} Integration tests:"
+uv run pytest --collect-only -q -m "integration and not real_providers and not expensive" | grep -E "(test session|tests collected)" || echo "  No matching tests"
+echo ""
+echo "${CW_PREFIX} Real provider tests:"
+uv run pytest --collect-only -q -m "real_providers" | grep -E "(test session|tests collected)" || echo "  No matching tests"
+echo ""
+echo "${CW_PREFIX} Heavy tests:"
+uv run pytest --collect-only -q -m "requires_models or expensive" | grep -E "(test session|tests collected)" || echo "  No matching tests"
 '''
 run_windows = '''
-echo [codeweaver] Cleaning build artifacts...
-if exist dist rd /s /q dist
-if exist build rd /s /q build
-if exist *.egg-info rd /s /q *.egg-info
-if exist .coverage del .coverage
-if exist test-results.xml del test-results.xml
-for /d /r . %%d in (__pycache__) do @if exist "%%d" rd /s /q "%%d"
-del /s /q *.pyc 2>NUL
-echo [codeweaver] Build artifacts cleaned!
+echo [codeweaver] Running test-categories task...
+echo [codeweaver] Test counts by category:
+echo [codeweaver] Fast unit tests:
+uv run pytest --collect-only -q -m "unit and not expensive and not requires_models" | findstr /R "test.*session tests.*collected" || echo   No matching tests
+echo.
+echo [codeweaver] Integration tests:
+uv run pytest --collect-only -q -m "integration and not real_providers and not expensive" | findstr /R "test.*session tests.*collected" || echo   No matching tests
+echo.
+echo [codeweaver] Real provider tests:
+uv run pytest --collect-only -q -m "real_providers" | findstr /R "test.*session tests.*collected" || echo   No matching tests
+echo.
+echo [codeweaver] Heavy tests:
+uv run pytest --collect-only -q -m "requires_models or expensive" | findstr /R "test.*session tests.*collected" || echo   No matching tests
+'''
+
+[tasks.clean]
+usage = '''
+flag "--deep" help="Perform deep clean (includes .venv and caches)"
+flag "--venv-only" help="Only recreate virtual environment"
+'''
+run = '''
+echo "running clean task"
+if [ "${usage_deep}" = "true" ]; then
+    echo "${CW_PREFIX} Performing deep clean..."
+    # First clean build artifacts
+    rm -rf dist/ build/ *.egg-info/ .coverage test-results.xml
+    find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+    find . -type f -name "*.pyc" -delete
+    # Then clean caches and venv
+    rm -rf .venv
+    mise cache clear
+    uv cache clean --force
+    echo "${CW_PREFIX} ✅ Deep clean complete! Recreating venv..."
+    mise //:venv
+elif [ "${usage_venv_only}" = "true" ]; then
+    echo "${CW_PREFIX} Recreating virtual environment..."
+    rm -rf .venv
+    mise //:venv
+else
+    echo "${CW_PREFIX} Cleaning build artifacts..."
+    rm -rf dist/ build/ *.egg-info/ .coverage test-results.xml &&
+    find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true &&
+    find . -type f -name "*.pyc" -delete &&
+    echo "${CW_PREFIX} ✅ Build artifacts cleaned!"
+fi
+'''
+run_windows = '''
+echo "running clean task"
+if "%usage_deep%"=="true" (
+    echo [codeweaver] Performing deep clean...
+    if exist dist rd /s /q dist
+    if exist build rd /s /q build
+    if exist *.egg-info rd /s /q *.egg-info
+    if exist .coverage del .coverage
+    if exist test-results.xml del test-results.xml
+    for /d /r . %%d in (__pycache__) do @if exist "%%d" rd /s /q "%%d"
+    del /s /q *.pyc 2>NUL
+    rd /s /q .venv
+    mise cache clear
+    uv cache clean --force
+    echo [codeweaver] Deep clean complete! Recreating venv...
+    mise //:venv
+) else if "%usage_venv_only%"=="true" (
+    echo [codeweaver] Recreating virtual environment...
+    rd /s /q .venv
+    mise //:venv
+) else (
+    echo [codeweaver] Cleaning build artifacts...
+    if exist dist rd /s /q dist
+    if exist build rd /s /q build
+    if exist *.egg-info rd /s /q *.egg-info
+    if exist .coverage del .coverage
+    if exist test-results.xml del test-results.xml
+    for /d /r . %%d in (__pycache__) do @if exist "%%d" rd /s /q "%%d"
+    del /s /q *.pyc 2>NUL
+    echo [codeweaver] Build artifacts cleaned!
+)
 '''
 
 # Release and maintenance
 [tasks.version]
 tools.uv = "latest"
 run = '''
+echo "running version task"
 echo "${CW_PREFIX} CodeWeaver version information:"
 echo "${CW_PREFIX} 📦 Package version: $CODEWEAVER_VERSION"
 echo "${CW_PREFIX} 🐍 Python version: $(python --version)"
 echo "${CW_PREFIX} 🌞 UV version: $(uv --version)"
 '''
 run_windows = '''
+echo "running version task"
 echo [codeweaver] CodeWeaver version information:
 echo [codeweaver] 📦 Package version: %CODEWEAVER_VERSION%
 for /f "delims=" %%v in ('python --version') do echo [codeweaver] Python version: %%v
@@ -383,6 +644,7 @@ for /f "delims=" %%v in ('uv --version') do echo [codeweaver] UV version: %%v
 [tasks.pre-commit]
 env.MISE_EXPERIMENTAL = "1"
 run = [
+  "echo \"${CW_PREFIX} Running pre-commit task...\"",
   "echo \"${CW_PREFIX} Running CodeWeaver pre-commit checks 🪝... Thanks for your contributions! You're pretty cool. 🚀\" || true",
   "mise //:format || echo \"${CW_PREFIX} ⚠️  You need to fix some issues before committing. Do not pass go, do not collect 200 dollars. 💸 😦\" && exit 1",
   "git add .",
@@ -391,6 +653,7 @@ run = [
   "echo \"${CW_PREFIX} ✅ All pre-commit checks passed! You're awesome! 🎉 ... and they said the Kobiyashi Maru was unwinnable! 🖖\"",
 ]
 run_windows = '''
+echo "running pre-commit task"
 echo [codeweaver] Running CodeWeaver pre-commit checks... Thanks for your contributions! You're pretty cool. 🚀
 mise //:format
 if %ERRORLEVEL% neq 0 (
@@ -408,7 +671,25 @@ echo [codeweaver] All pre-commit checks passed! You're awesome!
 '''
 
 [tasks.activate]
-run = '''eval "$(mise activate "$ACTIVE_SHELL")" &>/dev/null'''
-run_windows = '''mise activate cmd'''
+run = '''
+echo "running activate task"
+eval "$(mise activate "$ACTIVE_SHELL")" &>/dev/null
+'''
+run_windows = '''
+echo "running activate task"
+mise activate cmd
+'''
 hide = true
 env.ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo zsh') }}'''
+
+[tasks.activate-shims]
+run = '''
+echo "running activate-shims task"
+eval '"$(mise activate "${ACTIVE_SHELL:-zsh}" --shims)"' &>/dev/null
+'''
+run_windows = '''
+echo "running activate-shims task"
+mise activate cmd --shims
+'''
+hide = true
+env.ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo bash') }}'''

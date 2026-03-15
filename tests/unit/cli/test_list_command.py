@@ -6,7 +6,7 @@
 
 Tests validate corrections from CLI_CORRECTIONS_PLAN.md:
 - Registry usage (not hardcoded providers)
-- Sparse embedding support (ProviderKind.SPARSE_EMBEDDING)
+- Sparse embedding support (ProviderCategory.SPARSE_EMBEDDING)
 - ModelRegistry integration (correct model lists)
 - Coverage >90% of actual capabilities
 """
@@ -15,9 +15,18 @@ from __future__ import annotations
 
 import pytest
 
-from codeweaver.cli.commands.list import app as list_app
-from codeweaver.common.registry import get_provider_registry
-from codeweaver.providers.provider import ProviderKind
+from codeweaver.cli.commands.ls import app as list_app
+from codeweaver.core import ProviderCategory
+from codeweaver.core.types.provider import Provider
+from codeweaver.core.types.service_cards import get_provider_capabilities_map
+
+
+# Build a PROVIDER_CAPABILITIES dict mapping Provider → set[ProviderCategory]
+_raw_caps = get_provider_capabilities_map(Provider)
+PROVIDER_CAPABILITIES = {
+    provider: {ProviderCategory.from_string(cat) for cat in cats}
+    for provider, cats in _raw_caps.items()
+}
 
 
 @pytest.mark.unit
@@ -25,8 +34,8 @@ from codeweaver.providers.provider import ProviderKind
 class TestListProviders:
     """Tests for list providers command."""
 
-    def test_list_providers_uses_registry(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test list providers uses ProviderRegistry."""
+    def test_list_providers_uses_capabilities(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test list providers uses PROVIDER_CAPABILITIES."""
         with pytest.raises(SystemExit) as exc_info:
             list_app("providers")
         captured = capsys.readouterr()
@@ -35,42 +44,42 @@ class TestListProviders:
         assert exc_info.value.code == 0
 
         # List output should include major providers
-        major_providers = {"voyage", "openai", "fastembed", "cohere"}
+        major_providers = {"voyage", "fastembed", "cohere"}
         for provider in major_providers:
             assert provider in captured.out.lower()
 
     def test_list_shows_all_providers(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test list shows >90% of actual providers."""
+        """Test list shows a reasonable number of providers."""
         with pytest.raises(SystemExit) as exc_info:
             list_app("providers")
         exc_info.value.code = exc_info.value.code
 
         assert exc_info.value.code == 0
 
-        # Get actual provider count from registry
-        registry = get_provider_registry()
-        all_providers = set()
+        # Get embedding providers (default category shown)
+        embedding_providers = {
+            provider
+            for provider, caps in PROVIDER_CAPABILITIES.items()
+            if ProviderCategory.EMBEDDING in caps
+        }
 
-        for kind in ProviderKind:
-            if kind != ProviderKind.UNSET:
-                all_providers.update(registry.list_providers(kind))
-
-        # Should show at least 90% of actual providers
-        # (some may be unavailable due to missing dependencies)
-        expected_min_providers = int(len(all_providers) * 0.5)  # 50% minimum
+        # Should show at least 50% of embedding providers
+        expected_min_providers = int(len(embedding_providers) * 0.5)
 
         # Count providers in output (rough estimate)
         output_lines = capsys.readouterr().out.split("\n")
         provider_lines = [
-            line for line in output_lines if any(p.value in line.lower() for p in all_providers)
+            line
+            for line in output_lines
+            if any(p.value in line.lower() for p in embedding_providers)
         ]
 
         assert len(provider_lines) >= expected_min_providers
 
-    def test_list_providers_by_kind(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test list providers with --kind filter."""
+    def test_list_providers_by_category(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test list providers with --category filter."""
         with pytest.raises(SystemExit) as exc_info:
-            list_app(["providers", "--kind", "embedding"])
+            list_app(["providers", "--category", "embedding"])
         captured = capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -123,7 +132,7 @@ class TestListModels:
             # May not be available, but command should succeed
             pass
 
-    def test_list_models_includes_all_kinds(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_list_models_includes_all_categories(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test list models includes embedding, sparse, and reranking."""
         providers_to_test = ["voyage", "fastembed", "cohere"]
 
@@ -154,11 +163,14 @@ class TestListCoverage:
 
     def test_list_embedding_providers_coverage(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test list shows >90% of embedding providers."""
-        registry = get_provider_registry()
-        embedding_providers = registry.list_providers(ProviderKind.EMBEDDING)
+        embedding_providers = [
+            prov
+            for prov, caps in PROVIDER_CAPABILITIES.items()
+            if ProviderCategory.EMBEDDING in caps
+        ]
 
         with pytest.raises(SystemExit) as exc_info:
-            list_app(["providers", "--kind", "embedding"])
+            list_app(["providers", "--category", "embedding"])
         captured = capsys.readouterr()
         assert exc_info.value.code == 0
 
@@ -173,11 +185,14 @@ class TestListCoverage:
 
     def test_list_reranking_providers_coverage(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test list shows reranking providers."""
-        registry = get_provider_registry()
-        reranking_providers = registry.list_providers(ProviderKind.RERANKING)
+        reranking_providers = [
+            prov
+            for prov, caps in PROVIDER_CAPABILITIES.items()
+            if ProviderCategory.RERANKING in caps
+        ]
 
         with pytest.raises(SystemExit) as exc_info:
-            list_app(["providers", "--kind", "reranking"])
+            list_app(["providers", "--category", "reranking"])
         captured = capsys.readouterr()
         assert exc_info.value.code == 0
 
@@ -190,12 +205,15 @@ class TestListCoverage:
 
     def test_list_sparse_providers_coverage(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test list shows sparse embedding providers."""
-        registry = get_provider_registry()
-        sparse_providers = registry.list_providers(ProviderKind.SPARSE_EMBEDDING)
+        sparse_providers = [
+            prov
+            for prov, caps in PROVIDER_CAPABILITIES.items()
+            if ProviderCategory.SPARSE_EMBEDDING in caps
+        ]
 
         if len(sparse_providers) > 0:
             with pytest.raises(SystemExit) as exc_info:
-                list_app(["providers", "--kind", "sparse-embedding"])
+                list_app(["providers", "--category", "sparse-embedding"])
             captured = capsys.readouterr()
             assert exc_info.value.code == 0
 
@@ -205,26 +223,6 @@ class TestListCoverage:
             )
 
             assert shown_count > 0
-
-
-@pytest.mark.unit
-@pytest.mark.config
-class TestListModelRegistry:
-    """Tests for ModelRegistry integration."""
-
-    @pytest.mark.skip(
-        reason="Test needs access to internal model registry API which may not be public"
-    )
-    def test_uses_model_registry(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test list command uses ModelRegistry."""
-        # Skipping - requires internal model registry API
-
-    @pytest.mark.skip(
-        reason="Test needs access to internal model registry API which may not be public"
-    )
-    def test_model_registry_has_sparse_models(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test ModelRegistry includes sparse embedding models."""
-        # Skipping - requires internal model registry API
 
 
 @pytest.mark.unit

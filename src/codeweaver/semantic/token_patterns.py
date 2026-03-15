@@ -14,7 +14,7 @@ from functools import lru_cache
 from types import MappingProxyType
 from typing import TYPE_CHECKING, TypedDict
 
-from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core import SemanticSearchLanguage
 
 
 logger = logging.getLogger(__name__)
@@ -1346,8 +1346,18 @@ def get_checks(thing_name: str, language: SemanticSearchLanguage) -> tuple[Seman
 
 
 __all__ = (
+    "IS_ANNOTATION",
+    "IS_IDENTIFIER",
+    "IS_KEYWORD",
+    "IS_LITERAL",
+    "IS_OPERATOR",
     "LANGUAGE_SPECIFIC_TOKEN_EXCEPTIONS",
     "NAMED_NODE_COUNTS",
+    "NOT_SYMBOL",
+    "JavaScriptFamily",
+    "JavaScriptLangs",
+    "TokenPatternCacheDict",
+    "TypeScriptLangs",
     "get_checks",
     "get_token_patterns_sync",
 )

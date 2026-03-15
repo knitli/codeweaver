@@ -9,19 +9,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, Required, TypedDict
 
-from pydantic import PositiveFloat, PositiveInt
+from pydantic import PositiveInt
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.provider import Provider
-
-
-class EmbeddingSettingsDict(TypedDict, total=False):
-    """A dictionary representing the settings for an embedding client, embedding model, and the embedding call itself. If any."""
-
-    client_options: dict[str, Any]
-    model_options: dict[str, Any]
-    call_options: dict[str, Any]
+    from codeweaver.core import Provider
+    from codeweaver.providers.embedding.capabilities.base import ModelFamily
 
 
 type PartialCapabilities = dict[
@@ -34,7 +27,9 @@ type PartialCapabilities = dict[
         "other",
         "is_normalized",
         "hf_name",
+        "max_batch_size",
         "max_batch_tokens",
+        "model_family",
         "name",
         "output_dimensions",
         "output_dtypes",
@@ -46,18 +41,7 @@ type PartialCapabilities = dict[
         "tokenizer_model",
         "version",
     ],
-    Literal[
-        "tokenizers", "tiktoken", "dot", "cosine", "euclidean", "manhattan", "hamming", "chebyshev"
-    ]
-    | str
-    | PositiveInt
-    | PositiveFloat
-    | bool
-    | Provider
-    | None
-    | dict[str, Any]
-    | tuple[str, ...]
-    | tuple[PositiveInt, ...],
+    Any,
 ]
 
 
@@ -76,7 +60,9 @@ class EmbeddingCapabilitiesDict(TypedDict, total=False):
     output_dtypes: NotRequired[tuple[str, ...] | None]
     is_normalized: NotRequired[bool]
     context_window: NotRequired[PositiveInt]
+    max_batch_size: NotRequired[PositiveInt]
     max_batch_tokens: NotRequired[PositiveInt]
+    model_family: NotRequired[ModelFamily | None]
     supports_context_chunk_embedding: NotRequired[bool]
     tokenizer: NotRequired[Literal["tokenizers", "tiktoken"]]
     tokenizer_model: NotRequired[str]
@@ -87,4 +73,4 @@ class EmbeddingCapabilitiesDict(TypedDict, total=False):
     other: NotRequired[dict[str, Any]]
 
 
-__all__ = ("EmbeddingCapabilitiesDict", "EmbeddingSettingsDict", "PartialCapabilities")
+__all__ = ("EmbeddingCapabilitiesDict", "PartialCapabilities")

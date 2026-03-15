@@ -21,29 +21,17 @@ with contextlib.suppress(Exception):
     os.environ["PYTHONWARNINGS"] = "ignore::pydantic.warnings.PydanticDeprecatedSince212"
 
 from collections.abc import Iterable, Sequence
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import Any, ClassVar, Literal, cast
 
-from google.genai.types import HttpOptions
+from codeweaver.core import BaseEnum, CodeChunk, ConfigurationError, Provider
+from codeweaver.providers.embedding.providers.base import (
+    EmbeddingCustomDeps,
+    EmbeddingImplementationDeps,
+    EmbeddingProvider,
+)
 
-from codeweaver.core.types.enum import BaseEnum
-from codeweaver.exceptions import ConfigurationError
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
-
-
-if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
 
 logger = logging.getLogger(__name__)
-
-
-def get_shared_kwargs() -> dict[str, dict[str, HttpOptions] | int]:
-    """Get the default kwargs for the Google embedding provider."""
-    from google.genai.types import HttpOptions
-
-    return {
-        "config": {"http_options": HttpOptions(api_version="v1alpha")},
-        "output_dimensionality": 768,
-    }
 
 
 class GoogleEmbeddingTasks(BaseEnum):
@@ -71,6 +59,7 @@ class GoogleEmbeddingTasks(BaseEnum):
         "fact_verification",
     ]:
         """Returns the enum value."""
+        # normally we use .variable for string conversion, but it's more explicit this way (even if it's probably the same)
         return self.value
 
 
@@ -91,29 +80,42 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
     """Google embedding provider."""
 
     client: genai.Client
+    _provider: ClassVar[Literal[Provider.GOOGLE]] = Provider.GOOGLE
+
+    def _initialize(
+        self,
+        impl_deps: EmbeddingImplementationDeps = None,
+        custom_deps: EmbeddingCustomDeps = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the Google embedding client."""
+        # Nothing to initialize here - options are set in model_post_init
 
     async def _report_stats(self, documents: Iterable[genai_types.Part]) -> None:
         """Report token usage statistics."""
-        http_kwargs = self.doc_kwargs.get("config", {}).get("http_options", {})
         try:
             response = await self.client.aio.models.count_tokens(
                 model=self.caps.name,
                 contents=list(documents),
-                config=genai_types.CountTokensConfig(http_options=http_kwargs),
+                config=genai_types.CountTokensConfig(),
             )
             if response and response.total_tokens is not None and response.total_tokens > 0:
+                loop = self._get_loop()
                 _ = self._fire_and_forget(
-                    lambda: self._update_token_stats(token_count=cast(int, response.total_tokens))
+                    lambda: self._update_token_stats(token_count=cast(int, response.total_tokens)),
+                    loop=loop,
                 )
         except genai_errors.APIError:
             logger.warning(
                 "Error requesting token stats from Google. Falling back to local tokenizer for approximation.",
                 exc_info=True,
             )
+            loop = self._get_loop()
             _ = self._fire_and_forget(
                 lambda: self._update_token_stats(
                     from_docs=[cast(str, part.text) for part in documents]
-                )
+                ),
+                loop=loop,
             )
 
     async def _embed_documents(
@@ -122,8 +124,10 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
         """
         Embed the documents using the Google embedding provider.
         """
+        config_kwargs = (self.embed_options.as_settings() if self.embed_options else {}) | (
+            kwargs or {}
+        )
         readied_docs = self.chunks_to_strings(documents)
-        config_kwargs = self.doc_kwargs.get("config", {})
         content = (genai_types.Part.from_text(text=cast(str, doc)) for doc in readied_docs)
         response = await self.client.aio.models.embed_content(
             model=self.caps.name,
@@ -131,7 +135,6 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
             config=genai_types.EmbedContentConfig(
                 task_type=str(GoogleEmbeddingTasks.RETRIEVAL_DOCUMENT), **config_kwargs
             ),
-            **kwargs,
         )
         embeddings = [
             item.values
@@ -145,7 +148,7 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
         """
         Embed the query using the Google embedding provider.
         """
-        config_kwargs = self.query_kwargs.get("config", {})
+        config_kwargs = (self.query_options or {}) | (kwargs or {})
         content = [genai_types.Part.from_text(text=q) for q in query]
         response = await self.client.aio.models.embed_content(
             model=self.caps.name,
@@ -153,12 +156,25 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
             config=genai_types.EmbedContentConfig(
                 task_type=str(GoogleEmbeddingTasks.CODE_RETRIEVAL_QUERY), **config_kwargs
             ),
-            **kwargs,
         )
-        embeddings = [
-            item.values
-            for item in cast(list[genai_types.ContentEmbedding], response.embeddings)
-            if response.embeddings is not None and item
-        ] or [[]]
+        if (
+            self.caps
+            and self.caps.default_dimension
+            and self.dimension != self.caps.default_dimension
+        ):
+            embeddings = [
+                self.normalize(item.values)
+                for item in cast(list[genai_types.ContentEmbedding], response.embeddings)
+                if response.embeddings is not None and item
+            ] or [[]]
+        else:
+            embeddings = [
+                item.values
+                for item in cast(list[genai_types.ContentEmbedding], response.embeddings)
+                if response.embeddings is not None and item
+            ] or [[]]
         _ = await self._report_stats(content)
         return embeddings  # ty: ignore[invalid-return-type]
+
+
+__all__ = ("GoogleEmbeddingProvider", "GoogleEmbeddingTasks")

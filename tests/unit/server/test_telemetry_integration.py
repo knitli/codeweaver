@@ -23,9 +23,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from codeweaver.common.telemetry.client import PostHogClient
-from codeweaver.config.settings import CodeWeaverSettings
-from codeweaver.config.telemetry import TelemetrySettings
+from codeweaver.core import TelemetryService, TelemetrySettings
 
 
 pytestmark = [pytest.mark.unit, pytest.mark.server]
@@ -33,7 +31,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.server]
 
 def create_session_statistics():
     """Create a SessionStatistics instance with all required fields."""
-    from codeweaver.common.statistics import (
+    from codeweaver.core import (
         FailoverStats,
         FileStatistics,
         SessionStatistics,
@@ -67,8 +65,8 @@ def create_find_code_response(
     index_coverage=100.0,
 ):
     """Create a FindCodeResponseSummary with all required fields."""
-    from codeweaver.agent_api.find_code.intent import IntentType
-    from codeweaver.agent_api.find_code.types import FindCodeResponseSummary, SearchStrategy
+    from codeweaver.core import SearchStrategy
+    from codeweaver.server.agent_api import FindCodeResponseSummary, IntentType
 
     return FindCodeResponseSummary(
         matches=matches or [],
@@ -95,10 +93,10 @@ class TestTelemetryIntegration:
     """Test telemetry integration in server initialization."""
 
     def test_posthog_client_handles_import_error(self) -> None:
-        """Test that PostHogClient gracefully handles missing posthog package."""
+        """Test that TelemetryService gracefully handles missing posthog package."""
         # Temporarily hide posthog module
         with patch.dict(sys.modules, {"posthog": None}):
-            client = PostHogClient(enabled=True)
+            client = TelemetryService(enabled=True)
 
             # Client should be disabled and not raise an error
             assert client.enabled is False
@@ -108,8 +106,8 @@ class TestTelemetryIntegration:
             client.capture("test_event", {"key": "value"})
 
     def test_posthog_client_respects_disabled_setting(self) -> None:
-        """Test that PostHogClient respects enabled=False setting."""
-        client = PostHogClient(enabled=False)
+        """Test that TelemetryService respects enabled=False setting."""
+        client = TelemetryService(enabled=False)
 
         assert client.enabled is False
         assert client._client is None
@@ -119,45 +117,42 @@ class TestTelemetryIntegration:
 
     def test_from_settings_respects_disable_telemetry(self) -> None:
         """Test that from_settings respects disable_telemetry setting."""
-        # Create a mock settings object with telemetry disabled
-        mock_settings = MagicMock(spec=CodeWeaverSettings)
+        # Create a mock telemetry settings object with telemetry disabled
         mock_telemetry = MagicMock(spec=TelemetrySettings)
         mock_telemetry.enabled = False
         mock_telemetry.disable_telemetry = True
-        mock_settings.telemetry = mock_telemetry
 
-        with patch("codeweaver.config.settings.get_settings", return_value=mock_settings):
-            client = PostHogClient.from_settings()
+        # Pass settings directly instead of trying to patch
+        client = TelemetryService.from_settings(mock_telemetry)
 
-            assert client.enabled is False
-            assert client._client is None
+        assert client.enabled is False
+        assert client._client is None
 
     def test_from_settings_with_no_api_key(self) -> None:
         """Test that from_settings handles missing API key."""
-        mock_settings = MagicMock(spec=CodeWeaverSettings)
+        # Create a mock telemetry settings object with no API key
         mock_telemetry = MagicMock(spec=TelemetrySettings)
         mock_telemetry.enabled = True
         mock_telemetry.disable_telemetry = False
         mock_telemetry.posthog_project_key = None
         mock_telemetry.posthog_host = "https://us.i.posthog.com"
-        mock_settings.telemetry = mock_telemetry
 
-        with patch("codeweaver.config.settings.get_settings", return_value=mock_settings):
-            client = PostHogClient.from_settings()
+        # Pass settings directly instead of trying to patch
+        client = TelemetryService.from_settings(mock_telemetry)
 
-            assert client.enabled is False
-            assert client._client is None
+        assert client.enabled is False
+        assert client._client is None
 
     def test_shutdown_with_no_client(self) -> None:
         """Test that shutdown handles case when client is None."""
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
 
         # Should not raise an error
         client.shutdown()
 
     def test_shutdown_with_client_error(self) -> None:
         """Test that shutdown handles errors from posthog client."""
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
         client._client = MagicMock()
         client._client.flush.side_effect = Exception("Test error")
 
@@ -166,7 +161,7 @@ class TestTelemetryIntegration:
 
     def test_capture_never_raises(self) -> None:
         """Test that capture method never raises exceptions."""
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
         client._client = MagicMock()
         client._client.capture.side_effect = Exception("Test error")
         client.enabled = True  # Force it to try to capture
@@ -176,7 +171,7 @@ class TestTelemetryIntegration:
 
     def test_capture_with_serialization(self) -> None:
         """Test capture_with_serialization with a serializable object."""
-        from codeweaver.core.types.models import BasedModel
+        from codeweaver.core import BasedModel
 
         class TestModel(BasedModel):
             field1: str = "value1"
@@ -184,7 +179,7 @@ class TestTelemetryIntegration:
             def _telemetry_keys(self):
                 return None
 
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
         obj = TestModel()
 
         # Should not raise an error even when disabled
@@ -192,7 +187,7 @@ class TestTelemetryIntegration:
 
     def test_capture_from_event(self) -> None:
         """Test capture_from_event with a telemetry event object."""
-        from codeweaver.common.telemetry.events import SessionEvent
+        from codeweaver.core import SessionEvent
 
         # Create SessionStatistics with all required fields
         stats = create_session_statistics()
@@ -207,7 +202,7 @@ class TestTelemetryIntegration:
             duration_seconds=300.0,
         )
 
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
 
         # Should not raise an error even when disabled
         client.capture_from_event(event)
@@ -220,7 +215,7 @@ class TestSessionEvent:
 
     def test_session_event_creation(self) -> None:
         """Test SessionEvent can be created from statistics."""
-        from codeweaver.common.telemetry.events import SessionEvent
+        from codeweaver.core import SessionEvent
 
         stats = create_session_statistics()
         event = SessionEvent.from_statistics(
@@ -238,7 +233,7 @@ class TestSessionEvent:
 
     def test_session_event_to_posthog_event(self) -> None:
         """Test SessionEvent converts to PostHog event format."""
-        from codeweaver.common.telemetry.events import SessionEvent
+        from codeweaver.core import SessionEvent
 
         stats = create_session_statistics()
         event = SessionEvent.from_statistics(
@@ -264,7 +259,7 @@ class TestSessionEvent:
 
     def test_session_event_empty_stats(self) -> None:
         """Test SessionEvent handles empty statistics."""
-        from codeweaver.common.telemetry.events import SessionEvent
+        from codeweaver.core import SessionEvent
 
         event = SessionEvent()
         event_name, properties = event.to_posthog_event()
@@ -280,9 +275,8 @@ class TestSearchEvent:
 
     def test_search_event_creation(self) -> None:
         """Test SearchEvent can be created."""
-        from codeweaver.agent_api.find_code.intent import IntentType
-        from codeweaver.agent_api.find_code.types import SearchStrategy
-        from codeweaver.common.telemetry.events import SearchEvent
+        from codeweaver.core import SearchEvent, SearchStrategy
+        from codeweaver.server.agent_api import IntentType
 
         response = create_find_code_response()
 
@@ -301,9 +295,8 @@ class TestSearchEvent:
 
     def test_search_event_to_posthog_event(self) -> None:
         """Test SearchEvent converts to PostHog event format."""
-        from codeweaver.agent_api.find_code.intent import IntentType
-        from codeweaver.agent_api.find_code.types import SearchStrategy
-        from codeweaver.common.telemetry.events import SearchEvent
+        from codeweaver.core import SearchEvent, SearchStrategy
+        from codeweaver.server.agent_api import IntentType
 
         response = create_find_code_response(
             total_matches=10,
@@ -338,9 +331,8 @@ class TestSearchEvent:
 
     def test_search_event_with_tools_over_privacy(self) -> None:
         """Test SearchEvent includes query details when tools_over_privacy=True."""
-        from codeweaver.agent_api.find_code.intent import IntentType
-        from codeweaver.agent_api.find_code.types import SearchStrategy
-        from codeweaver.common.telemetry.events import SearchEvent
+        from codeweaver.core import SearchEvent, SearchStrategy
+        from codeweaver.server.agent_api import IntentType
 
         response = create_find_code_response()
 
@@ -366,9 +358,8 @@ class TestSearchEvent:
 
     def test_search_event_without_tools_over_privacy(self) -> None:
         """Test SearchEvent excludes query details when tools_over_privacy=False."""
-        from codeweaver.agent_api.find_code.intent import IntentType
-        from codeweaver.agent_api.find_code.types import SearchStrategy
-        from codeweaver.common.telemetry.events import SearchEvent
+        from codeweaver.core import SearchEvent, SearchStrategy
+        from codeweaver.server.agent_api import IntentType
 
         response = create_find_code_response()
 
@@ -395,7 +386,7 @@ class TestContextManagement:
 
     def test_start_session(self) -> None:
         """Test start_session initializes context."""
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
 
         # Should not raise even when disabled
         client.start_session({"version": "0.5.0"})
@@ -405,14 +396,14 @@ class TestContextManagement:
 
     def test_end_session(self) -> None:
         """Test end_session cleans up context."""
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
 
         # Should not raise even when disabled
         client.end_session()
 
     def test_context_manager(self) -> None:
-        """Test PostHogClient works as context manager."""
-        with PostHogClient(enabled=False) as client:
+        """Test TelemetryService works as context manager."""
+        with TelemetryService(enabled=False) as client:
             assert client.enabled is False
             client.capture("test_event", {"key": "value"})
 
@@ -420,7 +411,7 @@ class TestContextManagement:
 
     def test_feature_flag_returns_none_when_disabled(self) -> None:
         """Test feature flag returns None when client is disabled."""
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
 
         result = client.get_feature_flag("test-flag")
 
@@ -428,7 +419,7 @@ class TestContextManagement:
 
     def test_get_all_feature_flags_returns_empty_when_disabled(self) -> None:
         """Test get_all_feature_flags returns empty dict when disabled."""
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
 
         result = client.get_all_feature_flags()
 
@@ -436,45 +427,45 @@ class TestContextManagement:
 
 
 @pytest.mark.mock_only
+@pytest.mark.asyncio
 @pytest.mark.telemetry
 class TestConvenienceFunctions:
     """Test convenience functions for capturing events."""
 
-    def test_capture_session_event_respects_opt_out(self) -> None:
+    async def test_capture_session_event_respects_opt_out(self, clean_container) -> None:
         """Test capture_session_event doesn't capture when disabled."""
-        from codeweaver.common.telemetry.events import capture_session_event
+        from codeweaver.core import capture_session_event
 
-        with patch("codeweaver.common.telemetry.get_telemetry_client") as mock_get_client:
-            mock_client = MagicMock()
-            mock_client.enabled = False
-            mock_get_client.return_value = mock_client
+        # Override TelemetryService in DI container
+        mock_client = MagicMock()
+        mock_client.enabled = False
+        clean_container.override(TelemetryService, mock_client)
 
-            stats = create_session_statistics()
-            capture_session_event(stats, version="0.5.0", duration_seconds=100.0)
+        stats = create_session_statistics()
+        await capture_session_event(stats, version="0.5.0", duration_seconds=100.0)
 
-            # capture should not be called when disabled
-            mock_client.capture.assert_not_called()
+        # capture should not be called when disabled
+        mock_client.capture.assert_not_called()
 
-    def test_capture_search_event_respects_opt_out(self) -> None:
+    async def test_capture_search_event_respects_opt_out(self, clean_container) -> None:
         """Test capture_search_event doesn't capture when disabled."""
-        from codeweaver.agent_api.find_code.intent import IntentType
-        from codeweaver.agent_api.find_code.types import SearchStrategy
-        from codeweaver.common.telemetry.events import capture_search_event
+        from codeweaver.core import SearchStrategy, capture_search_event
+        from codeweaver.server.agent_api import IntentType
 
-        with patch("codeweaver.common.telemetry.get_telemetry_client") as mock_get_client:
-            mock_client = MagicMock()
-            mock_client.enabled = False
-            mock_get_client.return_value = mock_client
+        # Override TelemetryService in DI container
+        mock_client = MagicMock()
+        mock_client.enabled = False
+        clean_container.override(TelemetryService, mock_client)
 
-            response = create_find_code_response()
+        response = create_find_code_response()
 
-            capture_search_event(
-                response=response,
-                query="test",
-                intent_type=IntentType.UNDERSTAND,
-                strategies=[SearchStrategy.HYBRID_SEARCH],
-                execution_time_ms=100.0,
-            )
+        await capture_search_event(
+            response=response,
+            query="test",
+            intent_type=IntentType.UNDERSTAND,
+            strategies=[SearchStrategy.HYBRID_SEARCH],
+            execution_time_ms=100.0,
+        )
 
-            # capture should not be called when disabled
-            mock_client.capture.assert_not_called()
+        # capture should not be called when disabled
+        mock_client.capture.assert_not_called()

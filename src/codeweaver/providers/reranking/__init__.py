@@ -1,184 +1,210 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Base class for reranking providers."""
 
 from __future__ import annotations
 
-from importlib import import_module
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal
+
+# === MANAGED EXPORTS ===
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
+from typing import TYPE_CHECKING
+
+from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.exceptions import ConfigurationError
-    from codeweaver.providers.provider import Provider
-    from codeweaver.providers.reranking.capabilities import (
-        dependency_map,
+    from codeweaver.providers.reranking.capabilities.alibaba_nlp import (
+        AlibabaNlpRerankingCapabilities,
         get_alibaba_reranking_capabilities,
+    )
+    from codeweaver.providers.reranking.capabilities.amazon import (
+        AmazonRerankingCapabilities,
         get_amazon_reranking_capabilities,
+    )
+    from codeweaver.providers.reranking.capabilities.baai import (
+        BaaiRerankingCapabilities,
         get_baai_reranking_capabilities,
+    )
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+    from codeweaver.providers.reranking.capabilities.cohere import (
+        CohereRerankingCapabilities,
+        cohere_max_input,
         get_cohere_reranking_capabilities,
+    )
+    from codeweaver.providers.reranking.capabilities.jinaai import (
+        JinaaiRerankingCapabilities,
         get_jinaai_reranking_capabilities,
+    )
+    from codeweaver.providers.reranking.capabilities.mixed_bread_ai import (
+        MixedBreadAiRerankingCapabilities,
+        get_mixed_bread_reranking_capabilities,
+    )
+    from codeweaver.providers.reranking.capabilities.ms_marco import (
+        MsMarcoRerankingCapabilities,
         get_marco_reranking_capabilities,
+    )
+    from codeweaver.providers.reranking.capabilities.qwen import (
+        QwenRerankingCapabilities,
         get_qwen_reranking_capabilities,
+    )
+    from codeweaver.providers.reranking.capabilities.resolver import RerankingCapabilityResolver
+    from codeweaver.providers.reranking.capabilities.types import (
+        PartialRerankingCapabilitiesDict,
+        RerankingCapabilitiesDict,
+    )
+    from codeweaver.providers.reranking.capabilities.voyage import (
+        VoyageRerankingCapabilities,
         get_voyage_reranking_capabilities,
-        load_default_capabilities,
     )
-    from codeweaver.providers.reranking.providers import (
-        BedrockRerankingProvider,
-        CohereRerankingProvider,
-        FastEmbedRerankingProvider,
-        QueryType,
+    from codeweaver.providers.reranking.providers.base import (
         RerankingProvider,
-        RerankingResult,
+        default_reranking_input_transformer,
+        default_reranking_output_transformer,
+    )
+    from codeweaver.providers.reranking.providers.bedrock import (
+        VALID_REGION_PATTERN,
+        VALID_REGIONS,
+        BaseBedrockModel,
+        BedrockInlineDocumentSource,
+        BedrockRerankConfiguration,
+        BedrockRerankingProvider,
+        BedrockRerankingResult,
+        BedrockRerankModelConfiguration,
+        BedrockRerankRequest,
+        BedrockRerankResultItem,
+        BedrockTextQuery,
+        DocumentSource,
+        RerankConfiguration,
+        bedrock_reranking_input_transformer,
+        bedrock_reranking_output_transformer,
+    )
+    from codeweaver.providers.reranking.providers.cohere import (
+        CohereRerankingProvider,
+        cohere_reranking_output_transformer,
+    )
+    from codeweaver.providers.reranking.providers.fastembed import FastEmbedRerankingProvider
+    from codeweaver.providers.reranking.providers.sentence_transformers import (
         SentenceTransformersRerankingProvider,
+        preprocess_for_qwen,
+    )
+    from codeweaver.providers.reranking.providers.types import RerankingResult
+    from codeweaver.providers.reranking.providers.voyage import (
         VoyageRerankingProvider,
+        voyage_reranking_output_transformer,
     )
-
-
-type KnownRerankModelName = Literal[
-    "voyage:voyage-rerank-2.5",
-    "voyage:voyage-rerank-2.5-lite",
-    "cohere:rerank-v3.5",
-    "cohere:rerank-english-v3.0",
-    "cohere:rerank-multilingual-v3.0",
-    "bedrock:amazon.rerank-v1:0",
-    "bedrock:cohere.rerank-v3-5:0",
-    "fastembed:Xenova/ms-marco-MiniLM-L-6-v2",
-    "fastembed:Xenova/ms-marco-MiniLM-L-12-v2",
-    "fastembed:BAAI/bge-reranking-base",
-    "fastembed:jinaai/jina-reranking-v2-base-multilingual",
-    "sentence-transformers:Qwen/Qwen3-Reranking-0.6B",
-    "sentence-transformers:Qwen/Qwen3-Reranking-4B",
-    "sentence-transformers:Qwen/Qwen3-Reranking-8B",
-    "sentence-transformers:mixedbread-ai/mxbai-rerank-large-v2",
-    "sentence-transformers:mixedbread-ai/mxbai-rerank-base-v2",
-    "sentence-transformers:jinaai/jina-reranking-m0",
-    "sentence-transformers:BAAI/bge-reranking-v2-m3",
-    "sentence-transformers:BAAI/bge-reranking-large",
-    "sentence-transformers:cross-encoder/ms-marco-MiniLM-L6-v2",
-    "sentence-transformers:cross-encoder/ms-marco-MiniLM-L12-v2",
-    "sentence-transformers:Alibaba-NLP/gte-multilingual-reranking-base",
-    "sentence-transformers:mixedbread-ai/mxbai-rerank-xsmall-v1",
-    "sentence-transformers:mixedbread-ai/mxbai-rerank-base-v1",
-]
-
-
-def get_rerank_model_provider(provider: Provider) -> type[RerankingProvider[Any]]:
-    """Get rerank model provider."""
-    from codeweaver.providers.provider import Provider
-
-    if provider in {Provider.VOYAGE}:
-        from codeweaver.providers.reranking.providers.voyage import VoyageRerankingProvider
-
-        return VoyageRerankingProvider  # type: ignore[return-value]
-
-    if provider == Provider.COHERE:
-        from codeweaver.providers.reranking.providers.cohere import CohereRerankingProvider
-
-        return CohereRerankingProvider  # type: ignore[return-value]
-
-    if provider == Provider.BEDROCK:
-        from codeweaver.providers.reranking.providers.bedrock import BedrockRerankingProvider
-
-        return BedrockRerankingProvider  # type: ignore[return-value]
-
-    if provider == Provider.FASTEMBED:
-        from codeweaver.providers.reranking.providers.fastembed import FastEmbedRerankingProvider
-
-        return FastEmbedRerankingProvider  # type: ignore[return-value]
-
-    if provider == Provider.SENTENCE_TRANSFORMERS:
-        from codeweaver.providers.reranking.providers.sentence_transformers import (
-            SentenceTransformersRerankingProvider,
-        )
-
-        return SentenceTransformersRerankingProvider
-
-    # Get list of supported reranking providers dynamically
-    supported_providers = [
-        p.value
-        for p in [
-            Provider.VOYAGE,
-            Provider.COHERE,
-            Provider.BEDROCK,
-            Provider.FASTEMBED,
-            Provider.SENTENCE_TRANSFORMERS,
-        ]
-    ]
-
-    raise ConfigurationError(
-        f"Unknown reranking provider: {provider}",
-        details={"provided_provider": str(provider), "supported_providers": supported_providers},
-        suggestions=[
-            "Check provider name spelling in configuration",
-            "Install required reranking provider package",
-            "Review available providers in documentation",
-        ],
-    )
-
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "RerankingProvider": (__spec__.parent, "providers"),
-    "VoyageRerankingProvider": (__spec__.parent, "providers"),
-    "CohereRerankingProvider": (__spec__.parent, "providers"),
-    "BedrockRerankingProvider": (__spec__.parent, "providers"),
-    "FastEmbedRerankingProvider": (__spec__.parent, "providers"),
-    "SentenceTransformersRerankingProvider": (__spec__.parent, "providers"),
-    "QueryType": (__spec__.parent, "providers"),
-    "RerankingResult": (__spec__.parent, "providers"),
-    "dependency_map": (__spec__.parent, "capabilities"),
-    "load_default_capabilities": (__spec__.parent, "capabilities"),
-    "get_alibaba_reranking_capabilities": (__spec__.parent, "capabilities"),
-    "get_amazon_reranking_capabilities": (__spec__.parent, "capabilities"),
-    "get_baai_reranking_capabilities": (__spec__.parent, "capabilities"),
-    "get_cohere_reranking_capabilities": (__spec__.parent, "capabilities"),
-    "get_jinaai_reranking_capabilities": (__spec__.parent, "capabilities"),
-    "get_marco_reranking_capabilities": (__spec__.parent, "capabilities"),
-    "get_qwen_reranking_capabilities": (__spec__.parent, "capabilities"),
-    "get_voyage_reranking_capabilities": (__spec__.parent, "capabilities"),
+    "VALID_REGION_PATTERN": (__spec__.parent, "providers.bedrock"),
+    "VALID_REGIONS": (__spec__.parent, "providers.bedrock"),
+    "AlibabaNlpRerankingCapabilities": (__spec__.parent, "capabilities.alibaba_nlp"),
+    "AmazonRerankingCapabilities": (__spec__.parent, "capabilities.amazon"),
+    "BaaiRerankingCapabilities": (__spec__.parent, "capabilities.baai"),
+    "BaseBedrockModel": (__spec__.parent, "providers.bedrock"),
+    "BedrockInlineDocumentSource": (__spec__.parent, "providers.bedrock"),
+    "BedrockRerankConfiguration": (__spec__.parent, "providers.bedrock"),
+    "BedrockRerankingProvider": (__spec__.parent, "providers.bedrock"),
+    "BedrockRerankingResult": (__spec__.parent, "providers.bedrock"),
+    "BedrockRerankModelConfiguration": (__spec__.parent, "providers.bedrock"),
+    "BedrockRerankRequest": (__spec__.parent, "providers.bedrock"),
+    "BedrockRerankResultItem": (__spec__.parent, "providers.bedrock"),
+    "BedrockTextQuery": (__spec__.parent, "providers.bedrock"),
+    "CohereRerankingCapabilities": (__spec__.parent, "capabilities.cohere"),
+    "CohereRerankingProvider": (__spec__.parent, "providers.cohere"),
+    "DocumentSource": (__spec__.parent, "providers.bedrock"),
+    "FastEmbedRerankingProvider": (__spec__.parent, "providers.fastembed"),
+    "JinaaiRerankingCapabilities": (__spec__.parent, "capabilities.jinaai"),
+    "MixedBreadAiRerankingCapabilities": (__spec__.parent, "capabilities.mixed_bread_ai"),
+    "MsMarcoRerankingCapabilities": (__spec__.parent, "capabilities.ms_marco"),
+    "PartialRerankingCapabilitiesDict": (__spec__.parent, "capabilities.types"),
+    "QwenRerankingCapabilities": (__spec__.parent, "capabilities.qwen"),
+    "RerankConfiguration": (__spec__.parent, "providers.bedrock"),
+    "RerankingCapabilitiesDict": (__spec__.parent, "capabilities.types"),
+    "RerankingCapabilityResolver": (__spec__.parent, "capabilities.resolver"),
+    "RerankingModelCapabilities": (__spec__.parent, "capabilities.base"),
+    "RerankingProvider": (__spec__.parent, "providers.base"),
+    "RerankingResult": (__spec__.parent, "providers.types"),
+    "SentenceTransformersRerankingProvider": (__spec__.parent, "providers.sentence_transformers"),
+    "VoyageRerankingCapabilities": (__spec__.parent, "capabilities.voyage"),
+    "VoyageRerankingProvider": (__spec__.parent, "providers.voyage"),
+    "bedrock_reranking_input_transformer": (__spec__.parent, "providers.bedrock"),
+    "bedrock_reranking_output_transformer": (__spec__.parent, "providers.bedrock"),
+    "cohere_max_input": (__spec__.parent, "capabilities.cohere"),
+    "cohere_reranking_output_transformer": (__spec__.parent, "providers.cohere"),
+    "default_reranking_input_transformer": (__spec__.parent, "providers.base"),
+    "default_reranking_output_transformer": (__spec__.parent, "providers.base"),
+    "get_alibaba_reranking_capabilities": (__spec__.parent, "capabilities.alibaba_nlp"),
+    "get_amazon_reranking_capabilities": (__spec__.parent, "capabilities.amazon"),
+    "get_baai_reranking_capabilities": (__spec__.parent, "capabilities.baai"),
+    "get_cohere_reranking_capabilities": (__spec__.parent, "capabilities.cohere"),
+    "get_jinaai_reranking_capabilities": (__spec__.parent, "capabilities.jinaai"),
+    "get_marco_reranking_capabilities": (__spec__.parent, "capabilities.ms_marco"),
+    "get_mixed_bread_reranking_capabilities": (__spec__.parent, "capabilities.mixed_bread_ai"),
+    "get_qwen_reranking_capabilities": (__spec__.parent, "capabilities.qwen"),
+    "get_voyage_reranking_capabilities": (__spec__.parent, "capabilities.voyage"),
+    "preprocess_for_qwen": (__spec__.parent, "providers.sentence_transformers"),
+    "voyage_reranking_output_transformer": (__spec__.parent, "providers.voyage"),
 })
 
-
-def __getattr__(name: str) -> object:
-    """Dynamically import submodules and classes for the reranking providers package."""
-    if name in _dynamic_imports:
-        module_name, submodule_name = _dynamic_imports[name]
-        module = import_module(f"{module_name}.{submodule_name}")
-        result = getattr(module, name)
-        globals()[name] = result  # Cache in globals for future access
-        return result
-    if globals().get(name) is not None:
-        return globals()[name]
-    raise AttributeError(f"module {__name__} has no attribute {name}")
-
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
+    "VALID_REGIONS",
+    "VALID_REGION_PATTERN",
+    "AlibabaNlpRerankingCapabilities",
+    "AmazonRerankingCapabilities",
+    "BaaiRerankingCapabilities",
+    "BaseBedrockModel",
+    "BedrockInlineDocumentSource",
+    "BedrockRerankConfiguration",
+    "BedrockRerankModelConfiguration",
+    "BedrockRerankRequest",
+    "BedrockRerankResultItem",
     "BedrockRerankingProvider",
+    "BedrockRerankingResult",
+    "BedrockTextQuery",
+    "CohereRerankingCapabilities",
     "CohereRerankingProvider",
+    "DocumentSource",
     "FastEmbedRerankingProvider",
-    "KnownRerankModelName",
-    "QueryType",
+    "JinaaiRerankingCapabilities",
+    "MixedBreadAiRerankingCapabilities",
+    "MsMarcoRerankingCapabilities",
+    "PartialRerankingCapabilitiesDict",
+    "QwenRerankingCapabilities",
+    "RerankConfiguration",
+    "RerankingCapabilitiesDict",
+    "RerankingCapabilityResolver",
+    "RerankingModelCapabilities",
     "RerankingProvider",
     "RerankingResult",
     "SentenceTransformersRerankingProvider",
+    "VoyageRerankingCapabilities",
     "VoyageRerankingProvider",
-    "dependency_map",
+    "bedrock_reranking_input_transformer",
+    "bedrock_reranking_output_transformer",
+    "cohere_max_input",
+    "cohere_reranking_output_transformer",
+    "default_reranking_input_transformer",
+    "default_reranking_output_transformer",
     "get_alibaba_reranking_capabilities",
     "get_amazon_reranking_capabilities",
     "get_baai_reranking_capabilities",
     "get_cohere_reranking_capabilities",
     "get_jinaai_reranking_capabilities",
     "get_marco_reranking_capabilities",
+    "get_mixed_bread_reranking_capabilities",
     "get_qwen_reranking_capabilities",
-    "get_rerank_model_provider",
     "get_voyage_reranking_capabilities",
-    "load_default_capabilities",
+    "preprocess_for_qwen",
+    "voyage_reranking_output_transformer",
 )
 
 
 def __dir__() -> list[str]:
-    """List available attributes in the reranking providers package."""
+    """List available attributes for the package."""
     return list(__all__)

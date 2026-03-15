@@ -1,0 +1,238 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+name: Nightly Tests
+
+permissions:
+  contents: read
+  issues: write
+
+on:
+  schedule:
+    # Run every night at 2 AM UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      python-versions:
+        description: JSON array of Python versions to test
+        required: false
+        type: string
+        default: '["3.12", "3.13", "3.14"]'
+
+concurrency:
+  group: nightly-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nightly-integration-tests:
+    name: Nightly Integration Tests
+    uses: ./.github/workflows/_reusable-test.yml
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
+      QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+    with:
+      python-versions: ${{ inputs.python-versions || '["3.12", "3.13", "3.14"]' }}
+      # Run integration tests, expensive tests, and tests requiring models
+      # Exclude only docker, qdrant (requires external setup), skip_ci, and flaky tests
+      test-markers: "not docker and not qdrant and not skip_ci and not flaky"
+      upload-coverage: true
+      run-quality-checks: false
+
+  nightly-real-provider-tests:
+    name: Nightly Real Provider Tests
+    uses: ./.github/workflows/_reusable-test.yml
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
+      QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+    with:
+      python-versions: '["3.12"]'
+      # Run only real provider tests (with model downloads)
+      test-markers: "real_providers and requires_models and not docker and not skip_ci and not flaky"
+      upload-coverage: true
+      run-quality-checks: false
+
+  nightly-benchmark-tests:
+    name: Nightly Benchmark Tests
+    uses: ./.github/workflows/_reusable-test.yml
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
+      QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+    with:
+      python-versions: '["3.12"]'
+      # Run benchmark and performance tests
+      test-markers: "benchmark or performance or dev_only and not docker and not skip_ci"
+      upload-coverage: false
+      run-quality-checks: false
+
+  nightly-summary:
+    name: Nightly Test Summary
+    runs-on: ubuntu-latest
+    needs:
+      - nightly-integration-tests
+      - nightly-real-provider-tests
+      - nightly-benchmark-tests
+    if: always()
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Check test results
+        id: check-results
+        run: |
+          integration_result="${{ needs.nightly-integration-tests.result }}"
+          provider_result="${{ needs.nightly-real-provider-tests.result }}"
+          benchmark_result="${{ needs.nightly-benchmark-tests.result }}"
+
+          echo "Integration Tests: $integration_result"
+          echo "Real Provider Tests: $provider_result"
+          echo "Benchmark Tests: $benchmark_result"
+
+          # Determine overall status
+          if [ "$integration_result" == "failure" ] || [ "$provider_result" == "failure" ]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "Overall Status: FAILURE ❌"
+          elif [ "$benchmark_result" == "failure" ]; then
+            echo "status=warning" >> $GITHUB_OUTPUT
+            echo "Overall Status: WARNING ⚠️ (Benchmarks Failed)"
+          elif [ "$integration_result" == "success" ] && [ "$provider_result" == "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "Overall Status: SUCCESS ✅"
+          else
+            echo "status=unknown" >> $GITHUB_OUTPUT
+            echo "Overall Status: UNKNOWN ❓"
+          fi
+
+      - name: Generate summary
+        run: |
+          echo "# Nightly Test Results 🌙" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Date**: $(date -u +"%Y-%m-%d %H:%M UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## Test Suite Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          integration="${{ needs.nightly-integration-tests.result }}"
+          provider="${{ needs.nightly-real-provider-tests.result }}"
+          benchmark="${{ needs.nightly-benchmark-tests.result }}"
+
+          # Integration Tests
+          if [ "$integration" == "success" ]; then
+            echo "- ✅ **Integration Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
+          elif [ "$integration" == "failure" ]; then
+            echo "- ❌ **Integration Tests**: FAILED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ⚠️ **Integration Tests**: $integration" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Real Provider Tests
+          if [ "$provider" == "success" ]; then
+            echo "- ✅ **Real Provider Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
+          elif [ "$provider" == "failure" ]; then
+            echo "- ❌ **Real Provider Tests**: FAILED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ⚠️ **Real Provider Tests**: $provider" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Benchmark Tests
+          if [ "$benchmark" == "success" ]; then
+            echo "- ✅ **Benchmark Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
+          elif [ "$benchmark" == "failure" ]; then
+            echo "- ⚠️ **Benchmark Tests**: FAILED (Non-blocking)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ⚠️ **Benchmark Tests**: $benchmark" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Overall Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          status="${{ steps.check-results.outputs.status }}"
+          if [ "$status" == "success" ]; then
+            echo "✅ **All critical tests passed**" >> $GITHUB_STEP_SUMMARY
+          elif [ "$status" == "warning" ]; then
+            echo "⚠️ **Critical tests passed, but benchmarks failed**" >> $GITHUB_STEP_SUMMARY
+          elif [ "$status" == "failure" ]; then
+            echo "❌ **Critical test failures detected**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❓ **Unknown status**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View full results: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create issue on failure
+        if: steps.check-results.outputs.status == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `🌙 Nightly Tests Failed - ${new Date().toISOString().split('T')[0]}`;
+            const body = `## Nightly Test Failure Report
+
+            **Date**: ${new Date().toUTCString()}
+            **Commit**: ${{ github.sha }}
+            **Workflow Run**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            ### Failed Test Suites
+
+            - Integration Tests: ${{ needs.nightly-integration-tests.result }}
+            - Real Provider Tests: ${{ needs.nightly-real-provider-tests.result }}
+            - Benchmark Tests: ${{ needs.nightly-benchmark-tests.result }}
+
+            ### Action Required
+
+            Please investigate and fix the failing tests. Check the workflow run for detailed logs.
+
+            ---
+            *This issue was automatically created by the nightly test workflow.*
+            `;
+
+            // Check if an open issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'nightly-tests,automated',
+              per_page: 10
+            });
+
+            const existingIssue = issues.data.find(issue =>
+              issue.title.includes('Nightly Tests Failed')
+            );
+
+            if (existingIssue) {
+              // Update existing issue with comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: `**New Failure Detected**\n\n${body}`
+              });
+              console.log(`Updated existing issue #${existingIssue.number}`);
+            } else {
+              // Create new issue
+              const newIssue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                // assign to claude
+                labels: ['nightly-tests', 'automated', 'bug', 'claude']
+              });
+              console.log(`Created new issue #${newIssue.data.number}`);
+            }
+
+      - name: Fail workflow if critical tests failed
+        if: steps.check-results.outputs.status == 'failure'
+        run: |
+          echo "Critical tests failed - failing workflow"
+          exit 1

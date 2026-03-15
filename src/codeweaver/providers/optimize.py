@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-"""Optimization decision logic for Fastembed and SentenceTransformers providers."""
+"""Optimization decision logic for FastEmbed and SentenceTransformers providers."""
 
 from __future__ import annotations
 
@@ -14,21 +14,22 @@ import subprocess
 
 from collections.abc import Callable
 from importlib import metadata
-from importlib.util import find_spec
 from types import ModuleType
 from typing import Literal, NotRequired, Required, TypedDict
 
-from codeweaver.common.utils import LazyImport, has_package, lazy_import
+from lateimport import LateImport, lateimport
+
+from codeweaver.core import has_package
 
 
 # ===========================================================================
-# *               Fastembed GPU/CPU Decision Logic                     *
+# *               FastEmbed GPU/CPU Decision Logic                     *
 # ===========================================================================
-"""This section conducts a series of checks to determine if Fastembed-GPU can be used.
+"""This section conducts a series of checks to determine if FastEmbed-GPU can be used.
 
-It is only called if the user requests a Fastembed provider.
+It is only called if the user requests a FastEmbed provider.
 
-There is also a separate set of optimizations that can be used with Fastembed and SentenceTransformers. These aren't yet fully implemented.
+There is also a separate set of optimizations that can be used with FastEmbed and SentenceTransformers. These aren't yet fully implemented.
 """
 
 logger = logging.getLogger(__name__)
@@ -36,9 +37,7 @@ logger = logging.getLogger(__name__)
 
 def _which_fastembed_dist() -> str | None:
     """Check if fastembed or fastembed-gpu is installed, and return which one."""
-    return next(
-        (dist for dist in ("fastembed-gpu", "fastembed") if find_spec(dist) is not None), None
-    )
+    return next((dist for dist in ("fastembed-gpu", "fastembed") if has_package(dist)), None)
 
 
 def _nvidia_smi_device_ids() -> list[int]:
@@ -127,7 +126,7 @@ def decide_fastembed_runtime(
             from warnings import warn
 
             warn(
-                f"It looks like you requested GPU usage for Fastembed, but cuda is not available. Make sure to provide your device_ids in your CodeWeaver settings if you have GPUs available, installed the `codeweaver[fastembed-gpu]` extra, and followed Fastembed's [gpu setup instructions](https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/). Our checks returned this message: {decision[2]}",
+                f"It looks like you requested GPU usage for FastEmbed, but cuda is not available. Make sure to provide your device_ids in your CodeWeaver settings if you have GPUs available, installed the `codeweaver[fastembed-gpu]` extra, and followed FastEmbed's [gpu setup instructions](https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/). Our checks returned this message: {decision[2]}",
                 stacklevel=2,
             )
             return "cpu"
@@ -140,7 +139,7 @@ def decide_fastembed_runtime(
 # These optimizations aren't yet tied into the provider executions
 # We need to:
 #    - integrate and combine them with user settings/choices
-#    - ensure they are integrated with `Fastembed` and `SentenceTransformers` (Fastembed will always use onnx, however)
+#    - ensure they are integrated with `FastEmbed` and `SentenceTransformers` (FastEmbed will always use onnx, however)
 #    - account for any potential conflicts or limitations in the chosen execution environment
 # ===========================================================================
 
@@ -169,6 +168,7 @@ class OptimizationDecisions(TypedDict, total=False):
     chunk_func: NotRequired[Callable[[int], int]]
     """A callable that takes the model's max_seq_length and returns the max chunk size to use."""
     use_small_batch_for_sparse: NotRequired[bool | None]
+    """Whether to use small batches for sparse models. """
 
 
 def _set_dense_optimization(opts: AvailableOptimizations) -> OptimizationDecisions:
@@ -233,7 +233,7 @@ def _get_general_optimizations_available() -> AvailableOptimizations:
 def _set_cpu_optimizations() -> dict[
     Literal["intel_cpu", "simd_available", "simd_exts"], bool | tuple[str, ...]
 ]:
-    cpuinfo: LazyImport[ModuleType] = lazy_import("cpuinfo")
+    cpuinfo: LateImport[ModuleType] = lateimport("cpuinfo")
     info = cpuinfo.get_cpu_info()
     simd_exts = tuple(
         flag for flag in ("avx512_vnni", "avx512", "avx2", "arm64") if flag in info.get("flags", [])
@@ -248,33 +248,46 @@ def _set_cpu_optimizations() -> dict[
 
 def get_optimizations(model_kind: Literal["dense", "sparse", "both"]) -> OptimizationDecisions:
     """Determine the optimization strategy based on input parameters."""
-    opts = _get_general_optimizations_available()
-    dense_opts = _set_dense_optimization(opts)
-    sparse_opts = dense_opts
-    for key in ("use_small_chunks_for_dense", "chunk_func"):
-        _ = sparse_opts.pop(key, None)
-    sparse_opts = OptimizationDecisions(  # ty: ignore[missing-typed-dict-key]
-        **(
-            sparse_opts
-            | {
-                "use_small_batch_for_sparse": sparse_opts["backend"] == "onnx_gpu",
-                "backend": sparse_opts["backend"],
-                "dtype": sparse_opts["dtype"],
-            }
+    try:
+        opts = _get_general_optimizations_available()
+        dense_opts = _set_dense_optimization(opts)
+        sparse_opts = dense_opts
+        for key in ("use_small_chunks_for_dense", "chunk_func"):
+            _ = sparse_opts.pop(key, None)
+        sparse_opts = OptimizationDecisions(  # ty: ignore[missing-typed-dict-key]
+            **(
+                sparse_opts
+                | {
+                    "use_small_batch_for_sparse": sparse_opts["backend"] == "onnx_gpu",
+                    "backend": sparse_opts["backend"],
+                    "dtype": sparse_opts["dtype"],
+                }
+            )
         )
-    )
-    return (
-        dense_opts
-        if model_kind == "dense"
-        else sparse_opts
-        if model_kind == "sparse"
-        else OptimizationDecisions(**(dense_opts | sparse_opts))  # ty: ignore[missing-typed-dict-key]
-    )
+    except Exception as e:
+        logger.warning(
+            msg="Failed to determine optimizations, falling back to defaults.", exc_info=e
+        )
+        return OptimizationDecisions(
+            backend="torch" if has_package("torch") else "onnx",
+            dtype="float16",
+            use_small_chunks_for_dense=False,
+        )
+
+    else:
+        return (
+            dense_opts
+            if model_kind == "dense"
+            else sparse_opts
+            if model_kind == "sparse"
+            else OptimizationDecisions(**(dense_opts | sparse_opts))
+        )
 
 
 __all__ = (
     "AvailableOptimizations",
     "OptimizationDecisions",
+    "SimdExtensions",
     "decide_fastembed_runtime",
     "get_optimizations",
 )

@@ -6,22 +6,29 @@
 
 from __future__ import annotations
 
+import logging
+
 from pathlib import Path
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 from weakref import WeakValueDictionary
 
 from pydantic import UUID7
 
-from codeweaver.core.discovery import DiscoveredFile
-from codeweaver.core.stores import UUIDStore
-from codeweaver.core.types.aliases import UUID7Hex, UUID7HexT
+from codeweaver.core import UUID7Hex, UUID7HexT, UUIDStore
+
+
+ONE_MEGABYTE = 1024 * 1024
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.core import AnonymityConversion, FilteredKeyT
+    from codeweaver.core.discovery import DiscoveredFile
+
+logger = logging.getLogger(__name__)
 
 
-class SourceIdRegistry(UUIDStore[DiscoveredFile]):
+class SourceIdRegistry(UUIDStore["DiscoveredFile"]):
     """Maintains per-file source IDs to ensure span consistency within files.
 
     This registry ensures that all spans from the same file share the same source_id, enabling set-like span operations and clean merging/splitting.
@@ -33,20 +40,44 @@ class SourceIdRegistry(UUIDStore[DiscoveredFile]):
 
     def __init__(self) -> None:
         """Initialize the registry."""
-        self.store: dict[UUID7, DiscoveredFile] = {}
-        # Keep weak references to avoid memory leaks for temporary file processing
-        self._trash_heap: WeakValueDictionary[UUID7, DiscoveredFile] = WeakValueDictionary()
+        from codeweaver.core.di.container import get_container
+        from codeweaver.core.discovery import DiscoveredFile
 
-        self._value_type = DiscoveredFile
-        self._size_limit = 1024 * 1024 * 5  # 5MB
+        try:
+            container = get_container()
+            container.register(type(self), lambda: self, singleton=True)
+        except Exception as e:
+            # Log if DI not available (monorepo compatibility)
+            logger.debug(
+                "Dependency injection container not available, skipping registration of SourceIdRegistry: %s",
+                e,
+            )
+        super().__init__(
+            store={},
+            size_limit=ONE_MEGABYTE * 5,
+            _value_type=DiscoveredFile,
+            _trash_heap=WeakValueDictionary(),
+        )
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("store"): AnonymityConversion.COUNT,
             FilteredKey("_trash_heap"): AnonymityConversion.FORBIDDEN,
         }
+
+    @property
+    def path_mapping(self) -> MappingProxyType[Path, UUID7]:
+        """Mapping from file paths to their corresponding source IDs."""
+        return MappingProxyType({file.path: file.source_id for file in self.store.values()})
+
+    def file_from_path(self, path: Path) -> DiscoveredFile | None:
+        """Get the DiscoveredFile instance for a given file path."""
+        # first we need to normalize the path
+        path = path.resolve()
+        source_id = self.path_mapping.get(path)
+        return None if source_id is None else self.store.get(source_id)
 
     def source_id_for(self, file: DiscoveredFile) -> UUID7HexT:
         """Get or create a source ID for the given file.
@@ -64,6 +95,8 @@ class SourceIdRegistry(UUIDStore[DiscoveredFile]):
         # Use the DiscoveredFile's existing source_id, don't generate a new one
         if file not in self.store.values():
             self.store[file.source_id] = file
+        if file.source_id in self.store and self.store[file.source_id] is not file:
+            self.store[file.source_id] = file
         return UUID7Hex(file.source_id.hex)
 
     def clear(self) -> None:
@@ -80,6 +113,8 @@ class SourceIdRegistry(UUIDStore[DiscoveredFile]):
         Returns:
             True if the file was in the registry, False otherwise
         """
+        from codeweaver.core.discovery import DiscoveredFile
+
         if isinstance(value, DiscoveredFile):
             file = next((k for k, v in self.store.items() if v == value), None)
             if file is None:
@@ -92,56 +127,4 @@ class SourceIdRegistry(UUIDStore[DiscoveredFile]):
         return removed
 
 
-# Global registry instance for the process
-_globalstore: SourceIdRegistry | None = None
-
-
-def source_id_for(file: DiscoveredFile) -> UUID7HexT:
-    """Get or create a source ID for the given file path using the global registry.
-
-    Args:
-        file: DiscoveredFile instance
-
-    Returns:
-        Hex string representation of the UUID7 source ID
-    """
-    global _globalstore
-    if _globalstore is None:
-        _globalstore = SourceIdRegistry()
-    return _globalstore.source_id_for(file)
-
-
-def for_file_path(file_path: str | Path) -> UUID7HexT:
-    """Get or create a source ID for the given file path using the global registry.
-
-    Args:
-        file_path: Path to the file as a string or Path object
-
-    Returns:
-        Hex string representation of the UUID7 source ID
-    """
-    from codeweaver.core.discovery import DiscoveredFile
-
-    if discovered_file := DiscoveredFile.from_path(
-        file_path if isinstance(file_path, Path) else Path(file_path)
-    ):
-        return source_id_for(discovered_file)
-    raise ValueError(f"Could not discover file from path: {file_path}")
-
-
-def clear_store() -> None:
-    """Clear the global registry."""
-    global _globalstore
-    if _globalstore is not None:
-        _globalstore.clear()
-
-
-def get_store() -> SourceIdRegistry:
-    """Get the global registry instance."""
-    global _globalstore
-    if _globalstore is None:
-        _globalstore = SourceIdRegistry()
-    return _globalstore
-
-
-__all__ = ("SourceIdRegistry", "clear_store", "get_store", "source_id_for")
+__all__ = ("ONE_MEGABYTE", "SourceIdRegistry")

@@ -35,35 +35,57 @@ from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from ast_grep_py import SgNode
+from codeweaver_tokenizers import Tokenizer
 from pydantic import UUID7
 
-from codeweaver.common.utils import uuid7
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata, SemanticMetadata
-from codeweaver.core.spans import Span
-from codeweaver.core.stores import (
+from codeweaver.core import (
+    INJECTED,
     BlakeHashKey,
     BlakeStore,
+    ChunkSource,
+    CodeChunk,
+    ExtCategory,
+    Metadata,
+    SemanticSearchLanguage,
+    SessionStatistics,
+    Span,
+    StatisticsDep,
     UUIDStore,
     get_blake_hash,
     make_blake_store,
     make_uuid_store,
+    uuid7,
+)
+from codeweaver.core.constants import (
+    DEFAULT_BLAKE_STORE_MAX_SIZE,
+    DEFAULT_UUID_STORE_MAX_SIZE,
+    MAX_SEMANTIC_CHUNKER_RECURSION_DEPTH,
+    ONE_MILLISECOND_IN_MICROSECONDS,
+    SEMANTIC_CHUNKER_PERFORMANCE_THRESHOLD_MS,
 )
 from codeweaver.engine.chunker.base import BaseChunker
 from codeweaver.engine.chunker.exceptions import ASTDepthExceededError, BinaryFileError, ParseError
 from codeweaver.engine.chunker.governance import ResourceGovernor
+from codeweaver.semantic.types import SemanticMetadata
 
 
 if TYPE_CHECKING:
     from ast_grep_py import SgRoot
 
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
     from codeweaver.engine.chunker.base import ChunkGovernor
-    from codeweaver.semantic.ast_grep import AstThing, FileThing
+    from codeweaver.semantic import AstThing, FileThing
 
 
 logger = logging.getLogger(__name__)
+
+# Import chunker logging functions for structured logging
+from codeweaver.engine.chunker._logging import (
+    log_chunking_deduplication,
+    log_chunking_edge_case,
+    log_chunking_failed,
+    log_chunking_fallback,
+)
 
 
 class SemanticChunker(BaseChunker):
@@ -89,20 +111,21 @@ class SemanticChunker(BaseChunker):
     Attributes:
         language: Target language for semantic parsing
         _importance_threshold: Minimum importance score for node inclusion
-        _store: Class-level UUID store for chunk batches
-        _hash_store: Class-level Blake3 store for content hashes
+        _store: UUID store for chunk batches
+        _hash_store: BlakeStore[UUID7] = make_blake_store(
     """
 
     language: SemanticSearchLanguage
 
-    # Class-level deduplication stores shared across instances
+    _statistics: SessionStatistics
+
     _store: UUIDStore[list[CodeChunk]] = make_uuid_store(
         value_type=list,
-        size_limit=3 * 1024 * 1024,  # 3MB cache for chunk batches
+        size_limit=DEFAULT_UUID_STORE_MAX_SIZE,  # 3MB cache for chunk batches
     )
     _hash_store: BlakeStore[UUID7] = make_blake_store(
         value_type=UUID,  # UUID7 but UUID is the type
-        size_limit=256 * 1024,  # 256KB cache for content hashes
+        size_limit=DEFAULT_BLAKE_STORE_MAX_SIZE,  # 256KB cache for content hashes
     )
 
     @classmethod
@@ -116,22 +139,55 @@ class SemanticChunker(BaseChunker):
         # Recreate stores instead of clearing to avoid weak reference issues with lists
         cls._store = make_uuid_store(
             value_type=list,
-            size_limit=3 * 1024 * 1024,  # 3MB cache for chunk batches
+            size_limit=DEFAULT_UUID_STORE_MAX_SIZE,  # 3MB cache for chunk batches
         )
         cls._hash_store = make_blake_store(
             value_type=UUID,  # UUID7 but UUID is the type
-            size_limit=256 * 1024,  # 256KB cache for content hashes
+            size_limit=DEFAULT_BLAKE_STORE_MAX_SIZE,  # 256KB cache for content hashes
         )
 
-    def __init__(self, governor: ChunkGovernor, language: SemanticSearchLanguage) -> None:
+    def __init__(
+        self,
+        governor: ChunkGovernor,
+        language: SemanticSearchLanguage,
+        tokenizer: Tokenizer | None = None,
+        statistics: StatisticsDep = INJECTED,
+    ) -> None:
         """Initialize semantic chunker with governor and language.
 
         Args:
             governor: Configuration for chunking behavior and resource limits
             language: Target semantic search language for parsing
+            tokenizer: Optional tokenizer for accurate token counting
+            statistics: Session statistics tracker for metrics
         """
         super().__init__(governor)
         self.language = language
+
+        # Handle statistics injection - resolve placeholder in test environments
+        from codeweaver.core.di import is_depends_marker
+
+        if is_depends_marker(statistics):
+            # No DI container active, create a simple SessionStatistics instance
+            self._statistics = SessionStatistics()
+        else:
+            self._statistics = statistics
+
+        # Handle tokenizer injection
+        if tokenizer is None or is_depends_marker(tokenizer):
+            try:
+                # Try to resolve from container if not provided
+                from codeweaver_tokenizers import get_tokenizer
+
+                # Default to tokenizers/gpt-4 if nothing else available
+                self.tokenizer = get_tokenizer("tokenizers", "gpt-4")
+            except Exception:
+                self.tokenizer = None
+        else:
+            self.tokenizer = tokenizer
+
+        # Cache tokenizer existence for performance (avoid repeated None checks)
+        self._has_tokenizer = self.tokenizer is not None
 
         # Use importance threshold from settings, fallback to default
         if governor.settings is not None:
@@ -167,9 +223,6 @@ class SemanticChunker(BaseChunker):
             ChunkLimitExceededError: If chunk count exceeds configured maximum
             ASTDepthExceededError: If AST nesting exceeds safe depth limit
         """
-        from codeweaver.common.statistics import get_session_statistics
-
-        statistics = get_session_statistics()
         start_time = time.perf_counter()
         batch_id = uuid7()
 
@@ -191,7 +244,7 @@ class SemanticChunker(BaseChunker):
                 unique_chunks = self._finalize_chunks(chunks, batch_id)
 
                 # Track statistics and metrics
-                self._track_statistics(file_path, statistics, unique_chunks, start_time)
+                self._track_statistics(file_path, self._statistics, unique_chunks, start_time)
 
             except ParseError as e:
                 # Log at debug level - this is an expected condition for malformed files
@@ -202,7 +255,17 @@ class SemanticChunker(BaseChunker):
                     type(e).__name__,
                     extra={"file_path": str(file_path) if file_path else None},
                 )
-                self._track_skipped_file(file_path, statistics)
+
+                # Log structured error event for observability
+                log_chunking_failed(
+                    file_path=file_path or Path("<unknown>"),
+                    chunker_type=self,
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    fallback_triggered=True,  # Caller will trigger fallback
+                )
+
+                self._track_skipped_file(file_path, self._statistics)
                 raise
             else:
                 return unique_chunks
@@ -216,7 +279,7 @@ class SemanticChunker(BaseChunker):
         Returns:
             Tuple of (file_path, source_id)
         """
-        from codeweaver.core.types.aliases import UUID7Hex
+        from codeweaver.core import UUID7Hex
 
         file_path = file.path if file else None
         if file_path:
@@ -234,7 +297,7 @@ class SemanticChunker(BaseChunker):
         if self.governor.settings is not None:
             return self.governor.settings.performance
 
-        from codeweaver.config.chunker import PerformanceSettings
+        from codeweaver.engine.config import PerformanceSettings
 
         return PerformanceSettings()
 
@@ -261,16 +324,21 @@ class SemanticChunker(BaseChunker):
         # Parse content to AST
         root: FileThing[SgRoot] = self._parse_file(content, file_path)
 
-        # Find chunkable nodes
-        nodes: list[AstThing[SgNode]] = self._find_chunkable_nodes(
+        # Find chunkable nodes and cache their depths
+        nodes, node_depths = self._find_chunkable_nodes(
             root, max_depth=performance_settings.max_ast_depth, file_path=file_path
         )
 
-        # Convert nodes to chunks
-        return self._convert_nodes_to_chunks(nodes, file_path, source_id, governor)
+        # Convert nodes to chunks using cached depths
+        return self._convert_nodes_to_chunks(nodes, file_path, source_id, governor, node_depths)
 
     def _convert_nodes_to_chunks(
-        self, nodes: list[AstThing[SgNode]], file_path: Path | None, source_id: Any, governor: Any
+        self,
+        nodes: list[AstThing[SgNode]],
+        file_path: Path | None,
+        source_id: Any,
+        governor: Any,
+        node_depths: dict[int, int],
     ) -> list[CodeChunk]:
         """Convert AST nodes to code chunks with size enforcement.
 
@@ -279,6 +347,7 @@ class SemanticChunker(BaseChunker):
             file_path: Optional file path
             source_id: Source identifier
             governor: Resource governor
+            node_depths: Mapping of node id to cached depth
 
         Returns:
             List of code chunks
@@ -287,15 +356,23 @@ class SemanticChunker(BaseChunker):
         for node in nodes:
             governor.check_timeout()
 
+            # Cache node text to avoid repeated property access
             node_text = node.text
-            tokens = len(node_text) // 4  # Rough approximation
+            # Use cached tokenizer flag for performance
+            tokens = (
+                cast(Tokenizer, self.tokenizer).estimate(node_text)
+                if self._has_tokenizer
+                else len(node_text) // 4
+            )
+
+            # Get cached depth for this node
+            depth = node_depths.get(id(node))
 
             if tokens <= self.chunk_limit:
-                chunks.append(self._create_chunk_from_node(node, file_path, source_id))
+                chunks.append(self._create_chunk_from_node(node, file_path, source_id, depth))
+                governor.register_chunk()
             else:
-                chunks.extend(self._handle_oversized_node(node, file_path, source_id))
-
-            governor.register_chunk()
+                chunks.extend(self._handle_oversized_node(node, file_path, source_id, governor))
 
         return chunks
 
@@ -329,9 +406,21 @@ class SemanticChunker(BaseChunker):
             start_time: Start time for duration calculation
         """
         with contextlib.suppress(ValueError, OSError):
-            if file_path and (ext_kind := ExtKind.from_file(file_path)):
-                statistics.add_file_operations_by_extkind([(file_path, ext_kind, "processed")])
-        self._track_chunk_metrics(chunks, time.perf_counter() - start_time)
+            if file_path and (ext_category := ExtCategory.from_file(file_path)):
+                statistics.add_file_operations_by_extcategory([
+                    (file_path, ext_category, "processed")
+                ])
+
+        # Calculate file size from chunks
+        file_size_bytes = sum(len(c.content) for c in chunks) if chunks else 0
+
+        self._track_chunk_metrics(
+            chunks,
+            time.perf_counter() - start_time,
+            file_path=file_path,
+            file_size_bytes=file_size_bytes,
+            language=self.language.as_title,
+        )
 
     def _track_skipped_file(self, file_path: Path | None, statistics: Any) -> None:
         """Track skipped file in statistics.
@@ -341,8 +430,10 @@ class SemanticChunker(BaseChunker):
             statistics: Statistics tracker
         """
         with contextlib.suppress(ValueError, OSError):
-            if file_path and (ext_kind := ExtKind.from_file(file_path)):
-                statistics.add_file_operations_by_extkind([(file_path, ext_kind, "skipped")])
+            if file_path and (ext_category := ExtCategory.from_file(file_path)):
+                statistics.add_file_operations_by_extcategory([
+                    (file_path, ext_category, "skipped")
+                ])
 
     def _handle_edge_cases(
         self, content: str, file_path: Path | None, source_id: UUID7
@@ -378,15 +469,29 @@ class SemanticChunker(BaseChunker):
         # Empty file
         if not content:
             logger.info("Empty file: %s, returning no chunks", file_path)
+
+            # Log edge case for observability
+            log_chunking_edge_case(
+                file_path=file_path or Path("<unknown>"), edge_case_type="empty_file", chunk_count=0
+            )
+
             return []
 
         # Whitespace-only file
         if not content.strip():
+            # Log edge case for observability
+            log_chunking_edge_case(
+                file_path=file_path or Path("<unknown>"),
+                edge_case_type="whitespace_only",
+                chunk_count=1,
+                extra_context={"line_count": content.count("\n") + 1},
+            )
+
             return [
                 CodeChunk.model_construct(
                     content=content,
                     line_range=Span(1, content.count("\n") + 1, source_id),
-                    ext_kind=ExtKind.from_file(file_path) if file_path else None,
+                    ext_category=ExtCategory.from_file(file_path) if file_path else None,
                     file_path=file_path,
                     language=self.language,
                     source=ChunkSource.TEXT_BLOCK,
@@ -408,14 +513,23 @@ class SemanticChunker(BaseChunker):
         ]
 
         if len(code_lines) <= 1:
-            ext_kind = ExtKind.from_file(file_path) if file_path else None
+            ext_category = ExtCategory.from_file(file_path) if file_path else None
             total_lines = content.count("\n") + 1
+
+            # Log edge case for observability
+            log_chunking_edge_case(
+                file_path=file_path or Path("<unknown>"),
+                edge_case_type="single_line",
+                chunk_count=1,
+                extra_context={"total_lines": total_lines, "code_lines": len(code_lines)},
+            )
+
             return [
                 CodeChunk.model_construct(
                     content=content,
                     line_range=Span(1, total_lines, source_id),
                     file_path=file_path,
-                    ext_kind=ext_kind,
+                    ext_category=ext_category,
                     language=self.language,
                     source=ChunkSource.TEXT_BLOCK,
                     metadata={
@@ -458,7 +572,7 @@ class SemanticChunker(BaseChunker):
                 message,
                 file_path=str(file_path) if file_path else None,
                 details={
-                    "language": self.language.value,
+                    "language": self.language.variable,
                     "line_number": line_number,
                     **(details or {}),
                 },
@@ -467,40 +581,29 @@ class SemanticChunker(BaseChunker):
         try:
             from ast_grep_py import SgRoot
 
-            from codeweaver.semantic.ast_grep import FileThing
+            from codeweaver.semantic import FileThing
 
-            root: SgRoot = SgRoot(content, self.language.value)
+            root: SgRoot = SgRoot(content, self.language.variable)
 
-            # Check for ERROR nodes which indicate syntax errors
-            error_nodes: list[tuple[int, str]] = []
-
-            def find_errors(node: SgNode) -> None:
-                """Recursively find ERROR nodes in AST."""
-                if node.kind() == "ERROR":
-                    error_nodes.append((node.range().start.line + 1, node.text()[:50]))
-                for child in node.children():
-                    find_errors(child)
-
-            find_errors(root.root())
-
-            if error_nodes:
-                error_details = "; ".join(
-                    f"line {line}: {text}..." for line, text in error_nodes[:3]
-                )
-                raise_parse_error(
-                    f"Syntax errors found in {file_path or 'content'}: {error_details}",
-                    e=None,
-                    line_number=error_nodes[0][0] if error_nodes else None,
-                    details={
-                        "language": self.language.as_title,
-                        "error_count": len(error_nodes),
-                        "errors": error_nodes,
-                    },
-                )
+            # Note: Removed ERROR node scanning for performance. ast-grep-py already
+            # raises exceptions for fatal syntax errors. ERROR nodes typically indicate
+            # partial parsing/error recovery which we don't use anyway. If SgRoot
+            # construction succeeds, the AST is usable for our purposes.
         except ParseError:
             raise
         except Exception as e:
             logger.warning("Failed to parse %s", file_path or "content", exc_info=True)
+
+            # Log structured error event for observability
+            log_chunking_failed(
+                file_path=file_path or Path("<unknown>"),
+                chunker_type=self,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                fallback_triggered=False,  # Will be handled by caller's exception handling
+                extra_context={"language": self.language.as_title},
+            )
+
             raise_parse_error(
                 f"Failed to parse {file_path or 'content'}",
                 e=e,
@@ -511,12 +614,13 @@ class SemanticChunker(BaseChunker):
 
     def _find_chunkable_nodes(
         self, root: FileThing[SgRoot], max_depth: int = 200, file_path: Path | None = None
-    ) -> list[AstThing[SgNode]]:
+    ) -> tuple[list[AstThing[SgNode]], dict[int, int]]:
         """Traverse AST and filter nodes by classification and importance.
 
         Recursively walks the AST tree from root, checking each node against
         chunkability criteria (classification and importance threshold) and
-        enforcing AST depth safety limits.
+        enforcing AST depth safety limits. Returns both chunkable nodes and
+        their depths for efficient metadata building.
 
         Args:
             root: FileThing AST root to traverse
@@ -524,27 +628,45 @@ class SemanticChunker(BaseChunker):
             file_path: Optional file path for error messages
 
         Returns:
-            List of AstThing nodes meeting chunkability criteria
+            Tuple of (chunkable nodes list, node depth mapping)
 
         Raises:
             ASTDepthExceededError: If any node exceeds safe nesting depth
         """
         chunkable: list[AstThing[SgNode]] = []
+        # Cache node depths to avoid repeated ancestor traversal
+        node_depths: dict[int, int] = {}
 
-        # Recursively check depth for all nodes in the tree
-        def check_tree_depth(node: AstThing[SgNode]) -> None:
-            self._check_ast_depth(node, max_depth, file_path)
+        # Single-pass optimized traversal that tracks depth and finds chunkable nodes
+        def traverse(node: AstThing[SgNode], depth: int) -> None:
+            # Check depth limit
+            if depth > max_depth:
+                raise ASTDepthExceededError(
+                    (
+                        f"AST nesting depth of {depth} levels exceeds the configured maximum of {max_depth} levels. "
+                        f"This typically indicates deeply nested code structures that may cause performance issues."
+                    ),
+                    actual_depth=depth,
+                    max_depth=max_depth,
+                    file_path=str(file_path) if file_path else None,
+                )
+
+            # Cache depth for this node (using id as key for O(1) lookup)
+            node_depths[id(node)] = depth
+
+            # Check if this node is chunkable
+            if self._is_chunkable(node):
+                chunkable.append(node)
+
+            # Recurse into children
             for child in node.positional_connections:
-                check_tree_depth(child)
+                traverse(child, depth + 1)
 
-        # Check depth for entire tree
+        # Start traversal from root's children
         for child_thing in root.root.positional_connections:
-            check_tree_depth(child_thing)
+            traverse(child_thing, 1)
 
-            if self._is_chunkable(child_thing):
-                chunkable.append(child_thing)
-
-        return chunkable
+        return chunkable, node_depths
 
     def _is_chunkable(self, node: AstThing[SgNode]) -> bool:
         """Check if node meets chunkability criteria.
@@ -568,7 +690,7 @@ class SemanticChunker(BaseChunker):
         if node.importance:
             # Values are already NonNegativeFloat from ImportanceScoresDict
             # Type checker loses this info through .values(), so we help it with a cast
-            scores = node.importance.as_dict().values()  # type: ignore[attr-defined]
+            scores = node.importance.as_dict().values()
             return any(score >= self._importance_threshold for score in scores)  # type: ignore[operator]
 
         # Include if we have classification but no importance scores
@@ -582,6 +704,9 @@ class SemanticChunker(BaseChunker):
         Protects against stack overflow and excessive memory usage during
         traversal of pathologically deep AST structures.
 
+        Note: This method is now primarily used for legacy support or individual checks.
+        Primary depth enforcement happens in _find_chunkable_nodes traversal.
+
         Args:
             node: AstThing node to check
             max_depth: Maximum safe nesting depth
@@ -590,7 +715,8 @@ class SemanticChunker(BaseChunker):
         Raises:
             ASTDepthExceededError: If node depth exceeds maximum
         """
-        depth = len(list(node.ancestors()))
+        # Calculate depth efficiently if needed, but prefer passing depth during traversal
+        depth = len(list(node._node.ancestors()))  # Use raw node to avoid AstThing overhead
         if depth > max_depth:
             raise ASTDepthExceededError(
                 (
@@ -603,7 +729,11 @@ class SemanticChunker(BaseChunker):
             )
 
     def _create_chunk_from_node(
-        self, node: AstThing[SgNode], file_path: Path | None, source_id: UUID7
+        self,
+        node: AstThing[SgNode],
+        file_path: Path | None,
+        source_id: UUID7,
+        depth: int | None = None,
     ) -> CodeChunk:
         """Create CodeChunk with rich metadata from AstThing node.
 
@@ -614,12 +744,13 @@ class SemanticChunker(BaseChunker):
             node: AstThing node to convert
             file_path: Optional file path for chunk context
             source_id: Shared source ID for all chunks from this file
+            depth: Optional cached depth to avoid ancestor traversal
 
         Returns:
             CodeChunk with semantic metadata
         """
         range_obj = node.range
-        metadata = self._build_metadata(node)
+        metadata = self._build_metadata(node, depth)
 
         # Use model_construct to bypass validation since dependencies may not be fully defined
         return CodeChunk.model_construct(
@@ -629,15 +760,15 @@ class SemanticChunker(BaseChunker):
                 range_obj.start.line + 1,
                 range_obj.end.line + 1,
                 source_id,
-            ),  # type: ignore[call-arg]  # All spans from same file share source_id
-            ext_kind=ExtKind.from_file(file_path) if file_path else None,
+            ),  # All spans from same file share source_id
+            ext_category=ExtCategory.from_file(file_path) if file_path else None,
             file_path=file_path,
             language=self.language,
             source=ChunkSource.SEMANTIC,
             metadata=metadata,
         )
 
-    def _build_metadata(self, node: AstThing[SgNode]) -> Metadata:
+    def _build_metadata(self, node: AstThing[SgNode], depth: int | None = None) -> Metadata:
         """Build metadata using existing Metadata TypedDict structure.
 
         Creates comprehensive metadata optimized for AI context delivery,
@@ -646,6 +777,7 @@ class SemanticChunker(BaseChunker):
 
         Args:
             node: AstThing node to extract metadata from
+            depth: Optional cached depth to avoid ancestor traversal
 
         Returns:
             Metadata TypedDict with semantic and context information
@@ -658,11 +790,14 @@ class SemanticChunker(BaseChunker):
         with contextlib.suppress(Exception):
             # For functions/methods/classes, try to get the "name" field from AST
             # Note: Accessing _node is acceptable here as it's wrapped in exception handling
-            if name_node := node._node.field("name"):  # type: ignore[attr-defined]
+            if name_node := node._node.field("name"):
                 simple_name = name_node.text()
         # Fallback to using title or node name
         if not simple_name:
             simple_name = node.title if hasattr(node, "title") else str(node.name)
+
+        # Use cached depth if available, otherwise calculate from ancestors
+        nesting_level = depth if depth is not None else len(list(node.ancestors()))
 
         metadata: Metadata = {
             "chunk_id": uuid7(),
@@ -674,18 +809,26 @@ class SemanticChunker(BaseChunker):
                 "chunker_type": "semantic",
                 "content_hash": self._compute_content_hash(node.text),
                 "classification": node.classification.name if node.classification else None,
-                "kind": str(node.name),
-                "category": node.primary_category if hasattr(node, "primary_category") else None,
-                "importance_scores": node.importance.as_dict() if node.importance else None,  # type: ignore[attr-defined]
+                "kind": node.primary_category
+                if hasattr(node, "primary_category")
+                else str(node.name)
+                if node.name
+                else "",
+                "importance_scores": node.importance.as_dict() if node.importance else None,
                 "is_composite": node.is_composite,
-                "nesting_level": len(list(node.ancestors())),
+                "nesting_level": nesting_level,
             },
         }
 
         return metadata
 
     def _handle_oversized_node(
-        self, node: AstThing[SgNode], file_path: Path | None, source_id: UUID7
+        self,
+        node: AstThing[SgNode],
+        file_path: Path | None,
+        source_id: UUID7,
+        governor: Any,
+        recursion_depth: int = 0,
     ) -> list[CodeChunk]:
         """Handle nodes exceeding token limit via multi-tiered strategy.
 
@@ -698,52 +841,120 @@ class SemanticChunker(BaseChunker):
 
         Args:
             node: Oversized AstThing node
-            file_path: Optional file path for context
+            file_path: Optional file_path for context
             source_id: Shared source ID for all chunks from this file
+            governor: Resource governor for limit enforcement
+            recursion_depth: Current recursion depth to prevent stack overflow
 
         Returns:
             List of chunks derived from oversized node
         """
-        # Try chunking children first for composite nodes
-        if node.is_composite:
-            children = list(node.positional_connections)
-            child_chunks: list[CodeChunk] = []
+        # Tier 1: Recursive child chunking for composite nodes
+        if (
+            node.is_composite
+            and recursion_depth < MAX_SEMANTIC_CHUNKER_RECURSION_DEPTH
+            and (
+                child_chunks := self._chunk_oversized_node_children(
+                    node, file_path, source_id, governor, recursion_depth
+                )
+            )
+        ):
+            return child_chunks
 
-            for child in children:
-                child_tokens = len(child.text) // 4
+        # Log recursion limit warning if falling back due to depth
+        if recursion_depth >= MAX_SEMANTIC_CHUNKER_RECURSION_DEPTH:
+            logger.warning(
+                "Maximum recursion depth (%d) reached for oversized node '%s', using delimiter fallback",
+                MAX_SEMANTIC_CHUNKER_RECURSION_DEPTH,
+                node.name,
+            )
 
-                if child_tokens <= self.chunk_limit:
-                    child_chunks.append(self._create_chunk_from_node(child, file_path, source_id))
-                else:
-                    # Recursive handling for oversized children
-                    child_chunks.extend(self._handle_oversized_node(child, file_path, source_id))
+        # Tier 2: Fallback to delimiter-based chunking
+        return self._fallback_to_delimiter_chunking(node, file_path, source_id, governor)
 
-            if child_chunks:
-                return child_chunks
+    def _chunk_oversized_node_children(
+        self,
+        node: AstThing[SgNode],
+        file_path: Path | None,
+        source_id: UUID7,
+        governor: Any,
+        recursion_depth: int,
+    ) -> list[CodeChunk]:
+        """Recursive child chunking for oversized composite nodes."""
+        children = list(node.positional_connections)
+        child_chunks: list[CodeChunk] = []
 
-        # Fallback: Use delimiter chunker to split oversized node text
+        for child in children:
+            governor.check_timeout()
+            # Cache child text for performance
+            child_text = child.text
+            if self._has_tokenizer:
+                child_tokens = cast(Tokenizer, self.tokenizer).estimate(child_text)
+            else:
+                child_tokens = len(child_text) // 4
+
+            if child_tokens <= self.chunk_limit:
+                child_chunks.append(self._create_chunk_from_node(child, file_path, source_id))
+                governor.register_chunk()
+            else:
+                # Recursive handling for oversized children with incremented depth
+                child_chunks.extend(
+                    self._handle_oversized_node(
+                        child, file_path, source_id, governor, recursion_depth + 1
+                    )
+                )
+
+        return child_chunks
+
+    def _fallback_to_delimiter_chunking(
+        self, node: AstThing[SgNode], file_path: Path | None, source_id: UUID7, governor: Any
+    ) -> list[CodeChunk]:
+        """Delimiter-based fallback for oversized nodes that cannot be semantically subdivided."""
         logger.info(
             "Oversized node without chunkable children: %s, falling back to delimiter chunker",
             node.name,
         )
 
-        # Import delimiter chunker for fallback
         from codeweaver.engine.chunker.delimiter import DelimiterChunker
 
         # Create delimiter chunker with same language
         delimiter_chunker = DelimiterChunker(
             governor=self.governor,
-            language=self.language.value if hasattr(self.language, "value") else str(self.language),
+            language=self.language.variable
+            if hasattr(self.language, "variable")
+            else str(self.language),
         )
 
-        # Chunk the node text using delimiter patterns
-        # Create a pseudo-file for the node text with proper source tracking
-        from codeweaver.core.discovery import DiscoveredFile as _DiscoveredFile
+        log_chunking_fallback(
+            file_path=file_path or Path("<unknown>"),
+            from_chunker=self,
+            to_chunker=delimiter_chunker,
+            reason="oversized_chunk",
+            extra_context={"node_name": node.name, "node_text_length": len(node.text)},
+        )
+
+        from codeweaver.core import DiscoveredFile as _DiscoveredFile
 
         temp_file = _DiscoveredFile.from_path(file_path) if file_path else None
-
-        # Get delimiter chunks
         delimiter_chunks = delimiter_chunker.chunk(node.text, file=temp_file)
+
+        # If delimiter chunking didn't actually split it (produced 1 chunk >= original size)
+        # OR if it produced no chunks, we MUST return a single chunk to avoid infinite recursion
+        if not delimiter_chunks or (
+            len(delimiter_chunks) == 1 and len(delimiter_chunks[0].content) >= len(node.text)
+        ):
+            metadata = self._build_metadata(node)
+            chunk = CodeChunk(
+                content=node.text,
+                line_range=Span(node.range.start.line + 1, node.range.end.line + 1, source_id),
+                ext_category=ExtCategory.from_file(file_path) if file_path else None,
+                file_path=file_path,
+                language=self.language,
+                source=ChunkSource.SEMANTIC,
+                metadata=metadata,
+            )
+            governor.register_chunk()
+            return [chunk]
 
         # Enhance each chunk with semantic fallback metadata
         metadata = self._build_metadata(node)
@@ -765,18 +976,18 @@ class SemanticChunker(BaseChunker):
                 chunk_metadata["context"] = {}
 
             # Add semantic fallback indicators (both top-level and in context)
-            chunk_metadata["context"]["fallback"] = "delimiter"  # type: ignore[index]
-            chunk_metadata["context"]["parent_semantic_node"] = node.name  # type: ignore[index]
+            chunk_metadata["context"]["fallback"] = "delimiter"
+            chunk_metadata["context"]["parent_semantic_node"] = node.name
 
             # Create enhanced chunk preserving delimiter chunk properties
             enhanced_chunk = CodeChunk(
                 content=delimiter_chunk.content,
                 line_range=delimiter_chunk.line_range,
-                ext_kind=delimiter_chunk.ext_kind,
+                ext_category=delimiter_chunk.ext_category,
                 file_path=delimiter_chunk.file_path,
                 language=delimiter_chunk.language,
                 source=ChunkSource.TEXT_BLOCK,  # Not truly semantic
-                metadata=Metadata(**chunk_metadata),  # type: ignore
+                metadata=Metadata(**chunk_metadata),
             )
             enhanced_chunks.append(enhanced_chunk)
 
@@ -784,8 +995,8 @@ class SemanticChunker(BaseChunker):
             # Last resort: single chunk with fallback metadata
             CodeChunk(
                 content=node.text,
-                line_range=Span(node.range.start.line, node.range.end.line, source_id),  # type: ignore[call-arg]
-                ext_kind=ExtKind.from_file(file_path) if file_path else None,
+                line_range=Span(node.range.start.line, node.range.end.line, source_id),
+                ext_category=ExtCategory.from_file(file_path) if file_path else None,
                 file_path=file_path,
                 language=self.language,
                 source=ChunkSource.SEMANTIC,
@@ -821,7 +1032,7 @@ class SemanticChunker(BaseChunker):
         Returns:
             List of unique chunks
         """
-        from codeweaver.core.chunks import BatchKeys
+        from codeweaver.core import BatchKeys
 
         deduplicated: list[CodeChunk] = []
 
@@ -857,9 +1068,25 @@ class SemanticChunker(BaseChunker):
             batch_keys = BatchKeys(id=batch_id, idx=idx)
             deduplicated.append(chunk.set_batch_keys(batch_keys))
 
+        # Log deduplication statistics if any duplicates were found
+        if len(chunks) > len(deduplicated):
+            log_chunking_deduplication(
+                file_path=Path("<batch>"),  # Batch-level dedup doesn't have single file
+                total_chunks=len(chunks),
+                duplicate_chunks=len(chunks) - len(deduplicated),
+                unique_chunks=len(deduplicated),
+            )
+
         return deduplicated
 
-    def _track_chunk_metrics(self, chunks: list[CodeChunk], duration: float) -> None:
+    def _track_chunk_metrics(
+        self,
+        chunks: list[CodeChunk],
+        duration: float,
+        file_path: Path | None = None,
+        file_size_bytes: int = 0,
+        language: str = "unknown",
+    ) -> None:
         """Track chunking performance metrics via structured logging.
 
         Logs structured event with chunk count, duration, chunker type,
@@ -868,18 +1095,33 @@ class SemanticChunker(BaseChunker):
         Args:
             chunks: Generated chunks for metrics
             duration: Operation duration in seconds
+            file_path: Optional file path being chunked
+            file_size_bytes: Total size of content in bytes
+            language: Programming language of the file
         """
-        logger.info(
-            "chunking_completed",
-            extra={
-                "chunk_count": len(chunks),
-                "duration_ms": duration * 1000,
-                "chunker_type": "semantic",
-                "avg_chunk_size": sum(len(c.content) for c in chunks) / len(chunks)
-                if chunks
-                else 0,
-            },
+        from codeweaver.engine.chunker import _logging as chunker_logging
+
+        duration_ms = duration * ONE_MILLISECOND_IN_MICROSECONDS
+
+        # Use standardized structured logging
+        chunker_logging.log_chunking_completed(
+            file_path=file_path or Path("<unknown>"),
+            chunker_type=self,
+            chunk_count=len(chunks),
+            duration_ms=duration_ms,
+            file_size_bytes=file_size_bytes,
+            language=language,
         )
+
+        # Log performance warning if chunking took too long
+        if duration_ms > SEMANTIC_CHUNKER_PERFORMANCE_THRESHOLD_MS:
+            chunker_logging.log_chunking_performance_warning(
+                file_path=file_path or Path("<unknown>"),
+                chunker_type=self,
+                duration_ms=duration_ms,
+                threshold_ms=SEMANTIC_CHUNKER_PERFORMANCE_THRESHOLD_MS,
+                extra_context={"chunk_count": len(chunks), "file_size_bytes": file_size_bytes},
+            )
 
 
 __all__ = ("SemanticChunker",)

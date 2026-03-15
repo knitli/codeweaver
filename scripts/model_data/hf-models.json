@@ -1,0 +1,3927 @@
+{
+  "aliases": {
+    "fastembed": {
+      "nomic-ai/nomic-embed-text-v1.5-GGUF": "nomic-ai/nomic-embed-text-v1.5-Q"
+    },
+    "ollama": {
+      "BAAI/bge-large-en-v1.5": "bge-large-en:335m",
+      "BAAI/bge-m3": "bge-m3:567m",
+      "ibm-granite/granite-embedding-278m-multilingual": "granite-embedding:278m",
+      "ibm-granite/granite-embedding-30m-english": "granite-embedding:30m",
+      "mixedbread-ai/mxbai-embed-large-v1": "mxbai-embed-large",
+      "nomic-ai/nomic-embed-text-v1.5": "nomic-embed-text",
+      "sentence-transformers/all-MiniLM-L6-v2": "all-minilm:22m",
+      "Snowflake/snowflake-arctic-embed-l-v2.0": "snowflake-arctic-embed2:568m"
+    }
+  },
+  "model_map": {
+    "Alibaba-NLP": {
+      "Alibaba-NLP/gte-modernbert-base": [
+        "groq",
+        "hf-inference",
+        "sentence-transformers",
+        "together"
+      ],
+      "Alibaba-NLP/gte-multilingual-base": [
+        "sentence-transformers"
+      ]
+    },
+    "BAAI": {
+      "BAAI/bge-base-en-v1.5": [
+        "fastembed",
+        "hf-inference",
+        "sentence-transformers",
+        "together"
+      ],
+      "BAAI/bge-large-en-v1": [
+        "hf-inference",
+        "sentence-transformers"
+      ],
+      "BAAI/bge-large-en-v1.5": [
+        "fastembed",
+        "hf-inference",
+        "sentence-transformers",
+        "together"
+      ],
+      "BAAI/bge-m3": [
+        "hf-inference",
+        "sentence-transformers",
+        "fastembed"
+      ],
+      "BAAI/bge-small-en-v1.5": [
+        "fastembed",
+        "hf-inference",
+        "sentence-transformers"
+      ]
+    },
+    "ibm-granite": {
+      "ibm-granite/granite-embedding-278m-multilingual": [
+        "hf-inference",
+        "sentence-transformers"
+      ],
+      "ibm-granite/granite-embedding-30m-english": [
+        "sentence-transformers"
+      ],
+      "ibm-granite/granite-embedding:278m": [
+        "ollama"
+      ],
+      "ibm-granite/granite-embedding:30m": [
+        "ollama"
+      ]
+    },
+    "intfloat": {
+      "intfloat/multilingual-e5-large": [
+        "hf-inference",
+        "fastembed",
+        "sentence-transformers"
+      ],
+      "intfloat/multilingual-e5-large-instruct": [
+        "hf-inference",
+        "sentence-transformers",
+        "together"
+      ]
+    },
+    "jinaai": {
+      "jinaai/jina-embeddings-v2-base-code": [
+        "fastembed"
+      ],
+      "jinaai/jina-embeddings-v3": [
+        "fastembed"
+      ],
+      "jinaai/jina-embeddings-v4": [
+        "sentence-transformers"
+      ]
+    },
+    "mixedbread-ai": {
+      "mixedbread-ai/mxbai-embed-large-v1": [
+        "ollama"
+      ]
+    },
+    "nomic-ai": {
+      "nomic-ai/modernbert-embed-base": [
+        "fireworks",
+        "hf-inference",
+        "sentence-transformers"
+      ],
+      "nomic-ai/nomic-embed-text-v1.5": [
+        "fireworks",
+        "fastembed"
+      ],
+      "nomic-ai/nomic-embed-text-v1.5-GGUF": [
+        "fastembed"
+      ],
+      "nomic-ai/nomic-embed-text-v2-moe": [
+        "fireworks",
+        "sentence-transformers"
+      ]
+    },
+    "Qwen": {
+      "Qwen/Qwen3-Embedding-0.6B": [
+        "sentence-transformers"
+      ],
+      "Qwen/Qwen3-Embedding-4B": [
+        "sentence-transformers"
+      ],
+      "Qwen/Qwen3-Embedding-8B": [
+        "sentence-transformers"
+      ]
+    },
+    "sentence-transformers": {
+      "sentence-transformers/all-MiniLM-L12-v2": [
+        "hf-inference",
+        "sentence-transformers"
+      ],
+      "sentence-transformers/all-MiniLM-L6-v2": [
+        "fastembed",
+        "hf-inference",
+        "sentence-transformers"
+      ],
+      "sentence-transformers/all-mpnet-base-v2": [
+        "hf-inference",
+        "sentence-transformers"
+      ],
+      "sentence-transformers/gtr-t5-base": [
+        "hf-inference",
+        "sentence-transformers"
+      ],
+      "sentence-transformers/LaBSE": [
+        "hf-inference",
+        "sentence-transformers"
+      ],
+      "sentence-transformers/multi-qa-MiniLM-L6-cos-v1": [
+        "hf-inference",
+        "sentence-transformers"
+      ],
+      "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2": [
+        "fastembed",
+        "hf-inference",
+        "sentence-transformers"
+      ],
+      "sentence-transformers/paraphrase-multilingual-mpnet-base-v2": [
+        "fastembed",
+        "hf-inference",
+        "sentence-transformers"
+      ]
+    },
+    "Snowflake": {
+      "Snowflake/snowflake-arctic-embed-l": [
+        "fastembed"
+      ],
+      "Snowflake/snowflake-arctic-embed-l-v2.0": [
+        "hf-inference",
+        "sentence-transformers",
+        "fastembed",
+        "ollama"
+      ],
+      "Snowflake/snowflake-arctic-embed-m": [
+        "fastembed"
+      ],
+      "Snowflake/snowflake-arctic-embed-m-long": [
+        "fastembed"
+      ],
+      "Snowflake/snowflake-arctic-embed-m-v2.0": [
+        "fastembed",
+        "sentence-transformers"
+      ],
+      "Snowflake/snowflake-arctic-embed-s": [
+        "fastembed"
+      ],
+      "Snowflake/snowflake-arctic-embed-xs": [
+        "fastembed"
+      ]
+    },
+    "thenlper": {
+      "thenlper/gte-base": [
+        "fastembed",
+        "fireworks"
+      ],
+      "thenlper/gte-large": [
+        "fastembed",
+        "fireworks"
+      ]
+    },
+    "WhereIsAI": {
+      "WhereIsAI/UAE-Code-Large-V1": [
+        "sentence-transformers"
+      ],
+      "WhereIsAI/UAE-Large-V1": [
+        "fastembed",
+        "fireworks",
+        "hf-inference",
+        "sentence-transformers",
+        "together"
+      ]
+    }
+  },
+  "models": {
+    "Alibaba-NLP/gte-modernbert-base": {
+      "adapted_from": null,
+      "embed_dim": 768,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name": "Alibaba-NLP/gte-modernbert-base",
+        "revision": "7ca8b4ca700621b67618669f5378fe5f5820b8e4"
+      },
+      "max_tokens": 8192,
+      "memory_usage_mb": 284,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 149000000,
+      "name": "Alibaba-NLP/gte-modernbert-base",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/Alibaba-NLP/gte-modernbert-base",
+      "release_date": "2025-01-21",
+      "revision": "7ca8b4ca700621b67618669f5378fe5f5820b8e4",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "CMedQAv2-reranking": [
+          "train"
+        ],
+        "DuRetrieval": [
+          "train"
+        ],
+        "FEVER": [
+          "train"
+        ],
+        "FEVER-NL": [
+          "train"
+        ],
+        "HotpotQA": [
+          "train"
+        ],
+        "HotpotQA-NL": [
+          "train"
+        ],
+        "MIRACLReranking": [
+          "train"
+        ],
+        "MIRACLRetrieval": [
+          "train"
+        ],
+        "MIRACLRetrievalHardNegatives": [
+          "train"
+        ],
+        "mMARCO-NL": [
+          "train"
+        ],
+        "MMarcoReranking": [
+          "train"
+        ],
+        "MrTidyRetrieval": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "MultiLongDocRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "NQ-NL": [
+          "train"
+        ],
+        "T2Retrieval": [
+          "train"
+        ]
+      },
+      "use_instructions": false
+    },
+    "Alibaba-NLP/gte-multilingual-base": {
+      "adapted_from": null,
+      "embed_dim": 768,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "afr-Latn",
+        "ara-Arab",
+        "aze-Latn",
+        "bel-Cyrl",
+        "bul-Cyrl",
+        "ben-Being",
+        "cat-Latn",
+        "ceb-Latn",
+        "ces-Latn",
+        "cym-Latn",
+        "dan-Latn",
+        "deu-Latn",
+        "ell-Grek",
+        "eng-Latn",
+        "spa-Latn",
+        "est-Latn",
+        "eus-Latn",
+        "fas-Arab",
+        "fin-Latn",
+        "fra-Latn",
+        "glg-Latn",
+        "guj-Gujr",
+        "heb-Hebr",
+        "hin-Deva",
+        "hrv-Latn",
+        "hat-Latn",
+        "hun-Latn",
+        "hye-Armn",
+        "ind-Latn",
+        "isl-Latn",
+        "ita-Latn",
+        "jpn-Jpan",
+        "jav-Latn",
+        "kat-Geor",
+        "kaz-Cyrl",
+        "khm-Khmr",
+        "kan-Knda",
+        "kor-Hang",
+        "kir-Cyrl",
+        "lao-Laoo",
+        "lit-Latn",
+        "lav-Latn",
+        "mkd-Cyrl",
+        "mal-Mlym",
+        "mon-Cyrl",
+        "mar-Deva",
+        "msa-Latn",
+        "mya-Mymr",
+        "nep-Deva",
+        "nld-Latn",
+        "nor-Latn",
+        "pan-Guru",
+        "pol-Latn",
+        "por-Latn",
+        "que-Latn",
+        "ron-Latn",
+        "rus-Cyrl",
+        "sin-Sinh",
+        "slk-Latn",
+        "slv-Latn",
+        "swa-Latn",
+        "tam-Taml",
+        "tel-Telu",
+        "tha-Thai",
+        "tgl-Latn",
+        "tur-Latn",
+        "ukr-Cyrl",
+        "urd-Arab",
+        "vie-Latn",
+        "your-Latn",
+        "zho-Hans"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name": "Alibaba-NLP/gte-multilingual-base",
+        "revision": "ca1791e0bcc104f6db161f27de1340241b13c5a4"
+      },
+      "max_tokens": 8192,
+      "memory_usage_mb": 582,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 305000000,
+      "name": "Alibaba-NLP/gte-multilingual-base",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/Alibaba-NLP/gte-multilingual-base",
+      "release_date": "2024-07-20",
+      "revision": "ca1791e0bcc104f6db161f27de1340241b13c5a4",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "CMedQAv2-reranking": [
+          "train"
+        ],
+        "DuRetrieval": [
+          "train"
+        ],
+        "FEVER": [
+          "train"
+        ],
+        "FEVER-NL": [
+          "train"
+        ],
+        "HotpotQA": [
+          "train"
+        ],
+        "HotpotQA-NL": [
+          "train"
+        ],
+        "MIRACLReranking": [
+          "train"
+        ],
+        "MIRACLRetrieval": [
+          "train"
+        ],
+        "MIRACLRetrievalHardNegatives": [
+          "train"
+        ],
+        "mMARCO-NL": [
+          "train"
+        ],
+        "MMarcoReranking": [
+          "train"
+        ],
+        "MrTidyRetrieval": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "MultiLongDocRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "NQ-NL": [
+          "train"
+        ],
+        "T2Retrieval": [
+          "train"
+        ]
+      },
+      "use_instructions": false
+    },
+    "BAAI/bge-base-en-v1.5": {
+      "adapted_from": null,
+      "embed_dim": 768,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "mit",
+      "loader": {
+        "model_name": "BAAI/bge-base-en-v1.5",
+        "model_prompts": {
+          "query": "Represent this sentence for searching relevant passages: "
+        },
+        "revision": "a5beb1e3e68b9ab74eb54cfd186867f64f240e1a"
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": 390,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 109000000,
+      "name": "BAAI/bge-base-en-v1.5",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": "https://data.baai.ac.cn/details/BAAI-MTP",
+      "reference": "https://huggingface.co/BAAI/bge-base-en-v1.5",
+      "release_date": "2023-09-11",
+      "revision": "a5beb1e3e68b9ab74eb54cfd186867f64f240e1a",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "AmazonReviewsClassification": [
+          "validation",
+          "test"
+        ],
+        "DuRetrieval": [
+          "train"
+        ],
+        "MLQARetrieval": [
+          "validation",
+          "test"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ]
+      },
+      "use_instructions": true
+    },
+    "BAAI/bge-large-en-v1.5": {
+      "adapted_from": null,
+      "embed_dim": 1024,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "mit",
+      "loader": {
+        "model_name": "BAAI/bge-large-en-v1.5",
+        "model_prompts": {
+          "query": "Represent this sentence for searching relevant passages: "
+        },
+        "revision": "d4aa6901d3a41ba39fb536a557fa166f842b0e09"
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": 1242,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 335000000,
+      "name": "BAAI/bge-large-en-v1.5",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": "https://data.baai.ac.cn/details/BAAI-MTP",
+      "reference": "https://huggingface.co/BAAI/bge-large-en-v1.5",
+      "release_date": "2023-09-12",
+      "revision": "d4aa6901d3a41ba39fb536a557fa166f842b0e09",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "AmazonReviewsClassification": [
+          "validation",
+          "test"
+        ],
+        "DuRetrieval": [
+          "train"
+        ],
+        "MLQARetrieval": [
+          "validation",
+          "test"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ]
+      },
+      "use_instructions": true
+    },
+    "BAAI/bge-small-en-v1.5": {
+      "adapted_from": null,
+      "embed_dim": 512,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "mit",
+      "loader": {
+        "model_name": "BAAI/bge-small-en-v1.5",
+        "model_prompts": {
+          "query": "Represent this sentence for searching relevant passages: "
+        },
+        "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": 127,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 33400000,
+      "name": "BAAI/bge-small-en-v1.5",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": "https://data.baai.ac.cn/details/BAAI-MTP",
+      "reference": "https://huggingface.co/BAAI/bge-small-en-v1.5",
+      "release_date": "2023-09-12",
+      "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "AmazonReviewsClassification": [
+          "validation",
+          "test"
+        ],
+        "DuRetrieval": [
+          "train"
+        ],
+        "MLQARetrieval": [
+          "validation",
+          "test"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ]
+      },
+      "use_instructions": true
+    },
+    "ibm-granite/granite-embedding-278m-multilingual": {
+      "adapted_from": null,
+      "embed_dim": 768,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "ara-Latn",
+        "ces-Latn",
+        "deu-Latn",
+        "eng-Latn",
+        "spa-Latn",
+        "fra-Latn",
+        "ita-Latn",
+        "jpn-Latn",
+        "kor-Latn",
+        "nld-Latn",
+        "por-Latn",
+        "zho-Hant",
+        "zho-Hans"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name": "ibm-granite/granite-embedding-278m-multilingual",
+        "revision": "84e3546b88b0cb69f8078608a1df558020bcbf1f"
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": 530,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 278000000,
+      "name": "ibm-granite/granite-embedding-278m-multilingual",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/ibm-granite/granite-embedding-278m-multilingual",
+      "release_date": "2024-12-18",
+      "revision": "84e3546b88b0cb69f8078608a1df558020bcbf1f",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "AskUbuntuDupQuestions": [],
+        "DBPedia": [
+          "train"
+        ],
+        "DBPedia-NL": [
+          "train"
+        ],
+        "FEVER": [
+          "test"
+        ],
+        "FEVER-NL": [
+          "test"
+        ],
+        "FEVERHardNegatives": [
+          "test"
+        ],
+        "HotPotQA": [
+          "test"
+        ],
+        "HotpotQA-NL": [
+          "test"
+        ],
+        "HotPotQA-PL": [
+          "test"
+        ],
+        "HotPotQAHardNegatives": [
+          "test"
+        ],
+        "MIRACLReranking": [
+          "train"
+        ],
+        "MIRACLRetrieval": [
+          "train"
+        ],
+        "MIRACLRetrievalHardNegatives": [
+          "train"
+        ],
+        "MrTidyRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ],
+        "StackExchangeClustering": [],
+        "StackExchangeClustering.v2": [],
+        "StackExchangeClusteringP2P": [],
+        "StackExchangeClusteringP2P.v2": [],
+        "StackOverflowDupQuestions": [],
+        "WikipediaRerankingMultilingual": [],
+        "WikipediaRetrievalMultilingual": []
+      },
+      "use_instructions": false
+    },
+    "ibm-granite/granite-embedding-30m-english": {
+      "adapted_from": null,
+      "embed_dim": 384,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name": "ibm-granite/granite-embedding-30m-english",
+        "revision": "eddbb57470f896b5f8e2bfcb823d8f0e2d2024a5"
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": 58,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 30000000,
+      "name": "ibm-granite/granite-embedding-30m-english",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/ibm-granite/granite-embedding-30m-english",
+      "release_date": "2024-12-18",
+      "revision": "eddbb57470f896b5f8e2bfcb823d8f0e2d2024a5",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "AskUbuntuDupQuestions": [],
+        "DBPedia": [
+          "train"
+        ],
+        "DBPedia-NL": [
+          "train"
+        ],
+        "FEVER": [
+          "test"
+        ],
+        "FEVER-NL": [
+          "test"
+        ],
+        "FEVERHardNegatives": [
+          "test"
+        ],
+        "HotPotQA": [
+          "test"
+        ],
+        "HotpotQA-NL": [
+          "test"
+        ],
+        "HotPotQA-PL": [
+          "test"
+        ],
+        "HotPotQAHardNegatives": [
+          "test"
+        ],
+        "MIRACLReranking": [
+          "train"
+        ],
+        "MIRACLRetrieval": [
+          "train"
+        ],
+        "MIRACLRetrievalHardNegatives": [
+          "train"
+        ],
+        "MrTidyRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ],
+        "StackExchangeClustering": [],
+        "StackExchangeClustering.v2": [],
+        "StackExchangeClusteringP2P": [],
+        "StackExchangeClusteringP2P.v2": [],
+        "StackOverflowDupQuestions": [],
+        "WikipediaRerankingMultilingual": [],
+        "WikipediaRetrievalMultilingual": []
+      },
+      "use_instructions": false
+    },
+    "ibm-granite/granite-embedding-english-r2": {
+      "adapted_from": null,
+      "embed_dim": 768,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {},
+      "max_tokens": 8192,
+      "memory_usage_mb": 284,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 149000000,
+      "name": "ibm-granite/granite-embedding-english-r2",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/ibm-granite/granite-embedding-english-r2",
+      "release_date": "2025-08-15",
+      "revision": "6e7b8ce0e76270394ac4669ba4bbd7133b60b7f9",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "AskUbuntuDupQuestions": [],
+        "DBPedia": [
+          "train"
+        ],
+        "DBPedia-NL": [
+          "train"
+        ],
+        "FEVER": [
+          "test"
+        ],
+        "FEVER-NL": [
+          "test"
+        ],
+        "FEVERHardNegatives": [
+          "test"
+        ],
+        "HotPotQA": [
+          "test"
+        ],
+        "HotpotQA-NL": [
+          "test"
+        ],
+        "HotPotQA-PL": [
+          "test"
+        ],
+        "HotPotQAHardNegatives": [
+          "test"
+        ],
+        "MIRACLReranking": [
+          "train"
+        ],
+        "MIRACLRetrieval": [
+          "train"
+        ],
+        "MIRACLRetrievalHardNegatives": [
+          "train"
+        ],
+        "MrTidyRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ],
+        "StackExchangeClustering": [],
+        "StackExchangeClustering.v2": [],
+        "StackExchangeClusteringP2P": [],
+        "StackExchangeClusteringP2P.v2": [],
+        "StackOverflowDupQuestions": [],
+        "WikipediaRerankingMultilingual": [],
+        "WikipediaRetrievalMultilingual": []
+      },
+      "use_instructions": false
+    },
+    "ibm-granite/granite-embedding-small-english-r2": {
+      "adapted_from": null,
+      "embed_dim": 384,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {},
+      "max_tokens": 8192,
+      "memory_usage_mb": 91,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 47000000,
+      "name": "ibm-granite/granite-embedding-small-english-r2",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/ibm-granite/granite-embedding-small-english-r2",
+      "release_date": "2025-08-15",
+      "revision": "54a8d2616a0844355a5164432d3f6dafb37b17a3",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "AskUbuntuDupQuestions": [],
+        "DBPedia": [
+          "train"
+        ],
+        "DBPedia-NL": [
+          "train"
+        ],
+        "FEVER": [
+          "test"
+        ],
+        "FEVER-NL": [
+          "test"
+        ],
+        "FEVERHardNegatives": [
+          "test"
+        ],
+        "HotPotQA": [
+          "test"
+        ],
+        "HotpotQA-NL": [
+          "test"
+        ],
+        "HotPotQA-PL": [
+          "test"
+        ],
+        "HotPotQAHardNegatives": [
+          "test"
+        ],
+        "MIRACLReranking": [
+          "train"
+        ],
+        "MIRACLRetrieval": [
+          "train"
+        ],
+        "MIRACLRetrievalHardNegatives": [
+          "train"
+        ],
+        "MrTidyRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ],
+        "StackExchangeClustering": [],
+        "StackExchangeClustering.v2": [],
+        "StackExchangeClusteringP2P": [],
+        "StackExchangeClusteringP2P.v2": [],
+        "StackOverflowDupQuestions": [],
+        "WikipediaRerankingMultilingual": [],
+        "WikipediaRetrievalMultilingual": []
+      },
+      "use_instructions": false
+    },
+    "intfloat/multilingual-e5-large": {
+      "adapted_from": "FacebookAI/xlm-roberta-large",
+      "embed_dim": 1024,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "afr-Latn",
+        "amh-Latn",
+        "ara-Latn",
+        "asm-Latn",
+        "aze-Latn",
+        "bel-Latn",
+        "bul-Latn",
+        "ben-Latn",
+        "ben-Being",
+        "bre-Latn",
+        "bos-Latn",
+        "cat-Latn",
+        "ces-Latn",
+        "cym-Latn",
+        "dan-Latn",
+        "deu-Latn",
+        "ell-Latn",
+        "eng-Latn",
+        "epo-Latn",
+        "spa-Latn",
+        "est-Latn",
+        "eus-Latn",
+        "fas-Latn",
+        "fin-Latn",
+        "fra-Latn",
+        "fry-Latn",
+        "gle-Latn",
+        "gla-Latn",
+        "glg-Latn",
+        "guj-Latn",
+        "hau-Latn",
+        "heb-Latn",
+        "hin-Latn",
+        "hin-Deva",
+        "hrv-Latn",
+        "hun-Latn",
+        "hye-Latn",
+        "ind-Latn",
+        "isl-Latn",
+        "ita-Latn",
+        "jpn-Latn",
+        "jav-Latn",
+        "kat-Latn",
+        "kaz-Latn",
+        "khm-Latn",
+        "kan-Latn",
+        "kor-Latn",
+        "kur-Latn",
+        "kir-Latn",
+        "lat-Latn",
+        "lao-Latn",
+        "lit-Latn",
+        "lav-Latn",
+        "mlg-Latn",
+        "mkd-Latn",
+        "mal-Latn",
+        "mon-Latn",
+        "mar-Latn",
+        "msa-Latn",
+        "mya-Latn",
+        "nep-Latn",
+        "nld-Latn",
+        "nob-Latn",
+        "orm-Latn",
+        "ori-Latn",
+        "pan-Latn",
+        "pol-Latn",
+        "pus-Latn",
+        "por-Latn",
+        "ron-Latn",
+        "rus-Latn",
+        "san-Latn",
+        "snd-Latn",
+        "sin-Latn",
+        "slk-Latn",
+        "slv-Latn",
+        "some-Latn",
+        "sqi-Latn",
+        "srp-Latn",
+        "sun-Latn",
+        "swe-Latn",
+        "swa-Latn",
+        "tam-Latn",
+        "tam-Taml",
+        "tel-Latn",
+        "tel-Telu",
+        "tha-Latn",
+        "tgl-Latn",
+        "tur-Latn",
+        "uig-Latn",
+        "ukr-Latn",
+        "urd-Latn",
+        "urd-Arab",
+        "uzb-Latn",
+        "vie-Latn",
+        "xho-Latn",
+        "yid-Latn",
+        "zho-Hant",
+        "zho-Hans"
+      ],
+      "license": "mit",
+      "loader": {
+        "model_name": "intfloat/multilingual-e5-large",
+        "model_prompts": {
+          "document": "passage: ",
+          "query": "query: "
+        },
+        "revision": "ab10c1a7f42e74530fe7ae5be82e6d4f11a719eb"
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": 2136,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 560000000,
+      "name": "intfloat/multilingual-e5-large",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/intfloat/multilingual-e5-large",
+      "release_date": "2024-02-08",
+      "revision": "ab10c1a7f42e74530fe7ae5be82e6d4f11a719eb",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "FEVER": [
+          "train"
+        ],
+        "FEVER-NL": [
+          "train"
+        ],
+        "FEVERHardNegatives": [
+          "train"
+        ],
+        "HotpotQA": [
+          "train"
+        ],
+        "HotpotQA-NL": [
+          "train"
+        ],
+        "HotpotQA-PL": [
+          "train"
+        ],
+        "HotpotQAHardNegatives": [
+          "train"
+        ],
+        "MIRACLReranking": [
+          "train"
+        ],
+        "MIRACLRetrieval": [
+          "train"
+        ],
+        "MIRACLRetrievalHardNegatives": [
+          "train"
+        ],
+        "mMARCO-NL": [
+          "train"
+        ],
+        "MrTidyRetrieval": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "MSMARCO-PL": [
+          "train"
+        ],
+        "MSMARCOHardNegatives": [
+          "train"
+        ],
+        "NanoMSMARCORetrieval": [
+          "train"
+        ],
+        "NanoNQRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "NQ-NL": [
+          "train"
+        ],
+        "NQ-PL": [
+          "train"
+        ],
+        "NQHardNegatives": [
+          "train"
+        ],
+        "XQuADRetrieval": [
+          "train"
+        ]
+      },
+      "use_instructions": true
+    },
+    "intfloat/multilingual-e5-large-instruct": {
+      "adapted_from": "FacebookAI/xlm-roberta-large",
+      "embed_dim": 1024,
+      "framework": [
+        "GritLM",
+        "PyTorch",
+        "Sentence Transformers"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "afr-Latn",
+        "amh-Latn",
+        "ara-Latn",
+        "asm-Latn",
+        "aze-Latn",
+        "bel-Latn",
+        "bul-Latn",
+        "ben-Latn",
+        "ben-Being",
+        "bre-Latn",
+        "bos-Latn",
+        "cat-Latn",
+        "ces-Latn",
+        "cym-Latn",
+        "dan-Latn",
+        "deu-Latn",
+        "ell-Latn",
+        "eng-Latn",
+        "epo-Latn",
+        "spa-Latn",
+        "est-Latn",
+        "eus-Latn",
+        "fas-Latn",
+        "fin-Latn",
+        "fra-Latn",
+        "fry-Latn",
+        "gle-Latn",
+        "gla-Latn",
+        "glg-Latn",
+        "guj-Latn",
+        "hau-Latn",
+        "heb-Latn",
+        "hin-Latn",
+        "hin-Deva",
+        "hrv-Latn",
+        "hun-Latn",
+        "hye-Latn",
+        "ind-Latn",
+        "isl-Latn",
+        "ita-Latn",
+        "jpn-Latn",
+        "jav-Latn",
+        "kat-Latn",
+        "kaz-Latn",
+        "khm-Latn",
+        "kan-Latn",
+        "kor-Latn",
+        "kur-Latn",
+        "kir-Latn",
+        "lat-Latn",
+        "lao-Latn",
+        "lit-Latn",
+        "lav-Latn",
+        "mlg-Latn",
+        "mkd-Latn",
+        "mal-Latn",
+        "mon-Latn",
+        "mar-Latn",
+        "msa-Latn",
+        "mya-Latn",
+        "nep-Latn",
+        "nld-Latn",
+        "nob-Latn",
+        "orm-Latn",
+        "ori-Latn",
+        "pan-Latn",
+        "pol-Latn",
+        "pus-Latn",
+        "por-Latn",
+        "ron-Latn",
+        "rus-Latn",
+        "san-Latn",
+        "snd-Latn",
+        "sin-Latn",
+        "slk-Latn",
+        "slv-Latn",
+        "some-Latn",
+        "sqi-Latn",
+        "srp-Latn",
+        "sun-Latn",
+        "swe-Latn",
+        "swa-Latn",
+        "tam-Latn",
+        "tam-Taml",
+        "tel-Latn",
+        "tel-Telu",
+        "tha-Latn",
+        "tgl-Latn",
+        "tur-Latn",
+        "uig-Latn",
+        "ukr-Latn",
+        "urd-Latn",
+        "urd-Arab",
+        "uzb-Latn",
+        "vie-Latn",
+        "xho-Latn",
+        "yid-Latn",
+        "zho-Hant",
+        "zho-Hans"
+      ],
+      "license": "mit",
+      "loader": {
+        "attn": "cccc",
+        "instruction_template": "Instruct: {instruction}\nQuery: ",
+        "mode": "embedding",
+        "model_name_or_path": "intfloat/multilingual-e5-large-instruct",
+        "normalized": true,
+        "pooling_method": "mean",
+        "torch_dtype": "torch.float16"
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": 1068,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 560000000,
+      "name": "intfloat/multilingual-e5-large-instruct",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/intfloat/multilingual-e5-large-instruct",
+      "release_date": "2024-02-08",
+      "revision": "baa7be480a7de1539afce709c8f13f833a510e0a",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "FEVER": [
+          "train"
+        ],
+        "FEVER-NL": [
+          "train"
+        ],
+        "FEVERHardNegatives": [
+          "train"
+        ],
+        "HotpotQA": [
+          "train"
+        ],
+        "HotpotQA-NL": [
+          "train"
+        ],
+        "HotpotQA-PL": [
+          "train"
+        ],
+        "HotpotQAHardNegatives": [
+          "train"
+        ],
+        "MIRACLReranking": [
+          "train"
+        ],
+        "MIRACLRetrieval": [
+          "train"
+        ],
+        "MIRACLRetrievalHardNegatives": [
+          "train"
+        ],
+        "mMARCO-NL": [
+          "train"
+        ],
+        "MrTidyRetrieval": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "MSMARCO-PL": [
+          "train"
+        ],
+        "MSMARCOHardNegatives": [
+          "train"
+        ],
+        "NanoMSMARCORetrieval": [
+          "train"
+        ],
+        "NanoNQRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "NQ-NL": [
+          "train"
+        ],
+        "NQ-PL": [
+          "train"
+        ],
+        "NQHardNegatives": [
+          "train"
+        ],
+        "XQuADRetrieval": [
+          "train"
+        ]
+      },
+      "use_instructions": true
+    },
+    "jinaai/jina-embeddings-v2-base-code": {
+      "adapted_from": "jina-bert-base-en-v1",
+      "embed_dim": 768,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model": "jinaai/jina-embeddings-v2-base-en",
+        "revision": "6e85f575bc273f1fd840a658067d0157933c83f0",
+        "trust_remote_code": true
+      },
+      "max_tokens": 8192,
+      "memory_usage_mb": 262,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 137000000,
+      "name": "jinaai/jina-embeddings-v2-base-code",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/jinaai/jina-embeddings-v2-base-en",
+      "release_date": "2023-09-27",
+      "revision": "6e85f575bc273f1fd840a658067d0157933c83f0",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "AmazonQA": [
+          "train"
+        ],
+        "CC-NEWS": [],
+        "ELI5": [
+          "train"
+        ],
+        "ESCI": [
+          "train"
+        ],
+        "FEVER": [
+          "train"
+        ],
+        "Flickr30k": [
+          "train"
+        ],
+        "GooAQ": [
+          "train"
+        ],
+        "HotpotQA": [
+          "train"
+        ],
+        "MsCocoCaptions": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "NegationDataset": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "PAQ": [
+          "train"
+        ],
+        "QuoraQA": [
+          "train"
+        ],
+        "S2ORC": [],
+        "SentenceCompression": [
+          "train"
+        ],
+        "SimpleWikipedia": [
+          "train"
+        ],
+        "SNLI": [
+          "train"
+        ],
+        "Specter": [
+          "train"
+        ],
+        "Squad2": [
+          "train"
+        ],
+        "StackExchange": [],
+        "Tmdb": [
+          "train"
+        ],
+        "TrivialQA": [
+          "train"
+        ],
+        "TweetQA": [
+          "train"
+        ],
+        "WikiAnswers": [
+          "train"
+        ],
+        "WikiHow": [
+          "train"
+        ],
+        "Xmarket": [],
+        "YahooAnswers": []
+      },
+      "use_instructions": false
+    },
+    "jinaai/jina-embeddings-v3": {
+      "adapted_from": "XLM-RoBERTa",
+      "embed_dim": 1024,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "afr-Latn",
+        "amh-Latn",
+        "ara-Latn",
+        "asm-Latn",
+        "aze-Latn",
+        "bel-Latn",
+        "bul-Latn",
+        "ben-Latn",
+        "ben-Being",
+        "bre-Latn",
+        "bos-Latn",
+        "cat-Latn",
+        "ces-Latn",
+        "cym-Latn",
+        "dan-Latn",
+        "deu-Latn",
+        "ell-Latn",
+        "eng-Latn",
+        "epo-Latn",
+        "spa-Latn",
+        "est-Latn",
+        "eus-Latn",
+        "fas-Latn",
+        "fin-Latn",
+        "fra-Latn",
+        "fry-Latn",
+        "gle-Latn",
+        "gla-Latn",
+        "glg-Latn",
+        "guj-Latn",
+        "hau-Latn",
+        "heb-Latn",
+        "hin-Latn",
+        "hin-Deva",
+        "hrv-Latn",
+        "hun-Latn",
+        "hye-Latn",
+        "ind-Latn",
+        "isl-Latn",
+        "ita-Latn",
+        "jpn-Latn",
+        "jav-Latn",
+        "kat-Latn",
+        "kaz-Latn",
+        "khm-Latn",
+        "kan-Latn",
+        "kor-Latn",
+        "kur-Latn",
+        "kir-Latn",
+        "lat-Latn",
+        "lao-Latn",
+        "lit-Latn",
+        "lav-Latn",
+        "mlg-Latn",
+        "mkd-Latn",
+        "mal-Latn",
+        "mon-Latn",
+        "mar-Latn",
+        "msa-Latn",
+        "mya-Latn",
+        "nep-Latn",
+        "nld-Latn",
+        "nob-Latn",
+        "orm-Latn",
+        "ori-Latn",
+        "pan-Latn",
+        "pol-Latn",
+        "pus-Latn",
+        "por-Latn",
+        "ron-Latn",
+        "rus-Latn",
+        "san-Latn",
+        "snd-Latn",
+        "sin-Latn",
+        "slk-Latn",
+        "slv-Latn",
+        "some-Latn",
+        "sqi-Latn",
+        "srp-Latn",
+        "sun-Latn",
+        "swe-Latn",
+        "swa-Latn",
+        "tam-Latn",
+        "tam-Taml",
+        "tel-Latn",
+        "tel-Telu",
+        "tha-Latn",
+        "tgl-Latn",
+        "tur-Latn",
+        "uig-Latn",
+        "ukr-Latn",
+        "urd-Latn",
+        "urd-Arab",
+        "uzb-Latn",
+        "vie-Latn",
+        "xho-Latn",
+        "yid-Latn",
+        "zho-Hant",
+        "zho-Hans"
+      ],
+      "license": "cc-by-nc-4.0",
+      "loader": {
+        "model": "jinaai/jina-embeddings-v3",
+        "model_prompts": {
+          "BitextMining": "text-matching",
+          "Classification": "classification",
+          "Clustering": "separation",
+          "MultilabelClassification": "classification",
+          "PairClassification": "classification",
+          "Reranking": "separation",
+          "Retrieval-document": "retrieval.passage",
+          "Retrieval-query": "retrieval.query",
+          "STS": "text-matching",
+          "Summarization": "text-matching"
+        },
+        "revision": "215a6e121fa0183376388ac6b1ae230326bfeaed",
+        "trust_remote_code": true
+      },
+      "max_tokens": 8194,
+      "memory_usage_mb": 1092,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 572000000,
+      "name": "jinaai/jina-embeddings-v3",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/jinaai/jina-embeddings-v3",
+      "release_date": "2024-09-18",
+      "revision": "215a6e121fa0183376388ac6b1ae230326bfeaed",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "mMARCO-NL": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "MSMARCOHardNegatives": [
+          "train"
+        ],
+        "NanoMSMARCORetrieval": [
+          "train"
+        ],
+        "NanoNQRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "NQ-NL": [
+          "train"
+        ],
+        "NQ-PL": [
+          "train"
+        ],
+        "NQHardNegatives": [
+          "train"
+        ],
+        "STS12": []
+      },
+      "use_instructions": true
+    },
+    "jinaai/jina-embeddings-v4": {
+      "adapted_from": "Qwen/Qwen2.5-VL-3B-Instruct",
+      "embed_dim": 2048,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "afr-Latn",
+        "amh-Latn",
+        "ara-Latn",
+        "asm-Latn",
+        "aze-Latn",
+        "bel-Latn",
+        "bul-Latn",
+        "ben-Latn",
+        "ben-Being",
+        "bre-Latn",
+        "bos-Latn",
+        "cat-Latn",
+        "ces-Latn",
+        "cym-Latn",
+        "dan-Latn",
+        "deu-Latn",
+        "ell-Latn",
+        "eng-Latn",
+        "epo-Latn",
+        "spa-Latn",
+        "est-Latn",
+        "eus-Latn",
+        "fas-Latn",
+        "fin-Latn",
+        "fra-Latn",
+        "fry-Latn",
+        "gle-Latn",
+        "gla-Latn",
+        "glg-Latn",
+        "guj-Latn",
+        "hau-Latn",
+        "heb-Latn",
+        "hin-Latn",
+        "hin-Deva",
+        "hrv-Latn",
+        "hun-Latn",
+        "hye-Latn",
+        "ind-Latn",
+        "isl-Latn",
+        "ita-Latn",
+        "jpn-Latn",
+        "jav-Latn",
+        "kat-Latn",
+        "kaz-Latn",
+        "khm-Latn",
+        "kan-Latn",
+        "kor-Latn",
+        "kur-Latn",
+        "kir-Latn",
+        "lat-Latn",
+        "lao-Latn",
+        "lit-Latn",
+        "lav-Latn",
+        "mlg-Latn",
+        "mkd-Latn",
+        "mal-Latn",
+        "mon-Latn",
+        "mar-Latn",
+        "msa-Latn",
+        "mya-Latn",
+        "nep-Latn",
+        "nld-Latn",
+        "nob-Latn",
+        "orm-Latn",
+        "ori-Latn",
+        "pan-Latn",
+        "pol-Latn",
+        "pus-Latn",
+        "por-Latn",
+        "ron-Latn",
+        "rus-Latn",
+        "san-Latn",
+        "snd-Latn",
+        "sin-Latn",
+        "slk-Latn",
+        "slv-Latn",
+        "some-Latn",
+        "sqi-Latn",
+        "srp-Latn",
+        "sun-Latn",
+        "swe-Latn",
+        "swa-Latn",
+        "tam-Latn",
+        "tam-Taml",
+        "tel-Latn",
+        "tel-Telu",
+        "tha-Latn",
+        "tgl-Latn",
+        "tur-Latn",
+        "uig-Latn",
+        "ukr-Latn",
+        "urd-Latn",
+        "urd-Arab",
+        "uzb-Latn",
+        "vie-Latn",
+        "xho-Latn",
+        "yid-Latn",
+        "zho-Hant",
+        "zho-Hans"
+      ],
+      "license": "cc-by-nc-4.0",
+      "loader": {
+        "model": "jinaai/jina-embeddings-v4",
+        "model_prompts": {
+          "DocumentUnderstanding": "retrieval.query",
+          "Retrieval-document": "retrieval.passage",
+          "Retrieval-query": "retrieval.query",
+          "STS": "text-matching"
+        },
+        "revision": "4a58ca57710c49f51896e4bc820e202fbf64904b",
+        "trust_remote_code": true
+      },
+      "max_tokens": 32768,
+      "memory_usage_mb": 7500,
+      "modalities": [
+        "image",
+        "text"
+      ],
+      "n_parameters": 3800000000,
+      "name": "jinaai/jina-embeddings-v4",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/jinaai/jina-embeddings-v4",
+      "release_date": "2025-06-24",
+      "revision": "4a58ca57710c49f51896e4bc820e202fbf64904b",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "AppsRetrieval": [
+          "train"
+        ],
+        "arXivQA": [
+          "train"
+        ],
+        "CodeFeedbackMT": [
+          "train"
+        ],
+        "CodeFeedbackST": [
+          "train"
+        ],
+        "CodeSearchNetRetrieval": [
+          "train"
+        ],
+        "CornStack": [],
+        "DocVQA": [
+          "train"
+        ],
+        "InfoVQA": [
+          "train"
+        ],
+        "mMARCO-NL": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "MSMARCOHardNegatives": [
+          "train"
+        ],
+        "NanoMSMARCORetrieval": [
+          "train"
+        ],
+        "NanoNQRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "NQ-NL": [
+          "train"
+        ],
+        "NQ-PL": [
+          "train"
+        ],
+        "NQHardNegatives": [
+          "train"
+        ],
+        "SICK-R": [
+          "train"
+        ],
+        "StackOverflowQA": [
+          "train"
+        ],
+        "STS12": [
+          "train"
+        ],
+        "TATDQA": [
+          "train"
+        ],
+        "VDRMultilingualRetrieval": [
+          "train"
+        ]
+      },
+      "use_instructions": true
+    },
+    "mixedbread-ai/mxbai-embed-large-v1": {
+      "adapted_from": null,
+      "embed_dim": 1024,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name": "mixedbread-ai/mxbai-embed-large-v1",
+        "model_prompts": {
+          "query": "Represent this sentence for searching relevant passages: "
+        },
+        "revision": "990580e27d329c7408b3741ecff85876e128e203"
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": 639,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 335000000,
+      "name": "mixedbread-ai/mxbai-embed-large-v1",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/mixedbread-ai/mxbai-embed-large-v1",
+      "release_date": "2024-03-07",
+      "revision": "990580e27d329c7408b3741ecff85876e128e203",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "MSMARCO": []
+      },
+      "use_instructions": true
+    },
+    "nomic-ai/modernbert-embed-base": {
+      "adapted_from": "answerdotai/ModernBERT-base",
+      "embed_dim": 768,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_kwargs": {
+          "torch_dtype": "torch.float16"
+        },
+        "model_name": "nomic-ai/modernbert-embed-base",
+        "model_prompts": {
+          "Classification": "classification: ",
+          "Clustering": "clustering: ",
+          "document": "search_document: ",
+          "MultilabelClassification": "classification: ",
+          "PairClassification": "classification: ",
+          "query": "search_query: ",
+          "Reranking": "classification: ",
+          "STS": "classification: ",
+          "Summarization": "classification: "
+        },
+        "revision": "5960f1566fb7cb1adf1eb6e816639cf4646d9b12"
+      },
+      "max_tokens": 8192,
+      "memory_usage_mb": 568,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 149000000,
+      "name": "nomic-ai/modernbert-embed-base",
+      "open_weights": true,
+      "public_training_code": "https://github.com/nomic-ai/contrastors/blob/5f7b461e5a13b5636692d1c9f1141b27232fe966/src/contrastors/configs/train/contrastive_pretrain_modernbert.yaml",
+      "public_training_data": null,
+      "reference": "https://huggingface.co/nomic-ai/modernbert-embed-base",
+      "release_date": "2024-12-29",
+      "revision": "5960f1566fb7cb1adf1eb6e816639cf4646d9b12",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "AmazonCounterfactualClassification": [],
+        "AmazonPolarityClassification": [],
+        "AmazonReviewsClassification": [],
+        "CodeSearchNetCCRetrieval": [],
+        "COIRCodeSearchNetRetrieval": [],
+        "FEVER": [
+          "test"
+        ],
+        "FEVER-NL": [
+          "test"
+        ],
+        "FEVERHardNegatives": [
+          "test"
+        ],
+        "FQuADRetrieval": [],
+        "HotPotQA": [
+          "test"
+        ],
+        "HotpotQA-NL": [
+          "test"
+        ],
+        "HotPotQA-PL": [
+          "test"
+        ],
+        "HotPotQAHardNegatives": [
+          "test"
+        ],
+        "mMARCO-NL": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "MSMARCOHardNegatives": [
+          "train"
+        ],
+        "NanoMSMARCORetrieval": [
+          "train"
+        ],
+        "NanoNQRetrieval": [
+          "train"
+        ],
+        "NanoQuoraRetrieval": [],
+        "NQ": [
+          "train"
+        ],
+        "NQ-NL": [
+          "train"
+        ],
+        "NQ-PL": [
+          "train"
+        ],
+        "NQHardNegatives": [
+          "train"
+        ],
+        "Quora-NL": [],
+        "QuoraRetrieval": [],
+        "RedditClustering": [],
+        "RedditClustering.v2": [],
+        "RedditClusteringP2P": [],
+        "RedditClusteringP2P.v2": [],
+        "StackExchangeClustering.v2": [],
+        "StackExchangeClusteringP2P.v2": [],
+        "WikipediaRerankingMultilingual": [],
+        "WikipediaRetrievalMultilingual": [],
+        "YahooAnswersTopicsClassification": []
+      },
+      "use_instructions": true
+    },
+    "nomic-ai/nomic-embed-text-v2-moe": {
+      "adapted_from": null,
+      "embed_dim": 768,
+      "framework": [
+        "PyTorch",
+        "Sentence Transformers"
+      ],
+      "is_cross_encoder": null,
+      "languages": null,
+      "license": "apache-2.0",
+      "loader": {
+        "trust_remote_code": true
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": null,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": null,
+      "name": "nomic-ai/nomic-embed-text-v2-moe",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": null,
+      "release_date": null,
+      "revision": null,
+      "similarity_fn_name": null,
+      "superseded_by": null,
+      "training_datasets": null,
+      "use_instructions": null
+    },
+    "Qwen/Qwen3-Embedding-0.6B": {
+      "adapted_from": null,
+      "embed_dim": 1024,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "afr-Latn",
+        "ara-Arab",
+        "aze-Latn",
+        "bel-Cyrl",
+        "bul-Cyrl",
+        "ben-Being",
+        "cat-Latn",
+        "ceb-Latn",
+        "ces-Latn",
+        "cym-Latn",
+        "dan-Latn",
+        "deu-Latn",
+        "ell-Grek",
+        "eng-Latn",
+        "spa-Latn",
+        "est-Latn",
+        "eus-Latn",
+        "fas-Arab",
+        "fin-Latn",
+        "fra-Latn",
+        "glg-Latn",
+        "guj-Gujr",
+        "heb-Hebr",
+        "hin-Deva",
+        "hrv-Latn",
+        "hat-Latn",
+        "hun-Latn",
+        "hye-Armn",
+        "ind-Latn",
+        "isl-Latn",
+        "ita-Latn",
+        "jpn-Jpan",
+        "jav-Latn",
+        "kat-Geor",
+        "kaz-Cyrl",
+        "khm-Khmr",
+        "kan-Knda",
+        "kor-Hang",
+        "kir-Cyrl",
+        "lao-Laoo",
+        "lit-Latn",
+        "lav-Latn",
+        "mkd-Cyrl",
+        "mal-Mlym",
+        "mon-Cyrl",
+        "mar-Deva",
+        "msa-Latn",
+        "mya-Mymr",
+        "nep-Deva",
+        "nld-Latn",
+        "nor-Latn",
+        "pan-Guru",
+        "pol-Latn",
+        "por-Latn",
+        "que-Latn",
+        "ron-Latn",
+        "rus-Cyrl",
+        "sin-Sinh",
+        "slk-Latn",
+        "slv-Latn",
+        "swa-Latn",
+        "tam-Taml",
+        "tel-Telu",
+        "tha-Thai",
+        "tgl-Latn",
+        "tur-Latn",
+        "ukr-Cyrl",
+        "urd-Arab",
+        "vie-Latn",
+        "your-Latn",
+        "zho-Hans"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name_or_path": "Qwen/Qwen3-Embedding-0.6B"
+      },
+      "max_tokens": 32768,
+      "memory_usage_mb": 2272,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 595776512,
+      "name": "Qwen/Qwen3-Embedding-0.6B",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/Qwen/Qwen3-Embedding-0.6B",
+      "release_date": "2025-06-05",
+      "revision": "b22da495047858cce924d27d76261e96be6febc0",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "CMedQAv2-reranking": [
+          "train"
+        ],
+        "CodeSearchNet": [
+          "train"
+        ],
+        "DuRetrieval": [
+          "train"
+        ],
+        "FEVER": [
+          "train"
+        ],
+        "HotpotQA": [
+          "train"
+        ],
+        "MIRACLRetrieval": [
+          "train"
+        ],
+        "MMarcoReranking": [
+          "train"
+        ],
+        "MrTidyRetrieval": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "T2Retrieval": [
+          "train"
+        ]
+      },
+      "use_instructions": true
+    },
+    "Qwen/Qwen3-Embedding-4B": {
+      "adapted_from": null,
+      "embed_dim": 2560,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "afr-Latn",
+        "ara-Arab",
+        "aze-Latn",
+        "bel-Cyrl",
+        "bul-Cyrl",
+        "ben-Being",
+        "cat-Latn",
+        "ceb-Latn",
+        "ces-Latn",
+        "cym-Latn",
+        "dan-Latn",
+        "deu-Latn",
+        "ell-Grek",
+        "eng-Latn",
+        "spa-Latn",
+        "est-Latn",
+        "eus-Latn",
+        "fas-Arab",
+        "fin-Latn",
+        "fra-Latn",
+        "glg-Latn",
+        "guj-Gujr",
+        "heb-Hebr",
+        "hin-Deva",
+        "hrv-Latn",
+        "hat-Latn",
+        "hun-Latn",
+        "hye-Armn",
+        "ind-Latn",
+        "isl-Latn",
+        "ita-Latn",
+        "jpn-Jpan",
+        "jav-Latn",
+        "kat-Geor",
+        "kaz-Cyrl",
+        "khm-Khmr",
+        "kan-Knda",
+        "kor-Hang",
+        "kir-Cyrl",
+        "lao-Laoo",
+        "lit-Latn",
+        "lav-Latn",
+        "mkd-Cyrl",
+        "mal-Mlym",
+        "mon-Cyrl",
+        "mar-Deva",
+        "msa-Latn",
+        "mya-Mymr",
+        "nep-Deva",
+        "nld-Latn",
+        "nor-Latn",
+        "pan-Guru",
+        "pol-Latn",
+        "por-Latn",
+        "que-Latn",
+        "ron-Latn",
+        "rus-Cyrl",
+        "sin-Sinh",
+        "slk-Latn",
+        "slv-Latn",
+        "swa-Latn",
+        "tam-Taml",
+        "tel-Telu",
+        "tha-Thai",
+        "tgl-Latn",
+        "tur-Latn",
+        "ukr-Cyrl",
+        "urd-Arab",
+        "vie-Latn",
+        "your-Latn",
+        "zho-Hans"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name_or_path": "Qwen/Qwen3-Embedding-4B"
+      },
+      "max_tokens": 32768,
+      "memory_usage_mb": 15341,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 4021774336,
+      "name": "Qwen/Qwen3-Embedding-4B",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/Qwen/Qwen3-Embedding-4B",
+      "release_date": "2025-06-05",
+      "revision": "636cd9bf47d976946cdbb2b0c3ca0cb2f8eea5ff",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "CMedQAv2-reranking": [
+          "train"
+        ],
+        "CodeSearchNet": [
+          "train"
+        ],
+        "DuRetrieval": [
+          "train"
+        ],
+        "FEVER": [
+          "train"
+        ],
+        "HotpotQA": [
+          "train"
+        ],
+        "MIRACLRetrieval": [
+          "train"
+        ],
+        "MMarcoReranking": [
+          "train"
+        ],
+        "MrTidyRetrieval": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "T2Retrieval": [
+          "train"
+        ]
+      },
+      "use_instructions": true
+    },
+    "Qwen/Qwen3-Embedding-8B": {
+      "adapted_from": null,
+      "embed_dim": 4096,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "afr-Latn",
+        "ara-Arab",
+        "aze-Latn",
+        "bel-Cyrl",
+        "bul-Cyrl",
+        "ben-Being",
+        "cat-Latn",
+        "ceb-Latn",
+        "ces-Latn",
+        "cym-Latn",
+        "dan-Latn",
+        "deu-Latn",
+        "ell-Grek",
+        "eng-Latn",
+        "spa-Latn",
+        "est-Latn",
+        "eus-Latn",
+        "fas-Arab",
+        "fin-Latn",
+        "fra-Latn",
+        "glg-Latn",
+        "guj-Gujr",
+        "heb-Hebr",
+        "hin-Deva",
+        "hrv-Latn",
+        "hat-Latn",
+        "hun-Latn",
+        "hye-Armn",
+        "ind-Latn",
+        "isl-Latn",
+        "ita-Latn",
+        "jpn-Jpan",
+        "jav-Latn",
+        "kat-Geor",
+        "kaz-Cyrl",
+        "khm-Khmr",
+        "kan-Knda",
+        "kor-Hang",
+        "kir-Cyrl",
+        "lao-Laoo",
+        "lit-Latn",
+        "lav-Latn",
+        "mkd-Cyrl",
+        "mal-Mlym",
+        "mon-Cyrl",
+        "mar-Deva",
+        "msa-Latn",
+        "mya-Mymr",
+        "nep-Deva",
+        "nld-Latn",
+        "nor-Latn",
+        "pan-Guru",
+        "pol-Latn",
+        "por-Latn",
+        "que-Latn",
+        "ron-Latn",
+        "rus-Cyrl",
+        "sin-Sinh",
+        "slk-Latn",
+        "slv-Latn",
+        "swa-Latn",
+        "tam-Taml",
+        "tel-Telu",
+        "tha-Thai",
+        "tgl-Latn",
+        "tur-Latn",
+        "ukr-Cyrl",
+        "urd-Arab",
+        "vie-Latn",
+        "your-Latn",
+        "zho-Hans"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name_or_path": "Qwen/Qwen3-Embedding-8B"
+      },
+      "max_tokens": 32768,
+      "memory_usage_mb": 28866,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 7567295488,
+      "name": "Qwen/Qwen3-Embedding-8B",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/Qwen/Qwen3-Embedding-8B",
+      "release_date": "2025-06-05",
+      "revision": "4e423935c619ae4df87b646a3ce949610c66241c",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "CMedQAv2-reranking": [
+          "train"
+        ],
+        "CodeSearchNet": [
+          "train"
+        ],
+        "DuRetrieval": [
+          "train"
+        ],
+        "FEVER": [
+          "train"
+        ],
+        "HotpotQA": [
+          "train"
+        ],
+        "MIRACLRetrieval": [
+          "train"
+        ],
+        "MMarcoReranking": [
+          "train"
+        ],
+        "MrTidyRetrieval": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "T2Retrieval": [
+          "train"
+        ]
+      },
+      "use_instructions": true
+    },
+    "sentence-transformers/all-MiniLM-L12-v2": {
+      "adapted_from": null,
+      "embed_dim": 384,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {},
+      "max_tokens": 256,
+      "memory_usage_mb": 127,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 33400000,
+      "name": "sentence-transformers/all-MiniLM-L12-v2",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/sentence-transformers/all-MiniLM-L12-v2",
+      "release_date": "2021-08-30",
+      "revision": "364dd28d28dcd3359b537f3cf1f5348ba679da62",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "mMARCO-NL": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "MSMARCO-PL": [
+          "train"
+        ],
+        "MSMARCOHardNegatives": [
+          "train"
+        ],
+        "NanoMSMARCORetrieval": [
+          "train"
+        ],
+        "NanoNQRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "NQ-NL": [
+          "train"
+        ],
+        "NQ-PL": [
+          "train"
+        ],
+        "NQHardNegatives": [
+          "train"
+        ]
+      },
+      "use_instructions": false
+    },
+    "sentence-transformers/all-mpnet-base-v2": {
+      "adapted_from": null,
+      "embed_dim": 768,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {},
+      "max_tokens": 384,
+      "memory_usage_mb": 418,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 109000000,
+      "name": "sentence-transformers/all-mpnet-base-v2",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/sentence-transformers/all-mpnet-base-v2",
+      "release_date": "2021-08-30",
+      "revision": "9a3225965996d404b775526de6dbfe85d3368642",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "mMARCO-NL": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "MSMARCO-PL": [
+          "train"
+        ],
+        "MSMARCOHardNegatives": [
+          "train"
+        ],
+        "NanoMSMARCORetrieval": [
+          "train"
+        ],
+        "NanoNQRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "NQ-NL": [
+          "train"
+        ],
+        "NQ-PL": [
+          "train"
+        ],
+        "NQHardNegatives": [
+          "train"
+        ]
+      },
+      "use_instructions": false
+    },
+    "sentence-transformers/gtr-t5-base": {
+      "adapted_from": null,
+      "embed_dim": 768,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {},
+      "max_tokens": 512,
+      "memory_usage_mb": 209,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 110000000,
+      "name": "sentence-transformers/gtr-t5-base",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/sentence-transformers/gtr-t5-base",
+      "release_date": "2022-02-09",
+      "revision": "7027e9594267928589816394bdd295273ddc0739",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "Community QA": [
+          "train"
+        ],
+        "mMARCO-NL": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "MSMARCO-PL": [
+          "train"
+        ],
+        "MSMARCOHardNegatives": [
+          "train"
+        ],
+        "NanoMSMARCORetrieval": [
+          "train"
+        ],
+        "NanoNQRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "NQ-NL": [
+          "train"
+        ],
+        "NQ-PL": [
+          "train"
+        ],
+        "NQHardNegatives": [
+          "train"
+        ]
+      },
+      "use_instructions": false
+    },
+    "sentence-transformers/multi-qa-MiniLM-L6-cos-v1": {
+      "adapted_from": "nreimers/MiniLM-L6-H384-uncased",
+      "embed_dim": 384,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {},
+      "max_tokens": 512,
+      "memory_usage_mb": 87,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 22700000,
+      "name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
+      "release_date": "2021-08-30",
+      "revision": "b207367332321f8e44f96e224ef15bc607f4dbf0",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "mMARCO-NL": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "MSMARCO-PL": [
+          "train"
+        ],
+        "MSMARCOHardNegatives": [
+          "train"
+        ],
+        "NanoMSMARCORetrieval": [
+          "train"
+        ],
+        "NanoNQRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "NQ-NL": [
+          "train"
+        ],
+        "NQ-PL": [
+          "train"
+        ],
+        "NQHardNegatives": [
+          "train"
+        ]
+      },
+      "use_instructions": false
+    },
+    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2": {
+      "adapted_from": null,
+      "embed_dim": 768,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "ara-Arab",
+        "bul-Cyrl",
+        "cat-Latn",
+        "ces-Latn",
+        "dan-Latn",
+        "deu-Latn",
+        "ell-Grek",
+        "eng-Latn",
+        "spa-Latn",
+        "est-Latn",
+        "fas-Arab",
+        "fin-Latn",
+        "fra-Latn",
+        "fra-Latn",
+        "glg-Latn",
+        "guj-Gujr",
+        "heb-Hebr",
+        "hin-Deva",
+        "hrv-Latn",
+        "hun-Latn",
+        "hye-Armn",
+        "ind-Latn",
+        "ita-Latn",
+        "jpn-Jpan",
+        "kat-Geor",
+        "kor-Hang",
+        "kur-Arab",
+        "lit-Latn",
+        "lav-Latn",
+        "mkd-Cyrl",
+        "mon-Cyrl",
+        "mar-Deva",
+        "msa-Latn",
+        "mya-Mymr",
+        "nob-Latn",
+        "nld-Latn",
+        "pol-Latn",
+        "por-Latn",
+        "por-Latn",
+        "ron-Latn",
+        "rus-Cyrl",
+        "slk-Latn",
+        "slv-Latn",
+        "sqi-Latn",
+        "srp-Cyrl",
+        "swe-Latn",
+        "tha-Thai",
+        "tur-Latn",
+        "ukr-Cyrl",
+        "urd-Arab",
+        "vie-Latn",
+        "zho-Hans",
+        "zho-Hant"
+      ],
+      "license": "apache-2.0",
+      "loader": {},
+      "max_tokens": 512,
+      "memory_usage_mb": 449,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 118000000,
+      "name": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "release_date": "2019-11-01",
+      "revision": "bf3bf13ab40c3157080a7ab344c831b9ad18b5eb",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "mMARCO-NL": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "MSMARCO-PL": [
+          "train"
+        ],
+        "MSMARCOHardNegatives": [
+          "train"
+        ],
+        "NanoMSMARCORetrieval": [
+          "train"
+        ],
+        "NanoNQRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "NQ-NL": [
+          "train"
+        ],
+        "NQ-PL": [
+          "train"
+        ],
+        "NQHardNegatives": [
+          "train"
+        ]
+      },
+      "use_instructions": false
+    },
+    "sentence-transformers/paraphrase-multilingual-mpnet-base-v2": {
+      "adapted_from": null,
+      "embed_dim": 768,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "ara-Arab",
+        "bul-Cyrl",
+        "cat-Latn",
+        "ces-Latn",
+        "dan-Latn",
+        "deu-Latn",
+        "ell-Grek",
+        "eng-Latn",
+        "spa-Latn",
+        "est-Latn",
+        "fas-Arab",
+        "fin-Latn",
+        "fra-Latn",
+        "fra-Latn",
+        "glg-Latn",
+        "guj-Gujr",
+        "heb-Hebr",
+        "hin-Deva",
+        "hrv-Latn",
+        "hun-Latn",
+        "hye-Armn",
+        "ind-Latn",
+        "ita-Latn",
+        "jpn-Jpan",
+        "kat-Geor",
+        "kor-Hang",
+        "kur-Arab",
+        "lit-Latn",
+        "lav-Latn",
+        "mkd-Cyrl",
+        "mon-Cyrl",
+        "mar-Deva",
+        "msa-Latn",
+        "mya-Mymr",
+        "nob-Latn",
+        "nld-Latn",
+        "pol-Latn",
+        "por-Latn",
+        "por-Latn",
+        "ron-Latn",
+        "rus-Cyrl",
+        "slk-Latn",
+        "slv-Latn",
+        "sqi-Latn",
+        "srp-Cyrl",
+        "swe-Latn",
+        "tha-Thai",
+        "tur-Latn",
+        "ukr-Cyrl",
+        "urd-Arab",
+        "vie-Latn",
+        "zho-Hans",
+        "zho-Hant"
+      ],
+      "license": "apache-2.0",
+      "loader": {},
+      "max_tokens": 512,
+      "memory_usage_mb": 1061,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 278000000,
+      "name": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+      "release_date": "2019-11-01",
+      "revision": "79f2382ceacceacdf38563d7c5d16b9ff8d725d6",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "mMARCO-NL": [
+          "train"
+        ],
+        "MSMARCO": [
+          "train"
+        ],
+        "MSMARCO-PL": [
+          "train"
+        ],
+        "MSMARCOHardNegatives": [
+          "train"
+        ],
+        "NanoMSMARCORetrieval": [
+          "train"
+        ],
+        "NanoNQRetrieval": [
+          "train"
+        ],
+        "NQ": [
+          "train"
+        ],
+        "NQ-NL": [
+          "train"
+        ],
+        "NQ-PL": [
+          "train"
+        ],
+        "NQHardNegatives": [
+          "train"
+        ]
+      },
+      "use_instructions": false
+    },
+    "snowflake-arctic-embed2:568m": {
+      "adapted_from": "BAAI/bge-m3-retromae",
+      "embed_dim": 1024,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "afr-Latn",
+        "ara-Arab",
+        "aze-Latn",
+        "bel-Cyrl",
+        "bul-Cyrl",
+        "ben-Being",
+        "cat-Latn",
+        "ceb-Latn",
+        "ces-Latn",
+        "cym-Latn",
+        "dan-Latn",
+        "deu-Latn",
+        "ell-Grek",
+        "eng-Latn",
+        "spa-Latn",
+        "est-Latn",
+        "eus-Latn",
+        "fas-Arab",
+        "fin-Latn",
+        "fra-Latn",
+        "glg-Latn",
+        "guj-Gujr",
+        "heb-Hebr",
+        "hin-Deva",
+        "hrv-Latn",
+        "hat-Latn",
+        "hun-Latn",
+        "hye-Armn",
+        "ind-Latn",
+        "isl-Latn",
+        "ita-Latn",
+        "jpn-Jpan",
+        "jav-Latn",
+        "kat-Geor",
+        "kaz-Cyrl",
+        "khm-Khmr",
+        "kan-Knda",
+        "kor-Hang",
+        "kir-Cyrl",
+        "lao-Laoo",
+        "lit-Latn",
+        "lav-Latn",
+        "mkd-Cyrl",
+        "mal-Mlym",
+        "mon-Cyrl",
+        "mar-Deva",
+        "msa-Latn",
+        "mya-Mymr",
+        "nep-Deva",
+        "nld-Latn",
+        "pan-Guru",
+        "pol-Latn",
+        "por-Latn",
+        "que-Latn",
+        "ron-Latn",
+        "rus-Cyrl",
+        "sin-Sinh",
+        "slk-Latn",
+        "slv-Latn",
+        "some-Latn",
+        "sqi-Latn",
+        "srp-Cyrl",
+        "swe-Latn",
+        "swa-Latn",
+        "tam-Taml",
+        "tel-Telu",
+        "tha-Thai",
+        "tgl-Latn",
+        "tur-Latn",
+        "ukr-Cyrl",
+        "urd-Arab",
+        "vie-Latn",
+        "your-Latn",
+        "zho-Hans"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name": "Snowflake/snowflake-arctic-embed-l-v2.0",
+        "revision": "edc2df7b6c25794b340229ca082e7c78782e6374"
+      },
+      "max_tokens": 8192,
+      "memory_usage_mb": 2166,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 568000000,
+      "name": "Snowflake/snowflake-arctic-embed-v2.0-ollama",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-l-v2.0",
+      "release_date": "2024-12-04",
+      "revision": "edc2df7b6c25794b340229ca082e7c78782e6374",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "FEVER": [
+          "test"
+        ],
+        "FEVER-NL": [
+          "test"
+        ],
+        "FEVERHardNegatives": [
+          "test"
+        ],
+        "HotPotQA": [
+          "test"
+        ],
+        "HotpotQA-NL": [
+          "test"
+        ],
+        "HotPotQA-PL": [
+          "test"
+        ],
+        "HotPotQAHardNegatives": [
+          "test"
+        ],
+        "MIRACLReranking": [
+          "train"
+        ],
+        "MIRACLRetrieval": [
+          "train"
+        ],
+        "MIRACLRetrievalHardNegatives": [
+          "train"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQ-PL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ]
+      },
+      "use_instructions": true
+    },
+    "Snowflake/snowflake-arctic-embed-l": {
+      "adapted_from": "intfloat/e5-base-unsupervised",
+      "embed_dim": 1024,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name": "Snowflake/snowflake-arctic-embed-l",
+        "revision": "9a9e5834d2e89cdd8bb72b64111dde496e4fe78c"
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": 1274,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 335000000,
+      "name": "Snowflake/snowflake-arctic-embed-l",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-l",
+      "release_date": "2024-04-12",
+      "revision": "9a9e5834d2e89cdd8bb72b64111dde496e4fe78c",
+      "similarity_fn_name": "cosine",
+      "superseded_by": "Snowflake/snowflake-arctic-embed-l-v2.0",
+      "training_datasets": {
+        "FEVER": [
+          "test"
+        ],
+        "FEVER-NL": [
+          "test"
+        ],
+        "FEVERHardNegatives": [
+          "test"
+        ],
+        "HotPotQA": [
+          "test"
+        ],
+        "HotpotQA-NL": [
+          "test"
+        ],
+        "HotPotQA-PL": [
+          "test"
+        ],
+        "HotPotQAHardNegatives": [
+          "test"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQ-PL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ]
+      },
+      "use_instructions": true
+    },
+    "Snowflake/snowflake-arctic-embed-l-v2.0": {
+      "adapted_from": "BAAI/bge-m3-retromae",
+      "embed_dim": 1024,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "afr-Latn",
+        "ara-Arab",
+        "aze-Latn",
+        "bel-Cyrl",
+        "bul-Cyrl",
+        "ben-Being",
+        "cat-Latn",
+        "ceb-Latn",
+        "ces-Latn",
+        "cym-Latn",
+        "dan-Latn",
+        "deu-Latn",
+        "ell-Grek",
+        "eng-Latn",
+        "spa-Latn",
+        "est-Latn",
+        "eus-Latn",
+        "fas-Arab",
+        "fin-Latn",
+        "fra-Latn",
+        "glg-Latn",
+        "guj-Gujr",
+        "heb-Hebr",
+        "hin-Deva",
+        "hrv-Latn",
+        "hat-Latn",
+        "hun-Latn",
+        "hye-Armn",
+        "ind-Latn",
+        "isl-Latn",
+        "ita-Latn",
+        "jpn-Jpan",
+        "jav-Latn",
+        "kat-Geor",
+        "kaz-Cyrl",
+        "khm-Khmr",
+        "kan-Knda",
+        "kor-Hang",
+        "kir-Cyrl",
+        "lao-Laoo",
+        "lit-Latn",
+        "lav-Latn",
+        "mkd-Cyrl",
+        "mal-Mlym",
+        "mon-Cyrl",
+        "mar-Deva",
+        "msa-Latn",
+        "mya-Mymr",
+        "nep-Deva",
+        "nld-Latn",
+        "pan-Guru",
+        "pol-Latn",
+        "por-Latn",
+        "que-Latn",
+        "ron-Latn",
+        "rus-Cyrl",
+        "sin-Sinh",
+        "slk-Latn",
+        "slv-Latn",
+        "some-Latn",
+        "sqi-Latn",
+        "srp-Cyrl",
+        "swe-Latn",
+        "swa-Latn",
+        "tam-Taml",
+        "tel-Telu",
+        "tha-Thai",
+        "tgl-Latn",
+        "tur-Latn",
+        "ukr-Cyrl",
+        "urd-Arab",
+        "vie-Latn",
+        "your-Latn",
+        "zho-Hans"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name": "Snowflake/snowflake-arctic-embed-l-v2.0",
+        "revision": "edc2df7b6c25794b340229ca082e7c78782e6374"
+      },
+      "max_tokens": 8192,
+      "memory_usage_mb": 2166,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 568000000,
+      "name": "Snowflake/snowflake-arctic-embed-l-v2.0",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-l-v2.0",
+      "release_date": "2024-12-04",
+      "revision": "edc2df7b6c25794b340229ca082e7c78782e6374",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "FEVER": [
+          "test"
+        ],
+        "FEVER-NL": [
+          "test"
+        ],
+        "FEVERHardNegatives": [
+          "test"
+        ],
+        "HotPotQA": [
+          "test"
+        ],
+        "HotpotQA-NL": [
+          "test"
+        ],
+        "HotPotQA-PL": [
+          "test"
+        ],
+        "HotPotQAHardNegatives": [
+          "test"
+        ],
+        "MIRACLReranking": [
+          "train"
+        ],
+        "MIRACLRetrieval": [
+          "train"
+        ],
+        "MIRACLRetrievalHardNegatives": [
+          "train"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQ-PL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ]
+      },
+      "use_instructions": true
+    },
+    "Snowflake/snowflake-arctic-embed-m": {
+      "adapted_from": "intfloat/e5-base-unsupervised",
+      "embed_dim": 768,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name": "Snowflake/snowflake-arctic-embed-m",
+        "revision": "cc17beacbac32366782584c8752220405a0f3f40"
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": 415,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 109000000,
+      "name": "Snowflake/snowflake-arctic-embed-m",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-m",
+      "release_date": "2024-04-12",
+      "revision": "cc17beacbac32366782584c8752220405a0f3f40",
+      "similarity_fn_name": "cosine",
+      "superseded_by": "Snowflake/snowflake-arctic-embed-m-v1.5",
+      "training_datasets": {
+        "FEVER": [
+          "test"
+        ],
+        "FEVER-NL": [
+          "test"
+        ],
+        "FEVERHardNegatives": [
+          "test"
+        ],
+        "HotPotQA": [
+          "test"
+        ],
+        "HotpotQA-NL": [
+          "test"
+        ],
+        "HotPotQA-PL": [
+          "test"
+        ],
+        "HotPotQAHardNegatives": [
+          "test"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQ-PL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ]
+      },
+      "use_instructions": true
+    },
+    "Snowflake/snowflake-arctic-embed-m-long": {
+      "adapted_from": "nomic-ai/nomic-embed-text-v1-unsupervised",
+      "embed_dim": 768,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name": "Snowflake/snowflake-arctic-embed-m-long",
+        "revision": "89d0f6ab196eead40b90cb6f9fefec01a908d2d1",
+        "trust_remote_code": true
+      },
+      "max_tokens": 2048,
+      "memory_usage_mb": 522,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 137000000,
+      "name": "Snowflake/snowflake-arctic-embed-m-long",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-m-long",
+      "release_date": "2024-04-12",
+      "revision": "89d0f6ab196eead40b90cb6f9fefec01a908d2d1",
+      "similarity_fn_name": "cosine",
+      "superseded_by": "Snowflake/snowflake-arctic-embed-m-v2.0",
+      "training_datasets": {
+        "FEVER": [
+          "test"
+        ],
+        "FEVER-NL": [
+          "test"
+        ],
+        "FEVERHardNegatives": [
+          "test"
+        ],
+        "HotPotQA": [
+          "test"
+        ],
+        "HotpotQA-NL": [
+          "test"
+        ],
+        "HotPotQA-PL": [
+          "test"
+        ],
+        "HotPotQAHardNegatives": [
+          "test"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQ-PL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ]
+      },
+      "use_instructions": true
+    },
+    "Snowflake/snowflake-arctic-embed-m-v2.0": {
+      "adapted_from": "Alibaba-NLP/gte-multilingual-base",
+      "embed_dim": 768,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "afr-Latn",
+        "ara-Arab",
+        "aze-Latn",
+        "bel-Cyrl",
+        "bul-Cyrl",
+        "ben-Being",
+        "cat-Latn",
+        "ceb-Latn",
+        "ces-Latn",
+        "cym-Latn",
+        "dan-Latn",
+        "deu-Latn",
+        "ell-Grek",
+        "eng-Latn",
+        "spa-Latn",
+        "est-Latn",
+        "eus-Latn",
+        "fas-Arab",
+        "fin-Latn",
+        "fra-Latn",
+        "glg-Latn",
+        "guj-Gujr",
+        "heb-Hebr",
+        "hin-Deva",
+        "hrv-Latn",
+        "hat-Latn",
+        "hun-Latn",
+        "hye-Armn",
+        "ind-Latn",
+        "isl-Latn",
+        "ita-Latn",
+        "jpn-Jpan",
+        "jav-Latn",
+        "kat-Geor",
+        "kaz-Cyrl",
+        "khm-Khmr",
+        "kan-Knda",
+        "kor-Hang",
+        "kir-Cyrl",
+        "lao-Laoo",
+        "lit-Latn",
+        "lav-Latn",
+        "mkd-Cyrl",
+        "mal-Mlym",
+        "mon-Cyrl",
+        "mar-Deva",
+        "msa-Latn",
+        "mya-Mymr",
+        "nep-Deva",
+        "nld-Latn",
+        "pan-Guru",
+        "pol-Latn",
+        "por-Latn",
+        "que-Latn",
+        "ron-Latn",
+        "rus-Cyrl",
+        "sin-Sinh",
+        "slk-Latn",
+        "slv-Latn",
+        "some-Latn",
+        "sqi-Latn",
+        "srp-Cyrl",
+        "swe-Latn",
+        "swa-Latn",
+        "tam-Taml",
+        "tel-Telu",
+        "tha-Thai",
+        "tgl-Latn",
+        "tur-Latn",
+        "ukr-Cyrl",
+        "urd-Arab",
+        "vie-Latn",
+        "your-Latn",
+        "zho-Hans"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name": "Snowflake/snowflake-arctic-embed-m-v2.0",
+        "revision": "f2a7d59d80dfda5b1d14f096f3ce88bb6bf9ebdc",
+        "trust_remote_code": true
+      },
+      "max_tokens": 8192,
+      "memory_usage_mb": 1165,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 305000000,
+      "name": "Snowflake/snowflake-arctic-embed-m-v2.0",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-m-v2.0",
+      "release_date": "2024-12-04",
+      "revision": "f2a7d59d80dfda5b1d14f096f3ce88bb6bf9ebdc",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "FEVER": [
+          "test"
+        ],
+        "FEVER-NL": [
+          "test"
+        ],
+        "FEVERHardNegatives": [
+          "test"
+        ],
+        "HotPotQA": [
+          "test"
+        ],
+        "HotpotQA-NL": [
+          "test"
+        ],
+        "HotPotQA-PL": [
+          "test"
+        ],
+        "HotPotQAHardNegatives": [
+          "test"
+        ],
+        "MIRACLReranking": [
+          "train"
+        ],
+        "MIRACLRetrieval": [
+          "train"
+        ],
+        "MIRACLRetrievalHardNegatives": [
+          "train"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQ-PL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ]
+      },
+      "use_instructions": true
+    },
+    "Snowflake/snowflake-arctic-embed-s": {
+      "adapted_from": "intfloat/e5-small-unsupervised",
+      "embed_dim": 384,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name": "Snowflake/snowflake-arctic-embed-s",
+        "revision": "d3c1d2d433dd0fdc8e9ca01331a5f225639e798f"
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": 127,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 32200000,
+      "name": "Snowflake/snowflake-arctic-embed-s",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-s",
+      "release_date": "2024-04-12",
+      "revision": "d3c1d2d433dd0fdc8e9ca01331a5f225639e798f",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "FEVER": [
+          "test"
+        ],
+        "FEVER-NL": [
+          "test"
+        ],
+        "FEVERHardNegatives": [
+          "test"
+        ],
+        "HotPotQA": [
+          "test"
+        ],
+        "HotpotQA-NL": [
+          "test"
+        ],
+        "HotPotQA-PL": [
+          "test"
+        ],
+        "HotPotQAHardNegatives": [
+          "test"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQ-PL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ]
+      },
+      "use_instructions": true
+    },
+    "Snowflake/snowflake-arctic-embed-xs": {
+      "adapted_from": "sentence-transformers/all-MiniLM-L6-v2",
+      "embed_dim": 384,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "apache-2.0",
+      "loader": {
+        "model_name": "Snowflake/snowflake-arctic-embed-xs",
+        "revision": "742da4f66e1823b5b4dbe6c320a1375a1fd85f9e"
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": 86,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 22600000,
+      "name": "Snowflake/snowflake-arctic-embed-xs",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-xs",
+      "release_date": "2024-07-08",
+      "revision": "742da4f66e1823b5b4dbe6c320a1375a1fd85f9e",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "FEVER": [
+          "test"
+        ],
+        "FEVER-NL": [
+          "test"
+        ],
+        "FEVERHardNegatives": [
+          "test"
+        ],
+        "HotPotQA": [
+          "test"
+        ],
+        "HotpotQA-NL": [
+          "test"
+        ],
+        "HotPotQA-PL": [
+          "test"
+        ],
+        "HotPotQAHardNegatives": [
+          "test"
+        ],
+        "NQ": [
+          "test"
+        ],
+        "NQ-NL": [
+          "test"
+        ],
+        "NQ-PL": [
+          "test"
+        ],
+        "NQHardNegatives": [
+          "test"
+        ]
+      },
+      "use_instructions": true
+    },
+    "thenlper/gte-base": {
+      "adapted_from": null,
+      "embed_dim": 768,
+      "framework": [
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "mit",
+      "loader": {},
+      "max_tokens": 512,
+      "memory_usage_mb": 209,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 109482752,
+      "name": "thenlper/gte-base",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/thenlper/gte-base",
+      "release_date": "2023-07-27",
+      "revision": "c078288308d8dee004ab72c6191778064285ec0c",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": null,
+      "use_instructions": null
+    },
+    "thenlper/gte-large": {
+      "adapted_from": null,
+      "embed_dim": 1024,
+      "framework": [
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "mit",
+      "loader": {},
+      "max_tokens": 512,
+      "memory_usage_mb": 639,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 335122400,
+      "name": "thenlper/gte-large",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/thenlper/gte-large",
+      "release_date": "2023-07-27",
+      "revision": "4bef63f39fcc5e2d6b0aae83089f307af4970164",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": null,
+      "use_instructions": null
+    },
+    "WhereIsAI/UAE-Code-Large-V1": {
+      "adapted_from": null,
+      "embed_dim": 1024,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "mit",
+      "loader": {
+        "model": "WhereIsAI/UAE-Code-Large-V1",
+        "model_prompts": {
+          "query": "Represent this sentence for searching relevant passages: {text}",
+          "Summarization": "Summarize sentence \"{text}\" in one word:\""
+        },
+        "revision": "369c368f70f16a613f19f5598d4f12d9f44235d4"
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": 1278,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 335000000,
+      "name": "WhereIsAI/UAE-Code-Large-V1",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/WhereIsAI/UAE-Code-Large-V1",
+      "release_date": "2023-12-04",
+      "revision": "c601ffcfd22c0956a0f97eeada84b27634a7afc8",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "MNLI": [],
+        "NLI": [],
+        "SNLI": []
+      },
+      "use_instructions": true
+    },
+    "WhereIsAI/UAE-Large-V1": {
+      "adapted_from": null,
+      "embed_dim": 1024,
+      "framework": [
+        "Sentence Transformers",
+        "PyTorch"
+      ],
+      "is_cross_encoder": null,
+      "languages": [
+        "eng-Latn"
+      ],
+      "license": "mit",
+      "loader": {
+        "model": "WhereIsAI/UAE-Large-V1",
+        "model_prompts": {
+          "query": "Represent this sentence for searching relevant passages: {text}",
+          "Summarization": "Summarize sentence \"{text}\" in one word:\""
+        },
+        "revision": "369c368f70f16a613f19f5598d4f12d9f44235d4"
+      },
+      "max_tokens": 512,
+      "memory_usage_mb": 1278,
+      "modalities": [
+        "text"
+      ],
+      "n_parameters": 335000000,
+      "name": "WhereIsAI/UAE-Large-V1",
+      "open_weights": true,
+      "public_training_code": null,
+      "public_training_data": null,
+      "reference": "https://huggingface.co/WhereIsAI/UAE-Large-V1",
+      "release_date": "2023-12-04",
+      "revision": "369c368f70f16a613f19f5598d4f12d9f44235d4",
+      "similarity_fn_name": "cosine",
+      "superseded_by": null,
+      "training_datasets": {
+        "MNLI": [],
+        "NLI": [],
+        "SNLI": []
+      },
+      "use_instructions": true
+    }
+  },
+  "sparse_models": {
+    "fastembed": [
+      "Qdrant/bm25",
+      "Qdrant/bm42-all-minilm-l6-v2-attentions",
+      "Qdrant/minicoil-v1",
+      {
+        "Qdrant/Splade_PP_en_v1": "prithivida/Splade_PP_en_v1"
+      }
+    ],
+    "sentence-transformers": [
+      "prithivida/Splade_PP_en_v2",
+      "ibm-granite/granite-embedding-30m-sparse",
+      "opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini"
+    ]
+  }
+}

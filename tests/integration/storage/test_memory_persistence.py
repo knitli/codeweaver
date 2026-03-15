@@ -1,0 +1,104 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+"""Integration test: Scenario 4 - In-memory persistence.
+
+From quickstart.md:228-284
+Validates acceptance criteria spec.md:78
+"""
+
+import tempfile  # noqa: I001
+
+from pathlib import Path
+
+import pytest
+
+from codeweaver.core import uuid7
+from codeweaver.core import SemanticSearchLanguage as Language
+from codeweaver.providers import MemoryVectorStoreProvider
+
+# sourcery skip: dont-import-test-modules
+from tests.conftest import create_test_chunk_with_embeddings
+
+pytestmark = [pytest.mark.integration]
+
+
+pytestmark = pytest.mark.integration
+
+
+async def test_inmemory_persistence(vector_store_factory):
+    """
+    User Story: Use in-memory storage with automatic persistence.
+
+    Given: I want to use in-memory storage for testing
+    When: I configure the in-memory provider
+    Then: System stores embeddings in memory and persists to disk on shutdown
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        temp_path = Path(tmpdir) / "test_memory_db"
+
+        # Phase 1: Create and populate
+        provider1 = await vector_store_factory(
+            MemoryVectorStoreProvider,
+            config_overrides={
+                "persist_path": temp_path,
+                "auto_persist": True,
+                "collection_name": "test_memory",
+            },
+        )
+
+        # Get the actual dimension from the embedding provider configuration
+        # This dynamically adapts to whatever model is configured (testing profile uses minishlab/potion-base-8M = 256 dims)
+        dense_caps = provider1.caps.dense.capability if provider1.caps.dense else None
+        embedding_dim = dense_caps.default_dimension if dense_caps else 512
+
+        chunk = create_test_chunk_with_embeddings(
+            chunk_id=uuid7(),
+            chunk_name="memory_test.py:func",
+            file_path=Path("memory_test.py"),
+            language=Language.PYTHON,
+            content="test function",
+            dense_embedding=[0.7] * embedding_dim,  # Match actual configured dimension
+            line_start=1,
+            line_end=5,
+        )
+
+        await provider1.upsert([chunk])
+
+        # Trigger persistence
+        await provider1._persist_to_disk()
+
+        # Verify persistence file exists
+        assert temp_path.exists(), "Persistence directory should be created"
+        assert temp_path.is_dir(), "Persistence path should be a directory"
+
+        # Phase 2: Restore from disk
+        provider2 = await vector_store_factory(
+            MemoryVectorStoreProvider,
+            config_overrides={
+                "persist_path": temp_path,
+                "auto_persist": True,
+                "collection_name": "test_memory",
+            },
+        )
+
+        # Verify: Chunk restored from disk
+        from codeweaver.core import SearchStrategy, StrategizedQuery
+
+        # Use the same dimension as we used for upserting
+        dense_caps2 = provider2.caps.dense.capability if provider2.caps.dense else None
+        embedding_dim2 = dense_caps2.default_dimension if dense_caps2 else 512
+
+        results = await provider2.search(
+            StrategizedQuery(
+                query="test function",
+                strategy=SearchStrategy.DENSE_ONLY,
+                dense=[0.7] * embedding_dim2,  # Match actual configured dimension
+                sparse=None,
+            )
+        )
+        assert len(results) > 0, "Should restore chunks from persistence file"
+        assert results[0].chunk.chunk_name == "memory_test.py:func"
+
+        print("✅ Scenario 4 PASSED: In-memory provider persists to disk")

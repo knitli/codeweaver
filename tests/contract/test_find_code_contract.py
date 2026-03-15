@@ -25,16 +25,15 @@ import pytest
 
 from pydantic import ValidationError
 
-from codeweaver.agent_api.find_code import find_code
-from codeweaver.agent_api.find_code.intent import IntentType
-from codeweaver.agent_api.find_code.types import (
+from codeweaver.core import ChunkKind, SemanticSearchLanguage
+from codeweaver.core.types import SearchStrategy
+from codeweaver.server.agent_api.search import find_code
+from codeweaver.server.agent_api.search.types import (
     CodeMatch,
     CodeMatchType,
     FindCodeResponseSummary,
-    SearchStrategy,
+    IntentType,
 )
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.metadata import ChunkKind
 
 
 pytestmark = [pytest.mark.validation]
@@ -66,6 +65,11 @@ class TestFindCodeSignature:
         assert "max_results" in params, "find_code must have 'max_results' parameter"
         assert "context" in params, "find_code must have 'context' parameter"
 
+        # DI parameters (should be present but with INJECTED defaults)
+        assert "search_package" in params, "find_code must have 'search_package' parameter"
+        assert "telemetry_settings" in params, "find_code must have 'telemetry_settings' parameter"
+        assert "telemetry" in params, "find_code must have 'telemetry' parameter"
+
     def test_find_code_parameter_defaults(self):
         """Verify optional parameters have correct default values per contract."""
         sig = inspect.signature(find_code)
@@ -74,17 +78,29 @@ class TestFindCodeSignature:
         # intent default: None
         assert params["intent"].default is None, "intent default must be None"
 
-        # token_limit default: 30000
-        assert params["token_limit"].default == 30000, "token_limit default must be 30000"
+        # token_limit default: 20000
+        assert params["token_limit"].default == 20000, "token_limit default must be 20000"
 
         # focus_languages default: None
         assert params["focus_languages"].default is None, "focus_languages default must be None"
 
-        # max_results default: 30
-        assert params["max_results"].default == 30, "max_results default must be 30"
+        # max_results default: 10
+        assert params["max_results"].default == 10, "max_results default must be 10"
 
         # context default: None
         assert params["context"].default is None, "context default must be None"
+
+        # DI parameters should have INJECTED defaults
+        # Note: We don't check the actual INJECTED sentinel value as that's implementation detail
+        assert params["search_package"].default != inspect.Parameter.empty, (
+            "search_package must have default value (INJECTED)"
+        )
+        assert params["telemetry_settings"].default != inspect.Parameter.empty, (
+            "telemetry_settings must have default value (INJECTED)"
+        )
+        assert params["telemetry"].default != inspect.Parameter.empty, (
+            "telemetry must have default value (INJECTED)"
+        )
 
     def test_find_code_return_type(self):
         """Verify find_code returns FindCodeResponseSummary."""
@@ -257,7 +273,7 @@ class TestCodeMatchSchema:
             ), "relevance_score must have maximum 1.0"
         else:
             # Check directly if not nested
-            pass  # type: ignore # Pydantic may represent this differently
+            pass  # Pydantic may represent this differently
 
     def test_code_match_match_type_enum(self):
         """Verify match_type uses CodeMatchType enum values."""
@@ -273,17 +289,14 @@ class TestCodeMatchSchema:
         """Verify span tuple validation (2 elements, start <= end, >= 1)."""
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
-        from codeweaver.core.chunks import CodeChunk
-        from codeweaver.core.discovery import DiscoveredFile
-        from codeweaver.core.metadata import ExtKind
-        from codeweaver.core.spans import Span
+        from codeweaver.core import CodeChunk, DiscoveredFile, ExtCategory, Span, uuid7
+        from codeweaver.core.exceptions import ValidationError as CodeWeaverValidationError
 
         # Create minimal test data
         test_file = DiscoveredFile(path=Path("test.py"))
         test_chunk = CodeChunk(
             content="def test(): pass",
-            ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+            ext_category=ExtCategory(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
             line_range=Span(1, 1, uuid7()),
         )
 
@@ -299,8 +312,11 @@ class TestCodeMatchSchema:
         assert match.span.start == 1
         assert match.span.end == 10
 
-        # Invalid: start > end (Span validation catches this)
-        with pytest.raises(ValidationError, match="Start must be less than or equal to end"):
+        # Invalid: start > end (CodeMatch validation catches this)
+        with pytest.raises(
+            CodeWeaverValidationError,
+            match=r"Invalid span.*start line must be less than or equal to end line",
+        ):
             CodeMatch(
                 file=test_file,
                 content=test_chunk,
@@ -310,8 +326,11 @@ class TestCodeMatchSchema:
                 related_symbols=(),
             )
 
-        # Invalid: start < 1 (Pydantic PositiveInt validation catches this)
-        with pytest.raises(ValidationError):
+        # Invalid: start < 1 (Span validation catches this at creation time)
+        with pytest.raises(
+            (ValidationError, CodeWeaverValidationError),
+            match=r"(Invalid span.*start line must be greater than or equal to 1|Input should be greater than 0)",
+        ):
             CodeMatch(
                 file=test_file,
                 content=test_chunk,
@@ -370,13 +389,13 @@ class TestParameterValidation:
     def test_token_limit_constraints(self):
         """Verify token_limit is validated per contract (min: 1000, max: 100000)."""
         self._test_find_code_min_max_constraints(
-            "token_limit", 30000, "token_limit default must be 30000"
+            "token_limit", 20000, "token_limit default must be 20000"
         )
 
     def test_max_results_constraints(self):
         """Verify max_results is validated per contract (min: 1, max: 100)."""
         self._test_find_code_min_max_constraints(
-            "max_results", 30, "max_results default must be 30"
+            "max_results", 10, "max_results default must be 10"
         )
 
     def _test_find_code_min_max_constraints(self, constraint: str, bound: int, statement: str):
@@ -399,18 +418,14 @@ class TestContractExamples:
         """Verify response can represent the simple search example from contract."""
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
-        from codeweaver.core.chunks import CodeChunk
-        from codeweaver.core.discovery import DiscoveredFile
-        from codeweaver.core.metadata import ExtKind
-        from codeweaver.core.spans import Span
+        from codeweaver.core import CodeChunk, DiscoveredFile, ExtCategory, Span, uuid7
 
         # Recreate example from contract
         example_file = DiscoveredFile(path=Path("src/auth/middleware.py"))
         example_chunk = CodeChunk(
             content="class AuthMiddleware:\n    def __init__(self, config: AuthConfig):\n        ...",
             line_range=Span(15, 85, uuid7()),
-            ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+            ext_category=ExtCategory(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
         )
         example_match = CodeMatch(
             file=example_file,
@@ -461,8 +476,11 @@ class TestTypesSafety:
     def test_response_is_not_dict(self):
         """Verify find_code returns Pydantic model, not dict."""
         # This is enforced by type hints and Pydantic
-        type_hints = get_type_hints(find_code)
-        return_type_repr = str(type_hints["return"])
+        # Need to include locals to resolve INJECTED sentinels
+        from codeweaver.server.agent_api.search import INJECTED
+
+        type_hints = get_type_hints(find_code, localns={"INJECTED": INJECTED})
+        return_type_repr = str(type_hints.get("return", ""))
 
         # Should NOT return dict or dict[str, Any]
         assert "dict" not in return_type_repr.lower(), (
@@ -474,7 +492,7 @@ class TestTypesSafety:
         # Attempting to construct with wrong types should fail
         with pytest.raises((ValidationError, TypeError)):
             FindCodeResponseSummary(
-                matches="not a list",  # ty: ignore[invalid-argument-type]
+                matches="not a list",
                 summary="Test",
                 query_intent=IntentType.UNDERSTAND,
                 total_matches=0,

@@ -17,9 +17,13 @@ from textwrap import dedent
 import black
 import textcase
 
-from codeweaver.core.file_extensions import ALL_LANGUAGES
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.types.aliases import LanguageName, LanguageNameT
+from codeweaver.core import (
+    ALL_LANGUAGES,
+    ConfigLanguage,
+    LanguageName,
+    LanguageNameT,
+    SemanticSearchLanguage,
+)
 
 
 ALL_LANGUAGES = frozenset(ALL_LANGUAGES)
@@ -74,7 +78,7 @@ def generate_literal_type_file(languages: list[LanguageNameT], path: Path) -> No
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.exists():
         path.touch()
-    outcome = path.write_text(f"{intro}\n\n{content}")  # type: ignore
+    outcome = path.write_text(f"{intro}\n\n{content}")
     print(f"Wrote literal type file to {path} ({outcome} characters).")
 
 
@@ -118,7 +122,7 @@ def generate_markdown_file(languages: list[LanguageNameT], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.exists():
         path.touch()
-    outcome = path.write_text(content)  # type: ignore
+    outcome = path.write_text(content)
     print(f"Wrote markdown file to {path} ({outcome} characters).")
 
 

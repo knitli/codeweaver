@@ -11,27 +11,19 @@ Pydantic models and provider class for Bedrock reranking. Excuse the many ty ign
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from collections.abc import Iterator, Sequence
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Self, cast
+from typing import Annotated, Any, ClassVar, Literal, Self, cast
 
 from pydantic import AliasGenerator, ConfigDict, Field, JsonValue, PositiveInt, model_validator
 from pydantic.alias_generators import to_camel, to_snake
 
-from codeweaver.config.providers import AWSProviderSettings
-from codeweaver.core.types.models import BasedModel
-from codeweaver.exceptions import ConfigurationError
-from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.reranking.capabilities.amazon import get_amazon_reranking_capabilities
+from codeweaver.core import BasedModel, CodeChunk, ConfigurationError, Provider, StructuredDataInput
+from codeweaver.core import ValidationError as CodeWeaverValidationError
+from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
-
-
-if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk, StructuredDataInput
 
 
 class BaseBedrockModel(BasedModel):
@@ -96,7 +88,7 @@ class BedrockRerankConfiguration(BaseBedrockModel):
     ]
     number_of_results: Annotated[
         PositiveInt, Field(description="""Number of results to return -- this is `top_n`.""")
-    ] = 40
+    ] = DEFAULT_RERANKING_MAX_RESULTS
 
 
 class RerankConfiguration(BaseBedrockModel):
@@ -111,7 +103,7 @@ class RerankConfiguration(BaseBedrockModel):
     ] = "BEDROCK_RERANKING_MODEL"
 
     @classmethod
-    def from_arn(cls, arn: str, top_n: PositiveInt = 40) -> Self:
+    def from_arn(cls, arn: str, top_n: PositiveInt = DEFAULT_RERANKING_MAX_RESULTS) -> Self:
         """Create a RerankConfiguration from a Bedrock model ARN."""
         return cls.model_validate({
             "bedrock_reranking_configuration": {
@@ -218,8 +210,7 @@ class BedrockRerankingResult(BaseBedrockModel):
 
 
 try:
-    from boto3 import client as boto3_client
-    from types_boto3_bedrock_agent_runtime.client import AgentsforBedrockRuntimeClient
+    from boto3_types import AgentsforBedrockRuntimeClient
 
 except ImportError as e:
     logger.warning("Failed to import boto3", exc_info=True)
@@ -245,7 +236,7 @@ def bedrock_reranking_input_transformer(
     We can't actually produce the full objects we need here with just the documents. We need the query and model config to construct the full object.
     We're going to handle that in the rerank method, and break type override law. 👮
     """
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
     # Transform the input documents into the format expected by the Bedrock API
     if isinstance(documents, list | tuple | set):
@@ -282,90 +273,90 @@ def bedrock_reranking_output_transformer(
     response: BedrockRerankingResult, original_chunks: tuple[CodeChunk, ...] | Iterator[CodeChunk]
 ) -> list[RerankingResult]:
     """Transform the Bedrock API response into the format expected by the reranking provider."""
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
     parsed_response = BedrockRerankingResult.model_validate_json(cast(bytes, response))
-    results: list[RerankingResult] = []
-    for item in parsed_response.results:
-        # ty doesn't know that this will always be CodeChunk-as-JSON because that's what we send.
-        chunk = CodeChunk.model_validate_json(item.document.json_document)
-        results.append(
-            RerankingResult(
-                original_index=original_chunks.index(chunk)
+    return [
+        RerankingResult(
+            original_index=(
+                original_chunks.index(chunk)
                 if isinstance(original_chunks, tuple)
-                else tuple(original_chunks).index(chunk),
-                score=item.relevance_score,
-                batch_rank=item.index,
-                chunk=chunk,
-            )
+                else tuple(original_chunks).index(chunk)
+            ),
+            score=item.relevance_score,
+            batch_rank=item.index,
+            chunk=chunk,
         )
-    return results
+        for item in parsed_response.results
+        if (chunk := CodeChunk.model_validate_json(cast(bytes, item.document.json_document)))
+    ]
 
 
 class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient]):
     """Provider for Bedrock reranking."""
 
     client: AgentsforBedrockRuntimeClient
-    _provider = Provider.BEDROCK
-    caps: RerankingModelCapabilities = get_amazon_reranking_capabilities()[0]
+    _provider = ClassVar[Provider.BEDROCK]
     model_configuration: RerankConfiguration
 
     _kwargs: dict[str, Any] | None
 
-    _input_transformer = bedrock_reranking_input_transformer  # ty:ignore[invalid-method-override]
-    _output_transformer = bedrock_reranking_output_transformer  # ty:ignore[invalid-method-override]
+    _input_transformer = bedrock_reranking_input_transformer
+    _output_transformer = bedrock_reranking_output_transformer
 
     def __init__(
         self,
-        bedrock_provider_settings: AWSProviderSettings,
-        model_config: RerankConfiguration | None = None,
-        caps: RerankingModelCapabilities | None = None,
-        client: AgentsforBedrockRuntimeClient | None = None,
-        top_n: PositiveInt = 40,
-        prompt: str | None = None,
+        client: AgentsforBedrockRuntimeClient,
+        config: Any,  # RerankingProviderSettings (actually BedrockRerankingProviderSettings)
+        caps: RerankingModelCapabilities,
         **kwargs: Any,
     ) -> None:
-        """Override base init to set up Bedrock-specific client and configuration."""
-        from pydantic import SecretStr
+        """Initialize the Bedrock reranking provider.
 
-        # Prepare all values BEFORE calling super().__init__()
-        bedrock_settings = {
-            k: v.get_secret_value() if isinstance(v, SecretStr) else v
-            for k, v in bedrock_provider_settings.items()
-            if v is not None
-        }
-        model_configuration = model_config or RerankConfiguration.from_arn(
-            bedrock_provider_settings["model_arn"], kwargs.get("top_n", 40) if kwargs else top_n
-        )
-        _ = bedrock_provider_settings.pop("model_arn")  # ty: ignore[invalid-argument-type]  # the typed dict is mine, I do what I want
+        Args:
+            client: The Bedrock AgentsforBedrockRuntimeClient (provided by DI)
+            config: Configuration settings including reranking options (provided by DI)
+            caps: Model capabilities (provided by DI)
+            **kwargs: Additional keyword arguments to override config
+        """
+        from codeweaver.providers.config import BedrockRerankingProviderSettings
 
-        # Initialize client if not provided
-        if client is None:
-            client = boto3_client(  # ty: ignore[invalid-assignment,no-matching-overload]
-                "bedrock-agent-runtime",
-                **(bedrock_settings if isinstance(bedrock_settings, dict) else {}),  # ty: ignore[invalid-argument-type]
+        # Ensure we have the correct config type
+        if not isinstance(config, BedrockRerankingProviderSettings):
+            raise TypeError(
+                f"Expected BedrockRerankingProviderSettings, got {type(config).__name__}"
             )
 
-        final_caps = caps or get_amazon_reranking_capabilities()[0]
+        # Extract top_n from reranking config
+        rerank_opts = config.reranking_config._as_options().get("rerank", {})
+        top_n_value = rerank_opts.get("number_of_results", DEFAULT_RERANKING_MAX_RESULTS)
 
-        if not client:
-            raise ValueError("Either a Bedrock client or provider settings must be provided.")
+        # Build model configuration from the model ARN
+        # The validator ensures model_arn is in reranking_config.model
+        model_arn = config.reranking_config.model.get("model_arn") or config.model_arn
+        model_configuration = kwargs.pop(
+            "model_configuration", None
+        ) or RerankConfiguration.from_arn(model_arn, top_n_value)
 
-        # Call super().__init__() FIRST which handles all Pydantic initialization
-        super().__init__(client=client, caps=final_caps, top_n=top_n, prompt=prompt, **kwargs)
+        # Call super().__init__() with client, config, and caps
+        super().__init__(client=client, config=config, caps=caps, **kwargs)
 
-        # Set instance attributes AFTER Pydantic initialization
-        self._bedrock_provider_settings = bedrock_settings
+        # Set Bedrock-specific attributes
         self.model_configuration = model_configuration
+        self._initialize()
+
+    def _initialize(self) -> None:
+        """Initialize the Bedrock reranking provider after Pydantic setup."""
+        # Input and output transformers are already set as class attributes
 
     async def _execute_rerank(
         self,
         query: str,
         documents: Sequence[BedrockInlineDocumentSource],
         *,
-        top_n: int = 40,
+        top_n: int = DEFAULT_RERANKING_MAX_RESULTS,
         **kwargs: dict[str, Any] | None,
-    ) -> Any:  # ty:ignore[invalid-method-override]
+    ) -> Any:
         """
         Execute the reranking process.
         """
@@ -376,8 +367,24 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
             "sources": documents,
             "reranking_configuration": config,
         })
-        loop = asyncio.get_running_loop()
+        loop = await self._get_loop()
         return await loop.run_in_executor(None, self.client.rerank, request)
 
 
-__all__ = ("BedrockRerankingProvider", "BedrockRerankingResult")
+__all__ = (
+    "VALID_REGIONS",
+    "VALID_REGION_PATTERN",
+    "BaseBedrockModel",
+    "BedrockInlineDocumentSource",
+    "BedrockRerankConfiguration",
+    "BedrockRerankModelConfiguration",
+    "BedrockRerankRequest",
+    "BedrockRerankResultItem",
+    "BedrockRerankingProvider",
+    "BedrockRerankingResult",
+    "BedrockTextQuery",
+    "DocumentSource",
+    "RerankConfiguration",
+    "bedrock_reranking_input_transformer",
+    "bedrock_reranking_output_transformer",
+)

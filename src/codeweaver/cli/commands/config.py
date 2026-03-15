@@ -8,9 +8,8 @@
 
 from __future__ import annotations
 
-from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Literal
 
 import cyclopts
 
@@ -18,29 +17,34 @@ from cyclopts import App
 from pydantic import FilePath
 from rich.table import Table
 
-from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.cli.utils import is_codeweaver_config_path
-
-
-class ConfigProfile(StrEnum):
-    """Available configuration profiles for CodeWeaver setup."""
-
-    RECOMMENDED = "recommended"
-    QUICKSTART = "quickstart"
-    BACKUP = "backup"
-    TEST = "test"
+from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, UserInteractionDep, get_display
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.dependencies import ResolvedProjectPathDep, SettingsDep
+from codeweaver.core.di import INJECTED, get_container
+from codeweaver.core.types import UNSET
+from codeweaver.core.utils import detect_root_package, is_codeweaver_config_path
+from codeweaver.engine import ConfigChangeAnalyzerDep
+from codeweaver.providers import ProviderSettings, ProviderSettingsDep
 
 
 if TYPE_CHECKING:
-    from codeweaver.config import CodeWeaverSettingsDict, ProviderSettingsDict
-    from codeweaver.core.types.dictview import DictView
+    from codeweaver.core import DictView
 
 display: StatusDisplay = get_display()
 app = App("config", help="Manage and view your CodeWeaver config.", console=display.console)
 
 
+def _project_path(project_path: ResolvedProjectPathDep) -> Path:
+    return project_path
+
+
+def _settings(settings: SettingsDep = INJECTED) -> CodeWeaverSettingsType:
+    return settings
+
+
 @app.default()
-def config(
+async def config(
     *,
     project_path: Annotated[
         Path | None, cyclopts.Parameter(name=["--project", "-p"], help="Path to project directory")
@@ -59,37 +63,33 @@ def config(
     ] = False,
 ) -> None:
     """Manage CodeWeaver configuration."""
-    from codeweaver.config.settings import get_settings_map
-    from codeweaver.exceptions import CodeWeaverError
+    from codeweaver.core import CodeWeaverError
 
     error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
+    if config_file and not is_codeweaver_config_path(config_file):
+        try:
+            from codeweaver.core.dependencies import bootstrap_settings
 
-    try:
-        settings = get_settings_map()
-        if project_path or (config_file and not is_codeweaver_config_path(config_file)):
-            from codeweaver.config.settings import update_settings
+            settings = await bootstrap_settings(config_file=config_file)
+        except Exception as e:
+            error_handler.handle_error(e, "Configuration", exit_code=1)
 
-            if config_file:
-                display.print_info(f"Updating settings from config file: {config_file}")
-                display.print_info(
-                    "[red]Your config file is not in a standard location or name.[/red]"
-                )
-                display.print_info(
-                    f"[blue]Tip[/blue]: To ensure CodeWeaver finds it, you must set the `CODEWEAVER_CONFIG_FILE` environment variable to {config_file}, or always specify it with the `--config-file` option"
-                )
-            settings = update_settings(project_path=project_path, config_file=config_file)  # type: ignore
+        settings.project_path = project_path or settings.project_path
 
-        _show_config(settings)
-
-    except CodeWeaverError as e:
-        error_handler.handle_error(e, "Configuration", exit_code=1)
-    except Exception as e:
-        error_handler.handle_error(e, "Configuration", exit_code=1)
+    else:
+        try:
+            settings = await get_container().resolve(CodeWeaverSettingsType)
+            settings.project_path = project_path or settings.project_path
+        except CodeWeaverError as e:
+            error_handler.handle_error(e, "Configuration", exit_code=1)
+        except Exception as e:
+            error_handler.handle_error(e, "Configuration", exit_code=1)
+    _show_config(settings.view())
 
 
 def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
     """Display current configuration."""
-    from codeweaver.core.types.sentinel import Unset
+    from codeweaver.core import Unset
 
     display.print_command_header("CodeWeaver Configuration")
 
@@ -121,65 +121,81 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
         _show_provider_config(provider_settings)
 
 
-def _show_provider_config(provider_settings: ProviderSettingsDict) -> None:
-    """Display provider configuration details."""
-    from codeweaver.core.types.sentinel import Unset
+def _normalize_provider_configs(
+    configs: ProviderSettings | tuple[ProviderSettings, ...],
+    field: Literal["vector_store", "reranking", "embedding", "sparse_embedding", "agent", "data"],
+) -> tuple[ProviderSettings, ...]:
+    """Normalize provider configs to a tuple of valid config dicts."""
+    if isinstance(configs, tuple):
+        return configs
+    if configs is None or configs is UNSET:
+        if detect_root_package() == "core":
+            return ()
+        from codeweaver.providers.config.profiles import ProviderProfile
 
+        profile = ProviderProfile.RECOMMENDED
+        return getattr(profile.value, field, ())
+    return (configs,)
+
+
+def _build_provider_details(config) -> str:
+    """Build a human-readable details string for a provider config."""
+    details: list[str] = []
+
+    if (model_settings := config.get("model_settings")) and (model := model_settings.get("model")):
+        details.append(f"Model: {model}")
+
+    if provider_settings_dict := config.get("provider_settings"):
+        if url := provider_settings_dict.get("url"):
+            url_display = url if len(url) < 50 else f"{url[:47]}..."
+            details.append(f"URL: {url_display}")
+        if collection := provider_settings_dict.get("collection_name"):
+            details.append(f"Collection: {collection}")
+        if path := provider_settings_dict.get("persistence_path"):
+            details.append(f"Path: {path}")
+
+    return " | ".join(details) if details else "Default settings"
+
+
+def _show_provider_config(provider_settings: ProviderSettingsDep = INJECTED) -> None:
+    """Display provider configuration details."""
     display.print_section("Provider Configuration")
 
-    # provider_settings dict directly contains the configs by kind
-    if not provider_settings or isinstance(provider_settings, Unset):
+    if not provider_settings or provider_settings is UNSET:
         display.print_warning("No providers configured")
         return
 
-    # Group by provider kind - filter to only config dicts/tuples
-    valid_kinds = ("data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent")
-    for kind, configs in provider_settings.items():
-        if kind not in valid_kinds or not configs or isinstance(configs, Unset):
+    valid_categories = (
+        "data",
+        "embedding",
+        "sparse_embedding",
+        "reranking",
+        "vector_store",
+        "agent",
+    )
+
+    for category, configs in provider_settings.items():
+        if category not in valid_categories or not configs or configs is UNSET:
             continue
 
-        # Normalize to tuple and filter out invalid elements
-        if isinstance(configs, tuple):
-            config_list = tuple(c for c in configs if c is not None and not isinstance(c, Unset))
-        else:
-            config_list = (
-                (configs,) if configs is not None and not isinstance(configs, Unset) else ()
-            )
-        # Create table for this kind
+        config_list = _normalize_provider_configs(configs, field=category)  # ty:ignore[invalid-argument-type]
         table = Table(
-            title=f"{kind.replace('_', ' ').title()}", show_header=True, header_style="bold cyan"
+            title=f"{category.replace('_', ' ').title()}",
+            show_header=True,
+            header_style="bold cyan",
         )
         table.add_column("Provider", style="cyan")
         table.add_column("Status", style="white", no_wrap=True)
         table.add_column("Details", style="white")
 
         for config in config_list:
-            if config is None or isinstance(config, Unset):
+            if config is None or config is UNSET:
                 continue
+
             provider = config.get("provider")
             enabled = config.get("enabled", True)
-
-            # Get status with icon
             status = "✅ Enabled" if enabled else "⚠️ Disabled"
-
-            # Build details string
-            details = []
-            if (model_settings := config.get("model_settings")) and (
-                model := model_settings.get("model")
-            ):
-                details.append(f"Model: {model}")
-            if provider_settings_dict := config.get("provider_settings"):
-                # Show key provider-specific settings
-                if url := provider_settings_dict.get("url"):
-                    # Truncate long URLs
-                    url_display = url if len(url) < 50 else f"{url[:47]}..."
-                    details.append(f"URL: {url_display}")
-                if collection := provider_settings_dict.get("collection_name"):
-                    details.append(f"Collection: {collection}")
-                if path := provider_settings_dict.get("persistence_path"):
-                    details.append(f"Path: {path}")
-
-            details_str = " | ".join(details) if details else "Default settings"
+            details_str = _build_provider_details(config)
 
             table.add_row(
                 provider.as_title if hasattr(provider, "as_title") else str(provider),
@@ -188,7 +204,93 @@ def _show_provider_config(provider_settings: ProviderSettingsDict) -> None:
             )
 
         display.print_table(table)
-        display.console.print()  # Add spacing between tables
+        display.console.print()
+
+
+@app.command()
+async def set_config(
+    key: str,
+    value: str,
+    force: Annotated[
+        bool,
+        cyclopts.Parameter(
+            name=["--force", "-f"], help="Skip validation and apply change immediately"
+        ),
+    ] = False,
+    config_analyzer: ConfigChangeAnalyzerDep = INJECTED,
+    settings: SettingsDep = INJECTED,
+    interaction: UserInteractionDep = INJECTED,
+) -> None:
+    """Set a configuration value with proactive validation.
+
+    Validates embedding configuration changes before applying them to prevent
+    incompatible index states.
+
+    Args:
+        key: Configuration key (e.g., "provider.embedding.dimension")
+        value: New value for the key
+        force: Skip validation and apply change immediately
+        config_analyzer: DI-injected configuration analyzer
+        settings: DI-injected settings service
+        interaction: User interaction service
+    """
+    display.print_command_header("Set Configuration")
+
+    # Validate change using injected analyzer
+    if not force and key.startswith("provider.embedding"):
+        try:
+            analysis = await config_analyzer.validate_config_change(key, value)
+
+            if analysis:
+                from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
+
+                display.console.print()
+                match analysis.impact:
+                    case ChangeImpact.BREAKING:
+                        display.print_error("Configuration change is incompatible!")
+                        display.console.print(f"  {analysis.accuracy_impact}")
+                        display.console.print()
+                        display.console.print("Options:")
+                        for i, rec in enumerate(analysis.recommendations, 1):
+                            display.console.print(f"  {i}. {rec}")
+                        if not interaction.confirm("Continue anyway?"):
+                            display.print_warning("Configuration change cancelled")
+                            return
+
+                    case ChangeImpact.QUANTIZABLE | ChangeImpact.TRANSFORMABLE:
+                        display.print_warning("Transformation available")
+                        display.console.print(f"  Accuracy impact: {analysis.accuracy_impact}")
+                        display.console.print(
+                            f"  Time estimate: ~{analysis.estimated_time.total_seconds():.0f}s"
+                        )
+                        display.console.print()
+                        display.console.print("Recommendations:")
+                        for i, rec in enumerate(analysis.recommendations, 1):
+                            display.console.print(f"  {i}. {rec}")
+
+                    case _:
+                        display.print_success("Configuration change is compatible")
+
+        except Exception as e:
+            display.print_warning(f"Could not validate change: {e}")
+            if not force and not interaction.confirm("Continue without validation?"):
+                display.print_warning("Configuration change cancelled")
+                return
+
+    # Apply change using settings service
+    try:
+        # Note: Settings update mechanism needs to be implemented
+        # For now, this is a placeholder for the actual implementation
+        # Options:
+        # 1. Use settings.model_copy(update={key: value})
+        # 2. Implement a .set() method on Settings
+        # 3. Write directly to config file and reload
+        display.print_warning("Settings update not yet implemented")
+        display.console.print(f"Would update: {key} = {value}")
+        # TODO: Implement actual settings update mechanism
+    except Exception as e:
+        display.print_error(f"Failed to update configuration: {e}")
+        raise
 
 
 def main() -> None:
@@ -207,4 +309,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-__all__ = ("app", "main")
+__all__ = ()

@@ -22,7 +22,7 @@ from unittest.mock import MagicMock
 import pytest
 import tomli
 
-from codeweaver.cli.commands.init import app as init_app
+from codeweaver.cli import app as init_app
 
 
 @pytest.fixture
@@ -52,6 +52,7 @@ class TestInitConfigCommand:
         """Test `init config --profile recommended` creates correct config."""
         with pytest.raises(SystemExit) as exc_info:
             init_app([
+                "init",
                 "config",
                 "--profile",
                 "recommended",
@@ -66,8 +67,13 @@ class TestInitConfigCommand:
         assert config_path.exists()
         config = tomli.loads(config_path.read_text())
 
-        assert config["embedding"][0]["provider"] == "voyage"
-        assert config["vector_store"]["provider"] == "qdrant"
+        # Recommended profile uses asymmetric embedding (embed_provider + query_provider)
+        embedding_entry = config["provider"]["embedding"][0]
+        assert embedding_entry.get("config_type") == "asymmetric" or (
+            embedding_entry.get("embed_provider", {}).get("provider") == "voyage"
+            or embedding_entry.get("provider") == "voyage"
+        )
+        assert config["provider"]["vector_store"][0]["provider"] == "qdrant"
 
     def test_config_profile_quickstart(
         self, temp_project: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
@@ -75,6 +81,7 @@ class TestInitConfigCommand:
         """Test `init config --profile quickstart` creates offline-capable config."""
         with pytest.raises(SystemExit) as exc_info:
             init_app([
+                "init",
                 "config",
                 "--profile",
                 "quickstart",
@@ -90,15 +97,18 @@ class TestInitConfigCommand:
         config = tomli.loads(config_path.read_text())
 
         # Should use local providers (fastembed or sentence-transformers)
-        assert config["embedding"][0]["provider"] in ["fastembed", "sentence-transformers"]
-        assert config["vector_store"]["provider"] == "qdrant"
+        assert config["provider"]["embedding"][0]["provider"] in [
+            "fastembed",
+            "sentence-transformers",
+        ]
+        assert config["provider"]["vector_store"][0]["provider"] == "qdrant"
 
     def test_config_quickstart_flag(
         self, temp_project: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
     ) -> None:
         """Test `init config --quickstart` creates quickstart config."""
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["config", "--quickstart", "--project", str(temp_project)])
+            init_app(["init", "config", "--quickstart", "--project", str(temp_project)])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -122,7 +132,14 @@ class TestInitCommand:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--quickstart", "--client", "claude_code", "--project", str(temp_project)])
+            init_app([
+                "init",
+                "--quickstart",
+                "--client",
+                "claude_code",
+                "--project",
+                str(temp_project),
+            ])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -146,7 +163,14 @@ class TestInitCommand:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--quickstart", "--config-only", "--force", "--project", str(temp_project)])
+            init_app([
+                "init",
+                "--quickstart",
+                "--config-only",
+                "--force",
+                "--project",
+                str(temp_project),
+            ])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -170,7 +194,14 @@ class TestInitCommand:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--mcp-only", "--client", "claude_code", "--project", str(temp_project)])
+            init_app([
+                "init",
+                "--mcp-only",
+                "--client",
+                "claude_code",
+                "--project",
+                str(temp_project),
+            ])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -193,7 +224,14 @@ class TestHttpStreamingArchitecture:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--mcp-only", "--client", "claude_code", "--transport", "streamable-http"])
+            init_app([
+                "init",
+                "--mcp-only",
+                "--client",
+                "claude_code",
+                "--transport",
+                "streamable-http",
+            ])
         capsys.readouterr()
 
         # If succeeded, check config
@@ -217,7 +255,14 @@ class TestHttpStreamingArchitecture:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--mcp-only", "--client", "claude_code", "--transport", "streamable-http"])
+            init_app([
+                "init",
+                "--mcp-only",
+                "--client",
+                "claude_code",
+                "--transport",
+                "streamable-http",
+            ])
         capsys.readouterr()
 
         if exc_info.value.code == 0:
@@ -241,7 +286,7 @@ class TestHttpStreamingArchitecture:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--mcp-only", "--client", "claude_code"])
+            init_app(["init", "--mcp-only", "--client", "claude_code"])
         capsys.readouterr()
 
         if exc_info.value.code == 0:
@@ -275,9 +320,7 @@ class TestMcpClientSupport:
         for client in expected_clients:
             try:
                 config_path = _get_client_config_path(
-                    client=client,  # type: ignore[arg-type]
-                    config_level="project",
-                    project_path=temp_project,
+                    client=client, config_level="project", project_path=temp_project
                 )
                 assert config_path is not None
                 assert isinstance(config_path, Path)
@@ -300,9 +343,7 @@ class TestMcpClientSupport:
         for client, config_level, expected_path in test_cases:
             try:
                 config_path = _get_client_config_path(
-                    client=client,  # type: ignore[arg-type]
-                    config_level=config_level,  # type: ignore[arg-type]
-                    project_path=temp_project,
+                    client=client, config_level=config_level, project_path=temp_project
                 )
                 assert config_path == expected_path
                 # Path should be absolute
@@ -327,12 +368,12 @@ class TestInitIntegration:
         """Test init command integrates with config command."""
         # Init should create valid config
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--quickstart", "--project", str(temp_project)])
+            init_app(["init", "--quickstart", "--project", str(temp_project)])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
         # Config command should recognize it - config app doesn't take --show, just runs
-        from codeweaver.cli.commands.config import app as config_app
+        from codeweaver.cli import app as config_app
 
         with pytest.raises(SystemExit) as config_exc_info:
             config_app([])
@@ -354,12 +395,13 @@ class TestInitIntegration:
 provider = "fastembed"
 """)
 
-        # Init should detect and handle existing config
+        # Init should detect and handle existing config (use --force since DI injection
+        # for interaction is not available in unit test context)
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--quickstart", "--project", str(temp_project)])
+            init_app(["init", "--quickstart", "--force", "--project", str(temp_project)])
         capsys.readouterr()
 
-        # Should succeed (with --force or confirmation mocked)
+        # Should succeed with --force flag overriding existing config
         assert exc_info.value.code == 0
         # Config file should exist
         assert config_file.exists()
@@ -506,19 +548,48 @@ class TestHelperFunctions:
         assert config_path.parent.exists()
         assert config_path.exists()
 
-    @pytest.mark.skip(
-        reason="Backup functionality exists but test needs updating for actual backup behavior"
-    )
     def test_handle_write_output_backs_up_existing(self, temp_project: Path) -> None:
         """Test _handle_write_output backs up existing config."""
-        # Skipping - backup is created but the merge behavior makes testing complex
-        # The function _backup_config is called at line 415 in init.py
+        from codeweaver.cli.commands.init import _create_stdio_config, _handle_write_output
+
+        config = _create_stdio_config()
+
+        # Create the target directory and a pre-existing config file
+        config_path = temp_project / ".claude" / "mcp.json"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        original_content = (
+            '{"mcpServers": {"existing-tool": {"type": "stdio", "command": "existing"}}}'
+        )
+        config_path.write_text(original_content)
+
+        # Invoke _handle_write_output — the existing file should trigger _backup_config
+        _handle_write_output(
+            mcp_config=config,
+            config_level="project",
+            client="claude_code",
+            file_path=config_path,
+            project_path=temp_project,
+        )
+
+        # The original file should still exist (overwritten with new content)
+        assert config_path.exists()
+
+        # A backup file matching the pattern mcp.backup_*<suffix> should have been created
+        backup_files = list(config_path.parent.glob("mcp.backup_*.json"))
+        assert len(backup_files) >= 1, (
+            f"Expected at least one backup file matching 'mcp.backup_*.json' in "
+            f"{config_path.parent}, found: {list(config_path.parent.iterdir())}"
+        )
+
+        # The backup should contain the original content
+        assert backup_files[0].read_text() == original_content
 
     def test_mcp_command_stdio_transport(self, temp_project: Path) -> None:
         """Test mcp command creates stdio transport config."""
         # Call mcp subcommand via the app - need --output write to create file
         with pytest.raises(SystemExit) as exc_info:
             init_app([
+                "init",
                 "mcp",
                 "--output",
                 "write",
@@ -552,6 +623,7 @@ class TestHelperFunctions:
         # Call mcp subcommand via the app - need --output write to create file
         with pytest.raises(SystemExit) as exc_info:
             init_app([
+                "init",
                 "mcp",
                 "--output",
                 "write",

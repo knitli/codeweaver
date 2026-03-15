@@ -2,6 +2,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+#:tombi schema.strict = false
 
 [tools]
 bun = "1.3.3"
@@ -18,4 +19,4 @@ sync = "bun install"
 
 [tasks.gen-api-docs]
 tools.uv = "latest"
-run = "uvx ../scripts/gen-api-docs.py"
+run = "uvx ../scripts/gen_api_docs.py"

@@ -22,7 +22,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 ## Basic Usage
 
 ```python
-from codeweaver.common.utils.lazy_importer import lazy_import
+from codeweaver.common import lazy_import
 
 # Module import
 os_lazy = lazy_import("os")
@@ -91,7 +91,7 @@ _get_settings = lazy_import("codeweaver.config").get_settings
 
 # Later in functions - imports happen when called
 def tokenize(text: str):
-    encoding = _tiktoken.get_encoding("cl100k_base")  # Import NOW
+    encoding = _tiktoken.get_encoding("o200k_base")  # Import NOW
     return encoding.encode(text)
 
 def get_config():

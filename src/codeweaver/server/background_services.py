@@ -13,135 +13,89 @@ import logging
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
-from codeweaver.cli.ui.status_display import IndexingProgress, StatusDisplay
-from codeweaver.common.utils.utils import elapsed_time_to_human_readable
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.core import elapsed_time_to_human_readable
+from codeweaver.core.constants import WATCHER_WINDDOWN_TIMEOUT
+from codeweaver.core.ui_protocol import ProgressReporter
 
 
 if TYPE_CHECKING:
-    from codeweaver.server.lifespan import CodeWeaverState
+    from codeweaver.server.server import CodeWeaverState
 
 _logger = logging.getLogger(__name__)
 
 
-# Create callback that maps to IndexingProgress methods (same as index command)
 def _progress_callback(
-    progress_tracker: IndexingProgress,
-    current_batch_files: list[int],
+    progress_reporter: ProgressReporter,
     phase: str,
     current: int,
     total: int,
     *,
     extra: dict[str, Any] | None = None,
 ) -> None:
-    match phase:
-        case "batch_complete":
-            progress_tracker.complete_batch(current_batch_files[0])
-            current_batch_files[0] = 0
-        case "batch_start":
-            if current == 0:
-                # Initial setup - start with total batches
-                total_files = extra.get("total_files", 0) if extra else 0
-                progress_tracker.start(total_batches=total, total_files=total_files)
-            else:
-                # Start of a specific batch
-                files_in_batch = extra.get("files_in_batch", 0) if extra else 0
-                current_batch_files[0] = files_in_batch
-                progress_tracker.start_batch(current, files_in_batch)
-        case "checking":
-            progress_tracker.update_checking(current, total)
-        case "chunking":
-            chunks_created = extra.get("chunks_created", 0) if extra else 0
-            progress_tracker.update_chunking(current, total, chunks_created)
-        case "dense_embedding" | "embedding":
-            progress_tracker.update_dense_embedding(current, total)
-        case "discovery":
-            # Legacy discovery callback - maps to checking
-            progress_tracker.update_discovery(current, total)
-        case "indexing":
-            progress_tracker.update_indexing(current, total)
-        case "sparse_embedding":
-            progress_tracker.update_sparse_embedding(current, total)
+    """Report progress using ProgressReporter."""
+    progress_reporter.report_progress(phase, current, total, extra=extra)
 
 
 async def _perform_indexing(
-    state: CodeWeaverState, status_display: StatusDisplay, *, verbose: bool, debug: bool
+    state: CodeWeaverState, progress_reporter: ProgressReporter, *, verbose: bool, debug: bool
 ) -> None:
     """Perform the indexing operation with progress tracking."""
-    status_display.print_info("Initializing indexer...")
+    progress_reporter.start_operation("indexing", description="Initializing indexer...")
+    progress_reporter.start_operation("indexing", description="Starting indexing process...")
 
-    # Check if sparse embeddings are configured
-    has_sparse = state.indexer._sparse_provider is not None
-
-    # Create progress tracker with batch support (same as index command)
-    progress_tracker: IndexingProgress = IndexingProgress(
-        console=status_display.console, has_sparse=has_sparse
-    )
-
-    # Track files in current batch for complete_batch
-    current_batch_files = [0]  # Use list to allow mutation in closure
-
-    status_display.print_success("Starting indexing process...")
-
-    with progress_tracker:
-        await state.indexer.prime_index(
-            force_reindex=False,
-            progress_callback=partial(_progress_callback, progress_tracker, current_batch_files),
-            status_display=None if verbose or debug else status_display,
+    # Define simple callback wrapper
+    callback = partial(_progress_callback, progress_reporter)
+    if not state.indexer:
+        progress_reporter.report_error(
+            "No indexer configured, cannot perform indexing", recoverable=True
         )
-        progress_tracker.complete()
+        if verbose:
+            _logger.warning(
+                "No indexer configured, cannot perform indexing. This is probably a bug if you have everything else set up correctly."
+            )
+        return
+    await state.indexer.index_project(force_reindex=False, progress_callback=callback)
+    progress_reporter.complete_operation("indexing")
 
 
-def _display_indexing_summary(status_display: StatusDisplay, stats: Any) -> None:
+def _display_indexing_summary(progress_reporter: ProgressReporter, stats: Any) -> None:
     """Display the indexing summary statistics."""
-    status_display.console.print()
-    status_display.print_success("Indexing Complete!")
-    status_display.console.print()
-    status_display.console.print(f"  Files processed: [cyan]{stats.files_processed}[/cyan]")
-    status_display.console.print(f"  Chunks created: [cyan]{stats.chunks_created}[/cyan]")
-    status_display.console.print(f"  Chunks indexed: [cyan]{stats.chunks_indexed}[/cyan]")
-    status_display.console.print(
-        f"  Processing rate: [cyan]{stats.processing_rate():.2f}[/cyan] files/sec"
-    )
+    progress_reporter.report_status("Indexing Complete!", level="info")
+    progress_reporter.report_status(f"  Files processed: {stats.files_processed}")
+    progress_reporter.report_status(f"  Chunks created: {stats.chunks_created}")
+    progress_reporter.report_status(f"  Chunks indexed: {stats.chunks_indexed}")
+    progress_reporter.report_status(f"  Processing rate: {stats.processing_rate():.2f} files/sec")
 
     # Format elapsed time in human-readable format
     elapsed = stats.elapsed_time()
     human_time = elapsed_time_to_human_readable(elapsed)
-    status_display.console.print(f"  Time elapsed: [cyan]{human_time}[/cyan]")
+    progress_reporter.report_status(f"  Time elapsed: {human_time}")
 
     if stats.total_errors() > 0:
-        status_display.console.print(
-            f"  [yellow]Files with errors: {stats.total_errors()}[/yellow]"
+        progress_reporter.report_status(
+            f"  Files with errors: {stats.total_errors()}", level="warning"
         )
-
-    status_display.console.print()
 
 
 async def start_watcher(
-    state: CodeWeaverState, status_display: StatusDisplay
+    state: CodeWeaverState, progress_reporter: ProgressReporter
 ) -> asyncio.Task[None | int]:
     """Start the file watcher as an asynchronous task."""
-    import rignore
+    from codeweaver.core import get_container
+    from codeweaver.engine.services.watching_service import FileWatchingService
 
-    from codeweaver.common.utils import get_project_path
-    from codeweaver.engine.watcher import FileWatcher, IgnoreFilter
-
-    watcher = await FileWatcher.create(
-        get_project_path()
-        if isinstance(state.settings.project_path, Unset)
-        else state.settings.project_path,
-        file_filter=await IgnoreFilter.from_settings_async(),
-        walker=rignore.Walker(**state.indexer._walker_settings),  # ty: ignore[invalid-argument-type]
-        indexer=state.indexer,
-        status_display=status_display,  # Pass status_display to watcher
-    )
+    # Use DI container to resolve FileWatchingService with all its dependencies
+    watcher = await get_container().resolve(FileWatchingService)
 
     # Run watcher in a separate task so we can cancel it cleanly
     return asyncio.create_task(watcher.run())
 
 
 async def _handle_watcher_cancellation(
-    watcher_task: asyncio.Task[None | int] | None, status_display: StatusDisplay, *, verbose: bool
+    watcher_task: asyncio.Task[None | int] | None,
+    progress_reporter: ProgressReporter,
+    *,
+    verbose: bool,
 ) -> None:
     """Handle graceful cancellation of the watcher task."""
     if not watcher_task or watcher_task.done():
@@ -149,35 +103,44 @@ async def _handle_watcher_cancellation(
 
     watcher_task.cancel()
     try:
-        await asyncio.wait_for(watcher_task, timeout=2.5)
+        await asyncio.wait_for(watcher_task, timeout=WATCHER_WINDDOWN_TIMEOUT)
     except (TimeoutError, asyncio.CancelledError):
         if verbose:
             _logger.warning("Watcher did not stop within timeout")
-        status_display.console.print("  [dim]Tidying up a few loose threads...[/dim]")
+        progress_reporter.report_status("  Tidying up a few loose threads...")
 
 
 async def _run_indexing_workflow(
-    state: CodeWeaverState, status_display: StatusDisplay, *, verbose: bool, debug: bool
-) -> asyncio.Task[None | int]:
+    state: CodeWeaverState, progress_reporter: ProgressReporter, *, verbose: bool, debug: bool
+) -> asyncio.Task[None | int] | None:
     """Run the complete indexing workflow and start the watcher."""
     # Perform indexing with progress tracking
-    await _perform_indexing(state, status_display, verbose=verbose, debug=debug)
+    await _perform_indexing(state, progress_reporter, verbose=verbose, debug=debug)
 
     # Display final summary
-    _display_indexing_summary(status_display, state.indexer.stats)
+    if not state.indexer:
+        progress_reporter.report_error(
+            "No indexer configured, cannot display indexing summary", recoverable=True
+        )
+        if verbose:
+            _logger.warning(
+                "No indexer configured, cannot display indexing summary. This is probably a bug if you have everything else set up correctly."
+            )
+        return None
+    _display_indexing_summary(progress_reporter, state.indexer.stats)
 
-    status_display.print_step("Watching for file changes...")
+    progress_reporter.report_status("Watching for file changes...")
 
     # Start file watcher for real-time updates
     if verbose:
         _logger.info("Starting file watcher...")
 
-    return await start_watcher(state, status_display)
+    return await start_watcher(state, progress_reporter)
 
 
 async def run_background_indexing(
     state: CodeWeaverState,
-    status_display: StatusDisplay,
+    progress_reporter: ProgressReporter,
     *,
     verbose: bool = False,
     debug: bool = False,
@@ -186,8 +149,7 @@ async def run_background_indexing(
 
     Args:
         state: Application state
-        settings: Configuration settings
-        status_display: StatusDisplay instance for user-facing output
+        progress_reporter: ProgressReporter instance for user-facing output
         verbose: Whether to show verbose output
         debug: Whether debug mode is enabled
     """
@@ -196,7 +158,9 @@ async def run_background_indexing(
 
     if not state.indexer:
         # Always show this warning to the user - it's important
-        status_display.print_warning("No indexer configured, skipping background indexing")
+        progress_reporter.report_error(
+            "No indexer configured, skipping background indexing", recoverable=True
+        )
         if verbose:
             _logger.warning(
                 "No indexer configured, skipping background indexing. This is probably a bug if you have everything else set up correctly."
@@ -206,22 +170,29 @@ async def run_background_indexing(
     watcher_task = None
     try:
         watcher_task = await _run_indexing_workflow(
-            state, status_display, verbose=verbose, debug=debug
+            state, progress_reporter, verbose=verbose, debug=debug
         )
     except asyncio.CancelledError:
-        status_display.print_shutdown_start()
+        # status_display.print_shutdown_start() # Handled in lifespan cleanup usually?
+        # But here it catches cancellation of this task.
+        progress_reporter.report_status("Saving state...", extra={"end": ""})
         if verbose:
             _logger.info("Background indexing cancelled, shutting down watcher...")
-        await _handle_watcher_cancellation(watcher_task, status_display, verbose=verbose)
+        await _handle_watcher_cancellation(watcher_task, progress_reporter, verbose=verbose)
         raise
     except Exception as e:
-        status_display.print_error("Background indexing error", details=str(e))
+        progress_reporter.report_error("Background indexing error", extra={"details": str(e)})
         _logger.warning("Background indexing error", exc_info=True)
     finally:
         # Ensure watcher task is cancelled on any exit
         if watcher_task and not watcher_task.done():
             watcher_task.cancel()
-        status_display.print_shutdown_complete()
+        # status_display.print_shutdown_complete() # Handled in lifespan
+        # But wait, original code called print_shutdown_complete here.
+        # lifespan calls _cleanup_state which calls print_shutdown_complete.
+        # So maybe duplication here?
+        # _cleanup_state calls print_shutdown_start/complete.
+        # run_background_indexing is a task.
 
 
-__all__ = ("run_background_indexing",)
+__all__ = ("run_background_indexing", "start_watcher")

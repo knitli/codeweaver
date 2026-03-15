@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # sourcery skip: comment:docstrings-for-functions
+# ruff: noqa: N806
 """Custom wrappers around ast-grep's core types to add functionality and serialization.
 
 Like the rest of CodeWeaver, we use our specific vocabulary for concepts to make roles and relationships more clear. See [codeweaver.semantic.grammar_things] for more details.
@@ -50,20 +51,20 @@ from __future__ import annotations
 import contextlib
 import logging
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
+from contextvars import ContextVar
 from functools import cached_property
 from pathlib import Path
-from types import ModuleType
 from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
     Literal,
-    LiteralString,
     NamedTuple,
     Unpack,
     cast,
     overload,
+    override,
 )
 
 from ast_grep_py import (
@@ -93,12 +94,22 @@ from pydantic import (
     computed_field,
 )
 
-from codeweaver.common.utils import LazyImport, lazy_import, uuid7
-from codeweaver.common.utils.textify import humanize
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types.aliases import FileExt, LiteralStringT, ThingName, ThingNameT
-from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core import (
+    AnonymityConversion,
+    BasedModel,
+    BaseEnum,
+    FileExt,
+    LiteralStringT,
+    SemanticSearchLanguage,
+    ThingName,
+    ThingNameT,
+    generate_field_title,
+    has_package,
+    humanize,
+    uuid7,
+)
+from codeweaver.core.di.dependency import INJECTED
+from codeweaver.semantic.dependencies import ThingRegistryDep
 
 # Runtime imports needed for cast operations and type checking
 from codeweaver.semantic.grammar import Category, CompositeThing, Token
@@ -106,13 +117,23 @@ from codeweaver.semantic.grammar import Category, CompositeThing, Token
 
 # type-only imports
 if TYPE_CHECKING:
-    from codeweaver.core.types.aliases import FilteredKey
-    from codeweaver.core.types.enum import AnonymityConversion
+    from codeweaver.core import AnonymityConversion, DiscoveredFile, FilteredKey
     from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
+    from codeweaver.semantic.registry import ThingRegistry
+
+    if has_package("codeweaver.engine") is not None:
+        from codeweaver.engine.chunker.registry import SourceIdRegistry
+        from codeweaver.engine.dependencies import SourceIdRegistryDep
+    else:
+        SourceIdRegistry = None
+        SourceIdRegistryDep = None
+
 
 logger = logging.getLogger(__name__)
 
-registry_module: LazyImport[ModuleType] = lazy_import("codeweaver.semantic.registry")
+_resolving_ast_thing: ContextVar[set[int] | None] = ContextVar("_resolving_ast_thing", default=None)
+_thing_registry_instance: ThingRegistry | None = None
+"""Module-level singleton for ThingRegistry when DI container is not active."""
 
 # re-export Ast Grep's rules and config types:
 AstGrepSearchTypes = (
@@ -138,8 +159,10 @@ class MetaVar(str, BaseEnum):
 
     __slots__ = ()
 
+    @override
     def __str__(self) -> str:
         """Return the string representation of the meta variable."""
+        # This is an intentional override to ensure that str(MetaVar) returns the correct value.
         return self.value
 
     def to_metavar(
@@ -172,11 +195,19 @@ class Strictness(str, BaseEnum):
 class Position(NamedTuple):
     """Represents a `Pos` from ast-grep with pydantic validation. The position of the node in the source code."""
 
-    line: PositiveInt
-    column: PositiveInt
+    line: Annotated[
+        PositiveInt, Field(description="Line number", field_title_generator=generate_field_title)
+    ]
+    column: Annotated[
+        PositiveInt, Field(description="Column number", field_title_generator=generate_field_title)
+    ]
     idx: Annotated[
         NonNegativeInt,
-        Field(serialization_alias="index", description="""Byte index in the source"""),
+        Field(
+            serialization_alias="index",
+            description="""Byte index in the source""",
+            field_title_generator=generate_field_title,
+        ),
     ]
 
     @classmethod
@@ -230,8 +261,7 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
     _file_path: Path | None = PrivateAttr(default=None)
 
     def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
-        from codeweaver.core.types.aliases import FilteredKey
-        from codeweaver.core.types.enum import AnonymityConversion
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("_root"): AnonymityConversion.HASH,
@@ -261,6 +291,26 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
             return self._file_path
         return Path(self._root.filename())
 
+    @staticmethod
+    def _file_registry(registry: SourceIdRegistryDep = INJECTED) -> SourceIdRegistry | None:
+        return registry
+
+    @property
+    def discovered_file(self) -> DiscoveredFile | None:
+        """Get the discovered file associated with this FileThing."""
+        if not (registry := self._file_registry()):
+            return None
+        return registry.file_from_path(self.filename)
+
+    @computed_field
+    @property
+    def file_source_id(self) -> UUID7 | None:
+        """Get the source ID of the discovered file associated with this FileThing."""
+        if discovered_file := self.discovered_file:
+            return discovered_file.source_id
+        return None
+
+    @computed_field
     @property
     def id(self) -> UUID7:
         """Return the unique ID of the file thing."""
@@ -286,7 +336,7 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
     @classmethod
     def from_file(cls, file_path: Path) -> FileThing[SgRoot]:
         """Create a FileThing from a file."""
-        from codeweaver.core.language import SemanticSearchLanguage
+        from codeweaver.core import SemanticSearchLanguage
 
         content = file_path.read_text()
         language = SemanticSearchLanguage.from_extension(
@@ -295,6 +345,15 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
         return cls.from_sg_root(
             AstGrepRoot(content, cast(SemanticSearchLanguage, language).variable)
         )
+
+    def serialize_for_embedding(self) -> dict[str, Any]:
+        """Serialize the FileThing for embedding purposes."""
+        return {
+            "filename": str(self.filename),
+            "id": str(self._id),
+            "root": self.filename,
+            "file_path": str(self._file_path) if self._file_path is not None else None,
+        }
 
 
 class AstThing[SgNode: (AstGrepNode)](BasedModel):
@@ -326,18 +385,22 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
                 data["_node"].get_root().filename().suffix
                 or data["_node"].get_root().filename().name
             ),
+            field_title_generator=generate_field_title,
         ),
     ]
 
     thing_id: Annotated[UUID7, Field(description="""The unique ID of the node""")] = uuid7()
 
-    parent_thing_id: Annotated[UUID7 | None, Field(description="""The ID of the parent node""")] = (
-        None
-    )
+    def __repr__(self) -> str:
+        """Return a string representation of the node."""
+        return f"AstThing(name={self.name}, language={self.language.variable}, thing_id={self.thing_id})"
+
+    def __str__(self) -> str:
+        """Return a string representation of the node."""
+        return f"{self.language.variable} node: {self.name}"
 
     def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
-        from codeweaver.core.types.aliases import FilteredKey
-        from codeweaver.core.types.enum import AnonymityConversion
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("_node"): AnonymityConversion.HASH,
@@ -387,27 +450,62 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         parent_thing_id: UUID7 | None = None,
     ) -> AstThing[SgNode]:
         """Create an AstThing from an ast-grep `SgNode`."""
-        return cls.model_construct(
-            _node=sg_node,
-            language=language,
-            thing_id=thing_id or uuid7(),
-            parent_thing_id=parent_thing_id,
+        # Use object.__new__ to completely bypass Pydantic's initialization
+        # and prevent recursion in init_private_attributes/model_post_init
+        instance = object.__new__(cls)
+
+        # Manually set all fields
+        object.__setattr__(instance, "language", language)
+        object.__setattr__(instance, "thing_id", thing_id or uuid7())
+        object.__setattr__(instance, "parent_thing_id", parent_thing_id)
+
+        # Manually set Pydantic internal state
+        object.__setattr__(
+            instance, "__pydantic_fields_set__", {"language", "thing_id", "parent_thing_id"}
         )
+        object.__setattr__(instance, "__pydantic_extra__", None)
+        object.__setattr__(instance, "__pydantic_private__", None)
+
+        # Set our private attribute
+        object.__setattr__(instance, "_node", sg_node)
+
+        return instance
 
     # ================================================
     # *      Identity and Metadata Properties       *
     # ================================================
+    @staticmethod
+    def _thing_registry(registry: ThingRegistryDep = INJECTED) -> ThingRegistry:
+        """Get or create ThingRegistry instance.
+
+        When called through DI container, returns injected registry.
+        When called directly (e.g. in tests), creates singleton instance.
+        Ensures registry is populated on first access via lazy loading.
+        """
+        from codeweaver.core.di.dependency import DependsPlaceholder, _InjectedProxy
+        from codeweaver.semantic.registry import ThingRegistry
+
+        # Check if registry is INJECTED placeholder (either proxy or sentinel)
+        if isinstance(registry, (_InjectedProxy, DependsPlaceholder)):
+            # No DI container active, create singleton registry
+            global _thing_registry_instance
+            if _thing_registry_instance is None:
+                _thing_registry_instance = ThingRegistry()
+                # Populate registry on first access via lazy loading
+                # This loads the pickle cache and registers all Things and Categories
+                from codeweaver.semantic.node_type_parser import get_things
+
+                _ = get_things()  # Calls parse_languages → _register_everything
+            return _thing_registry_instance
+        return registry
 
     @computed_field
     @property
     def thing(self) -> CompositeThing | Token | Category | None:
         """Get the grammar Thing that this node represents."""
-        thing_name: ThingName = self.name  # type: ignore
-        # Handle ERROR nodes from ast-grep (syntax errors)
-        if thing_name == ThingName("ERROR"):
-            return None
-        registry = registry_module  # Access the module, don't call it
-        if thing := registry.get_registry().get_thing_by_name(thing_name, language=self.language):  # ty: ignore[unresolved-attribute]
+        thing_name: ThingName = self.name
+        registry = self._thing_registry()
+        if thing := registry.get_thing_by_name(thing_name, language=self.language):
             return cast(CompositeThing | Token | Category, thing)
         # Return None for unknown things rather than raising
         return None
@@ -463,15 +561,23 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     @cached_property
     def title(self) -> str:
         """Get a human-readable title for the node."""
-        name = humanize(self.name)
-        language = humanize(str(self.language))
+        name = humanize(self.name)  # ty:ignore[invalid-argument-type]
+        language = humanize(self.language.as_title)
         classification = (
             humanize(self.classification.name.as_title) if self.classification else "Not classified"
         )
-        text_snippet = humanize(self.text.strip().splitlines()[0])
+
+        # Safely handle empty text for snippet
+        lines = self.text.strip().splitlines()
+        text_snippet = humanize(lines[0]) if lines else ""
+
         if len(text_snippet) > 25:
             text_snippet = f"{text_snippet[:22]}..."
-        return f"{language}-{name}-{classification}: '{text_snippet}'"
+        return (
+            f"{language}-{name}-{classification}: '{text_snippet}'"
+            if text_snippet
+            else f"{language}-{name}-{classification}"
+        )
 
     @computed_field
     @property
@@ -508,7 +614,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     @cached_property
     def name(self) -> ThingNameT:
         """Get the name (kind - the name in the grammar) of the node."""
-        return ThingName(cast(LiteralString, self._node.kind()))
+        return ThingName(cast(LiteralStringT, self._node.kind()))
 
     @computed_field
     @cached_property
@@ -555,6 +661,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         """Calculate the importance score for this node for a specific context."""
         return self.importance_for_task(task).as_dict()[context]
 
+    @override
     def __getitem__(self, meta_var: str) -> AstThing[SgNode]:
         """Get the child node for the given meta variable."""
         return type(self).from_sg_node(cast(SgNode, self._node[meta_var]), self.language)
@@ -666,7 +773,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         )
 
     @computed_field
-    @cached_property
+    @property
     def parent(self) -> AstThing[SgNode] | None:
         """Get the parent of the thing."""
         parent_node = self._node.parent()
@@ -700,53 +807,91 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         """Commit a list of edits to the source code."""
         raise NotImplementedError("Edit functionality is not implemented yet.")
 
+    @cached_property
     def serialize_as_child(self) -> str:
         """Serialize the AstThing as a child for output."""
         return f"{self.title}: {self.get_file().filename} [{self.range.start.line}:{self.range.start.column}-{self.range.end.line}:{self.range.end.column}]"
 
+    @property
+    def _excluded_fields(self) -> set[str]:
+        return {
+            "_node",
+            "_registry",
+            "has_explicit_rule",
+            "is_explicit_rule_token",
+            "range",
+            "importance",
+            "thing_id",
+            "parent_thing_id",
+            "language",
+            "text",
+        } | self._special_fields
+
+    @property
+    def _special_fields(self) -> set[str]:
+        return {"parent", "positional_connections", "thing", "_root"}
+
+    def serialize_special_fields(self, *, for_cli: bool = False) -> dict[str, Any]:
+        """Serialize the special fields of the AstThing."""
+        fields: dict[str, Any] = {}
+        for field in self._special_fields:
+            value = getattr(self, field)
+            if isinstance(value, tuple):
+                fields[field] = tuple(
+                    item.serialize_as_child
+                    if hasattr(item, "serialize_as_child")
+                    else item.serialize_for_cli()
+                    if hasattr(item, "serialize_for_cli")
+                    else item
+                    for item in value
+                )
+                if for_cli and len(fields[field]) > 4:
+                    fields[field] = (*fields[field][:4], "...")
+                elif for_cli and len(fields) == 1:
+                    fields[field] = fields[field][0]
+            else:
+                fields[field] = (
+                    value.serialize_as_child
+                    if hasattr(value, "serialize_as_child")
+                    else value.serialize_for_cli()
+                    if hasattr(value, "serialize_for_cli")
+                    else value
+                )
+        return fields
+
     def serialize_for_cli(self) -> dict[str, Any]:
         """Serialize the AstThing for CLI output."""
-        as_python = self.model_dump(
-            mode="python",
-            round_trip=True,
-            exclude={
-                "_node",
-                "_registry",
-                "has_explicit_rule",
-                "is_explicit_rule_token",
-                "range",
-                "importance",
-                "thing_id",
-                "parent_thing_id",
-                "language",
-                "text",
-            },
-        )
-        for k, v in as_python.items():
-            if isinstance(v, Sequence | Iterator) and not isinstance(v, str):
-                as_python[k] = [
-                    item.serialize_as_child()  # type: ignore
-                    if hasattr(item, "serialize_as_child")  # type: ignore
-                    else item.serialize_for_cli()  # type: ignore
-                    if hasattr(item, "serialize_for_cli")  # type: ignore
-                    else item
-                    for item in v  # type: ignore
-                ]
-        return {
-            k: v.serialize_as_child()
-            if hasattr(v, "serialize_as_child")
-            else v.serialize_for_cli()
-            if hasattr(v, "serialize_for_cli")
-            else v
-            for k, v in as_python.items()
-        }
+        return self.model_dump(
+            mode="python", round_trip=True, exclude=self._excluded_fields
+        ) | self.serialize_special_fields(for_cli=True)
+
+    def serialize_for_embedding(self) -> dict[str, Any]:
+        """Serialize the AstThing for embedding purposes."""
+        return self.model_dump(
+            mode="python", round_trip=True, exclude=self._excluded_fields
+        ) | self.serialize_special_fields(for_cli=False)
+
+
+def rebuild_models_for_tests() -> bool:
+    """Rebuild all models with AstThing forward references for test scenarios.
+
+    This should be called at the beginning of test modules that instantiate CodeChunk,
+    ChunkEmbeddings, or other models that depend on AstThing/SemanticMetadata.
+
+    Returns:
+        bool: True if all models were rebuilt successfully, False otherwise
+    """
+    _rebuild_models_with_ast_thing()
+    return True
 
 
 __all__ = (
+    "AstGrepSearchTypes",
     "AstThing",
     "Config",
     "CustomLang",
     "FileThing",
+    "MetaVar",
     "NthChild",
     "Pattern",
     "Pos",
@@ -757,17 +902,68 @@ __all__ = (
     "Relation",
     "Rule",
     "RuleWithoutNot",
+    "Strictness",
+    "rebuild_models_for_tests",
 )
 
-# Rebuild models to resolve forward references
-with contextlib.suppress(Exception):
-    from codeweaver.core.chunks import CodeChunk
-    from codeweaver.core.metadata import SemanticMetadata
 
-    for model in (FileThing, AstThing, SemanticMetadata, CodeChunk):
-        if model.__pydantic_complete__:
-            continue
-        if not model.model_rebuild():
-            logger.warning("Model %s failed to rebuild in ast_grep.py", model.__name__)
-        else:
-            logger.debug("Model %s rebuilt successfully in ast_grep.py", model.__name__)
+# Rebuild models to resolve forward references
+def _rebuild_models_with_ast_thing() -> None:
+    """Rebuild Pydantic models that have forward references to AstThing.
+
+    This ensures that SemanticMetadata, CodeChunk, ChunkEmbeddings, and related models
+    can properly validate their AstThing fields. Called automatically on module import.
+    """
+    try:
+        from ast_grep_py import SgNode
+
+        from codeweaver.core import CodeChunk
+        from codeweaver.core.types.embeddings import ChunkEmbeddings
+        from codeweaver.semantic.types import SemanticMetadata
+
+        # Import type annotations that AstThing uses (for computed fields)
+        try:
+            from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
+        except ImportError:
+            # These might not be available yet
+            AgentTask = None  # type: ignore
+            ImportanceScores = None  # type: ignore
+            ThingClass = None  # type: ignore
+
+        # Create comprehensive namespace with all types for forward reference resolution
+        namespace = {
+            "AstThing": AstThing,
+            "FileThing": FileThing,
+            "SemanticMetadata": SemanticMetadata,
+            "CodeChunk": CodeChunk,
+            "ChunkEmbeddings": ChunkEmbeddings,
+            "SgNode": SgNode,
+            # Types used by AstThing computed fields
+            "ThingClass": ThingClass,
+            "ImportanceScores": ImportanceScores,
+            "AgentTask": AgentTask,
+        }
+
+        # Rebuild in dependency order: AstThing first, then dependent models
+        for model in (FileThing, AstThing, SemanticMetadata, CodeChunk, ChunkEmbeddings):
+            try:
+                if model.__pydantic_complete__:
+                    logger.debug("Model %s already complete, skipping rebuild", model.__name__)
+                    continue
+
+                if model.model_rebuild(_types_namespace=namespace):
+                    logger.debug("Model %s rebuilt successfully in ast_grep.py", model.__name__)
+                else:
+                    logger.warning("Model %s failed to rebuild in ast_grep.py", model.__name__)
+            except Exception as e:
+                logger.warning(
+                    "Error rebuilding model %s in ast_grep.py: %s", model.__name__, e, exc_info=True
+                )
+    except ImportError as e:
+        logger.debug("Could not import models for rebuild (expected during early import): %s", e)
+    except Exception as e:
+        logger.warning("Unexpected error during model rebuild: %s", e, exc_info=True)
+
+
+# Perform model rebuild on module import
+_rebuild_models_with_ast_thing()

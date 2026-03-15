@@ -54,4 +54,5 @@ class WatchfilesArgs(TypedDict, total=False):
     ignore_permission_denied: NotRequired[bool]  # default False
     """Whether to ignore permission denied errors."""
 
-    __all__ = ("FileChange", "WatchfilesArgs")
+
+__all__ = ("FileChange", "WatchfilesArgs")

@@ -1,26 +1,62 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Chunker services for embeddings and vector storage."""
 
 from __future__ import annotations
 
-from importlib import import_module
 from types import MappingProxyType
+
+# === MANAGED EXPORTS ===
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
 from typing import TYPE_CHECKING
+
+from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.engine.chunker.base import ChunkGovernor
-    from codeweaver.engine.chunker.delimiter import DelimiterChunker
-    from codeweaver.engine.chunker.delimiter_model import Boundary, Delimiter, DelimiterMatch
-    from codeweaver.engine.chunker.delimiters import (
-        DelimiterPattern,
-        LanguageFamily,
-        detect_language_family,
-        expand_pattern,
+    from codeweaver.engine.chunker._logging import (
+        get_name,
+        log_chunking_completed,
+        log_chunking_deduplication,
+        log_chunking_edge_case,
+        log_chunking_failed,
+        log_chunking_fallback,
+        log_chunking_performance_warning,
+        log_chunking_resource_limit,
     )
+    from codeweaver.engine.chunker.base import (
+        ACCEPTABLE_OVERAGE_RATIO,
+        FLOOR_RATIO,
+        MIN_FLOOR,
+        MIN_VIABLE_CHUNK,
+        RETRIEVAL_OPTIMAL,
+        SAFETY_MARGIN,
+        SMALL_MODEL_RATIO,
+        TRANSITION_POINT,
+        AdaptiveChunkBehavior,
+        BaseChunker,
+        ChunkGovernor,
+    )
+    from codeweaver.engine.chunker.delimiter import (
+        CHARS_PER_TOKEN,
+        MIN_LINES_FOR_PARAGRAPH_SPLIT,
+        PERFORMANCE_THRESHOLD_MS,
+        SLIDING_WINDOW_OVERLAP,
+        DelimiterChunker,
+        StringParseState,
+    )
+    from codeweaver.engine.chunker.delimiter_model import Boundary, Delimiter, DelimiterMatch
+    from codeweaver.engine.chunker.delimiters.families import (
+        PatternKey,
+        detect_family_characteristics,
+        detect_language_family,
+        get_family_patterns,
+    )
+    from codeweaver.engine.chunker.delimiters.patterns import expand_pattern
     from codeweaver.engine.chunker.exceptions import (
         ASTDepthExceededError,
         BinaryFileError,
@@ -32,60 +68,80 @@ if TYPE_CHECKING:
     )
     from codeweaver.engine.chunker.governance import ResourceGovernor
     from codeweaver.engine.chunker.parallel import chunk_files_parallel, chunk_files_parallel_dict
-    from codeweaver.engine.chunker.registry import (
-        SourceIdRegistry,
-        clear_store,
-        get_store,
-        source_id_for,
-    )
+    from codeweaver.engine.chunker.registry import ONE_MEGABYTE, SourceIdRegistry
     from codeweaver.engine.chunker.selector import ChunkerSelector, GracefulChunker
     from codeweaver.engine.chunker.semantic import SemanticChunker
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "ASTDepthExceededError": (__spec__.parent, "exceptions"),
+    "ACCEPTABLE_OVERAGE_RATIO": (__spec__.parent, "base"),
+    "CHARS_PER_TOKEN": (__spec__.parent, "delimiter"),
+    "FLOOR_RATIO": (__spec__.parent, "base"),
+    "MIN_FLOOR": (__spec__.parent, "base"),
+    "MIN_LINES_FOR_PARAGRAPH_SPLIT": (__spec__.parent, "delimiter"),
+    "MIN_VIABLE_CHUNK": (__spec__.parent, "base"),
+    "ONE_MEGABYTE": (__spec__.parent, "registry"),
+    "PERFORMANCE_THRESHOLD_MS": (__spec__.parent, "delimiter"),
+    "RETRIEVAL_OPTIMAL": (__spec__.parent, "base"),
+    "SAFETY_MARGIN": (__spec__.parent, "base"),
+    "SLIDING_WINDOW_OVERLAP": (__spec__.parent, "delimiter"),
+    "SMALL_MODEL_RATIO": (__spec__.parent, "base"),
+    "TRANSITION_POINT": (__spec__.parent, "base"),
+    "AdaptiveChunkBehavior": (__spec__.parent, "base"),
+    "BaseChunker": (__spec__.parent, "base"),
     "BinaryFileError": (__spec__.parent, "exceptions"),
     "Boundary": (__spec__.parent, "delimiter_model"),
-    "ChunkGovernor": (__spec__.parent, "base"),
-    "ChunkLimitExceededError": (__spec__.parent, "exceptions"),
     "ChunkerSelector": (__spec__.parent, "selector"),
+    "ChunkGovernor": (__spec__.parent, "base"),
     "ChunkingError": (__spec__.parent, "exceptions"),
     "ChunkingTimeoutError": (__spec__.parent, "exceptions"),
+    "ChunkLimitExceededError": (__spec__.parent, "exceptions"),
     "Delimiter": (__spec__.parent, "delimiter_model"),
     "DelimiterChunker": (__spec__.parent, "delimiter"),
     "DelimiterMatch": (__spec__.parent, "delimiter_model"),
-    "DelimiterPattern": (__spec__.parent, "delimiters"),
     "GracefulChunker": (__spec__.parent, "selector"),
-    "LanguageFamily": (__spec__.parent, "delimiters"),
     "OversizedChunkError": (__spec__.parent, "exceptions"),
     "ParseError": (__spec__.parent, "exceptions"),
+    "PatternKey": (__spec__.parent, "delimiters.families"),
     "ResourceGovernor": (__spec__.parent, "governance"),
     "SemanticChunker": (__spec__.parent, "semantic"),
     "SourceIdRegistry": (__spec__.parent, "registry"),
+    "StringParseState": (__spec__.parent, "delimiter"),
+    "ASTDepthExceededError": (__spec__.parent, "exceptions"),
     "chunk_files_parallel": (__spec__.parent, "parallel"),
     "chunk_files_parallel_dict": (__spec__.parent, "parallel"),
-    "clear_store": (__spec__.parent, "registry"),
-    "detect_language_family": (__spec__.parent, "delimiters"),
-    "expand_pattern": (__spec__.parent, "delimiters"),
-    "get_store": (__spec__.parent, "registry"),
-    "source_id_for": (__spec__.parent, "registry"),
+    "detect_family_characteristics": (__spec__.parent, "delimiters.families"),
+    "detect_language_family": (__spec__.parent, "delimiters.families"),
+    "expand_pattern": (__spec__.parent, "delimiters.patterns"),
+    "get_family_patterns": (__spec__.parent, "delimiters.families"),
+    "get_name": (__spec__.parent, "_logging"),
+    "log_chunking_completed": (__spec__.parent, "_logging"),
+    "log_chunking_deduplication": (__spec__.parent, "_logging"),
+    "log_chunking_edge_case": (__spec__.parent, "_logging"),
+    "log_chunking_failed": (__spec__.parent, "_logging"),
+    "log_chunking_fallback": (__spec__.parent, "_logging"),
+    "log_chunking_performance_warning": (__spec__.parent, "_logging"),
+    "log_chunking_resource_limit": (__spec__.parent, "_logging"),
 })
 
-
-def __getattr__(name: str) -> object:
-    """Dynamically import submodules and classes for the chunker package."""
-    if name in _dynamic_imports:
-        module_name, submodule_name = _dynamic_imports[name]
-        module = import_module(f"{module_name}.{submodule_name}")
-        result = getattr(module, name)
-        globals()[name] = result  # Cache in globals for future access
-        return result
-    if globals().get(name) is not None:
-        return globals()[name]
-    raise AttributeError(f"module {__name__} has no attribute {name}")
-
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
+    "ACCEPTABLE_OVERAGE_RATIO",
+    "CHARS_PER_TOKEN",
+    "FLOOR_RATIO",
+    "MIN_FLOOR",
+    "MIN_LINES_FOR_PARAGRAPH_SPLIT",
+    "MIN_VIABLE_CHUNK",
+    "ONE_MEGABYTE",
+    "PERFORMANCE_THRESHOLD_MS",
+    "RETRIEVAL_OPTIMAL",
+    "SAFETY_MARGIN",
+    "SLIDING_WINDOW_OVERLAP",
+    "SMALL_MODEL_RATIO",
+    "TRANSITION_POINT",
     "ASTDepthExceededError",
+    "AdaptiveChunkBehavior",
+    "BaseChunker",
     "BinaryFileError",
     "Boundary",
     "ChunkGovernor",
@@ -96,24 +152,31 @@ __all__ = (
     "Delimiter",
     "DelimiterChunker",
     "DelimiterMatch",
-    "DelimiterPattern",
     "GracefulChunker",
-    "LanguageFamily",
     "OversizedChunkError",
     "ParseError",
+    "PatternKey",
     "ResourceGovernor",
     "SemanticChunker",
     "SourceIdRegistry",
+    "StringParseState",
     "chunk_files_parallel",
     "chunk_files_parallel_dict",
-    "clear_store",
+    "detect_family_characteristics",
     "detect_language_family",
     "expand_pattern",
-    "get_store",
-    "source_id_for",
+    "get_family_patterns",
+    "get_name",
+    "log_chunking_completed",
+    "log_chunking_deduplication",
+    "log_chunking_edge_case",
+    "log_chunking_failed",
+    "log_chunking_fallback",
+    "log_chunking_performance_warning",
+    "log_chunking_resource_limit",
 )
 
 
 def __dir__() -> list[str]:
-    """List available attributes for the chunker package."""
+    """List available attributes for the package."""
     return list(__all__)

@@ -33,14 +33,12 @@ from pydantic import (
 )
 from pydantic_core import from_json
 from rich.console import Console
-from typing_extensions import TypeIs
 
 
 # make sure codeweaver is importable
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from codeweaver.providers.embedding.capabilities.base import PartialCapabilities
-from codeweaver.providers.provider import Provider
+from codeweaver.core import PartialCapabilities, Provider, TypeIs
 
 
 VERSION_PATTERNS = (  # some special cases first
@@ -140,7 +138,7 @@ class LoaderDict(TypedDict, total=False):
         Literal["embedding"]
     ]  # probably more values, but not in my small set of models
     pooling_method: NotRequired[Literal["mean", "max"]]
-    torch_dtype: NotRequired[Literal["float16", "bfloat16", "float32"]]
+    dtype: NotRequired[Literal["float16", "bfloat16", "float32"]]
     max_seq_length: NotRequired[int]
     padding_side: NotRequired[Literal["left", "right"]]
     add_eos_token: NotRequired[bool]
@@ -563,7 +561,8 @@ def generate_capabilities_file(models: list[SimplifiedModelMeta], model_maker: M
     page = f"{code}\n\n\n{func_def}\n"
     # black seems to think single tuples are just the value in parentheses, so we replace them after formatting
     return (
-        black.format_str(
+        black
+        .format_str(
             page,
             mode=black.FileMode(
                 target_versions={black.TargetVersion.PY312, black.TargetVersion.PY313}

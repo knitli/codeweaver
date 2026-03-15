@@ -7,19 +7,16 @@
 
 from __future__ import annotations
 
-import os
-
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, ClassVar, Literal, cast
 
-from codeweaver.exceptions import ConfigurationError
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
-from codeweaver.providers.provider import Provider
+from codeweaver.core import CodeChunk, ConfigurationError, Provider
+from codeweaver.providers.embedding.providers.base import (
+    EmbeddingCustomDeps,
+    EmbeddingImplementationDeps,
+    EmbeddingProvider,
+)
 
-
-if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
 
 try:
     from mistralai import Mistral
@@ -34,44 +31,16 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
     """Mistral embedding provider."""
 
     client: Mistral
-    _provider = Provider.MISTRAL
-    caps: EmbeddingModelCapabilities
+    _provider: ClassVar[Literal[Provider.MISTRAL]] = Provider.MISTRAL
 
-    def __init__(
-        self, caps: EmbeddingModelCapabilities, client: Mistral | None = None, **kwargs: Any
+    def _initialize(
+        self,
+        impl_deps: EmbeddingImplementationDeps = None,
+        custom_deps: EmbeddingCustomDeps = None,
+        **kwargs: Any,
     ) -> None:
-        """Initialize the Mistral embedding provider."""
-        kwargs = kwargs or {}
-
-        # Initialize client if not provided
-        if not client:
-            client_options = kwargs.get("client_options", {})
-            api_key = os.environ.get(
-                "MISTRAL_API_KEY", kwargs.get("api_key")
-            ) or client_options.get("api_key")
-            # Support connection pooling via async_client injection
-            # Mistral SDK accepts async_client as an AsyncHttpClient protocol (httpx.AsyncClient compatible)
-            if "httpx_client" in kwargs:
-                client_options["async_client"] = kwargs.pop("httpx_client")
-            client = Mistral(api_key=api_key, **client_options)
-
-        # Call super().__init__() FIRST which handles all Pydantic initialization
-        super().__init__(client=client, caps=caps, kwargs=kwargs)
-
-        # Set model attribute after Pydantic initialization completes
-        self.model = caps.name
-
-    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
-        """Initialize the Mistral embedding provider.
-
-        Sets up caps and configures default kwargs for document and query embedding.
-        """
-        # Set caps at start
-        self.caps = caps
-
-        # Configure default kwargs if needed
-        # Mistral uses same parameters for both documents and queries
-        # Base class handles merging with user-provided kwargs
+        """Initialize the Mistral client."""
+        # Nothing to initialize here - options are set in model_post_init
 
     @property
     def base_url(self) -> str | None:
@@ -89,12 +58,15 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
                 results = await mistral.embeddings.create_async(
                     model=self.model,
                     inputs=inputs,
-                    output_dtype=cast("EmbeddingDtype", self.caps.default_dtype),
+                    output_dtype=cast(EmbeddingDtype, self.caps.default_dtype),
                     **kwargs,
                 )
                 embeddings = [cast("list[float]", item.embedding) for item in results.data]
                 if token_counts := results.usage.total_tokens:
-                    _ = self._update_token_stats(token_count=token_counts)
+                    loop = await self._get_loop()
+                    _ = self._fire_and_forget(
+                        lambda: self._update_token_stats(token_count=token_counts), loop=loop
+                    )
                     tokens_updated = True
         except Exception:
             if not embeddings:
@@ -102,7 +74,9 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
         else:
             if not tokens_updated:
                 # If we got embeddings but failed to get token counts, we can still return the embeddings.
-                _ = self._fire_and_forget(lambda: self._update_token_stats(from_docs=inputs))
+                _ = self._fire_and_forget(
+                    lambda: self._update_token_stats(from_docs=inputs), loop=loop
+                )
             return embeddings
         return embeddings or [[]]
 
@@ -110,13 +84,13 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
         self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         readied_documents = self.chunks_to_strings(documents)
-        kwargs = (kwargs or {}) | self.doc_kwargs.get("client_options", {})
+        kwargs = (kwargs or {}) | self.embed_options.get("client_options", {})
         return await self._fetch_embeddings(cast("list[str]", readied_documents), **kwargs)
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
-        kwargs = (kwargs or {}) | self.query_kwargs.get("client_options", {})
+        kwargs = (kwargs or {}) | self.query_options.get("client_options", {})
         return await self._fetch_embeddings(cast("list[str]", query), **kwargs)
 
 

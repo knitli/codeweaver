@@ -17,9 +17,8 @@ processed via recursive child node chunking.
 
 import pytest
 
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.engine.chunker.base import ChunkGovernor
-from codeweaver.engine.chunker.semantic import SemanticChunker
+from codeweaver.core import SemanticSearchLanguage
+from codeweaver.engine import ChunkGovernor, SemanticChunker
 
 
 pytestmark = [pytest.mark.unit]

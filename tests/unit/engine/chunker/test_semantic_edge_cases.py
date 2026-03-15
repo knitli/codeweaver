@@ -6,10 +6,8 @@
 
 import pytest
 
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.engine.chunker import SemanticChunker
-from codeweaver.engine.chunker.base import ChunkGovernor
-from codeweaver.engine.chunker.exceptions import BinaryFileError
+from codeweaver.core import SemanticSearchLanguage
+from codeweaver.engine import BinaryFileError, ChunkGovernor, SemanticChunker
 
 
 pytestmark = [pytest.mark.unit]

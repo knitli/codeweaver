@@ -21,8 +21,9 @@ from types import MappingProxyType
 
 import textcase
 
-from codeweaver.core.types.sentinel import Unset
-from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
+from codeweaver.core import SettingsDep
+from codeweaver.core.di.dependency import INJECTED
+from codeweaver.core.types import UNSET, DelimiterKind
 from codeweaver.engine.chunker.delimiters.patterns import (
     EMPTY_PATTERN,
     LINEBREAK,
@@ -332,14 +333,14 @@ def generate_rst_character_ranges(character: str) -> list[str]:
 
 RST_SECTION_PATTERN = DelimiterPattern(
     starts=sorted(
-        (
+        [
             c
             for char in ("=", "-", "*", "~", "^", '"', "+", "#", "<", ">")
             for c in generate_rst_character_ranges(char)
-        ),
+        ],
         key=len,
         reverse=True,
-    ),
+    ),  # ty:ignore[invalid-argument-type]
     ends=PARAGRAPH_BREAK,
     kind=DelimiterKind.BLOCK,
     inclusive=True,
@@ -530,7 +531,7 @@ POD_SECTION_PATTERN = DelimiterPattern(
     inclusive=True,
     take_whole_lines=True,
     nestable=False,
-    formatter=lambda text: text.strip().replace("\n\n", "\n").strip(),  # type: ignore
+    formatter=lambda text: text.strip().replace("\n\n", "\n").strip(),
 )
 
 POD_SUB_PATTERN = DelimiterPattern(
@@ -665,7 +666,7 @@ _pattern_registry: dict[str, list[DelimiterPattern]] = {}
 
 
 @cache
-def get_custom_patterns(language: str) -> list[DelimiterPattern]:
+def get_custom_patterns(language: str, settings: SettingsDep = INJECTED) -> list[DelimiterPattern]:
     """Get custom delimiter patterns for a language.
 
     Args:
@@ -679,15 +680,14 @@ def get_custom_patterns(language: str) -> list[DelimiterPattern]:
         >>> len(patterns)
         6
     """
-    from codeweaver.config.settings import get_settings
-    from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
+    from codeweaver.core import ConfigLanguage, SemanticSearchLanguage
 
     language = textcase.snake(language)
     delimiters: list[DelimiterPattern] = []
     if (
-        (settings := get_settings())
-        and (chunker := settings.chunker)
-        and not isinstance(chunker, Unset)
+        settings
+        and (chunker := settings.chunker)  # ty:ignore[unresolved-attribute]
+        and chunker is not UNSET
         and (custom_delimiters := chunker.custom_delimiters)
     ):
         for delim in custom_delimiters:
@@ -714,4 +714,60 @@ def get_custom_patterns(language: str) -> list[DelimiterPattern]:
     return _pattern_registry.get(language, [])
 
 
-__all__ = ("CUSTOM_PATTERNS", "get_custom_patterns")
+__all__ = (
+    "ASSEMBLY_SEMICOLON_COMMENT",
+    "BASH_CASE_PATTERN",
+    "BASH_DO_PATTERN",
+    "BASH_FOR_PATTERN",
+    "BASH_IF_PATTERN",
+    "BASH_UNTIL_PATTERN",
+    "BASH_WHILE_PATTERN",
+    "COBOL_ASTERISK_COMMENT_PATTERN",
+    "COBOL_DIVISION_PATTERN",
+    "COBOL_EVALUATE_PATTERN",
+    "COBOL_IF_PATTERN",
+    "COBOL_INLINE_COMMENT_PATTERN",
+    "COBOL_PERFORM_PATTERN",
+    "COBOL_SEARCH_PATTERN",
+    "COBOL_SECTION_PATTERN",
+    "COQ_MATCH_END_PATTERN",
+    "COQ_SECTION_END_PATTERN",
+    "CSV_PATTERN",
+    "CUSTOM_PATTERNS",
+    "ELIXIR_DEFMODULE_PATTERN",
+    "ELIXIR_DEFP_PATTERN",
+    "ELIXIR_DO_END_PATTERN",
+    "GO_DEFER_PATTERN",
+    "GO_GO_PATTERN",
+    "GO_TYPE_PATTERN",
+    "HTML_TAGS_PATTERNS",
+    "LUA_DO_END_PATTERN",
+    "LUA_FOR_END_PATTERN",
+    "LUA_FUNCTION_END_PATTERN",
+    "LUA_IF_END_PATTERN",
+    "LUA_REPEAT_UNTIL_PATTERN",
+    "LUA_WHILE_END_PATTERN",
+    "PKL_DOC_COMMENT_PATTERN",
+    "PKL_IMPORT_PATTERN",
+    "POD_SECTION_PATTERN",
+    "POD_SUB_PATTERN",
+    "PROTOBUF_DECLARATION_PATTERN",
+    "PROTOBUF_DEFINITION_PATTERN",
+    "PROTOBUF_HIERARCHY_PATTERN",
+    "PYTHON_DECORATOR_AT_PATTERN",
+    "RST_COMMENT_PATTERN",
+    "RST_SECTION_PATTERN",
+    "RTF_EMPTY_PATTERN",
+    "RTF_LINE_PATTERN",
+    "RTF_PARAGRAPH_PATTERN",
+    "RTF_WHITESPACE_PATTERN",
+    "RUBY_DO_END_PATTERN",
+    "RUST_ATTRIBUTE_PATTERN",
+    "RUST_IMPL_PATTERN",
+    "RUST_MACRO_PATTERN",
+    "RUST_TYPE_PATTERN",
+    "TEXINFO_BLOCK_PATTERN",
+    "TSV_PATTERN",
+    "generate_rst_character_ranges",
+    "get_custom_patterns",
+)

@@ -14,6 +14,8 @@ import contextlib
 import sys
 import warnings
 
+from pathlib import Path
+
 
 # NOTE: google.genai emits a pydantic deprecation warning during module import
 # (before our code runs). To suppress it, set: PYTHONWARNINGS='ignore::pydantic.warnings.PydanticDeprecatedSince212'
@@ -23,19 +25,25 @@ with contextlib.suppress(Exception):
 
     warnings.simplefilter("ignore", PydanticDeprecatedSince212)
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
 from cyclopts import App, Parameter
 
 from codeweaver import __version__
 from codeweaver.cli.ui import get_display
-from codeweaver.common import CODEWEAVER_PREFIX
+from codeweaver.core.di.container import (
+    get_container,  # ensure we're pulling in the container module
+)
+from codeweaver.core.ui_protocol import ProgressReporter
+from codeweaver.core.utils.environment import detect_root_package
 
 
 if TYPE_CHECKING:
     from rich.console import Console
 
     from codeweaver.cli.ui.status_display import StatusDisplay
+
+ROOT_PACKAGE = detect_root_package()
 
 display: StatusDisplay = get_display()
 console: Console = display.console
@@ -46,29 +54,37 @@ app = App(
     version=__version__,
     console=console,
 )
+# command availability depends on what codeweaver packages are installed
+# if server; everything is available, and then progressively less from there
+if ROOT_PACKAGE == "server":
+    app.command("codeweaver.cli.commands.init:app", name="init")
+    app.command("codeweaver.cli.commands.doctor:app", name="doctor")
+    app.command("codeweaver.cli.commands.search:app", name="search")
+    app.command("codeweaver.cli.commands.server:app", name="server")
+    app.command("codeweaver.cli.commands.start:app", name="start")
+    app.command("codeweaver.cli.commands.stop:app", name="stop")
+    app.command("codeweaver.cli.commands.status:app", name="status")
+    # these are scaffolded for future implementation
+    # app.command("codeweaver.cli.commands.context:app", name="context", alias="prep")
+if ROOT_PACKAGE in ("engine", "server"):
+    app.command("codeweaver.cli.commands.index:app", name="index")
+if ROOT_PACKAGE in ("provider", "engine", "server"):
+    app.command("codeweaver.cli.commands.ls:app", name="list", alias="ls")
+
 app.command("codeweaver.cli.commands.config:app", name="config")
-app.command("codeweaver.cli.commands.search:app", name="search")
-app.command("codeweaver.cli.commands.server:app", name="server")
-app.command("codeweaver.cli.commands.start:app", name="start")
-app.command("codeweaver.cli.commands.stop:app", name="stop")
-app.command("codeweaver.cli.commands.index:app", name="index")
-app.command("codeweaver.cli.commands.doctor:app", name="doctor")
-app.command("codeweaver.cli.commands.list:app", name="list", alias="ls")
-app.command("codeweaver.cli.commands.init:app", name="init")
-app.command("codeweaver.cli.commands.status:app", name="status")
 
-
-# these are scaffolded for future implementation
-# app.command("codeweaver.cli.commands.context:app", name="context", alias="prep")
+# Developer tools - available in all packages
+# app.command("codeweaver.tools.lateimports.cli:app", name="lazy-imports")  # Not yet implemented
 
 
 def _handle_keyboard_interrupt():
+    from codeweaver.core.utils import get_codeweaver_prefix
+
+    prefix = get_codeweaver_prefix()
+    console.print(f"\n{prefix} [yellow]⚠️ We got a keyboard interrupt signal...⚠️[/yellow]")
+    console.print(f"{prefix} [yellow]Thanks for using CodeWeaver![/yellow]")
     console.print(
-        f"\n{CODEWEAVER_PREFIX} [yellow]⚠️ We got a keyboard interrupt signal...⚠️[/yellow]"
-    )
-    console.print(f"{CODEWEAVER_PREFIX} [yellow]Thanks for using CodeWeaver![/yellow]")
-    console.print(
-        f"{CODEWEAVER_PREFIX} [yellow]If you like CodeWeaver, please take a second to give us a star on GitHub! 🌟[/yellow] [cyan]https://github.com/knitli/codeweaver [/cyan] \n"
+        f"{prefix} [yellow]If you like CodeWeaver, please take a second to give us a star on GitHub! 🌟[/yellow] [cyan]https://github.com/knitli/codeweaver [/cyan] \n"
     )
     console.print()
     console.print("[dim]If you have feedback, please open an issue or discussion:[/dim]")
@@ -76,21 +92,73 @@ def _handle_keyboard_interrupt():
     console.print("  [dim]discussions: https://github.com/knitli/codeweaver/discussions[/dim]")
 
 
-def main() -> None:
-    """Main CLI entry point."""
+async def _init_di(config_path: str | None = None) -> None:
+    """Initialize dependency injection container with settings."""
+    from codeweaver.core.dependencies.core_settings import bootstrap_settings
+
+    # Bootstrap settings - this registers them in the DI container
+    await bootstrap_settings(config_file=Path(config_path) if config_path else None)
+    # Override DI to use StatusDisplay instead of default RichConsoleProgressReporter
+    get_container().override(ProgressReporter, display)
+
+
+def _print_error_message(message: str, e: Exception) -> NoReturn:
+    from codeweaver.core.utils import get_codeweaver_prefix
+
+    prefix = get_codeweaver_prefix()
+    console.print(f"{prefix} {message}{e}")
+    console.print("\n[red]Traceback:[/red]")
+    console.print_exception(max_frames=10)
+    raise SystemExit(1) from e
+
+
+async def _config_in_args(args: list[str]) -> str | None:
+    """Check if a --config argument is provided in the CLI args."""
+    return next(
+        (
+            (arg.split("=", 1)[1] if "=" in arg else args[i + 1] if i + 1 < len(args) else None)
+            for i, arg in enumerate(args)
+            if arg.startswith(("--config", "-c"))
+        ),
+        None,
+    )
+
+
+async def _async_main() -> None:
+    """Async main CLI entry point with DI initialization."""
     try:
-        app()
+        await _init_di(config_path=await _config_in_args(sys.argv))
+    except Exception as e:
+        _print_error_message(" [bold red]Fatal error during DI initialization: ", e)
+    try:
+        await app.run_async()
     except KeyboardInterrupt:
         _handle_keyboard_interrupt()
     except Exception as e:
-        console.print(f"{CODEWEAVER_PREFIX} [bold red]Fatal error: {e}[/bold red]")
-        console.print("\n[red]Traceback:[/red]")
-        console.print_exception(max_frames=10)
-        sys.exit(1)
+        _print_error_message(" [bold red]Fatal error: ", e)
+
+
+def main() -> None:
+    """Main CLI entry point (sync wrapper for async logic)."""
+    from codeweaver.core.utils.procs import asyncio_or_uvloop
+
+    loop = asyncio_or_uvloop()
+    loop.run(_async_main())
 
 
 if __name__ == "__main__":
-    main()
+    from codeweaver.core.utils import get_codeweaver_prefix
+
+    prefix = get_codeweaver_prefix()
+    console.print(f"{prefix} Starting CodeWeaver CLI...", style="dim")
+    try:
+        main()
+        console.print("Settings initialized.", style="dim")
+    except Exception as e:
+        try:
+            _print_error_message(" [bold red]Fatal error during startup: ", e)
+        except Exception:
+            sys.exit(1)
 
 
-__all__ = ("app", "main")
+__all__ = ("ROOT_PACKAGE", "app")

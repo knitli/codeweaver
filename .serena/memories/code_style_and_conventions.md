@@ -125,7 +125,7 @@ class MyModel(BasedModel):
 ✅ **DO**: Use `else` for returns after `try` blocks
 ✅ **DO**: Use `raise from` to maintain exception context
 ✅ **DO**: Use `contextlib.suppress` for intentional suppression
-✅ **DO**: Raise to specific codeweaver exceptions (`codeweaver.exceptions`)
+✅ **DO**: Raise to specific codeweaver exceptions (`codeweaver.core`)
 
 ### isinstance Calls
 ✅ **DO**: Use `|` syntax: `isinstance(value, str | int | MyClass)`

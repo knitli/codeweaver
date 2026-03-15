@@ -1,10 +1,7 @@
 <!--
-SPDX-FileCopyrightText: 2025 Knitli Inc.
-SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-
-SPDX-License-Identifier: MIT OR Apache-2.0
+SPDX-FileCopyrightText: 2025 Github Inc.
+SPDX-License-Identifier: MIT
 -->
-
 ---
 description: Perform a non-destructive cross-artifact consistency and quality analysis across spec.md, plan.md, and tasks.md after task generation.
 ---

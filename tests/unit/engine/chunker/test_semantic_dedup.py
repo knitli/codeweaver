@@ -11,14 +11,11 @@ integration. All tests are expected to FAIL initially as the implementation is p
 
 from __future__ import annotations
 
-import re
-
 from pathlib import Path
 
 import pytest
 
-from codeweaver.engine.chunker.base import ChunkGovernor
-from codeweaver.engine.chunker.semantic import SemanticChunker
+from codeweaver.engine import ChunkGovernor, SemanticChunker
 
 
 pytestmark = [pytest.mark.unit]
@@ -30,7 +27,7 @@ def chunk_governor() -> ChunkGovernor:
 
     Uses mock capabilities to provide chunk limits.
     """
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.providers import EmbeddingModelCapabilities
 
     # Create mock capability with test limits
     capabilities = (EmbeddingModelCapabilities(name="test-model", context_window=8192),)
@@ -40,7 +37,7 @@ def chunk_governor() -> ChunkGovernor:
 @pytest.fixture(autouse=True)
 def clear_semantic_chunker_stores():
     """Clear SemanticChunker class-level stores before each test for test isolation."""
-    from codeweaver.engine.chunker.semantic import SemanticChunker
+    from codeweaver.engine import SemanticChunker
 
     # Clear the internal store dictionaries directly to avoid weak reference issues
     SemanticChunker._store.store.clear()
@@ -54,7 +51,7 @@ def clear_semantic_chunker_stores():
 @pytest.fixture
 def semantic_chunker(chunk_governor: ChunkGovernor) -> SemanticChunker:
     """Create a SemanticChunker instance for testing."""
-    from codeweaver.core.language import SemanticSearchLanguage
+    from codeweaver.core import SemanticSearchLanguage
 
     return SemanticChunker(governor=chunk_governor, language=SemanticSearchLanguage.PYTHON)
 
@@ -137,44 +134,44 @@ def calculate_remainder(dividend: int, divisor: int) -> int:
 def test_duplicate_functions_deduplicated(
     semantic_chunker: SemanticChunker, python_file_with_duplicates: Path
 ) -> None:
-    """Test that duplicate function definitions are deduplicated.
+    """Test that duplicate AST node content is deduplicated.
+
+    The semantic chunker creates chunks for all semantically important AST nodes,
+    not just top-level functions and classes. With 3 identical 'add' methods,
+    duplicate identifiers like 'add', 'self', 'a', 'b' should be deduplicated.
 
     Verifies:
-    - Only one chunk created for duplicate content
-    - Deduplication detected (fewer chunks than definitions)
+    - Deduplication is working (duplicate AST nodes removed)
     - Hash store tracks content hashes
-
-    Expected to FAIL until SemanticChunker implements _deduplicate_chunks()
-    and hash-based deduplication.
+    - Chunks have proper metadata including content_hash
     """
     content = python_file_with_duplicates.read_text()
 
     # Create DiscoveredFile and chunk the file containing duplicates
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     discovered_file = DiscoveredFile.from_path(python_file_with_duplicates)
     chunks = semantic_chunker.chunk(content, file=discovered_file)
 
-    # Count method definitions in original content
-    method_count = len(re.findall(r"^\s+def \w+\(", content, re.MULTILINE))
+    # The semantic chunker creates chunks for all AST nodes, not just functions/classes
+    # With duplicate methods, we expect deduplication at the AST node level
+    # Expected: ~40-50 chunks (all unique AST nodes across 5 classes/methods)
+    # Without dedup, we'd have ~60+ chunks (3 duplicate methods * ~15 nodes each = ~45 extra)
 
-    # We have 5 classes with 5 methods total
-    # 3 classes have identical 'add' methods -> should deduplicate to 1
-    # Plus 1 'subtract' and 1 'multiply' = 3 unique methods
-    # Plus 5 unique class definitions = 8 total chunks after deduplication
-    assert len(chunks) < method_count + 5, (  # Should be less than total chunks
-        f"Expected deduplication to reduce chunks, got {len(chunks)}"
-    )
+    # Verify we get a reasonable number of chunks (semantic parsing creates many nodes)
+    assert len(chunks) > 0, "Should create at least some chunks"
+    assert len(chunks) < 100, f"Too many chunks created: {len(chunks)}"
 
-    # Verify that we have unique content hashes
+    # Verify that all chunks have content hashes
     content_hashes = {
-        chunk.metadata["context"]["content_hash"]
+        chunk.metadata.get("context", {}).get("content_hash")
         for chunk in chunks
-        if chunk.metadata and "context" in chunk.metadata
+        if chunk.metadata and chunk.metadata.get("context", {})
     }
-    # Should have fewer hashes than total methods due to deduplication
-    assert len(content_hashes) < method_count + 5, (
-        "Expected fewer unique hashes after deduplication"
+
+    # All chunks should have content hashes
+    assert len(content_hashes) == len(chunks), (
+        f"Expected {len(chunks)} unique hashes, got {len(content_hashes)}"
     )
 
     # Verify hash store is being used (check for _hash_store attribute)
@@ -188,37 +185,65 @@ def test_duplicate_functions_deduplicated(
         "Hash store should be initialized for deduplication tracking"
     )
 
+    # Verify hash store has same number of entries as unique chunks
+    assert len(semantic_chunker._hash_store.store) == len(chunks), (
+        f"Hash store should have {len(chunks)} entries, got {len(semantic_chunker._hash_store.store)}"
+    )
+
+    # Verify deduplication is working by checking for duplicate identifiers
+    # We have 3 identical 'add' methods, so 'add', 'self', 'a', 'b' should appear once
+    identifier_chunks = [
+        chunk
+        for chunk in chunks
+        if chunk.metadata
+        and "semantic_meta" in chunk.metadata
+        and hasattr(chunk.metadata["semantic_meta"], "thing")
+        and chunk.metadata["semantic_meta"].thing.name == "identifier"
+    ]
+
+    # Get all identifier content
+    identifier_contents = [chunk.content for chunk in identifier_chunks]
+
+    # 'add' appears in 3 methods but should only create 1 chunk due to deduplication
+    add_count = identifier_contents.count("add")
+    assert add_count == 1, (
+        f"Expected 'add' identifier to appear once (deduplicated), got {add_count}"
+    )
+
+    # 'self' appears in 3 methods but should only create 1 chunk due to deduplication
+    self_count = identifier_contents.count("self")
+    assert self_count == 1, (
+        f"Expected 'self' identifier to appear once (deduplicated), got {self_count}"
+    )
+
 
 def test_unique_chunks_preserved(
     semantic_chunker: SemanticChunker, python_file_with_unique_functions: Path
 ) -> None:
-    """Test that unique functions are all preserved.
+    """Test that unique AST nodes are preserved without false deduplication.
+
+    The semantic chunker creates chunks for all semantically important AST nodes.
+    With 5 unique functions, all AST nodes should be unique and preserved.
 
     Verifies:
-    - All unique chunks preserved (no false deduplication)
-    - Number of chunks matches number of unique functions
-
-    Expected to FAIL until SemanticChunker properly implements
-    deduplication logic that only removes true duplicates.
+    - All unique AST node chunks preserved (no false deduplication)
+    - All expected function names are present in the chunks
+    - No duplicate content exists (all chunks have unique content)
     """
     content = python_file_with_unique_functions.read_text()
 
     # Create DiscoveredFile and chunk the file with all unique functions
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     discovered_file = DiscoveredFile.from_path(python_file_with_unique_functions)
     chunks = semantic_chunker.chunk(content, file=discovered_file)
 
-    # Count function definitions in original content
-    function_count = len(re.findall(r"^def \w+\(", content, re.MULTILINE))
+    # The semantic chunker creates chunks for all AST nodes, not just functions
+    # With 5 unique functions, we expect many unique AST node chunks
+    assert len(chunks) > 0, "Should create at least some chunks"
+    assert len(chunks) < 200, f"Too many chunks created: {len(chunks)}"
 
-    # Assert no deduplication occurred (all functions unique)
-    assert len(chunks) == function_count, (
-        f"Expected {function_count} unique chunks, got {len(chunks)}. "
-        "All functions should be preserved as they are unique."
-    )
-
-    # Verify all expected function names are present
+    # Verify all expected function names are present in function_definition chunks
     expected_names = {
         "calculate_sum",
         "calculate_difference",
@@ -226,17 +251,38 @@ def test_unique_chunks_preserved(
         "calculate_quotient",
         "calculate_remainder",
     }
-    chunk_names = {chunk.metadata.get("name") for chunk in chunks if chunk.metadata}
 
-    assert chunk_names == expected_names, (
-        f"Expected {expected_names}, got {chunk_names}. "
-        "All unique functions should have corresponding chunks."
+    # Find all function_definition chunks
+    function_chunks = [
+        chunk
+        for chunk in chunks
+        if chunk.metadata
+        and "semantic_meta" in chunk.metadata
+        and hasattr(chunk.metadata["semantic_meta"], "thing")
+        and chunk.metadata["semantic_meta"].thing.name == "function_definition"
+    ]
+
+    function_names = {chunk.metadata.get("name") for chunk in function_chunks if chunk.metadata}
+
+    assert function_names == expected_names, (
+        f"Expected {expected_names}, got {function_names}. "
+        "All unique functions should have corresponding function_definition chunks."
     )
 
-    # Verify each chunk has unique content
+    # Verify each chunk has unique content (no false deduplication)
     chunk_contents = [chunk.content for chunk in chunks]
     assert len(chunk_contents) == len(set(chunk_contents)), (
         "All chunks should have unique content (no duplicate content strings)"
+    )
+
+    # Verify all chunks have unique content hashes
+    content_hashes = [
+        chunk.metadata.get("context", {}).get("content_hash")
+        for chunk in chunks
+        if chunk.metadata and "context" in chunk.metadata
+    ]
+    assert len(content_hashes) == len(set(content_hashes)), (
+        "All chunks should have unique content hashes (no false deduplication)"
     )
 
 
@@ -258,7 +304,7 @@ def test_batch_id_tracking(
     content = python_file_with_unique_functions.read_text()
 
     # Create DiscoveredFile and chunk the file
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     discovered_file = DiscoveredFile.from_path(python_file_with_unique_functions)
     chunks = semantic_chunker.chunk(content, file=discovered_file)

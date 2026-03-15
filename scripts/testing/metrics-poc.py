@@ -31,11 +31,7 @@ import argparse
 import sys
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-
-if TYPE_CHECKING:
-    pass
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -141,12 +137,10 @@ def print_separator(title: str = "") -> None:
     if title:
         print(f"\n{'=' * 70}")
         print(f" {title}")
-        print(f"{'=' * 70}\n")
-    else:
-        print(f"{'=' * 70}\n")
+    print(f"{'=' * 70}\n")
 
 
-def main() -> None:
+async def main() -> None:  # sourcery skip: low-code-quality
     """Run the metrics POC demonstration."""
     parser = argparse.ArgumentParser(description="CodeWeaver Metrics POC")
     parser.add_argument(
@@ -181,7 +175,7 @@ def main() -> None:
     print("\n📊 Step 3: Calculating baseline comparison...")
 
     try:
-        from codeweaver.common.telemetry.comparison import BaselineComparator, CodeWeaverMetrics
+        from codeweaver.common import BaselineComparator, CodeWeaverMetrics
 
         comparator = BaselineComparator()
 
@@ -263,10 +257,7 @@ def main() -> None:
     print_separator("Telemetry Event Generation")
 
     try:
-        from codeweaver.common.telemetry.events import (
-            PerformanceBenchmarkEvent,
-            SessionSummaryEvent,
-        )
+        from codeweaver.common import PerformanceBenchmarkEvent, SessionSummaryEvent
 
         # Create session summary event
         session_stats = simulate_session_statistics()
@@ -342,7 +333,7 @@ def main() -> None:
 
     try:
         # Test that events serialize correctly with privacy filtering
-        from codeweaver.common.telemetry.events import SessionSummaryEvent
+        from codeweaver.common import SessionSummaryEvent
 
         test_event = SessionSummaryEvent(
             session_duration_minutes=session_stats["duration_minutes"],
@@ -375,9 +366,9 @@ def main() -> None:
         print_separator("Sending Telemetry to PostHog")
 
         try:
-            from codeweaver.common.telemetry import get_telemetry_client
+            from codeweaver.common import get_telemetry_client
 
-            client = get_telemetry_client()
+            client = await get_telemetry_client()
 
             if client.enabled:
                 print("📤 Sending session summary event...")
@@ -428,4 +419,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+
+    asyncio.run(main())

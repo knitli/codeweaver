@@ -17,71 +17,71 @@ This multi-tiered approach ensures reliable chunking across 170+ languages while
 
 from __future__ import annotations
 
-import contextlib
 import logging
+import math
 
 from abc import ABC, abstractmethod
+from enum import StrEnum
 from functools import cached_property
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from pydantic import ConfigDict, Field, PositiveInt, PrivateAttr, computed_field
 
-# Import ChunkerSettings at runtime for model rebuild to work
-from codeweaver.config.chunker import ChunkerSettings
-from codeweaver.config.providers import ProviderSettingsDict
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.types.models import BasedModel
-from codeweaver.exceptions import InitializationError
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+from codeweaver.core import BasedModel, CodeChunk
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
+    from codeweaver.engine.config import ChunkerSettings
+
+from codeweaver.providers import EmbeddingModelCapabilities, RerankingModelCapabilities
 
 
 logger = logging.getLogger(__name__)
 
 
-def _get_chunker_settings() -> ChunkerSettings:
-    """Retrieve the chunker settings."""
-    from codeweaver.config.settings import get_settings
-
-    cw_settings = get_settings()
-    return (
-        cw_settings.chunker
-        if isinstance(cw_settings.chunker, ChunkerSettings)
-        else ChunkerSettings()
-    )
-
-
-def _get_capabilities() -> (
-    tuple[()]
-    | tuple[EmbeddingModelCapabilities]
-    | tuple[EmbeddingModelCapabilities, RerankingModelCapabilities]
-):
-    """Retrieve the capabilities."""
-    from codeweaver.common.registry.models import get_model_registry
-    from codeweaver.providers.provider import ProviderKind
-
-    registry = get_model_registry()
-    embedding_caps = registry.configured_models_for_kind(ProviderKind.EMBEDDING)
-    reranking_caps = registry.configured_models_for_kind(ProviderKind.RERANKING)
-    if embedding_caps and reranking_caps:
-        return (embedding_caps[0], reranking_caps[0])
-    if embedding_caps:
-        return (embedding_caps[0],)
-    raise InitializationError(
-        "Could not determine capabilities for embedding.",
-        details={"embedding_caps": embedding_caps, "reranking_caps": reranking_caps},
-        suggestions=[
-            "If you have providers configured, submit an issue. It's probably a bug -- this is an alpha release :)"
-        ],
-    )
-
-
 SAFETY_MARGIN = 0.1
 """A safety margin to apply to chunk sizes to account for metadata and tokenization variability."""
+
+# Adaptive chunking constants
+RETRIEVAL_OPTIMAL = 600
+"""LongEmbed benchmark sweet spot for retrieval quality (tokens)."""
+
+MIN_VIABLE_CHUNK = 100
+"""Minimum chunk size below which content becomes noise (tokens)."""
+
+SMALL_MODEL_RATIO = 0.80
+"""Use 80% of context window for small models."""
+
+TRANSITION_POINT = 512
+"""Context window size where we start transitioning to optimal (tokens)."""
+
+ACCEPTABLE_OVERAGE_RATIO = 1.67
+"""How much larger than optimal is acceptable before splitting (ratio)."""
+
+FLOOR_RATIO = 0.15
+"""Floor as percentage of optimal (ratio)."""
+
+MIN_FLOOR = 50
+"""Absolute minimum floor regardless of optimal (tokens)."""
+
+
+class AdaptiveChunkBehavior(StrEnum):
+    """Actions for adaptive chunk sizing.
+
+    The adaptive chunking system classifies each chunk by size and determines
+    the appropriate action:
+
+    - KEEP: Chunk is within acceptable range, use as-is
+    - MERGE: Chunk is too small, should combine with neighbors
+    - TRY_CHILDREN: Chunk exceeds optimal, try semantic split first
+    - FORCE_SPLIT: Chunk exceeds hard limit, must split mechanically
+    """
+
+    KEEP = "keep"
+    MERGE = "merge"
+    TRY_CHILDREN = "try_children"
+    FORCE_SPLIT = "force_split"
 
 
 class ChunkGovernor(BasedModel):
@@ -94,7 +94,7 @@ class ChunkGovernor(BasedModel):
         | tuple[EmbeddingModelCapabilities]
         | tuple[EmbeddingModelCapabilities, RerankingModelCapabilities],
         Field(description="""The model capabilities to infer chunking behavior from."""),
-    ] = ()  # type: ignore[assignment]
+    ] = ()
 
     settings: Annotated[
         ChunkerSettings | None,
@@ -128,13 +128,101 @@ class ChunkGovernor(BasedModel):
         """
         return int(max(50, min(200, self.chunk_limit * 0.2)))
 
+    @computed_field
+    @cached_property
+    def optimal_chunk_tokens(self) -> PositiveInt:
+        """Target chunk size for best retrieval quality.
+
+        Based on LongEmbed benchmarks, retrieval quality peaks around 500-800 tokens
+        regardless of model context window. Larger context windows let you *accept*
+        more tokens, but don't improve *retrieval* of relevant content.
+
+        Scaling:
+        - Small models (≤512 context): 80% of context window
+        - Medium models (512-8192): logarithmic curve toward 600
+        - Large models (8192+): capped at 600
+
+        Examples:
+        - all-MiniLM-L6-v2 (256 context) → 205 optimal
+        - bge-small (512 context) → 410 optimal
+        - bge-base (1024 context) → 457 optimal
+        - voyage-code-3 (8192 context) → 600 optimal
+        - voyage-3-large (32000 context) → 600 optimal
+        - cohere-embed-v4 (128000 context) → 600 optimal
+        """
+        # Check for user override first
+        if (
+            self.settings is not None
+            and hasattr(self.settings, "target_chunk_tokens")
+            and (target := getattr(self.settings, "target_chunk_tokens", None)) is not None
+        ):
+            # Respect override but cap at context window
+            return min(target, self.chunk_limit)
+
+        context = self.chunk_limit
+
+        if context <= TRANSITION_POINT:
+            # Small models: use 80% of available context
+            return max(MIN_VIABLE_CHUNK, int(context * SMALL_MODEL_RATIO))
+
+        # Logarithmic transition from 410 (512*0.8) to 600
+        # log2(1024/512) = 1, log2(8192/512) = 4
+        log_factor = math.log2(context / TRANSITION_POINT)
+
+        # Scale from 410 toward 600, reaching 600 at log_factor=4 (8192 tokens)
+        base = int(TRANSITION_POINT * SMALL_MODEL_RATIO)  # 410
+        headroom = RETRIEVAL_OPTIMAL - base  # 190
+
+        scaled = base + headroom * min(1.0, log_factor / 4)
+
+        return min(int(scaled), RETRIEVAL_OPTIMAL)
+
+    @computed_field
+    @cached_property
+    def floor_tokens(self) -> PositiveInt:
+        """Minimum viable chunk size.
+
+        Chunks smaller than this are likely noise and should be merged with
+        neighbors. Calculated as ~15% of optimal, with a minimum of 50 tokens.
+        """
+        return max(MIN_FLOOR, int(self.optimal_chunk_tokens * FLOOR_RATIO))
+
+    @computed_field
+    @cached_property
+    def acceptable_max_tokens(self) -> PositiveInt:
+        """Maximum chunk size before trying to split.
+
+        Chunks larger than this should attempt semantic splitting (finding child
+        boundaries). This is ~1.67x optimal, capped at the hard context limit.
+
+        The 1.67x ratio allows capturing complete "context units" (e.g., a function
+        that's slightly larger than optimal) without forcing unnecessary splits.
+        """
+        return min(int(self.optimal_chunk_tokens * ACCEPTABLE_OVERAGE_RATIO), self.chunk_limit)
+
+    def classify_chunk_size(self, tokens: int) -> AdaptiveChunkBehavior:
+        """Determine what action to take for a chunk of given size.
+
+        Args:
+            tokens: Estimated token count of the chunk
+
+        Returns:
+            AdaptiveChunkBehavior indicating the recommended action:
+            - MERGE: tokens < floor_tokens (too small, combine with neighbors)
+            - KEEP: floor_tokens <= tokens <= acceptable_max_tokens (good size)
+            - TRY_CHILDREN: acceptable_max_tokens < tokens <= chunk_limit (try semantic split)
+            - FORCE_SPLIT: tokens > chunk_limit (must split mechanically)
+        """
+        if tokens < self.floor_tokens:
+            return AdaptiveChunkBehavior.MERGE
+        if tokens <= self.acceptable_max_tokens:
+            return AdaptiveChunkBehavior.KEEP
+        if tokens <= self.chunk_limit:
+            return AdaptiveChunkBehavior.TRY_CHILDREN
+        return AdaptiveChunkBehavior.FORCE_SPLIT
+
     def _telemetry_keys(self) -> None:
         return None
-
-    def model_post_init(self, /, __context: Any) -> None:
-        """Ensure models are rebuilt on first instantiation."""
-        _rebuild_models()
-        super().model_post_init(__context)
 
     @staticmethod
     def _get_caps() -> (
@@ -168,7 +256,14 @@ class ChunkGovernor(BasedModel):
         Returns:
             A ChunkGovernor instance.
         """
-        from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+        # ChunkerSettings is imported under TYPE_CHECKING to avoid circular imports, so
+        # pydantic's defer_build cannot resolve it during class definition. Rebuild the
+        # model here (once) before the first instantiation, supplying ChunkerSettings in
+        # the namespace so pydantic can complete the schema.
+        from codeweaver.engine.config import ChunkerSettings as _ChunkerSettings
+        from codeweaver.providers import RerankingModelCapabilities
+
+        cls.model_rebuild(_types_namespace={"ChunkerSettings": _ChunkerSettings})
 
         capabilities = _get_capabilities()
         if len(capabilities) == 2:
@@ -182,100 +277,11 @@ class ChunkGovernor(BasedModel):
             )
             return cls(capabilities=(embedding_caps, reranking_caps), settings=settings)
         if len(capabilities) == 1:
-            embedding_caps = cast(EmbeddingModelCapabilities, capabilities[0])  # ty: ignore[index-out-of-bounds]
+            embedding_caps = cast(EmbeddingModelCapabilities, capabilities[0])
             logger.debug("Creating ChunkGovernor with embedding caps: %s", embedding_caps)
             return cls(capabilities=(embedding_caps,), settings=settings)
         logger.warning("Could not determine capabilities from settings, using default chunk limits")
         return cls(capabilities=(), settings=settings)
-
-    @classmethod
-    def from_backup_profile(
-        cls, backup_profile: ProviderSettingsDict, settings: ChunkerSettings | None = None
-    ) -> ChunkGovernor:
-        """Create a ChunkGovernor from backup profile settings.
-
-        This method creates a governor with capabilities derived from the backup
-        profile's embedding and reranking model settings. This is used to ensure
-        chunks are sized appropriately for the backup models.
-
-        Args:
-            backup_profile: ProviderSettingsDict from get_profile("backup", "local")
-            settings: Optional ChunkerSettings to use
-
-        Returns:
-            A ChunkGovernor instance configured for backup model constraints.
-        """
-        from codeweaver.providers.embedding.capabilities import (
-            load_default_capabilities as load_embedding_caps,
-        )
-        from codeweaver.providers.reranking.capabilities import (
-            load_default_capabilities as load_reranking_caps,
-        )
-
-        embedding_caps: EmbeddingModelCapabilities | None = None
-        reranking_caps: RerankingModelCapabilities | None = None
-
-        # Extract embedding model name from profile
-        if (
-            (embedding_settings := backup_profile.get("embedding"))
-            and isinstance(embedding_settings, tuple)
-            and len(embedding_settings) > 0
-        ):
-            first_setting = embedding_settings[0]
-            if (model_settings := getattr(first_setting, "model_settings", None)) and (
-                model_name := getattr(model_settings, "model", None)
-            ):
-                # Find matching capability
-                for cap in load_embedding_caps():
-                    if cap.name == model_name:
-                        embedding_caps = cap
-                        break
-
-        # Extract reranking model name from profile
-        if (
-            (reranking_settings := backup_profile.get("reranking"))
-            and isinstance(reranking_settings, tuple)
-            and len(reranking_settings) > 0
-        ):
-            first_setting = reranking_settings[0]
-            if (model_settings := getattr(first_setting, "model_settings", None)) and (
-                model_name := getattr(model_settings, "model", None)
-            ):
-                # Find matching capability
-                for cap in load_reranking_caps():
-                    if cap.name == model_name:
-                        reranking_caps = cap
-                        break
-
-        # Build capabilities tuple
-        if embedding_caps and reranking_caps:
-            capabilities: (
-                tuple[()]
-                | tuple[EmbeddingModelCapabilities]
-                | tuple[EmbeddingModelCapabilities, RerankingModelCapabilities]
-            ) = (embedding_caps, reranking_caps)
-            logger.debug(
-                "Creating backup ChunkGovernor with embedding caps: %s (ctx: %d) "
-                "and reranking caps: %s (ctx: %d)",
-                embedding_caps.name,
-                embedding_caps.context_window,
-                reranking_caps.name,
-                reranking_caps.context_window,
-            )
-        elif embedding_caps:
-            capabilities = (embedding_caps,)
-            logger.debug(
-                "Creating backup ChunkGovernor with embedding caps only: %s (ctx: %d)",
-                embedding_caps.name,
-                embedding_caps.context_window,
-            )
-        else:
-            capabilities = ()
-            logger.warning(
-                "Could not determine backup capabilities from profile, using default chunk limits"
-            )
-
-        return cls(capabilities=capabilities, settings=settings or ChunkerSettings())
 
 
 class BaseChunker(ABC):
@@ -322,55 +328,22 @@ class BaseChunker(ABC):
         return self._governor.simple_overlap
 
 
-__all__ = ("BaseChunker", "ChunkGovernor")
+__all__ = (
+    "ACCEPTABLE_OVERAGE_RATIO",
+    "FLOOR_RATIO",
+    "MIN_FLOOR",
+    "MIN_VIABLE_CHUNK",
+    "RETRIEVAL_OPTIMAL",
+    "SAFETY_MARGIN",
+    "SMALL_MODEL_RATIO",
+    "TRANSITION_POINT",
+    "AdaptiveChunkBehavior",
+    "BaseChunker",
+    "ChunkGovernor",
+)
 
 
-# Rebuild models to resolve forward references after all types are imported
-# This is done lazily on first use to avoid circular import with settings module
-_models_rebuilt = False
-
-
-def _rebuild_models() -> None:
-    """Rebuild pydantic models after all types are defined.
-
-    This is called lazily on first use to avoid circular imports with the settings module.
-    """
-    global _models_rebuilt
-    if _models_rebuilt:
-        return
-
-    logger = logging.getLogger(__name__)
-    try:
-        if not ChunkGovernor.__pydantic_complete__:
-            # Import ChunkerSettings to ensure it's available for rebuild
-            # The import is safe here because ChunkerSettings imports are already resolved
-            from codeweaver.config.chunker import ChunkerSettings as _ChunkerSettings
-            from codeweaver.engine.chunker.delimiters.families import LanguageFamily
-            from codeweaver.engine.chunker.delimiters.patterns import DelimiterPattern
-
-            # Build namespace for model rebuild with all required types
-            # ChunkGovernor needs ChunkerSettings, and BaseChunker methods use CodeChunk
-            namespace = {
-                "ChunkerSettings": _ChunkerSettings,
-                "CodeChunk": CodeChunk,
-                "DelimiterPattern": DelimiterPattern,
-                "EmbeddingModelCapabilities": EmbeddingModelCapabilities,
-                "LanguageFamily": LanguageFamily,
-                "RerankingModelCapabilities": RerankingModelCapabilities,
-            }
-            _ = ChunkGovernor.model_rebuild(_types_namespace=namespace)
-        _models_rebuilt = True
-    except Exception as e:
-        # If rebuild fails, model will still work but may have issues with ChunkerSettings
-        logger.debug("Failed to rebuild ChunkGovernor model: %s", e, exc_info=True)
-
-
-# Attempt to rebuild models at module level to resolve forward references
-# This ensures models are ready before first instantiation in most cases
-# NOTE: This happens after module-level imports are complete, but ChunkerSettings
-# may rebuild itself during its module initialization, which would invalidate our rebuild.
-# To handle this, we also call rebuild in model_post_init as a fallback.
-with contextlib.suppress(Exception):
-    _rebuild_models()
-
-__all__ = ("BaseChunker", "ChunkGovernor")
+def _get_capabilities() -> tuple[Any, ...]:
+    """Retrieve all configured model capabilities."""
+    # TODO: Implement capability retrieval from provider registry
+    return ()

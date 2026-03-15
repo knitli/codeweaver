@@ -7,32 +7,49 @@
 
 from __future__ import annotations
 
-import re
-
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
+
+from codeweaver.core import dependency_provider
+from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+    pass
 
 
-def get_marco_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
+class MsMarcoRerankingCapabilities(RerankingModelCapabilities):
+    """Capabilities for MS MARCO reranking models."""
+
+
+@dependency_provider(MsMarcoRerankingCapabilities, scope="singleton", collection=True)
+def get_marco_reranking_capabilities() -> tuple[MsMarcoRerankingCapabilities, ...]:
     """
     Get the MS-Marco MiniLM reranking capabilities.
     """
-    from codeweaver.providers.provider import Provider
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+    from codeweaver.core import Provider
     from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
 
-    shared_capabilities: PartialRerankingCapabilitiesDict = {
+    # FastEmbed uses Xenova namespace, SentenceTransformers uses cross-encoder namespace
+    fastembed_shared: PartialRerankingCapabilitiesDict = {
         "name": "Xenova/ms-marco-MiniLM-",
+        "max_input": 512,
+        "context_window": 512,
+        "tokenizer": "tokenizers",
+        "tokenizer_model": "Xenova/ms-marco-MiniLM-L-6-v2",
+        "supports_custom_prompt": False,
+        "provider": Provider.FASTEMBED,
+    }
+
+    sentence_transformers_shared: PartialRerankingCapabilitiesDict = {
+        "name": "cross-encoder/ms-marco-MiniLM-",
         "max_input": 512,
         "context_window": 512,
         "tokenizer": "tokenizers",
         "tokenizer_model": "cross-encoder/ms-marco-MiniLM-L6-v2",
         "supports_custom_prompt": False,
+        "provider": Provider.SENTENCE_TRANSFORMERS,
     }
+
     fastembed_models = ("L-6-v2", "L-12-v2")
     sentence_transformers_models = ("L6-v2", "L12-v2")
 
@@ -46,24 +63,29 @@ def get_marco_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
         "supports_custom_prompt": False,
     }
 
-    assembled_capabilities: list[RerankingModelCapabilities] = []
+    assembled_capabilities: list[MsMarcoRerankingCapabilities] = []
+
+    # Add FastEmbed models (Xenova namespace)
     assembled_capabilities.extend(
-        RerankingModelCapabilities.model_validate({
-            **shared_capabilities,
-            "name": f"{shared_capabilities['name']}{model}"
-            if re.match(r"^L-[61].*", model)
-            else f"{shared_capabilities['name']}{model.replace('Xenova', 'cross-encoder')}",
-            "provider": Provider.FASTEMBED
-            if re.match(r"^L-[61].*", model)
-            else Provider.SENTENCE_TRANSFORMERS,
-            "tokenizer_model": shared_capabilities["tokenizer_model"]
-            if shared_capabilities["name"] in {"L-6-v2", "L6-V2"}
-            else "cross-encoder/ms-marco-MiniLM-L12-v2",
+        MsMarcoRerankingCapabilities.model_validate({
+            **fastembed_shared,
+            "name": f"{fastembed_shared['name']}{model}",
+            "tokenizer_model": f"Xenova/ms-marco-MiniLM-{model}",
         })
-        for model in fastembed_models + sentence_transformers_models
+        for model in fastembed_models
     )
-    assembled_capabilities.append(RerankingModelCapabilities.model_validate(ultra_light))
-    return assembled_capabilities
+
+    # Add SentenceTransformers models (cross-encoder namespace)
+    assembled_capabilities.extend(
+        MsMarcoRerankingCapabilities.model_validate({
+            **sentence_transformers_shared,
+            "name": f"{sentence_transformers_shared['name']}{model}",
+            "tokenizer_model": f"cross-encoder/ms-marco-MiniLM-{model}",
+        })
+        for model in sentence_transformers_models
+    )
+    assembled_capabilities.append(MsMarcoRerankingCapabilities.model_validate(ultra_light))
+    return tuple(assembled_capabilities)
 
 
-__all__ = ("get_marco_reranking_capabilities",)
+__all__ = ("MsMarcoRerankingCapabilities", "get_marco_reranking_capabilities")

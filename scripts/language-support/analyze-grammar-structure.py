@@ -18,13 +18,11 @@ from __future__ import annotations
 import json
 
 from collections import Counter, defaultdict
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from pydantic import Field
-from pydantic.dataclasses import dataclass
-
-from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core import SemanticSearchLanguage
 
 
 @dataclass
@@ -37,36 +35,36 @@ class GrammarStructureStats:
     unnamed_nodes: int = 0
 
     # Abstract type patterns
-    abstract_types: dict[str, list[str]] = Field(default_factory=dict)
+    abstract_types: dict[str, list[str]] = field(default_factory=dict)
     abstract_type_count: int = 0
 
     # Field patterns
     nodes_with_fields: int = 0
-    common_field_names: Counter[str] = Field(default_factory=Counter)
-    field_semantic_roles: dict[str, list[str]] = Field(default_factory=lambda: defaultdict(list))
+    common_field_names: Counter[str] = field(default_factory=Counter)
+    field_semantic_roles: dict[str, list[str]] = field(default_factory=lambda: defaultdict(list))
 
     # Children patterns
     nodes_with_children: int = 0
     nodes_with_both: int = 0  # both fields and children
 
     # Extra patterns
-    extra_nodes: list[str] = Field(default_factory=list)
+    extra_nodes: list[str] = field(default_factory=list)
     extra_node_count: int = 0
 
     # Root patterns
-    root_nodes: list[str] = Field(default_factory=list)
+    root_nodes: list[str] = field(default_factory=list)
 
     # Q1: Category references in connections
-    field_references: dict[str, set[str]] = Field(default_factory=lambda: defaultdict(set))
-    children_references: dict[str, set[str]] = Field(default_factory=lambda: defaultdict(set))
-    category_references_in_fields: Counter[str] = Field(default_factory=Counter)
-    category_references_in_children: Counter[str] = Field(default_factory=Counter)
-    concrete_references_in_fields: Counter[str] = Field(default_factory=Counter)
-    concrete_references_in_children: Counter[str] = Field(default_factory=Counter)
+    field_references: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
+    children_references: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
+    category_references_in_fields: Counter[str] = field(default_factory=Counter)
+    category_references_in_children: Counter[str] = field(default_factory=Counter)
+    concrete_references_in_fields: Counter[str] = field(default_factory=Counter)
+    concrete_references_in_children: Counter[str] = field(default_factory=Counter)
 
     # Q2: Multiple category membership
-    concrete_to_categories: dict[str, set[str]] = Field(default_factory=lambda: defaultdict(set))
-    multi_category_things: dict[str, list[str]] = Field(default_factory=dict)
+    concrete_to_categories: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
+    multi_category_things: dict[str, list[str]] = field(default_factory=dict)
 
     def summary(self) -> str:
         """Generate summary statistics."""
@@ -303,30 +301,30 @@ class GrammarStructureAnalyzer:
             # Abstract type patterns (normalize leading underscore)
             for abstract_type in stats.abstract_types:
                 normalized = abstract_type.lstrip("_")
-                patterns["common_abstract_types"][normalized] += 1  # type: ignore
+                patterns["common_abstract_types"][normalized] += 1
 
             # Field name patterns
-            patterns["universal_field_names"].update(stats.common_field_names)  # type: ignore
+            patterns["universal_field_names"].update(stats.common_field_names)
 
             # Extra node patterns
             for extra_node in stats.extra_nodes:
-                patterns["common_extra_nodes"][extra_node] += 1  # type: ignore
+                patterns["common_extra_nodes"][extra_node] += 1
 
             # Field semantic patterns
             for field_name, contexts in stats.field_semantic_roles.items():
                 for context in contexts:
                     category = context.split(":")[0]
-                    patterns["field_semantic_patterns"][field_name][category] += 1  # type: ignore
+                    patterns["field_semantic_patterns"][field_name][category] += 1
 
             # Q1: Aggregate category and concrete references
-            patterns["category_refs_in_fields"].update(stats.category_references_in_fields)  # type: ignore
-            patterns["category_refs_in_children"].update(stats.category_references_in_children)  # type: ignore
-            patterns["concrete_refs_in_fields"].update(stats.concrete_references_in_fields)  # type: ignore
-            patterns["concrete_refs_in_children"].update(stats.concrete_references_in_children)  # type: ignore
+            patterns["category_refs_in_fields"].update(stats.category_references_in_fields)
+            patterns["category_refs_in_children"].update(stats.category_references_in_children)
+            patterns["concrete_refs_in_fields"].update(stats.concrete_references_in_fields)
+            patterns["concrete_refs_in_children"].update(stats.concrete_references_in_children)
 
             # Q2: Aggregate multi-category Things
             for thing, categories in stats.multi_category_things.items():
-                patterns["all_multi_category_things"][thing].update(categories)  # type: ignore
+                patterns["all_multi_category_things"][thing].update(categories)
 
         return patterns
 
@@ -580,7 +578,7 @@ class GrammarStructureAnalyzer:
         report = "\n".join(report_lines)
 
         if output_file:
-            output_file.write_text(report)  # type: ignore
+            output_file.write_text(report)
             print(f"\nReport written to: {output_file}")
 
         return report
@@ -596,7 +594,7 @@ def main() -> None:
     output_dir.mkdir(exist_ok=True)
     output_file = output_dir / "grammar_structure_analysis.md"
 
-    _report = analyzer.generate_report(output_file)  # type: ignore
+    _report = analyzer.generate_report(output_file)
 
     # Print summary
     print("\n" + "=" * 60)

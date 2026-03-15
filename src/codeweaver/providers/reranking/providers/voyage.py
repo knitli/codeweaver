@@ -7,25 +7,22 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
-import os
 
-from collections.abc import Callable, Iterator, Sequence
-from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Iterator, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 from warnings import filterwarnings
 
-from pydantic import ConfigDict, SecretStr, SkipValidation
+from pydantic import ConfigDict, SkipValidation
 
-from codeweaver.common.utils.utils import rpartial
-from codeweaver.exceptions import ProviderError
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+from codeweaver.core import Provider, ProviderError, rpartial
+from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +32,7 @@ try:
     from voyageai.object.reranking import RerankingResult as VoyageRerankingResult
 
 except ImportError as e:
-    from codeweaver.exceptions import ConfigurationError
+    from codeweaver.core import ConfigurationError
 
     raise ConfigurationError(
         r"Voyage AI SDK is not installed. Please install it with `pip install code-weaver\[voyage]`."
@@ -59,14 +56,20 @@ def voyage_reranking_output_transformer(
     def map_result(voyage_result: VoyageRerankingResult, new_index: int) -> RerankingResult:
         """Maps a VoyageRerankingResult to a CodeWeaver RerankingResult."""
         return RerankingResult(
-            original_index=voyage_result.index,  # type: ignore
+            original_index=voyage_result.index,
             batch_rank=new_index,
-            score=voyage_result.relevance_score,  # type: ignore
-            chunk=original_chunks[voyage_result.index],  # type: ignore
+            score=voyage_result.relevance_score,
+            chunk=original_chunks[voyage_result.index],
         )
 
     results, token_count = returned_result.results, returned_result.total_tokens
-    _instance._update_token_stats(token_count=token_count)
+    try:
+        loop = _instance._loop or asyncio.get_running_loop()
+        _ = loop.call_soon_threadsafe(
+            lambda: _instance._update_token_stats(token_count=token_count)
+        )
+    except RuntimeError:
+        _instance._update_token_stats(token_count=token_count)
     # Sort by relevance_score - handle both tuple (x[2]) and attribute (x.relevance_score) access
     try:
         results.sort(key=lambda x: cast(float, x.relevance_score), reverse=True)
@@ -76,68 +79,26 @@ def voyage_reranking_output_transformer(
 
 
 class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
-    """Base class for reranking providers."""
+    """Voyage AI reranking provider implementation."""
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     client: SkipValidation[AsyncClient]
-    _provider: Provider = Provider.VOYAGE
-    caps: RerankingModelCapabilities
-
-    _rerank_kwargs: MappingProxyType[str, Any]
-    _output_transformer: Callable[
-        [Any, Iterator[CodeChunk] | tuple[CodeChunk, ...]], list[RerankingResult]
-    ] = lambda x, y: x  # placeholder, actually set in _initialize()
-
-    def __init__(
-        self,
-        client: AsyncClient | None = None,
-        caps: RerankingModelCapabilities | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """Initialize the reranking provider."""
-        if caps is None:
-            from codeweaver.common.registry.models import get_model_registry
-
-            registry = get_model_registry()
-            caps = registry.configured_models_for_kind("reranking")  # ty: ignore[invalid-assignment]
-            if isinstance(caps, tuple) and len(caps) > 0:
-                caps = caps[0]
-        if not caps:
-            from codeweaver.providers.reranking.capabilities.voyage import (
-                get_voyage_reranking_capabilities,
-            )
-
-            voyage_caps = get_voyage_reranking_capabilities()
-            caps = (
-                next((cap for cap in voyage_caps if cap.name == "rerank-2.5"), None)
-                or voyage_caps[0]
-            )
-        if client is None:
-            if api_key := kwargs.pop("api_key", None) or os.getenv("VOYAGE_API_KEY"):
-                if isinstance(api_key, SecretStr):
-                    api_key = api_key.get_secret_value()
-                client = AsyncClient(api_key=api_key)
-
-            else:
-                logger.warning(
-                    "We could not find an API key for Voyage AI. In case you have other means of authentication, we're going to proceed without an explicit API key... if you get authentication errors, please set the VOYAGE_API_KEY environment variable."
-                )
-                client = AsyncClient()
-
-        # Call super().__init__() with client and caps
-        super().__init__(client=client, caps=caps, **kwargs)
-
-        self._initialize()
+    _provider: ClassVar[Literal[Provider.VOYAGE]] = Provider.VOYAGE
 
     def _initialize(self) -> None:
-
-        type(self)._output_transformer = rpartial(
+        """Initialize after Pydantic setup."""
+        self._output_transformer = rpartial(  # ty:ignore[invalid-assignment]
             voyage_reranking_output_transformer, _instance=self
         )
 
     async def _execute_rerank(
-        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
+        self,
+        query: str,
+        documents: Sequence[str],
+        *,
+        top_n: int = DEFAULT_RERANKING_MAX_RESULTS,
+        **kwargs: Any,
     ) -> Any:
         """Execute the reranking process."""
         try:
@@ -148,6 +109,7 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
                 model=self.caps.name,
                 top_k=top_n,
             )
+            self._loop = await self._get_loop()
         except Exception as e:
             raise ProviderError(
                 f"Voyage AI reranking request failed: {e}",
@@ -169,4 +131,4 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
             return response
 
 
-__all__ = ("VoyageRerankingProvider",)
+__all__ = ("VoyageRerankingProvider", "voyage_reranking_output_transformer")

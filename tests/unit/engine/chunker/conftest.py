@@ -10,17 +10,14 @@ from unittest.mock import Mock
 
 import pytest
 
-from codeweaver.config.chunker import ChunkerSettings, PerformanceSettings
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.engine.chunker.base import ChunkGovernor
+from codeweaver.core import CodeChunk, DelimiterPattern, EmbeddingBatchInfo, LanguageFamily
 
 # Rebuild models to resolve forward references
 # This must happen after all imports to ensure all referenced types are available
 # Import types needed for forward reference resolution
-from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
-from codeweaver.engine.chunker.governance import ResourceGovernor
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.embedding.types import EmbeddingBatchInfo  # noqa: F401
+from codeweaver.engine import ChunkGovernor, ResourceGovernor
+from codeweaver.engine.config import ChunkerSettings, PerformanceSettings
+from codeweaver.providers import EmbeddingModelCapabilities
 
 
 # Build namespace for Pydantic to resolve string annotations
@@ -35,6 +32,7 @@ ChunkerSettings.model_rebuild()
 # Then rebuild ChunkGovernor and CodeChunk with full namespace
 ChunkGovernor.model_rebuild(_types_namespace=namespace)
 CodeChunk.model_rebuild(_types_namespace=namespace)
+EmbeddingBatchInfo.model_rebuild(_types_namespace=namespace)
 
 
 @pytest.fixture
@@ -44,7 +42,7 @@ def performance_settings() -> PerformanceSettings:
         max_file_size_mb=10,
         chunk_timeout_seconds=30,
         parse_timeout_seconds=10,
-        max_chunks_per_file=5000,
+        max_chunks_per_file=10000,
         max_memory_mb_per_operation=100,
         max_ast_depth=200,
     )
@@ -181,7 +179,7 @@ def many_functions_file(fixture_path: Path) -> Path:
 @pytest.fixture
 def discovered_sample_python_file(sample_python_file: Path):
     """Create DiscoveredFile for sample Python fixture."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     return DiscoveredFile.from_path(sample_python_file)
 
@@ -189,7 +187,7 @@ def discovered_sample_python_file(sample_python_file: Path):
 @pytest.fixture
 def discovered_sample_javascript_file(sample_javascript_file: Path):
     """Create DiscoveredFile for sample JavaScript fixture."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     return DiscoveredFile.from_path(sample_javascript_file)
 
@@ -197,7 +195,7 @@ def discovered_sample_javascript_file(sample_javascript_file: Path):
 @pytest.fixture
 def discovered_sample_rust_file(sample_rust_file: Path):
     """Create DiscoveredFile for sample Rust fixture."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     return DiscoveredFile.from_path(sample_rust_file)
 
@@ -205,7 +203,7 @@ def discovered_sample_rust_file(sample_rust_file: Path):
 @pytest.fixture
 def discovered_sample_go_file(sample_go_file: Path):
     """Create DiscoveredFile for sample Go fixture."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     return DiscoveredFile.from_path(sample_go_file)
 
@@ -213,7 +211,7 @@ def discovered_sample_go_file(sample_go_file: Path):
 @pytest.fixture
 def discovered_malformed_python_file(malformed_python_file: Path):
     """Create DiscoveredFile for malformed Python fixture."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     return DiscoveredFile.from_path(malformed_python_file)
 
@@ -221,7 +219,7 @@ def discovered_malformed_python_file(malformed_python_file: Path):
 @pytest.fixture
 def discovered_huge_function_file(huge_function_file: Path):
     """Create DiscoveredFile for huge function fixture."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     return DiscoveredFile.from_path(huge_function_file)
 
@@ -229,7 +227,7 @@ def discovered_huge_function_file(huge_function_file: Path):
 @pytest.fixture
 def discovered_deep_nesting_file(deep_nesting_file: Path):
     """Create DiscoveredFile for deep nesting fixture."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     return DiscoveredFile.from_path(deep_nesting_file)
 
@@ -237,7 +235,7 @@ def discovered_deep_nesting_file(deep_nesting_file: Path):
 @pytest.fixture
 def discovered_empty_file(empty_file: Path):
     """Create DiscoveredFile for empty file fixture."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     return DiscoveredFile.from_path(empty_file)
 
@@ -245,7 +243,7 @@ def discovered_empty_file(empty_file: Path):
 @pytest.fixture
 def discovered_single_line_file(single_line_file: Path):
     """Create DiscoveredFile for single line fixture."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     return DiscoveredFile.from_path(single_line_file)
 
@@ -253,7 +251,7 @@ def discovered_single_line_file(single_line_file: Path):
 @pytest.fixture
 def discovered_whitespace_only_file(whitespace_only_file: Path):
     """Create DiscoveredFile for whitespace only fixture."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     return DiscoveredFile.from_path(whitespace_only_file)
 
@@ -261,7 +259,7 @@ def discovered_whitespace_only_file(whitespace_only_file: Path):
 @pytest.fixture
 def discovered_binary_mock_file(binary_mock_file: Path):
     """Create DiscoveredFile for binary mock fixture."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     return DiscoveredFile.from_path(binary_mock_file)
 
@@ -269,7 +267,7 @@ def discovered_binary_mock_file(binary_mock_file: Path):
 @pytest.fixture
 def discovered_large_class_file(large_class_file: Path):
     """Create DiscoveredFile for large class fixture."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     return DiscoveredFile.from_path(large_class_file)
 
@@ -277,7 +275,7 @@ def discovered_large_class_file(large_class_file: Path):
 @pytest.fixture
 def discovered_huge_string_literal_file(huge_string_literal_file: Path):
     """Create DiscoveredFile for huge string literal fixture."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     return DiscoveredFile.from_path(huge_string_literal_file)
 
@@ -285,6 +283,6 @@ def discovered_huge_string_literal_file(huge_string_literal_file: Path):
 @pytest.fixture
 def discovered_many_functions_file(many_functions_file: Path):
     """Create DiscoveredFile for many functions fixture."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     return DiscoveredFile.from_path(many_functions_file)

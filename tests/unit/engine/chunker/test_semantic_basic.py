@@ -13,9 +13,8 @@ Python, JavaScript, and Rust.
 
 import pytest
 
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.engine.chunker import SemanticChunker
-from codeweaver.engine.chunker.base import ChunkGovernor
+from codeweaver.core import SemanticSearchLanguage
+from codeweaver.engine import ChunkGovernor, SemanticChunker
 
 
 pytestmark = [pytest.mark.unit]

@@ -14,21 +14,21 @@ import sys
 from collections.abc import Callable, ItemsView, Iterator, KeysView, ValuesView
 from functools import cached_property
 from pathlib import Path
+from threading import Lock
 from types import MappingProxyType
 from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
     Literal,
-    NewType,
     NotRequired,
     Required,
     TypedDict,
-    TypeGuard,
     TypeVar,
     cast,
     get_args,
     get_origin,
+    override,
 )
 from weakref import WeakValueDictionary
 
@@ -42,41 +42,20 @@ from pydantic import (
     Tag,
     computed_field,
 )
-from typing_extensions import TypeIs
 
-from codeweaver.common.utils.utils import uuid7
+from codeweaver.core.constants import DEFAULT_BLAKE_STORE_MAX_SIZE, DEFAULT_UUID_STORE_MAX_SIZE
+from codeweaver.core.types.aliases import BlakeHashKey, BlakeKey
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.utils import TypeIs, get_blake_hash, get_blake_hash_generic, uuid7
 
 
 if TYPE_CHECKING:
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
-try:
-    # there are a handful of rare situations where users might not be able to install blake3
-    # luckily the apis are the same
-    from blake3 import blake3
-except ImportError:
-    from hashlib import blake2b as blake3
-
-
-BlakeKey = NewType("BlakeKey", str)
-BlakeHashKey = Annotated[
-    BlakeKey, Field(description="""A blake3 hash key string""", min_length=64, max_length=64)
-]
 
 HashKeyKind = TypeVar(
     "HashKeyKind", Annotated[UUID7, Tag("uuid")], Annotated[BlakeHashKey, Tag("blake")]
 )
-
-
-def get_blake_hash[AnyStr: (str, bytes)](value: AnyStr) -> BlakeHashKey:
-    """Hash a value using blake3 and return the hex digest."""
-    return BlakeKey(blake3(value.encode("utf-8") if isinstance(value, str) else value).hexdigest())
-
-
-def get_blake_hash_generic(value: str | bytes) -> BlakeHashKey:
-    """Hash a value using blake3 and return the hex digest - generic version."""
-    return BlakeKey(blake3(value.encode("utf-8") if isinstance(value, str) else value).hexdigest())
 
 
 def to_uuid() -> UUID7:
@@ -99,6 +78,8 @@ class StoreDict(TypedDict, total=False):
 class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     """A key-value store with precise typing for keys and values.
 
+    It started simple, but then got complicated...
+
     - KeyT is either UUID7 or BlakeHashKey, determined by the concrete subclass.
     - T is the value type for all items in the store.
 
@@ -110,7 +91,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         1. Entirely serializable. You can save and load it as JSON. Weakrefs are *not serialized*.
         2. Supports complex data types. You can store any picklable Python object, including nested structures.
         3. API that mimics a standard Python dictionary, making it easy to use.
-        4. Type-safe: Enforces that all values are of the specified type T.
+        4. Type-safe: Enforces that all values are of the specified type T. I really wanted to make this work strictly for subtypes too, but it quickly became unsustainably complex. So for now, it only enforces the top-level type.
 
     Example:
     ```python
@@ -145,13 +126,17 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     _keygen: Callable[[], UUID7] | Callable[[str | bytes], BlakeHashKey] = to_uuid
 
     _size_limit: Annotated[PositiveInt | None, Field(repr=False, kw_only=True)] = (
-        3 * 1024 * 1024
-    )  # 3 MB default limit
+        DEFAULT_UUID_STORE_MAX_SIZE
+    )
 
     # Per-instance trash heap; avoid sharing weakrefs across instances (don't want to accidentally maintain pointers across instances)
     _trash_heap: WeakValueDictionary[KeyT, T] = PrivateAttr(
         default_factory=lambda: WeakValueDictionary[KeyT, T]()
     )
+
+    _lock: Lock = PrivateAttr(default_factory=Lock)
+
+    _trash_lock: Lock = PrivateAttr(default_factory=Lock)
 
     _id: Annotated[
         UUID7,
@@ -168,7 +153,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         elif data.get("_value_type"):
             value_type = data.pop("_value_type")
         elif data:
-            value_type = next(iter(data.values())).__class__  # type: ignore
+            value_type = next(iter(data.values())).__class__
         else:
             value_type = None
 
@@ -192,7 +177,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         Override this to customize initialization behavior.
         """
 
-    def __pydantic_extra__(self, name: str, value: Any) -> dict[str, Any]:  # type: ignore
+    def __pydantic_extra__(self, name: str, value: Any) -> dict[str, Any]:
         """This is to prevent a pydantic bug that tries to set extra fields, when this method is deprecated.
         We'll remove once I get around to submitting a PR for it.
         """
@@ -228,7 +213,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
                 return "copy"
         with contextlib.suppress(Exception):
             # does it have a constructor that returns itself?
-            if callable(item) and item(item) is item:
+            if callable(item) and cast(Callable[[Any], Any], item)(item) is item:
                 return "constructor"
         if hasattr(item, "__iter__") and callable(type(item)):
             with contextlib.suppress(Exception):
@@ -236,7 +221,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
                     return "iter"
         return None
 
-    @cached_property
+    @cached_property  # ty:ignore[invalid-argument-type]
     def _get_copy_strategy(self) -> Callable[[T], T] | None:
         """Determine the best strategy for copying items from the store."""
         sample_item: T | None = None
@@ -259,28 +244,37 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             if copy_strategy == "copy":
                 return copy.copy
             if copy_strategy == "constructor":
-                return lambda item: type(item)(item)  # type: ignore  # we know it's callable from trial_and_error_copy
+                return lambda item: type(item)(
+                    item
+                )  # we know it's callable from trial_and_error_copy
             # copy_strategy == "iter"
-            return lambda item: type(item)(iter(item))  # type: ignore
+            return lambda item: type(item)(iter(item))
         return lambda item: item  # no-op copy
 
+    @override
     def get(self, key: KeyT, default: Any = None) -> T | None:
         """Get a value from the store."""
         if item := self.store.get(key):
-            return self._get_copy_strategy(item) if self._get_copy_strategy else item
+            if (strategy := self._get_copy_strategy) is not None:
+                return strategy(item)
+            return item
         # Try to recover from trash first, then return default
         return self.store.get(key, default) if self.recover(key) else default
 
-    def __iter__(self) -> Iterator[KeyT]:  # ty:ignore[invalid-method-override]
+    @override
+    def __iter__(self) -> Iterator[KeyT]:
         """Return an iterator over the keys in the store."""
         return iter(self.store)
 
     def __delitem__(self, key: KeyT) -> None:
         """Delete a value from the store."""
         if key in self:
-            self.delete(key)
+            with self._lock:
+                self.delete(key)
+            return
         raise KeyError(key)
 
+    @override
     def __getitem__(self, key: KeyT) -> T:
         """Get an item from the store by key."""
         if key in self:
@@ -294,6 +288,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     def __len__(self) -> int:
         return len(self.store)
 
+    @override
     def __setitem__(self, key: KeyT, value: Any) -> None:
         """Set an item in the store by key."""
         self.set(key, value)
@@ -333,21 +328,24 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         if not value:
             rand = os.urandom(16)
             value = rand
-        return cast(KeyT, self._keygen(value))
+        return cast(KeyT, cast(Callable[[str | bytes], KeyT], self._keygen)(value))
 
+    @override
     def keys(self) -> KeysView[KeyT]:
         """Return the keys in the store."""
         return self.store.keys()
 
+    @override
     def values(self) -> ValuesView[T]:
         """Return the values in the store."""
         return self.store.values()
 
+    @override
     def items(self) -> ItemsView[KeyT, T]:
         """Return the items in the store."""
         return self.store.items()
 
-    def _validate_value(self, value: Any) -> TypeGuard[T]:
+    def _validate_value(self, value: Any) -> TypeIs[T]:
         """Validate that the value is of the correct type."""
         return self._guard(value)
 
@@ -355,14 +353,16 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         """Check the value type and set the sub-value type if needed."""
         if key in self.store:
             return key
-        self.set(key, value)
+        with self._lock:
+            self.store[key] = value
         return key
 
     def update(self, values: dict[KeyT, T]) -> Iterator[KeyT]:
         """Update multiple items in the store."""
         if values and type(next(iter(values.keys()))) is type(next(iter(self.store.keys()))):
-            for key, value in values.items():
-                self[key] = value
+            with self._lock:
+                for key, value in values.items():
+                    self[key] = value
             yield from values.keys()
         else:
             yield from (self.add(value) for value in values.values())
@@ -402,7 +402,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             # LIFO removal strategy for simplicity
             removed = self.store.popitem()
             weight_loss_goal -= sys.getsizeof(removed[0]) + sys.getsizeof(removed[1])
-            if self._trash_heap is not None:  # type: ignore
+            if self._trash_heap is not None:
                 self._trash_heap[removed[0]] = removed[1]
             if weight_loss_goal <= 0:
                 break
@@ -418,12 +418,14 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
                 return
             _ = self._check_and_set(key, value)
         if (
-            self._trash_heap is not None  # type: ignore
+            self._trash_heap is not None
             and key in self._trash_heap
             and self._trash_heap[key] is not None
         ):
-            del self._trash_heap[key]
-        self.store[key] = value
+            with self._trash_lock:
+                del self._trash_heap[key]
+        with self._lock:
+            self.store[key] = value
 
     def has_room(self, additional_size: int = 0) -> bool:
         """Check if the store has room for additional data."""
@@ -432,28 +434,32 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     def delete(self, key: KeyT) -> None:
         """Delete a value from the store."""
         if key in self.store:
-            del self.store[key]
-        if self._trash_heap is not None and key in self._trash_heap:  # type: ignore
-            del self._trash_heap[key]
+            with self._lock:
+                del self.store[key]
+        if self._trash_heap is not None and key in self._trash_heap:
+            with self._trash_lock:
+                del self._trash_heap[key]
 
     def clear(self) -> None:
         """Clear the store."""
-        if self._trash_heap is not None:  # type: ignore
+        if self._trash_heap is not None:
             # Try to move items to trash heap, but if value type doesn't support weak refs
             # (e.g., NamedTuple), just skip the trash heap
-            with contextlib.suppress(TypeError):
+            with contextlib.suppress(TypeError) and self._trash_lock:
                 # Value type doesn't support weak references (e.g., NamedTuple)
                 self._trash_heap.update(self.store)
-        self.store.clear()
+        with self._lock:
+            self.store.clear()
 
     def clear_trash(self) -> None:
         """Clear the trash heap."""
-        if self._trash_heap is not None:  # type: ignore
-            self._trash_heap.clear()
+        if self._trash_heap is not None:
+            with self._trash_lock:
+                self._trash_heap.clear()
 
     def recover(self, key: KeyT) -> bool:
         """Recover a value from the trash heap."""
-        if self._trash_heap is None:  # type: ignore
+        if self._trash_heap is None:
             return False
         if (
             key in self._trash_heap
@@ -547,14 +553,14 @@ class BlakeStore[T](_SimpleTypedStore[BlakeHashKey, T]):
 
 
 def make_uuid_store[T](
-    *, value_type: type[T], size_limit: PositiveInt | None = None
+    *, value_type: type[T], size_limit: PositiveInt | None = DEFAULT_UUID_STORE_MAX_SIZE
 ) -> UUIDStore[T]:
     """Create a UUIDStore with the specified value type."""
     return UUIDStore[T](_value_type=value_type, store={}, _size_limit=size_limit)
 
 
 def make_blake_store[T](
-    *, value_type: type[T], size_limit: PositiveInt | None = None
+    *, value_type: type[T], size_limit: PositiveInt | None = DEFAULT_BLAKE_STORE_MAX_SIZE
 ) -> BlakeStore[T]:
     """Create a BlakeStore with the specified value type."""
     return BlakeStore[T](_value_type=value_type, store={}, _size_limit=size_limit)

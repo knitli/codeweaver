@@ -13,14 +13,21 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated, ClassVar, Literal, Self, TypedDict, cast
 
+from anyio import Path as AsyncPath
 from pydantic import DirectoryPath, Field, computed_field
-from pydantic.dataclasses import dataclass
 
+from codeweaver.core import BasedModel
 from codeweaver.core.file_extensions import COMMON_TOOLING_PATHS, TEST_DIR_NAMES
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.types.aliases import FilteredKeyT, LiteralStringT
+from codeweaver.core.types import (
+    DevToolNameT,
+    DirectoryName,
+    DirectoryNameT,
+    FilteredKey,
+    FilteredKeyT,
+    LlmToolNameT,
+)
 from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 
 
 if TYPE_CHECKING:
@@ -117,7 +124,7 @@ class DirectoryPurpose(str, BaseEnum):
                 for path in paths[1]
                 if "." not in str(path)[1:] or "/" not in str(path)
             ),
-        }
+        }  # ty:ignore[invalid-assignment]
         return aliases.get(self, ())
 
     @property
@@ -135,8 +142,7 @@ class DirectoryPurpose(str, BaseEnum):
         return MappingProxyType({member: member.validator for member in cls})
 
 
-@dataclass(config=DATACLASS_CONFIG)
-class RepoDirectory(DataclassSerializationMixin):
+class RepoDirectory(BasedModel):
     """Representation of a directory in the repository with its purpose.
 
     `RepoDirectory` also have detailed properties that are lazily evaluated, and helper methods for working with directories.
@@ -154,7 +160,6 @@ class RepoDirectory(DataclassSerializationMixin):
     """Cache of subdirectories in the directory."""
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types.aliases import FilteredKey
         from codeweaver.core.types.enum import AnonymityConversion
 
         return {
@@ -196,14 +201,13 @@ class RepoChecklistDict(TypedDict):
     has_migrations_dir: PathOrFalse
     has_notebooks_dir: PathOrFalse
     has_data_dir: PathOrFalse
-    tooling: tuple[tuple[str, Path], ...]
-    llm_tooling: tuple[tuple[str, Path], ...]
+    tooling: tuple[tuple[DevToolNameT, Path], ...]
+    llm_tooling: tuple[tuple[LlmToolNameT, Path], ...]
     config_files: tuple[tuple[str, Path], ...]
     language_specific_files: tuple[tuple[str, Path], ...]
 
 
-@dataclass(config=DATACLASS_CONFIG)
-class RepoChecklist(DataclassSerializationMixin):
+class RepoChecklist(BasedModel):
     """A checklist-style representation of repository structure.
 
     The attribute names aren't 1-for-1 to directory names. For example, `has_src_dir` indicates a directory named `src` or `source`.
@@ -220,7 +224,6 @@ class RepoChecklist(DataclassSerializationMixin):
 
     # monorepo indicators
     has_apps_dir: PathOrFalse
-    has_docs_dir: PathOrFalse
     has_packages_dir: PathOrFalse
     has_frontend_dir: PathOrFalse
     has_backend_dir: PathOrFalse
@@ -252,8 +255,8 @@ class RepoChecklist(DataclassSerializationMixin):
     has_data_dir: PathOrFalse
 
     # common tooling files and directories
-    tooling: tuple[tuple[str, Path], ...]
-    llm_tooling: tuple[tuple[str, Path], ...]
+    tooling: tuple[tuple[DevToolNameT, Path], ...]
+    llm_tooling: tuple[tuple[LlmToolNameT, Path], ...]
 
     # configuration files
     config_files: tuple[tuple[str, Path], ...]
@@ -263,18 +266,41 @@ class RepoChecklist(DataclassSerializationMixin):
     """Cache of child RepoChecklist instances for subdirectories."""
 
     # Directory name variants for common directories with alternate naming conventions
-    _DIR_VARIANTS: ClassVar[MappingProxyType[str, set[str]]] = MappingProxyType({
-        "apps": {"apps", "app", "applications", "application", "crates"},
-        "ci": {"ci", ".ci", "cd", ".cd", "ci-cd", ".ci-cd", ".ci_cd", "ci_cd"},
-        "lib": {"lib", "library", "libs", "libraries"},
-        "tests": {*TEST_DIR_NAMES},
-        "src": {"src", "source"},
-        "packages": {"packages", "pkg", "pkgs"},
-        "modules": {"modules", "mod", "mods", "workspaces", "pkgspaces", "services", "svcs"},
+    _DIR_VARIANTS: ClassVar[MappingProxyType[str, set[DirectoryNameT]]] = MappingProxyType({
+        "apps": {
+            DirectoryName(name) for name in {"apps", "app", "applications", "application", "crates"}
+        },
+        "ci": {
+            DirectoryName(name)
+            for name in {
+                "ci",
+                ".ci",
+                "cd",
+                ".cd",
+                "ci-cd",
+                ".ci-cd",
+                ".ci_cd",
+                "ci_cd",
+                ".github",
+                ".circleci",
+            }
+        },
+        "lib": {DirectoryName(name) for name in {"lib", "library", "libs", "libraries"}},
+        "tests": {DirectoryName(name) for name in TEST_DIR_NAMES}
+        | {
+            DirectoryName(name)
+            for name in {".cd", "ci-cd", ".ci-cd", ".ci_cd", "ci_cd", ".github", ".circleci"}
+        },
+        "src": {DirectoryName("src"), DirectoryName("source")},
+        "packages": {DirectoryName(name) for name in {"packages", "pkg", "pkgs"}},
+        "modules": {
+            DirectoryName(name)
+            for name in {"modules", "mod", "mods", "workspaces", "pkgspaces", "services", "svcs"}
+        },
     })
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+        from codeweaver.core.types import AnonymityConversion
 
         return {
             FilteredKey("_children"): AnonymityConversion.COUNT,
@@ -352,10 +378,11 @@ class RepoChecklist(DataclassSerializationMixin):
         - Path | False for directory/file presence flags
         - tuple[...] for tooling/config collections assigned later
         """
+        # TODO: Use rignore.walker as a category of inverted ignore to efficiently scan the root only
         # ensure the dict can hold mixed value types (Path|False and tuples)
         attrs: RepoChecklistDict = RepoChecklistDict(**{  # type: ignore[missing-typed-dict-key]
             key: False if key.startswith("has_") else () for key in cls.__dataclass_fields__
-        })  # type: ignore # it doesn't infer the keys
+        })
         for name in dir_checks:
             if name in root_level_dir_names:
                 attrs[f"has_{name}_dir"] = project_path / name  # ty: ignore[invalid-key]
@@ -392,10 +419,10 @@ class RepoChecklist(DataclassSerializationMixin):
     def _gather_tooling_paths(
         files: Sequence[Path],
         project_path: Path,
-        common_tooling_paths: tuple[tuple[LiteralStringT, tuple[Path, ...]], ...],
-    ) -> tuple[tuple[str, Path], ...]:
+        common_tooling_paths: tuple[tuple[DevToolNameT, tuple[Path, ...]], ...],
+    ) -> tuple[tuple[DevToolNameT, Path], ...]:
         """Gather common tooling paths from the repository files."""
-        tooling_paths: list[tuple[str, Path]] = []
+        tooling_paths: list[tuple[DevToolNameT, Path]] = []
         for tool_name, possible_paths in common_tooling_paths:
             for rel_path in possible_paths:
                 abs_path = project_path / rel_path
@@ -408,10 +435,10 @@ class RepoChecklist(DataclassSerializationMixin):
     def _gather_llm_tooling_paths(
         files: Sequence[Path],
         project_path: Path,
-        common_llm_tooling_paths: tuple[tuple[LiteralStringT, tuple[Path, ...]], ...],
-    ) -> tuple[tuple[str, Path], ...]:
+        common_llm_tooling_paths: tuple[tuple[LlmToolNameT, tuple[Path, ...]], ...],
+    ) -> tuple[tuple[LlmToolNameT, Path], ...]:
         """Gather common LLM tooling paths from the repository files."""
-        llm_tooling_paths: list[tuple[str, Path]] = []
+        llm_tooling_paths: list[tuple[LlmToolNameT, Path]] = []
         for tool_name, possible_paths in common_llm_tooling_paths:
             if valid_paths := (
                 project_path / rel_path
@@ -478,11 +505,10 @@ class RepoChecklist(DataclassSerializationMixin):
             if language == ConfigLanguage.SELF:
                 continue
             for ext in language.extensions:
-                config_files.extend(
-                    (language.variable, path)
-                    for path in project_path.rglob(f"*{ext}")
-                    if path in files and path.exists()
-                )
+                async for apath in AsyncPath(project_path).rglob(f"*{ext}"):
+                    path = Path(apath)
+                    if path in files and await apath.exists():
+                        config_files.append((language.variable, path))
         configs = [
             cfg
             for cfg in config_files
@@ -500,9 +526,7 @@ class RepoChecklist(DataclassSerializationMixin):
             if instance.apps
         }
         instance._children = {
-            app: child
-            for app, child in children.items()
-            if child and cls._any_exists(child)  # type: ignore
+            app: child for app, child in children.items() if child and cls._any_exists(child)
         }
         return instance
 
@@ -532,7 +556,7 @@ class RepoChecklist(DataclassSerializationMixin):
             elif isinstance(value, tuple):
                 paths.extend(
                     item[1]
-                    for item in value  # type: ignore
+                    for item in value
                     if isinstance(item, tuple)
                     and len(cast(tuple[str, Path], item)) == 2
                     and isinstance(item[1], Path)
