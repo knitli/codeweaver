@@ -41,8 +41,14 @@ class SpanTuple(NamedTuple):
 
     @classmethod
     def from_span(cls, span: Span) -> SpanTuple:
-        """Convert a Span to a SpanTuple."""
-        return cls(**span._asdict())
+        """Convert a Span to a SpanTuple.
+
+        Reads fields directly rather than using span._asdict(), because
+        Span.__iter__ yields line numbers and NamedTuple._asdict() uses
+        zip(fields, self), which would fill the dict with line-number
+        integers instead of the actual field values.
+        """
+        return cls(start=span.start, end=span.end, source_id=span.source_id)
 
 
 class Span(NamedTuple):
@@ -167,9 +173,9 @@ class Span(NamedTuple):
         diff2 = other - self
         result: list[Span] = []
         if diff1:
-            result.extend(diff1 if isinstance(diff1, tuple) else [diff1])  # ty: ignore[invalid-argument-type]
+            result.extend([diff1] if isinstance(diff1, Span) else diff1)
         if diff2:
-            result.extend(diff2 if isinstance(diff2, tuple) else [diff2])  # ty: ignore[invalid-argument-type]
+            result.extend([diff2] if isinstance(diff2, Span) else diff2)
         return tuple(result) if result else None
 
     @override
@@ -434,7 +440,7 @@ class SpanGroup(BasedModel):
                     new_leftovers: list[Span] = []
                     for lf in leftovers:
                         if diff := lf - s2:
-                            new_leftovers.extend(diff if isinstance(diff, tuple) else [diff])  # ty: ignore[invalid-argument-type]
+                            new_leftovers.extend([diff] if isinstance(diff, Span) else diff)
                     leftovers = new_leftovers
             result.update(leftovers)
         return SpanGroup(spans={r for r in result if r})

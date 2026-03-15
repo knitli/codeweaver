@@ -1,3 +1,7 @@
+---
+title: "Exquisite Context"
+---
+
 # Exquisite Context
 
 > **TL;DR:** This page explains the "Exquisite Context" philosophy. Use it to understand how CodeWeaver's Hybrid Search (Semantic + AST + Keyword) provides high-precision snippets. It saves 60–80% of token costs by eliminating irrelevant code from your agent's context.

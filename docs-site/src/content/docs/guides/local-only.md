@@ -1,3 +1,7 @@
+---
+title: "Local-Only Operation"
+---
+
 # Local-Only Operation
 
 > **TL;DR:** CodeWeaver Alpha 6 can run 100% locally with zero internet dependencies. Use it for airgapped environments or sensitive codebases where privacy is paramount. It saves your data from leaving your network while still providing high-quality semantic search.

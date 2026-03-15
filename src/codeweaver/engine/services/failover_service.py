@@ -249,5 +249,15 @@ class FailoverService:
         """Get the currently active store."""
         return self._active_store
 
+    @property
+    def is_failover_active(self) -> bool:
+        """Return True if backup store is currently active."""
+        return self._failover_active
+
+    @property
+    def backup_enabled(self) -> bool:
+        """Return True if a backup store is configured and failover is not disabled."""
+        return self.backup_store is not None and not self.settings.disable_failover
+
 
 __all__ = ("FailoverService",)

@@ -138,31 +138,6 @@ class TestCohereEmbeddingProviderInitialization:
         assert provider.client is not None
         assert provider.name == Provider.COHERE
 
-    @pytest.mark.skip(reason="API key validation not yet implemented when client is provided")
-    @patch.dict("os.environ", {}, clear=True)
-    def test_provider_initialization_without_api_key_raises_error(
-        self,
-        mock_cohere_client,
-        mock_cohere_config,
-        mock_embedding_registry,
-        mock_cache_manager,
-        cohere_capabilities,
-    ):
-        """Test that provider raises error without API key."""
-        from codeweaver.core import ConfigurationError
-        from codeweaver.providers import CohereEmbeddingProvider
-
-        with pytest.raises(ConfigurationError) as exc_info:
-            CohereEmbeddingProvider(
-                caps=cohere_capabilities,
-                client=mock_cohere_client,
-                config=mock_cohere_config,
-                registry=mock_embedding_registry,
-                cache_manager=mock_cache_manager,
-            )
-
-        assert "API key not found" in str(exc_info.value)
-
     def test_provider_initialization_with_client(
         self,
         mock_cohere_client,
@@ -184,30 +159,6 @@ class TestCohereEmbeddingProviderInitialization:
 
         assert provider.client is mock_cohere_client
         assert provider.caps == cohere_capabilities
-
-    @pytest.mark.skip(reason="Custom kwargs mechanism not yet implemented")
-    @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
-    def test_provider_initialization_with_custom_kwargs(
-        self,
-        mock_cohere_client,
-        mock_cohere_config,
-        mock_embedding_registry,
-        mock_cache_manager,
-        cohere_capabilities,
-    ):
-        """Test that custom kwargs are stored correctly."""
-        from codeweaver.providers import CohereEmbeddingProvider
-
-        provider = CohereEmbeddingProvider(
-            caps=cohere_capabilities,
-            client=mock_cohere_client,
-            config=mock_cohere_config,
-            registry=mock_embedding_registry,
-            cache_manager=mock_cache_manager,
-        )
-
-        assert "custom_param" in provider.embed_options
-        assert provider.embed_options["custom_param"] == "value"
 
     @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
     def test_provider_base_url_cohere(

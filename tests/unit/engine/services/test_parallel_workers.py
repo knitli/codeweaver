@@ -357,9 +357,39 @@ class TestWorkerFailureHandling:
         self, migration_service: MigrationService
     ) -> None:
         """Test that partial success triggers rollback."""
-        # If some workers succeed and some fail, should rollback
-        # This ensures data consistency - all or nothing
-        pytest.skip("Rollback logic not yet implemented")
+        from codeweaver.engine.services.migration_service import ChunkResult, MigrationError
+
+        # Workers 0 and 2 succeed; worker 1 fails (returns failure result)
+        async def mixed_worker(item, migration_id, checkpoint):
+            if item.worker_id == 1:
+                return ChunkResult(
+                    worker_id=1,
+                    vectors_processed=0,
+                    elapsed=timedelta(0),
+                    success=False,
+                    error="Worker 1 disk full",
+                )
+            return ChunkResult(
+                worker_id=item.worker_id, vectors_processed=100, elapsed=timedelta(0), success=True
+            )
+
+        target_collection = "test_collection_dim1024"
+        migration_service._migration_worker = mixed_worker
+        migration_service._create_work_items = Mock(
+            return_value=[Mock(worker_id=i) for i in range(3)]
+        )
+        migration_service._count_vectors = AsyncMock(return_value=1000)
+        migration_service._create_dimensioned_collection = AsyncMock()
+        migration_service._load_migration_checkpoint = AsyncMock(return_value=None)
+        migration_service._cleanup_failed_migration = AsyncMock()
+
+        with pytest.raises(MigrationError):
+            await migration_service.migrate_dimensions_parallel(
+                new_dimension=1024, worker_count=3, resume=False
+            )
+
+        # Cleanup must have been called with the target collection name
+        migration_service._cleanup_failed_migration.assert_called_once_with(target_collection)
 
 
 # ===========================================================================

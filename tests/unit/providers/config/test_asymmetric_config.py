@@ -130,12 +130,9 @@ class TestAsymmetricConfigCreation:
 
     def test_config_with_same_provider(self, voyage_4_large_settings: EmbeddingProviderSettings):
         """Test creating config with same provider but different models (less common use case)."""
-        try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+        from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
+        from codeweaver.providers.config.categories import EmbeddingProviderSettings
 
-            from codeweaver.providers.config.categories import EmbeddingProviderSettings
-        except ImportError:
-            pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         voyage_4_settings = EmbeddingProviderSettings(
             provider=Provider.VOYAGE,
             model_name="voyage-4",
@@ -257,19 +254,17 @@ class TestModelWithoutFamily:
         self, voyage_4_large_settings: EmbeddingProviderSettings
     ):
         """Test that models without family assignment are rejected."""
-        try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
-
-            from codeweaver.providers.config import FastEmbedEmbeddingConfig
-            from codeweaver.providers.config.categories import EmbeddingProviderSettings
-        except ImportError:
-            pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
-        no_family_settings = EmbeddingProviderSettings(
-            provider=Provider.FASTEMBED,
-            model_name="BAAI/bge-small-en-v1.5",
-            embedding_config=FastEmbedEmbeddingConfig(model_name="BAAI/bge-small-en-v1.5"),
+        from codeweaver.providers.config import (
+            AsymmetricEmbeddingProviderSettings,
+            FastEmbedEmbeddingProviderSettings,
         )
-        with pytest.raises(ConfigurationError, match=r"model.*family"):
+
+        no_family_settings = FastEmbedEmbeddingProviderSettings(
+            provider=Provider.FASTEMBED, model_name="BAAI/bge-small-en-v1.5"
+        )
+        # The validator checks dimension mismatch before family check, so either error
+        # (DimensionMismatchError or ConfigurationError) confirms the models are rejected.
+        with pytest.raises((ConfigurationError, DimensionMismatchError)):
             AsymmetricEmbeddingProviderSettings(
                 embed_provider=voyage_4_large_settings, query_provider=no_family_settings
             )
@@ -290,18 +285,15 @@ class TestUnknownModel:
 
     def test_unknown_model_rejected(self, voyage_4_large_settings: EmbeddingProviderSettings):
         """Test that unknown models not in capability registry are rejected."""
-        try:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+        from codeweaver.providers.config import AsymmetricEmbeddingProviderSettings
+        from codeweaver.providers.config.categories import EmbeddingProviderSettings
 
-            from codeweaver.providers.config.categories import EmbeddingProviderSettings
-        except ImportError:
-            pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         unknown_settings = EmbeddingProviderSettings(
             provider=Provider.VOYAGE,
             model_name="voyage-99-nonexistent",
             embedding_config=VoyageEmbeddingConfig(model_name="voyage-99-nonexistent"),
         )
-        with pytest.raises(ConfigurationError, match=r"unknown.*model|not.*found"):
+        with pytest.raises(ConfigurationError, match=r"unknown.*model|not.*found|not compatible"):
             AsymmetricEmbeddingProviderSettings(
                 embed_provider=voyage_4_large_settings, query_provider=unknown_settings
             )

@@ -33,18 +33,17 @@ This class extends `pydantic_settings.BaseSettings` to provide a foundation for 
 
 As with all CodeWeaver base models, it mandates all subclasses implement the `_telemetry_keys` method to specify how sensitive data should be handled during telemetry serialization. This makes it each class's responsibility to define which fields are safe for telemetry and how they should be anonymized or excluded. Classes can implement a `_telemetry_handler` method for finer control over the telemetry serialization process.
 
-
-
+// spellchecker:off
 Subclasses can use the `from_config` class method to create instances from specific configuration files, facilitating testing and specialized setups. If a subclass is subordinate to the main `CodeWeaverSettings`, it should handle settings_customise_sources in a way that avoids conflicts -- mirroring a localized version of the logic here, but only when the main class is not available. Since users can install only parts of CodeWeaver, this is important for modularity.
-
+// spellchecker:on
 Every class has the `project_path`, `config_file`, and `user_config_dir` properties available for use in configuration; primarily for situations where `CodeWeaverSettings` is not available.
 
 ## Class: `CodeWeaverCoreSettings`
 
 Root settings for core-only CodeWeaver installation, and base settings for all CodeWeaver installations. Other CodeWeaver packages extend this class to add additional configuration as needed.
-
+// spellchecker:off
 The class also includes an implementation of BaseSettings's `settings_customise_sources` method to define a comprehensive and prioritized configuration source hierarchy, including support for environment variables, dotenv files, multiple configuration file formats in a dozen or so locations, and secret management services.
-
+// spellchecker:on
 When only the core package is installed, this provides configuration
 for logging and telemetry only. All other CodeWeaver functionality
 requires additional packages (providers, engine, server).
@@ -131,13 +130,13 @@ serialize_for_telemetry()
 ```
 
 Serialize the model for telemetry output, filtering sensitive keys.
-
+// spellchecker:off
 ### Method: `settings_customise_sources`
 
 ```python
 settings_customise_sources()
 ```
-
+// spellchecker:on
 Customize settings sources for CodeWeaverSettings and subclasses.
 
 This method defines the configuration source hierarchy for CodeWeaver settings classes. It prioritizes environment variables, dotenv files, multiple configuration file formats in various locations, and secret management services. Subclasses can override this method to modify the source order or add additional sources as needed.

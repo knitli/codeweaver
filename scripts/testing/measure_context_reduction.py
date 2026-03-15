@@ -48,7 +48,7 @@ async def calculate_naive_baseline(project_path: Path, languages: Sequence[str])
     target_exts = {
         pair.ext
         for pair in CODE_FILES_EXTENSIONS
-        if str(pair.language).lower() in [l.lower() for l in languages]
+        if str(pair.language).lower() in [lang.lower() for lang in languages]
     }
 
     for root, _, files in os.walk(project_path):
@@ -74,7 +74,7 @@ async def measure_reduction():
     # Initialize DI
     from codeweaver.cli.dependencies import setup_cli_di
 
-    project_path = Path(os.getcwd())
+    project_path = Path.cwd()
     config_file = project_path / "codeweaver.toml"
     setup_cli_di(config_file=config_file, project_path=project_path)
 

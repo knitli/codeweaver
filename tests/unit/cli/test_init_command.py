@@ -548,13 +548,41 @@ class TestHelperFunctions:
         assert config_path.parent.exists()
         assert config_path.exists()
 
-    @pytest.mark.skip(
-        reason="Backup functionality exists but test needs updating for actual backup behavior"
-    )
     def test_handle_write_output_backs_up_existing(self, temp_project: Path) -> None:
         """Test _handle_write_output backs up existing config."""
-        # Skipping - backup is created but the merge behavior makes testing complex
-        # The function _backup_config is called at line 415 in init.py
+        from codeweaver.cli.commands.init import _create_stdio_config, _handle_write_output
+
+        config = _create_stdio_config()
+
+        # Create the target directory and a pre-existing config file
+        config_path = temp_project / ".claude" / "mcp.json"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        original_content = (
+            '{"mcpServers": {"existing-tool": {"type": "stdio", "command": "existing"}}}'
+        )
+        config_path.write_text(original_content)
+
+        # Invoke _handle_write_output — the existing file should trigger _backup_config
+        _handle_write_output(
+            mcp_config=config,
+            config_level="project",
+            client="claude_code",
+            file_path=config_path,
+            project_path=temp_project,
+        )
+
+        # The original file should still exist (overwritten with new content)
+        assert config_path.exists()
+
+        # A backup file matching the pattern mcp.backup_*<suffix> should have been created
+        backup_files = list(config_path.parent.glob("mcp.backup_*.json"))
+        assert len(backup_files) >= 1, (
+            f"Expected at least one backup file matching 'mcp.backup_*.json' in "
+            f"{config_path.parent}, found: {list(config_path.parent.iterdir())}"
+        )
+
+        # The backup should contain the original content
+        assert backup_files[0].read_text() == original_content
 
     def test_mcp_command_stdio_transport(self, temp_project: Path) -> None:
         """Test mcp command creates stdio transport config."""

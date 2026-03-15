@@ -1,3 +1,7 @@
+---
+title: "Choosing a Profile"
+---
+
 # Choosing a Profile
 
 > **TL;DR:** CodeWeaver Alpha 6 uses Profiles to simplify setup. Use `recommended` for production-grade search (Voyage AI) or `quickstart` for a free, local-only experience (FastEmbed). Profiles save you from manual configuration by bundling optimized provider settings.

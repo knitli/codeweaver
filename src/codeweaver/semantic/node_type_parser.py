@@ -614,6 +614,13 @@ class NodeTypeParser:
                 return False
 
             type(self)._registration_cache = cache_data["registration_cache"]
+            # Clear any stale cached_property values from pickled instances.
+            # classification_result may have been computed and cached during cache generation
+            # before GrammarClassificationResult was fully initialized, leaving broken empty
+            # instances. Clearing it ensures fresh computation on next access.
+            for lang_cache in type(self)._registration_cache.values():
+                for obj in (*lang_cache.get("tokens", []), *lang_cache.get("composites", [])):
+                    obj.__dict__.pop("classification_result", None)
             type(self)._cache_loaded = True
             logger.debug("Loaded node types from cache")
 

@@ -16,8 +16,9 @@ import logging
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
+from codeweaver import QdrantBaseProvider
 from codeweaver.core import get_user_state_dir
 from codeweaver.core.constants import DEFAULT_SNAPSHOT_RETENTION_COUNT, ONE_MINUTE
 from codeweaver.core.utils.general import generate_collection_name
@@ -60,7 +61,9 @@ class QdrantSnapshotBackupService:
         self.vector_store = vector_store
         self.retention_count = retention_count
         self.collection_name = (
-            collection_name or vector_store.collection_name or generate_collection_name()
+            collection_name
+            or cast(QdrantBaseProvider, vector_store).collection_name
+            or generate_collection_name()
         )
         if storage_path:
             self.storage_path = Path(storage_path)

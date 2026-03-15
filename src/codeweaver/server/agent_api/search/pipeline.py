@@ -228,8 +228,7 @@ def _normalize_sparse_embedding(result: Any) -> CodeWeaverSparseEmbedding | None
     if isinstance(result, CodeWeaverSparseEmbedding):
         # Ensure fields are plain Python lists (not numpy arrays).
         return CodeWeaverSparseEmbedding(
-            indices=_to_list(result.indices),
-            values=[float(x) for x in _to_list(result.values)],
+            indices=_to_list(result.indices), values=[float(x) for x in _to_list(result.values)]
         )
     if isinstance(result, list) and len(result) > 0:
         return _transform_to_sparse_embedding(result)
@@ -258,18 +257,15 @@ def _transform_to_sparse_embedding(result):
     if isinstance(item, CodeWeaverSparseEmbedding):
         # Ensure fields are plain Python lists (not numpy arrays).
         return CodeWeaverSparseEmbedding(
-            indices=_to_list(item.indices),
-            values=[float(x) for x in _to_list(item.values)],
+            indices=_to_list(item.indices), values=[float(x) for x in _to_list(item.values)]
         )
     if isinstance(item, dict) and "indices" in item and ("values" in item):
         return CodeWeaverSparseEmbedding(
-            indices=_to_list(item["indices"]),
-            values=[float(x) for x in _to_list(item["values"])],
+            indices=_to_list(item["indices"]), values=[float(x) for x in _to_list(item["values"])]
         )
     if isinstance(item, list) and len(result) == 2 and isinstance(result[1], list):
         return CodeWeaverSparseEmbedding(
-            indices=_to_list(result[0]),
-            values=[float(x) for x in _to_list(result[1])],
+            indices=_to_list(result[0]), values=[float(x) for x in _to_list(result[1])]
         )
     logger.warning("Unexpected sparse embedding format in list: %s", type(item))
     return None

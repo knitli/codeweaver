@@ -1,3 +1,7 @@
+---
+title: "Installation and Setup"
+---
+
 # Installation & Setup
 
 > **TL;DR:** This guide handles the initial installation and configuration of CodeWeaver Alpha 6. Use it to set up your environment and prepare your codebase for AI agent interaction. It saves time by providing a streamlined path from empty directory to "Exquisite Context."

@@ -988,8 +988,7 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             "fastembed",
             "sparse_embedding",
             lateimport(
-                "codeweaver.providers.embedding.providers.fastembed",
-                "FastEmbedSparseProvider",
+                "codeweaver.providers.embedding.providers.fastembed", "FastEmbedSparseProvider"
             ),
             lateimport(
                 "codeweaver.providers.embedding.fastembed_extensions", "get_sparse_embedder"

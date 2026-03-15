@@ -84,20 +84,12 @@ from codeweaver.providers.data.utils import get_provider_names_for_category
 
 
 logger = logging.getLogger(__name__)
-
 if has_package("sentence_transformers"):
-    # SentenceTransformerModelCardData contains these forward references:
-    # - eval_results_dict: dict[SentenceEvaluator, dict[str, Any]] | None
-    # - model: SentenceTransformer | None
-    # The type is used in SentenceTransformersClientOptions
-    # So if the configured settings uses SentenceTransformersClientOptions
-    # Then we need to have these in the namespace for pydantic to resolve
     from sentence_transformers import SentenceTransformer as SentenceTransformer
     from sentence_transformers.evaluation import SentenceEvaluator as SentenceEvaluator
     from sentence_transformers.model_card import (
         SentenceTransformerModelCardData as SentenceTransformerModelCardData,
     )
-
 possible_tags = get_provider_names_for_category("embedding")
 
 
@@ -110,10 +102,11 @@ def _get_embedding_capabilities_sync(model_name: ModelNameT) -> EmbeddingModelCa
             "codeweaver.providers.embedding.capabilities.resolver"
         )
         resolver = resolver_module.EmbeddingCapabilityResolver()
-        return asyncio.run(resolver.resolve(model_name))
     except Exception as e:
         logger.debug("Failed to resolve capabilities for %s: %s", model_name, e)
         return None
+    else:
+        return asyncio.run(resolver.resolve(model_name))
 
 
 def _get_embedding_capabilities(model_name: ModelNameT) -> EmbeddingModelCapabilities | None:
@@ -125,7 +118,6 @@ def _get_embedding_capabilities(model_name: ModelNameT) -> EmbeddingModelCapabil
     Returns:
         The embedding model capabilities or None if not found.
     """
-    # This is a legacy helper, but we should use the sync version here for pydantic validators
     return _get_embedding_capabilities_sync(model_name)
 
 
@@ -181,8 +173,6 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
         ):
             model_name = data.get("model_name")
             if "client_options" not in data and model_name:
-                # Pre-build client_options when absent so the default_factory doesn't need to
-                # access model_name (which may not yet be validated due to field ordering).
                 if provider == Provider.FASTEMBED:
                     from codeweaver.providers.config.clients.multi import FastEmbedClientOptions
 
@@ -200,9 +190,7 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
                 elif provider == Provider.HUGGINGFACE_INFERENCE:
                     from codeweaver.providers.config.clients.multi import HuggingFaceClientOptions
 
-                    data["client_options"] = HuggingFaceClientOptions(
-                        model=str(model_name)
-                    )
+                    data["client_options"] = HuggingFaceClientOptions(model=str(model_name))
             elif "client_options" in data:
                 if provider == Provider.FASTEMBED:
                     data = self._set_client_option(data, "model_name", model_name)
@@ -221,14 +209,14 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
         if config is not None:
             if (
                 not (
-                    config_model_name := config.get("model_name")
-                    if isinstance(config, dict)
-                    else config.model_name
+                    config_model_name := (
+                        config.get("model_name") if isinstance(config, dict) else config.model_name
+                    )
                 )
                 and model_name
             ):
                 config["model_name"] = ModelName(model_name)
-            elif config_model_name and not model_name:
+            elif config_model_name and (not model_name):
                 data["model_name"] = ModelName(config_model_name)
         super().__init__(**data)
 
@@ -292,7 +280,6 @@ class AzureEmbeddingProviderSettings(AzureProviderMixin, EmbeddingProviderSettin
     """Provider settings for Azure embedding models (Cohere or OpenAI)."""
 
     model_config = EmbeddingProviderSettings.model_config | ConfigDict(frozen=False)
-
     provider: Literal[Provider.AZURE]
     client_options: AzureClientOptionsType | None = Field(
         default=None, description="Client options for either Cohere or OpenAI client."
@@ -371,17 +358,14 @@ class BedrockEmbeddingProviderSettings(BedrockProviderMixin, EmbeddingProviderSe
     """Provider settings for Bedrock embedding models."""
 
     provider: Literal[Provider.BEDROCK]
-
     model_name: ModelNameT | None = Field(
         default=None,
         init=False,
         description="The name of the embedding model to use. For Bedrock, this is optional because the model ARN is required and contains the model name. If not provided, the model name will be inferred from the ARN.",
     )
-
     client_options: BedrockClientOptions = Field(
         default_factory=BedrockClientOptions, description="Client options for Bedrock."
     )
-
     embedding_config: BedrockEmbeddingConfig = Field(
         default_factory=lambda data: BedrockEmbeddingConfig(
             model_name=ModelName(data["model_name"] if isinstance(data, dict) else data.model_name)
@@ -410,11 +394,8 @@ class BedrockEmbeddingProviderSettings(BedrockProviderMixin, EmbeddingProviderSe
         """
         from codeweaver.providers.config.sdk import BedrockEmbeddingConfig
 
-        # Type narrow to ensure we're working with BedrockEmbeddingConfig
         if not isinstance(self.embedding_config, BedrockEmbeddingConfig):
             return self
-
-        # Inject ARN into embedding params
         base_config = BedrockEmbeddingRequestParams(model_id=self.model_arn)
         base_model_options = (
             BedrockCohereConfigDict(embedding_types="float")
@@ -423,7 +404,6 @@ class BedrockEmbeddingProviderSettings(BedrockProviderMixin, EmbeddingProviderSe
         )
         model_name = str(self.model_name) or self.model_arn.split("/")[-1]
         self.model_name = self.model_name or ModelName(model_name)
-
         if self.embedding_config.embedding:
             self.embedding_config.embedding = base_config | self.embedding_config.embedding
         else:
@@ -479,14 +459,12 @@ class FastEmbedEmbeddingProviderSettings(FastEmbedProviderMixin, EmbeddingProvid
     """Provider settings for FastEmbed embedding models."""
 
     provider: Literal[Provider.FASTEMBED]
-
     client_options: FastEmbedClientOptions = Field(
         default_factory=lambda data: FastEmbedClientOptions(
             model_name=ModelName(data["model_name"] if isinstance(data, dict) else data.model_name)
         ),
         description="Client options for FastEmbed embedding client.",
     )
-
     embedding_config: FastEmbedEmbeddingConfig = Field(
         default_factory=lambda data: FastEmbedEmbeddingConfig(
             model_name=ModelName(data["model_name"] if isinstance(data, dict) else data.model_name)
@@ -515,12 +493,10 @@ class GoogleEmbeddingProviderSettings(EmbeddingProviderSettings):
     """Provider settings for Google embedding models."""
 
     provider: Literal[Provider.GOOGLE]
-
     client_options: GoogleClientOptions = Field(
         default_factory=GoogleClientOptions,
         description="Client options for Google embedding client.",
     )
-
     embedding_config: GoogleEmbeddingConfig = Field(
         default_factory=_google_default_embedding_config_factory,
         description="Model configuration for Google embedding operations.",
@@ -537,21 +513,19 @@ type CoreEmbeddingProviderSettingsType = Annotated[
         discriminator=CORE_EMBEDDING_PROVIDER_DISCRIMINATOR,
     ),
 ]
-"""A type alias representing all configuration classes for core embedding providers -- meaning an embedding provider that only represents one model. This is used as the type for the embed_provider and query_provider fields in the AsymmetricEmbeddingProviderSettings, which allows for asymmetric embedding configurations where the embed and query providers can be different but still must be from the same family."""
+"A type alias representing all configuration classes for core embedding providers -- meaning an embedding provider that only represents one model. This is used as the type for the embed_provider and query_provider fields in the AsymmetricEmbeddingProviderSettings, which allows for asymmetric embedding configurations where the embed and query providers can be different but still must be from the same family."
 
 
 class HuggingFaceEmbeddingProviderSettings(EmbeddingProviderSettings):
     """Provider settings for HuggingFace Inference embedding models."""
 
     provider: Literal[Provider.HUGGINGFACE_INFERENCE]
-
     client_options: HuggingFaceClientOptions = Field(
         default_factory=lambda data: HuggingFaceClientOptions(
             model=str(data["model_name"] if isinstance(data, dict) else data.model_name)
         ),
         description="Client options for HuggingFace Inference embedding client.",
     )
-
     embedding_config: HuggingFaceEmbeddingConfig = Field(
         default_factory=lambda data: HuggingFaceEmbeddingConfig(
             model_name=str(data["model_name"] if isinstance(data, dict) else data.model_name)
@@ -563,12 +537,10 @@ class MistralEmbeddingProviderSettings(EmbeddingProviderSettings):
     """Provider settings for Mistral embedding models."""
 
     provider: Literal[Provider.MISTRAL]
-
     client_options: MistralClientOptions = Field(
         description="Client options for Mistral embedding client.",
         default_factory=MistralClientOptions,
     )
-
     embedding_config: MistralEmbeddingConfig = Field(
         default_factory=lambda data: MistralEmbeddingConfig(
             model_name=ModelName(
@@ -591,7 +563,6 @@ class SentenceTransformersEmbeddingProviderSettings(EmbeddingProviderSettings):
     """Provider settings for Sentence Transformers embedding models."""
 
     provider: Literal[Provider.SENTENCE_TRANSFORMERS]
-
     client_options: SentenceTransformersClientOptions = Field(
         default_factory=lambda data: SentenceTransformersClientOptions(
             model_name_or_path=str(
@@ -620,12 +591,10 @@ class VoyageEmbeddingProviderSettings(EmbeddingProviderSettings):
     """Provider settings for Voyage embedding models."""
 
     provider: Literal[Provider.VOYAGE]
-
     client_options: VoyageClientOptions = Field(
         default_factory=VoyageClientOptions,
         description="Client options for Voyage embedding client.",
     )
-
     embedding_config: VoyageEmbeddingConfig = Field(
         default_factory=lambda data: VoyageEmbeddingConfig(
             model_name=ModelName(data["model_name"] if isinstance(data, dict) else data.model_name)
@@ -661,10 +630,8 @@ def _get_model_name_for_family(v: Any) -> ModelNameT:
         _handle_ambiguous_property(v, "query_provider"),
     )
     configs = [
-        (
-            _handle_ambiguous_property(cfg, "embedding_config")
-            or _handle_ambiguous_property(cfg, "embedding_config")
-        )
+        _handle_ambiguous_property(cfg, "embedding_config")
+        or _handle_ambiguous_property(cfg, "embedding_config")
         for cfg in configs
         if cfg
     ]
@@ -703,7 +670,6 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
     """
 
     config_type: Literal["asymmetric"] = "asymmetric"
-
     embed_provider: Annotated[
         CoreEmbeddingProviderSettingsType,
         Field(description="Provider settings for the document embedding model."),
@@ -716,9 +682,7 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
         bool,
         Field(description="Whether to validate that both models belong to the same model family."),
     ] = True
-
     category: ClassVar[Literal[ProviderCategory.EMBEDDING]] = ProviderCategory.EMBEDDING
-
     _model_name: ModelNameT | None = PrivateAttr(default=None)
 
     def get_embed_kwargs(self) -> dict[str, Any]:
@@ -746,11 +710,8 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
         try:
             embed_dim = self.embed_provider.embedding_config.dimension
             query_dim = self.query_provider.embedding_config.dimension
-
             if embed_dim is not None and query_dim is not None:
-                return embed_dim, query_dim
-
-            # Try to resolve from capabilities
+                return (embed_dim, query_dim)
             embed_caps = (
                 self.embed_provider.embedding_config.capabilities
                 or _get_embedding_capabilities(self.embed_provider.model_name)
@@ -759,22 +720,19 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
                 self.query_provider.embedding_config.capabilities
                 or _get_embedding_capabilities(self.query_provider.model_name)
             )
-
             if embed_dim is None and embed_caps:
                 embed_dim = embed_caps.default_dimension
             if query_dim is None and query_caps:
                 query_dim = query_caps.default_dimension
-
-            # If one is still None, try to use the other if they are from same family
             if embed_dim is None and query_dim is not None:
                 embed_dim = query_dim
             if query_dim is None and embed_dim is not None:
                 query_dim = embed_dim
-
-            return embed_dim, query_dim
-        except Exception as e:
-            logger.exception("Error calculating dimension_tuple: %s", e)
-            return None, None
+        except Exception:
+            logger.exception("Error calculating dimension_tuple")
+            return (None, None)
+        else:
+            return (embed_dim, query_dim)
 
     @cached_property
     def datatype_tuple(self) -> tuple[str | None, str | None]:
@@ -785,11 +743,8 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
         """
         embed_dt = self.embed_provider.embedding_config.datatype
         query_dt = self.query_provider.embedding_config.datatype
-
         if embed_dt is not None and query_dt is not None:
-            return embed_dt, query_dt
-
-        # Try to resolve from capabilities
+            return (embed_dt, query_dt)
         embed_caps = (
             self.embed_provider.embedding_config.capabilities
             or _get_embedding_capabilities(self.embed_provider.model_name)
@@ -798,26 +753,19 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
             self.query_provider.embedding_config.capabilities
             or _get_embedding_capabilities(self.query_provider.model_name)
         )
-
         if embed_dt is None and embed_caps:
             embed_dt = embed_caps.default_dtype
         if query_dt is None and query_caps:
             query_dt = query_caps.default_dtype
-
-        # Fallback
         if embed_dt is None and query_dt is not None:
             embed_dt = query_dt
         if query_dt is None and embed_dt is not None:
             query_dt = embed_dt
-
-        return embed_dt, query_dt
+        return (embed_dt, query_dt)
         embed_dt = self.embed_provider.embedding_config.datatype
         query_dt = self.query_provider.embedding_config.datatype
-
         if embed_dt is not None and query_dt is not None:
-            return embed_dt, query_dt
-
-        # Try to resolve from capabilities
+            return (embed_dt, query_dt)
         embed_caps = (
             self.embed_provider.embedding_config.capabilities
             or _get_embedding_capabilities(self.embed_provider.model_name)
@@ -826,19 +774,15 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
             self.query_provider.embedding_config.capabilities
             or _get_embedding_capabilities(self.query_provider.model_name)
         )
-
         if embed_dt is None and embed_caps:
             embed_dt = embed_caps.default_dtype
         if query_dt is None and query_caps:
             query_dt = query_caps.default_dtype
-
-        # Fallback
         if embed_dt is None and query_dt is not None:
             embed_dt = query_dt
         if query_dt is None and embed_dt is not None:
             query_dt = embed_dt
-
-        return embed_dt, query_dt
+        return (embed_dt, query_dt)
 
     @model_validator(mode="after")
     def validate_model_compatibility(self) -> AsymmetricEmbeddingProviderSettings:
@@ -848,7 +792,6 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
         try:
             if not self.validate_family_compatibility:
                 return self
-
             if self.dimension_tuple[0] is not None and self.dimension_tuple[1] is not None:
                 if self.dimension_tuple[0] != self.dimension_tuple[1]:
                     raise DimensionMismatchError(
@@ -860,10 +803,8 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
                             "query_dimension": self.dimension_tuple[1],
                         },
                     )
-
             if self.datatype_tuple[0] is not None and self.datatype_tuple[1] is not None:
                 if self.datatype_tuple[0] != self.datatype_tuple[1]:
-                    # Special case for Voyage-4 family: uint8 and float32 are compatible
                     embed_caps = (
                         self.embed_provider.embedding_config.capabilities
                         or _get_embedding_capabilities(self.embed_provider.model_name)
@@ -872,44 +813,39 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
                         self.query_provider.embedding_config.capabilities
                         or _get_embedding_capabilities(self.query_provider.model_name)
                     )
-
                     if (
                         embed_caps
                         and query_caps
                         and embed_caps.model_family
-                        and embed_caps.model_family == query_caps.model_family
-                        and embed_caps.model_family.family_id == "voyage-4"
+                        and (embed_caps.model_family == query_caps.model_family)
+                        and (embed_caps.model_family.family_id == "voyage-4")
                     ):
                         pass
                     else:
                         raise DatatypeMismatchError(
                             f"Embedding datatype mismatch: embed model datatype '{self.datatype_tuple[0]}' != query model datatype '{self.datatype_tuple[1]}'"
                         )
-
             caps = self.embed_provider.embedding_config.capabilities or _get_embedding_capabilities(
                 self.embed_provider.model_name
             )
-
             if caps is not None and caps.model_family is not None:
                 if not caps.model_family.is_compatible(
                     str(self.embed_provider.model_name), str(self.query_provider.model_name)
                 ):
                     raise ConfigurationError(
-                        f"Models '{self.embed_provider.model_name}' and '{self.query_provider.model_name}' "
-                        f"are not compatible within family '{caps.model_family.family_id}'",
+                        f"Models '{self.embed_provider.model_name}' and '{self.query_provider.model_name}' are not compatible within family '{caps.model_family.family_id}'",
                         suggestions=[
                             f"Use models from the same family (e.g., two '{caps.model_family.family_id}' models)",
                             "Set validate_family_compatibility=False to skip this check",
                         ],
                     )
-
-            return self
         except (DimensionMismatchError, DatatypeMismatchError, ConfigurationError):
             raise
         except Exception as e:
             logger.error("Unexpected error in validate_model_compatibility: %s", e, exc_info=True)
-            # Re-raise as assertion error if it's something unexpected to see what's happening
             raise AssertionError(f"Internal validation error: {e!s}") from e
+        else:
+            return self
 
     @property
     def dimension(self) -> NonNegativeInt:
@@ -943,7 +879,6 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
         return
 
 
-# we can simply use the "config_type" discriminator to determine the correct settings type for asymmetric embedding configs, so we don't need a custom discriminator function like we do for the core embedding provider settings
 type EmbeddingProviderSettingsType = Annotated[
     Annotated[CoreEmbeddingProviderSettingsType, Tag("symmetric")]
     | Annotated[AsymmetricEmbeddingProviderSettings, Tag("asymmetric")],
@@ -952,8 +887,7 @@ type EmbeddingProviderSettingsType = Annotated[
         discriminator="config_type",
     ),
 ]
-"""A type alias representing all possible configuration classes for embedding providers."""
-
+"A type alias representing all possible configuration classes for embedding providers."
 __all__ = (
     "AsymmetricEmbeddingProviderSettings",
     "AsymmetricEmbeddingProviderSettingsDict",

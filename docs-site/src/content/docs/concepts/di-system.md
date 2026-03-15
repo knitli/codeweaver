@@ -1,3 +1,7 @@
+---
+title: "Universal Extensibility: The DI System"
+---
+
 # Universal Extensibility: The DI System
 
 > **TL;DR:** This module handles Universal Extensibility via Dependency Injection (DI). Use it when you need to register services or inject them into functions. It decouples implementation from usage, allowing you to swap providers with zero code changes.

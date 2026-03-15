@@ -525,8 +525,7 @@ async def _create_vector_store_providers() -> tuple[VectorStoreProvider, ...]:
     """Factory function to create vector store providers."""
     category_settings = await _get_settings_for_category("vector_store")
     providers = [
-        await _instantiate_provider_from_settings(s, VectorStoreProvider)
-        for s in category_settings
+        await _instantiate_provider_from_settings(s, VectorStoreProvider) for s in category_settings
     ]
     return tuple(providers)
 
@@ -560,8 +559,7 @@ async def _create_reranking_providers() -> tuple[RerankingProvider, ...]:
     """Factory function to create reranking providers."""
     category_settings = await _get_settings_for_category("reranking")
     providers = [
-        await _instantiate_provider_from_settings(s, RerankingProvider)
-        for s in category_settings
+        await _instantiate_provider_from_settings(s, RerankingProvider) for s in category_settings
     ]
     return tuple(providers)
 

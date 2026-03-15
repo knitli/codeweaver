@@ -1,3 +1,7 @@
+---
+title: "Provider Registry"
+---
+
 # Provider Registry
 
 > **TL;DR:** CodeWeaver Alpha 6 supports **17+ embedding providers** and multiple vector stores. Use this registry to find the right "brains" for your project. It saves you from vendor lock-in by providing a unified interface for the industry's best models.

@@ -881,17 +881,17 @@ Raises:
         - UNLOCKED: Never raises
 
 Examples:
-    >>> metadata = CollectionMetadata(
+    &gt;&gt;&gt; metadata = CollectionMetadata(
     ...     provider="voyage",
     ...     project_name="my-project",
     ...     dense_model="voyage-4-large",
     ...     dense_model_family="voyage-4",
     ...     policy=CollectionPolicy.FAMILY_AWARE,
     ... )
-    >>> # This succeeds - same family
-    >>> metadata.validate_config_change(new_query_model="voyage-4-nano")
-    >>> # This raises - different family
-    >>> metadata.validate_config_change(new_dense_model="voyage-3-large")
+    &gt;&gt;&gt; # This succeeds - same family
+    &gt;&gt;&gt; metadata.validate_config_change(new_query_model="voyage-4-nano")
+    &gt;&gt;&gt; # This raises - different family
+    &gt;&gt;&gt; metadata.validate_config_change(new_dense_model="voyage-3-large")
     Traceback (most recent call last):
     ...
     ConfigurationLockError: Model change breaks family compatibility
@@ -917,21 +917,21 @@ Values:
 Default: FAMILY_AWARE - balances safety with flexibility for asymmetric embedding.
 
 Examples:
-    >>> # Strict policy - no changes allowed
-    >>> metadata = CollectionMetadata(
+    &gt;&gt;&gt; # Strict policy - no changes allowed
+    &gt;&gt;&gt; metadata = CollectionMetadata(
     ...     provider="voyage", project_name="my-project", policy=CollectionPolicy.STRICT
     ... )
-    >>> # Will raise ConfigurationLockError if model changes
+    &gt;&gt;&gt; # Will raise ConfigurationLockError if model changes
 
-    >>> # Family-aware policy (default) - allows query model changes in family
-    >>> metadata = CollectionMetadata(
+    &gt;&gt;&gt; # Family-aware policy (default) - allows query model changes in family
+    &gt;&gt;&gt; metadata = CollectionMetadata(
     ...     provider="voyage",
     ...     project_name="my-project",
     ...     dense_model="voyage-4-large",
     ...     dense_model_family="voyage-4",
     ...     policy=CollectionPolicy.FAMILY_AWARE,  # or omit for default
     ... )
-    >>> # Can use voyage-4-nano for queries, but not voyage-3 models
+    &gt;&gt;&gt; # Can use voyage-4-nano for queries, but not voyage-3 models
 
 ## Class: `ConfiguredCapability`
 
@@ -1496,7 +1496,7 @@ Attributes:
     default: Optional default value
 
 Example:
-    >>> EnvVarConfig(
+    &gt;&gt;&gt; EnvVarConfig(
     ...     env="OPENAI_API_KEY",
     ...     description="Your OpenAI API Key",
     ...     is_secret=True,
@@ -1515,10 +1515,10 @@ Returns:
     dictionary suitable for JSON serialization
 
 Example:
-    >>> config = EnvVarConfig(...)
-    >>> data = config.to_dict()
-    >>> import json
-    >>> json.dumps(data)
+    &gt;&gt;&gt; config = EnvVarConfig(...)
+    &gt;&gt;&gt; data = config.to_dict()
+    &gt;&gt;&gt; import json
+    &gt;&gt;&gt; json.dumps(data)
 
 ## Class: `ExaAnswerResult`
 
@@ -2151,7 +2151,7 @@ Configuration for in-memory vector store provider.
 In-memory vector store with persistence for development/testing and local backup.
 
 Uses Qdrant's in-memory mode (:memory:) with automatic persistence to disk.
-Suitable for small codebases (<10k chunks) and testing scenarios.
+Suitable for small codebases (&lt;10k chunks) and testing scenarios.
 
 ### Method: `close`
 
@@ -2478,7 +2478,7 @@ Attributes:
     inherits_from: Optional parent provider for inheritance
 
 Example:
-    >>> ProviderEnvConfig(
+    &gt;&gt;&gt; ProviderEnvConfig(
     ...     provider="deepseek",
     ...     clients=("openai",),
     ...     api_key=EnvVarConfig(
@@ -2499,9 +2499,9 @@ Returns:
     Tuple of all EnvVarConfig instances (immutable and hashable)
 
 Example:
-    >>> config = ProviderEnvConfig(...)
-    >>> all_vars = config.all_vars()
-    >>> api_keys = [v for v in all_vars if v.is_secret]
+    &gt;&gt;&gt; config = ProviderEnvConfig(...)
+    &gt;&gt;&gt; all_vars = config.all_vars()
+    &gt;&gt;&gt; api_keys = [v for v in all_vars if v.is_secret]
 
 ### Method: `get_other`
 
@@ -2518,8 +2518,8 @@ Returns:
     EnvVarConfig if found, None otherwise
 
 Example:
-    >>> config = ProviderEnvConfig(...)
-    >>> webhook_secret = config.get_other("webhook_secret")
+    &gt;&gt;&gt; config = ProviderEnvConfig(...)
+    &gt;&gt;&gt; webhook_secret = config.get_other("webhook_secret")
 
 ### Method: `to_dict`
 
@@ -2533,10 +2533,10 @@ Returns:
     dictionary suitable for JSON serialization
 
 Example:
-    >>> config = ProviderEnvConfig(...)
-    >>> data = config.to_dict()
-    >>> import json
-    >>> json.dumps(data)
+    &gt;&gt;&gt; config = ProviderEnvConfig(...)
+    &gt;&gt;&gt; data = config.to_dict()
+    &gt;&gt;&gt; import json
+    &gt;&gt;&gt; json.dumps(data)
 
 ## Class: `ProviderEnvRegistry`
 
@@ -2550,14 +2550,14 @@ Features:
 - Inheritance resolution
 
 Example:
-    >>> # Get all configs for a provider
-    >>> configs = ProviderEnvRegistry.get("deepseek")
-    >>>
-    >>> # Get just API key env vars
-    >>> api_keys = ProviderEnvRegistry.get_api_key_envs("openai")
-    >>>
-    >>> # Get configs for specific client
-    >>> azure_openai = ProviderEnvRegistry.get_for_client("azure", "openai")
+    &gt;&gt;&gt; # Get all configs for a provider
+    &gt;&gt;&gt; configs = ProviderEnvRegistry.get("deepseek")
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # Get just API key env vars
+    &gt;&gt;&gt; api_keys = ProviderEnvRegistry.get_api_key_envs("openai")
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # Get configs for specific client
+    &gt;&gt;&gt; azure_openai = ProviderEnvRegistry.get_for_client("azure", "openai")
 
 ### Method: `all_configs`
 
@@ -2571,9 +2571,9 @@ Returns:
     Dictionary mapping provider names to their configs
 
 Example:
-    >>> all_configs = ProviderEnvRegistry.all_configs()
-    >>> for provider, configs in all_configs.items():
-    ...     print(f"{provider}: {len(configs)} config(s)")
+    &gt;&gt;&gt; all_configs = ProviderEnvRegistry.all_configs()
+    &gt;&gt;&gt; for provider, configs in all_configs.items():
+    ...     print(f"&#123;provider&#125;: &#123;len(configs)&#125; config(s)")
 
 ### Method: `all_providers`
 
@@ -2587,8 +2587,8 @@ Returns:
     Tuple of provider names (lowercase, sorted)
 
 Example:
-    >>> providers = ProviderEnvRegistry.all_providers()
-    >>> print(len(providers))
+    &gt;&gt;&gt; providers = ProviderEnvRegistry.all_providers()
+    &gt;&gt;&gt; print(len(providers))
     40
 
 ### Method: `get`
@@ -2609,8 +2609,8 @@ Returns:
     List of ProviderEnvConfig instances (empty if not found)
 
 Example:
-    >>> configs = ProviderEnvRegistry.get("deepseek")
-    >>> # Returns [DeepSeek config, OpenAI inherited configs]
+    &gt;&gt;&gt; configs = ProviderEnvRegistry.get("deepseek")
+    &gt;&gt;&gt; # Returns [DeepSeek config, OpenAI inherited configs]
 
 ### Method: `get_api_key_envs`
 
@@ -2629,8 +2629,8 @@ Returns:
     Tuple of environment variable names (e.g., ("OPENAI_API_KEY",))
 
 Example:
-    >>> api_keys = ProviderEnvRegistry.get_api_key_envs("openai")
-    >>> print(api_keys)
+    &gt;&gt;&gt; api_keys = ProviderEnvRegistry.get_api_key_envs("openai")
+    &gt;&gt;&gt; print(api_keys)
     ('OPENAI_API_KEY',)
 
 ### Method: `get_for_client`
@@ -2649,8 +2649,8 @@ Returns:
     Tuple of matching configs
 
 Example:
-    >>> configs = ProviderEnvRegistry.get_for_client("azure", "openai")
-    >>> # Returns only Azure OpenAI config, not Cohere or Anthropic
+    &gt;&gt;&gt; configs = ProviderEnvRegistry.get_for_client("azure", "openai")
+    &gt;&gt;&gt; # Returns only Azure OpenAI config, not Cohere or Anthropic
 
 ### Method: `register`
 
@@ -2673,7 +2673,7 @@ Raises:
     ValueError: If external provider conflicts with built-in provider
 
 Example (internal use only):
-    >>> ProviderEnvRegistry.register(
+    &gt;&gt;&gt; ProviderEnvRegistry.register(
     ...     "myprovider", ProviderEnvConfig(...), external=True
     ... )
 
@@ -2691,9 +2691,9 @@ Returns:
     Serializable dictionary of all configs
 
 Example:
-    >>> import json
-    >>> data = ProviderEnvRegistry.to_dict()
-    >>> json.dumps(data, indent=2)
+    &gt;&gt;&gt; import json
+    &gt;&gt;&gt; data = ProviderEnvRegistry.to_dict()
+    &gt;&gt;&gt; json.dumps(data, indent=2)
 
 ## Class: `ProviderNameMap`
 
@@ -3076,11 +3076,11 @@ Returns:
     Dictionary suitable for passing to AsyncQdrantClient constructor
 
 Example:
-    >>> options = QdrantClientOptions(
+    &gt;&gt;&gt; options = QdrantClientOptions(
     ...     url="https://qdrant.example.com", api_key="secret-key", timeout=30.0
     ... )
-    >>> params = options.to_qdrant_params()
-    >>> client = AsyncQdrantClient(**params)
+    &gt;&gt;&gt; params = options.to_qdrant_params()
+    &gt;&gt;&gt; client = AsyncQdrantClient(**params)
 
 ## Class: `QdrantVectorStoreProvider`
 
@@ -3506,7 +3506,7 @@ Attributes:
     role: Optional semantic role (defaults to name if not provided)
 
 Example:
-    >>> config = VectorConfig(
+    &gt;&gt;&gt; config = VectorConfig(
     ...     name="primary",
     ...     model_name=ModelName("voyage-code-3"),
     ...     params=VectorParams(size=1024, distance="Cosine"),
@@ -3531,9 +3531,9 @@ Returns:
     Configured VectorConfig instance
 
 Example:
-    >>> from codeweaver.providers.config.categories import EmbeddingProviderSettings
-    >>> settings = EmbeddingProviderSettings(...)
-    >>> config = await VectorConfig.from_provider_settings(
+    &gt;&gt;&gt; from codeweaver.providers.config.categories import EmbeddingProviderSettings
+    &gt;&gt;&gt; settings = EmbeddingProviderSettings(...)
+    &gt;&gt;&gt; config = await VectorConfig.from_provider_settings(
     ...     settings, name="primary", role=VectorRole.PRIMARY
     ... )
 
@@ -3550,9 +3550,9 @@ Returns:
     Qdrant's vectors_config or sparse_vectors_config dict.
 
 Example:
-    >>> config = VectorConfig(name="primary", ...)
-    >>> name, params = config.to_qdrant_config()
-    >>> collection_config = CollectionParams(vectors_config={name: params})
+    &gt;&gt;&gt; config = VectorConfig(name="primary", ...)
+    &gt;&gt;&gt; name, params = config.to_qdrant_config()
+    &gt;&gt;&gt; collection_config = CollectionParams(vectors_config=&#123;name: params&#125;)
 
 ## Class: `VectorRole`
 
@@ -3562,9 +3562,9 @@ The enum values should match common physical vector names by default.
 Use .variable property to get snake_case string representation.
 
 Example:
-    >>> VectorRole.PRIMARY.variable
+    &gt;&gt;&gt; VectorRole.PRIMARY.variable
     'primary'
-    >>> VectorRole.BACKUP.variable
+    &gt;&gt;&gt; VectorRole.BACKUP.variable
     'backup'
 
 Future extensions might include:
@@ -3585,15 +3585,15 @@ Attributes:
              (e.g., "primary", "backup", "sparse", "semantic_v1")
 
 Example:
-    >>> vector_set = VectorSet(vectors={
+    &gt;&gt;&gt; vector_set = VectorSet(vectors=&#123;
     ...     "primary": VectorConfig(name="primary", ...),
     ...     "backup": VectorConfig(name="backup", ...),
     ...     "sparse": VectorConfig(name="sparse", ...),
-    ... })
-    >>>
-    >>> # Convert to Qdrant config
-    >>> vectors_config = vector_set.to_qdrant_vectors_config()
-    >>> sparse_config = vector_set.to_qdrant_sparse_vectors_config()
+    ... &#125;)
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # Convert to Qdrant config
+    &gt;&gt;&gt; vectors_config = vector_set.to_qdrant_vectors_config()
+    &gt;&gt;&gt; sparse_config = vector_set.to_qdrant_sparse_vectors_config()
 
 ### Method: `backup`
 
@@ -3651,8 +3651,8 @@ Returns:
     List of matching VectorConfigs (may be empty)
 
 Example:
-    >>> primaries = vector_set.by_role(VectorRole.PRIMARY)
-    >>> backups = vector_set.by_role("backup")
+    &gt;&gt;&gt; primaries = vector_set.by_role(VectorRole.PRIMARY)
+    &gt;&gt;&gt; backups = vector_set.by_role("backup")
 
 ### Method: `default`
 
@@ -3695,8 +3695,8 @@ Returns:
     Configured VectorSet with standard layout
 
 Example:
-    >>> from codeweaver.providers.config.profiles import ProviderProfile
-    >>> vector_set = await VectorSet.from_profile(ProviderProfile.RECOMMENDED)
+    &gt;&gt;&gt; from codeweaver.providers.config.profiles import ProviderProfile
+    &gt;&gt;&gt; vector_set = await VectorSet.from_profile(ProviderProfile.RECOMMENDED)
 
 ### Method: `primary`
 
@@ -3742,7 +3742,7 @@ Returns:
     ready for CollectionConfig.sparse_vectors_config
 
 Example:
-    >>> config = CollectionParams(
+    &gt;&gt;&gt; config = CollectionParams(
     ...     sparse_vectors_config=vector_set.to_qdrant_sparse_vectors_config()
     ... )
 
@@ -3759,7 +3759,7 @@ Returns:
     ready for CollectionConfig.vectors_config
 
 Example:
-    >>> config = CollectionParams(vectors_config=vector_set.to_qdrant_vectors_config())
+    &gt;&gt;&gt; config = CollectionParams(vectors_config=vector_set.to_qdrant_vectors_config())
 
 ## Class: `VectorStoreProvider`
 
@@ -4016,11 +4016,11 @@ Returns:
     True if versions are compatible (same major version), False otherwise
 
 Examples:
-    >>> VersionedProfile.is_compatible_with("0.1.0", "0.2.5")
+    &gt;&gt;&gt; VersionedProfile.is_compatible_with("0.1.0", "0.2.5")
     True  # Same major version (0)
-    >>> VersionedProfile.is_compatible_with("0.1.0", "1.0.0")
+    &gt;&gt;&gt; VersionedProfile.is_compatible_with("0.1.0", "1.0.0")
     False  # Different major versions
-    >>> VersionedProfile.is_compatible_with("0.1.0a6", "0.1.0")
+    &gt;&gt;&gt; VersionedProfile.is_compatible_with("0.1.0a6", "0.1.0")
     True  # Pre-release compatible with same major.minor
 
 ### Method: `validate_against_collection`
@@ -4043,12 +4043,12 @@ Returns:
     Tuple of (is_valid, error_message). error_message is None if valid.
 
 Examples:
-    >>> profile = VersionedProfile("recommended", "0.1.0", config, [])
-    >>> profile.validate_against_collection("recommended", "0.1.5")
+    &gt;&gt;&gt; profile = VersionedProfile("recommended", "0.1.0", config, [])
+    &gt;&gt;&gt; profile.validate_against_collection("recommended", "0.1.5")
     (True, None)
-    >>> profile.validate_against_collection("quickstart", "0.1.0")
+    &gt;&gt;&gt; profile.validate_against_collection("quickstart", "0.1.0")
     (False, "Profile name mismatch: ...")
-    >>> profile.validate_against_collection("recommended", "1.0.0")
+    &gt;&gt;&gt; profile.validate_against_collection("recommended", "1.0.0")
     (False, "Incompatible versions: ...")
 
 ## Class: `Voyage4ModelFamily`
@@ -4193,9 +4193,9 @@ Returns:
     List of embedding vectors, or None if provider unavailable
 
 Example:
-    >>> embeddings = await create_backup_embeddings("example text")
-    >>> if embeddings:
-    ...     print(f"Generated {len(embeddings)} embeddings")
+    &gt;&gt;&gt; embeddings = await create_backup_embeddings("example text")
+    &gt;&gt;&gt; if embeddings:
+    ...     print(f"Generated &#123;len(embeddings)&#125; embeddings")
 
 ## Function: `create_qdrant_service`
 
@@ -4320,14 +4320,14 @@ Returns:
     Legacy env var info compatible with existing code
 
 Example:
-    >>> config = EnvVarConfig(
+    &gt;&gt;&gt; config = EnvVarConfig(
     ...     env="OPENAI_API_KEY",
     ...     description="API key",
     ...     is_secret=True,
     ...     variable_name="api_key",
     ... )
-    >>> info = env_var_config_to_info(config)
-    >>> info.env
+    &gt;&gt;&gt; info = env_var_config_to_info(config)
+    &gt;&gt;&gt; info.env
     'OPENAI_API_KEY'
 
 ## Function: `exa_answer_tool`
@@ -4537,8 +4537,8 @@ Returns:
     Dictionary with backup model configuration details
 
 Example:
-    >>> info = get_backup_model_info()
-    >>> print(f"Primary: {info['primary_model']}")
+    &gt;&gt;&gt; info = get_backup_model_info()
+    &gt;&gt;&gt; print(f"Primary: &#123;info['primary_model']&#125;")
     Primary: minishlab/potion-base-8M
 
 ## Function: `get_cohere_embedding_capabilities`
@@ -4742,8 +4742,8 @@ Returns:
     Tuple of provider configurations, or None if not found in registry
 
 Example:
-    >>> configs = get_provider_configs("azure")
-    >>> len(configs)
+    &gt;&gt;&gt; configs = get_provider_configs("azure")
+    &gt;&gt;&gt; len(configs)
     3  # Azure has 3 client configurations
 
 ## Function: `get_provider_env_vars_from_registry`
@@ -4763,8 +4763,8 @@ Returns:
     Tuple of ProviderEnvVars compatible with existing code, or None if not in registry
 
 Example:
-    >>> env_vars = get_provider_env_vars_from_registry("deepseek")
-    >>> env_vars[0]["api_key"].env
+    &gt;&gt;&gt; env_vars = get_provider_env_vars_from_registry("deepseek")
+    &gt;&gt;&gt; env_vars[0]["api_key"].env
     'DEEPSEEK_API_KEY'
 
 ## Function: `get_provider_names_for_category`
@@ -4903,8 +4903,8 @@ Returns:
     Frozenset of (key, EnvVarConfig) tuples for common HTTP settings
 
 Example:
-    >>> base_vars = httpx_env_vars()
-    >>> custom_vars = base_vars | frozenset([("custom", EnvVarConfig(...))])
+    &gt;&gt;&gt; base_vars = httpx_env_vars()
+    &gt;&gt;&gt; custom_vars = base_vars | frozenset([("custom", EnvVarConfig(...))])
 
 ## Function: `huggingface_hub_input_transformer`
 
@@ -5037,9 +5037,9 @@ Returns:
     Tuple of ProviderEnvConfig with updated provider names
 
 Example:
-    >>> _azure_openai = ProviderEnvConfig(...)
-    >>> _azure_cohere = ProviderEnvConfig(...)
-    >>> AZURE = multi_client_provider("azure", [_azure_openai, _azure_cohere])
+    &gt;&gt;&gt; _azure_openai = ProviderEnvConfig(...)
+    &gt;&gt;&gt; _azure_cohere = ProviderEnvConfig(...)
+    &gt;&gt;&gt; AZURE = multi_client_provider("azure", [_azure_openai, _azure_cohere])
 
 ## Function: `openai_compatible_provider`
 
@@ -5065,10 +5065,10 @@ Returns:
     Configured ProviderEnvConfig with OpenAI inheritance
 
 Example:
-    >>> DEEPSEEK = openai_compatible_provider(
+    &gt;&gt;&gt; DEEPSEEK = openai_compatible_provider(
     ...     "DeepSeek", api_key_env="DEEPSEEK_API_KEY"
     ... )
-    >>> GROQ = openai_compatible_provider(
+    &gt;&gt;&gt; GROQ = openai_compatible_provider(
     ...     "Groq",
     ...     api_key_env="GROQ_API_KEY",
     ...     base_url_env="GROQ_BASE_URL",
@@ -5108,7 +5108,7 @@ Returns:
     Legacy provider env vars compatible with existing code
 
 Example:
-    >>> config = ProviderEnvConfig(
+    &gt;&gt;&gt; config = ProviderEnvConfig(
     ...     provider="deepseek",
     ...     clients=("openai",),
     ...     api_key=EnvVarConfig(
@@ -5116,8 +5116,8 @@ Example:
     ...     ),
     ...     inherits_from="openai",
     ... )
-    >>> env_vars = provider_env_config_to_vars(config)
-    >>> env_vars["api_key"].env
+    &gt;&gt;&gt; env_vars = provider_env_config_to_vars(config)
+    &gt;&gt;&gt; env_vars["api_key"].env
     'DEEPSEEK_API_KEY'
 
 ## Function: `register_data_tool`
@@ -5196,10 +5196,10 @@ Returns:
     Configured ProviderEnvConfig
 
 Example:
-    >>> VOYAGE = simple_api_key_provider(
+    &gt;&gt;&gt; VOYAGE = simple_api_key_provider(
     ...     "Voyage", client="voyage", api_key_env="VOYAGE_API_KEY"
     ... )
-    >>> COHERE = simple_api_key_provider(
+    &gt;&gt;&gt; COHERE = simple_api_key_provider(
     ...     "Cohere",
     ...     client="cohere",
     ...     api_key_env="COHERE_API_KEY",
@@ -5246,43 +5246,43 @@ Note:
     for future filter transformations or field mapping customizations.
 
 Examples:
-    >>> from codeweaver.providers.vector_stores.search import (
+    &gt;&gt;&gt; from codeweaver.providers.vector_stores.search import (
     ...     Filter,
     ...     FieldCondition,
     ...     MatchAny,
     ... )
-    >>> # Filter by file paths
-    >>> filter_obj = Filter(
+    &gt;&gt;&gt; # Filter by file paths
+    &gt;&gt;&gt; filter_obj = Filter(
     ...     must=[
     ...         FieldCondition(
     ...             key="file_path", match=MatchAny(any=["src/main.py", "src/utils.py"])
     ...         )
     ...     ]
     ... )
-    >>> qdrant_filter = to_qdrant_filter(filter_obj)
-    >>> assert qdrant_filter == filter_obj
+    &gt;&gt;&gt; qdrant_filter = to_qdrant_filter(filter_obj)
+    &gt;&gt;&gt; assert qdrant_filter == filter_obj
 
-    >>> # Filter by language
-    >>> filter_obj = Filter(
+    &gt;&gt;&gt; # Filter by language
+    &gt;&gt;&gt; filter_obj = Filter(
     ...     must=[
     ...         FieldCondition(
     ...             key="language", match=MatchAny(any=["python", "javascript"])
     ...         )
     ...     ]
     ... )
-    >>> qdrant_filter = to_qdrant_filter(filter_obj)
-    >>> assert qdrant_filter is not None
+    &gt;&gt;&gt; qdrant_filter = to_qdrant_filter(filter_obj)
+    &gt;&gt;&gt; assert qdrant_filter is not None
 
-    >>> # Filter by line range
-    >>> from codeweaver.providers.vector_stores.search import Range
-    >>> filter_obj = Filter(
+    &gt;&gt;&gt; # Filter by line range
+    &gt;&gt;&gt; from codeweaver.providers.vector_stores.search import Range
+    &gt;&gt;&gt; filter_obj = Filter(
     ...     must=[FieldCondition(key="line_start", range=Range(gte=10, lte=100))]
     ... )
-    >>> qdrant_filter = to_qdrant_filter(filter_obj)
-    >>> assert qdrant_filter is not None
+    &gt;&gt;&gt; qdrant_filter = to_qdrant_filter(filter_obj)
+    &gt;&gt;&gt; assert qdrant_filter is not None
 
-    >>> # No filter
-    >>> assert to_qdrant_filter(None) is None
+    &gt;&gt;&gt; # No filter
+    &gt;&gt;&gt; assert to_qdrant_filter(None) is None
 
 ## Function: `try_for_azure_endpoint`
 
@@ -5292,7 +5292,7 @@ try_for_azure_endpoint()
 
 Try to identify the Azure endpoint.
 
-Azure uses this format: `https://<endpoint>.<region_name>.inference.ai.azure.com/v1`,
+Azure uses this format: `https://&lt;endpoint&gt;.&lt;region_name&gt;.inference.ai.azure.com/v1`,
 But because people often conflate `endpoint` and `url`, we try to be flexible.
 
 ## Function: `try_for_heroku_endpoint`

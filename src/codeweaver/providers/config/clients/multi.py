@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import contextlib
 
-from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Hashable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import Annotated, Any, ClassVar, Literal, Self, TypedDict
+from typing import Annotated, Any, ClassVar, Literal, Self, TypedDict, cast
 
 import httpx
 
@@ -33,7 +33,7 @@ from codeweaver.core.types import (
     LiteralProviderType,
     Provider,
 )
-from codeweaver.core.utils import deep_merge_dicts, has_package
+from codeweaver.core.utils import TypeIs, deep_merge_dicts, has_package
 from codeweaver.providers.config.clients.base import ClientOptions
 from codeweaver.providers.config.clients.utils import (
     AzureOptions,
@@ -286,6 +286,16 @@ class SentenceTransformersModelOptions(TypedDict, total=False):
     """Whether to export the model to onnx/openvino format."""
 
 
+def _is_str_dict(d: Any) -> TypeIs[dict[str, Any]]:
+    """Check if the given object is a dictionary with string keys."""
+    return isinstance(d, dict) and all(isinstance(k, str) for k in d if k)
+
+
+def _is_hashable_dict(d: Any) -> TypeIs[dict[Hashable, Any]]:
+    """Check if the given object is a dictionary with hashable keys."""
+    return isinstance(d, dict) and all(isinstance(k, Hashable) for k in d if k)
+
+
 class SentenceTransformersClientOptions(ClientOptions):
     """Client options for SentenceTransformers-based embedding providers."""
 
@@ -317,11 +327,16 @@ class SentenceTransformersClientOptions(ClientOptions):
     def __init__(self, **data: Any) -> None:
         """Initialize the SentenceTransformers client options."""
         model_name = data.get("model_name_or_path") or ""
-        data = deep_merge_dicts(
-            self.default_kwargs_for_model(model=str(model_name)) if model_name else {},
-            data or {},  # type: ignore
-        )  # type: ignore
-        super().__init__(**data)
+        data = data or {}
+        default_kwargs = self.default_kwargs_for_model(model=model_name) or {}
+        if not _is_hashable_dict(default_kwargs):
+            raise TypeError(
+                "Expected data and default_kwargs to be dicts with appropriate key types."
+            )
+        merged_data = deep_merge_dicts(default_kwargs, cast(dict[Hashable, Any], data))
+        if not _is_str_dict(merged_data):
+            raise TypeError("Expected merged data to be a dict with string keys.")
+        super().__init__(**merged_data)
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         return {

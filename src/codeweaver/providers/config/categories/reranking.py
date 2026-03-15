@@ -14,13 +14,7 @@ from pydantic import Field, PositiveInt, Tag, computed_field, model_validator
 
 from codeweaver.core import Provider
 from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
-from codeweaver.core.types import (
-    LiteralSDKClient,
-    ModelName,
-    ModelNameT,
-    ProviderCategory,
-    SDKClient,
-)
+from codeweaver.core.types import LiteralSDKClient, ModelNameT, ProviderCategory, SDKClient
 from codeweaver.providers import (
     BedrockRerankingConfig,
     CohereClientOptions,
@@ -149,7 +143,7 @@ class RerankingProviderSettings(BaseRerankingProviderSettings):
             # client_options (from BaseProviderCategorySettings) is validated before model_name
             # (from RerankingProviderSettings) in pydantic v2, so default_factory can't access model_name.
             if provider == Provider.FASTEMBED:
-                data["client_options"] = FastEmbedClientOptions(model_name=ModelName(model_name))
+                data["client_options"] = FastEmbedClientOptions(model_name=model_name)
             else:
                 data["client_options"] = SentenceTransformersClientOptions(
                     model_name_or_path=str(model_name)

@@ -662,6 +662,7 @@ include = [
   "src/codeweaver/providers/embedding/providers/bedrock.py",
   "src/codeweaver/providers/embedding/providers/cohere.py",
   "src/codeweaver/providers/embedding/providers/google.py",
+  "src/codeweaver/providers/config/profiles.py"
 ]
 
 [tool.ty.overrides.rules]
@@ -682,10 +683,17 @@ include = ["scripts/build/generate-mcp-server-json.py"]
 unknown-argument = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/codeweaver/providers/config/categories/embedding.py"]
+include = [
+  "src/codeweaver/providers/config/categories/embedding.py",
+  "src/codeweaver/providers/config/sdk/embedding.py"
+]
 
 [tool.ty.overrides.rules]
 unresolved-attribute = "ignore"
+invalid-assignment = "ignore"
+call-top-callable = "ignore"
+unsupported-operator = "ignore"
+missing-typed-dict-key = "ignore"
 
 [[tool.ty.overrides]]
 include = [

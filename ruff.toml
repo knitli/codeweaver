@@ -270,8 +270,8 @@ convention = "google"
 ]
 # Provider config validation has complex asymmetric compatibility checking
 "src/codeweaver/providers/config/categories/embedding.py" = [
-  "C901",    # too complex - asymmetric validation has inherent complexity
-  "G201",    # logger.exception preferred - existing logging style
+  "C901",  # too complex - asymmetric validation has inherent complexity
+  "G201",  # logger.exception preferred - existing logging style
   "SIM102",  # nested if - validates multiple independent conditions
   "TRY300",  # else block - return-in-try pattern intentional
   "TRY301",  # abstract raise - validation raises are intentional inline

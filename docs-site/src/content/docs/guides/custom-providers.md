@@ -1,3 +1,7 @@
+---
+title: "Custom Providers"
+---
+
 # Custom Providers
 
 > **TL;DR:** This module handles the registration and implementation of custom providers via the Dependency Injection (DI) system. Use it when you need to integrate a niche embedding model or vector store. It saves development time by allowing you to extend CodeWeaver without modifying the core codebase.

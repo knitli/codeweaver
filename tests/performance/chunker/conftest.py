@@ -80,7 +80,7 @@ def _patched_discovered_file_init(
     _original_discovered_file_init(self, path, *args, project_path=project_path, **kwargs)
 
 
-DiscoveredFile.__init__ = _patched_discovered_file_init  # ty: ignore[method-assign]
+DiscoveredFile.__init__ = _patched_discovered_file_init
 
 
 # ---------------------------------------------------------------------------

@@ -29,7 +29,7 @@ This is a proof-of-concept migration from Material for MkDocs to Starlight. It i
 
 ```bash
 # Install Node dependencies
-npm install
+bun install
 
 # Install Python dependencies (for API doc generation)
 pip install griffe
@@ -39,10 +39,10 @@ pip install griffe
 
 ```bash
 # Generate API docs from Python source
-npm run gen-api-docs
+bun run gen-api-docs
 
 # Start dev server
-npm run dev
+bun run dev
 
 # Open browser to http://localhost:4321
 ```
@@ -51,10 +51,10 @@ npm run dev
 
 ```bash
 # Generate API docs and build site
-npm run build
+bun run build
 
 # Preview built site
-npm run preview
+bun run preview
 ```
 
 ## Project Structure

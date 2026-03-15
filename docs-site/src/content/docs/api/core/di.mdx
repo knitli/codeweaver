@@ -18,7 +18,7 @@ from codeweaver.core.di import dependency_provider
 
 
 @dependency_provider(ServiceProvider)
-def service_factory() -> ServiceProvider:
+def service_factory() -&gt; ServiceProvider:
     return ServiceProvider()
 ```
 
@@ -68,7 +68,7 @@ if TYPE_CHECKING:
     from someplace import ServiceProvider
 
 
-async def my_function(service: ServiceProvider = INJECTED) -> None:
+async def my_function(service: ServiceProvider = INJECTED) -&gt; None:
     # service will be injected automatically by the DI container
     # The type annotation tells the container what to inject
     ...
@@ -241,7 +241,7 @@ class ServiceProvider:
         self.value = 42
 
 
-async def my_function(service: ServiceProvider = INJECTED) -> None:
+async def my_function(service: ServiceProvider = INJECTED) -&gt; None:
     # service is automatically injected based on the type annotation
     print(service.value)
 ```
@@ -256,14 +256,14 @@ from codeweaver.core.di import Depends, INJECTED, dependency_provider
 
 
 @dependency_provider(ServiceProvider)
-async def service_factory() -> ServiceProvider:
+async def service_factory() -&gt; ServiceProvider:
     # Custom initialization logic here
     return ServiceProvider()
 
 
 async def my_function(
     service: Annotated[ServiceProvider, Depends(service_factory)] = INJECTED,
-) -> None:
+) -&gt; None:
     print(service.value)
 ```
 
@@ -289,7 +289,7 @@ async def handler(
     singleton: SingletonService = INJECTED,
     request: RequestService = INJECTED,
     fresh: FunctionService = INJECTED,
-) -> None: ...
+) -&gt; None: ...
 ```
 
 ## Type Aliases for Clean Code
@@ -310,7 +310,7 @@ type ServiceDep = ServiceProvider
 type RequestScopedService = Annotated[ServiceProvider, depends(scope="request")]
 
 
-async def my_function(service: RequestScopedService = INJECTED) -> None:
+async def my_function(service: RequestScopedService = INJECTED) -&gt; None:
     # service will be injected with request scope
     ...
 ```
@@ -326,14 +326,14 @@ Usage:
     # Type-safe with subscript (recommended):
     async def my_function(
         embedding: Annotated[EmbeddingProvider, Depends(get_embedding)] = INJECTED
-    ) -> None:
+    ) -&gt; None:
         # embedding will be injected by the container
         ...
 
     # Or with type alias:
     async def my_function(
         embedding: EmbeddingDep = INJECTED
-    ) -> None:
+    ) -&gt; None:
         ...
 
 ## Class: `ProviderMetadata`
@@ -394,7 +394,7 @@ Supports three usage patterns in sync and async contexts:
     dependency_provider(MyService, scope="singleton")
 
 
-    async def create_my_service() -> MyService:
+    async def create_my_service() -&gt; MyService:
         return MyService()
     ```
 
@@ -414,7 +414,7 @@ Supports three usage patterns in sync and async contexts:
     dependency_provider(MyCapability, scope="singleton", collection=True)
 
 
-    def get_capabilities() -> Sequence[MyCapability]:
+    def get_capabilities() -&gt; Sequence[MyCapability]:
         return (MyCapability(...), MyCapability(...))
     ```
 
@@ -437,7 +437,7 @@ Example:
     dependency_provider(DatabaseConnection, scope="singleton")
 
 
-    async def get_db() -> DatabaseConnection:
+    async def get_db() -&gt; DatabaseConnection:
         return DatabaseConnection()
 
 
@@ -445,7 +445,7 @@ Example:
     dependency_provider(RequestContext, scope="request")
 
 
-    async def get_context() -> RequestContext:
+    async def get_context() -&gt; RequestContext:
         return RequestContext()
 
 
@@ -453,7 +453,7 @@ Example:
     dependency_provider(TempFile, scope="function")
 
 
-    async def create_temp() -> TempFile:
+    async def create_temp() -&gt; TempFile:
         return TempFile()
 
 
@@ -461,7 +461,7 @@ Example:
     dependency_provider(ResourcePool, scope="singleton")
 
 
-    async def get_pool() -> AsyncIterator[ResourcePool]:
+    async def get_pool() -&gt; AsyncIterator[ResourcePool]:
         pool = ResourcePool()
         await pool.connect()
         yield pool
@@ -481,7 +481,7 @@ Example:
     dependency_provider(Capability, scope="singleton", collection=True)
 
 
-    def get_all_capabilities() -> Sequence[Capability]:
+    def get_all_capabilities() -&gt; Sequence[Capability]:
         return (
             Capability(name="feature1"),
             Capability(name="feature2"),

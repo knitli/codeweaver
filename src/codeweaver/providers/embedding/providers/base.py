@@ -287,11 +287,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             "embed_options",
             embedding_config.embedding if embedding_config and embedding_config.embedding else {},
         )
-        object.__setattr__(
-            self,
-            "model_options",
-            getattr(embedding_config, "model", None) or {},
-        )
+        object.__setattr__(self, "model_options", getattr(embedding_config, "model", None) or {})
 
         # Phase 4: Use centralized cache manager instead of per-instance stores
         object.__setattr__(self, "cache_manager", cache_manager)
@@ -864,7 +860,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 from codeweaver.core.di.container import get_container
                 from codeweaver.core.statistics import SessionStatistics
 
-                statistics = get_container()[SessionStatistics]  # ty:ignore[assignment]
+                statistics = get_container()[SessionStatistics]
             except Exception:
                 # Statistics not available; skip token tracking silently.
                 return
@@ -1112,7 +1108,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     break
         if transformer is not None:
             return transformer(output_data)
-        return self._output_transformer(output_data)  # ty:ignore[return-value]
+        return self._output_transformer(output_data)
 
     async def _get_loop(self) -> asyncio.AbstractEventLoop | None:
         try:

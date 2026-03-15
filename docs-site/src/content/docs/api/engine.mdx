@@ -76,11 +76,11 @@ Attributes:
     nesting_level: Depth of nesting for this boundary (0 = top level)
 
 Raises:
-    ValueError: If start >= end (invalid boundary)
+    ValueError: If start &gt;= end (invalid boundary)
 
 Example:
-    >>> boundary = Boundary(start=0, end=100, delimiter=my_delimiter, nesting_level=0)
-    >>> boundary.length
+    &gt;&gt;&gt; boundary = Boundary(start=0, end=100, delimiter=my_delimiter, nesting_level=0)
+    &gt;&gt;&gt; boundary.length
     100
 
 ## Class: `ChangeImpact`
@@ -218,10 +218,10 @@ Args:
 
 Returns:
     AdaptiveChunkBehavior indicating the recommended action:
-    - MERGE: tokens < floor_tokens (too small, combine with neighbors)
-    - KEEP: floor_tokens <= tokens <= acceptable_max_tokens (good size)
-    - TRY_CHILDREN: acceptable_max_tokens < tokens <= chunk_limit (try semantic split)
-    - FORCE_SPLIT: tokens > chunk_limit (must split mechanically)
+    - MERGE: tokens &lt; floor_tokens (too small, combine with neighbors)
+    - KEEP: floor_tokens &lt;= tokens &lt;= acceptable_max_tokens (good size)
+    - TRY_CHILDREN: acceptable_max_tokens &lt; tokens &lt;= chunk_limit (try semantic split)
+    - FORCE_SPLIT: tokens &gt; chunk_limit (must split mechanically)
 
 ### Method: `from_settings`
 
@@ -267,20 +267,20 @@ Attributes:
 Examples:
     Basic usage with file discovery:
 
-    >>> from codeweaver.engine.chunker.base import ChunkGovernor
-    >>> from codeweaver.core import DiscoveredFile
-    >>> from pathlib import Path
-    >>>
-    >>> governor = ChunkGovernor(capabilities=(...))
-    >>> selector = ChunkerSelector(governor)
-    >>>
-    >>> # Select chunker for a Python file
-    >>> file = DiscoveredFile.from_path(Path("script.py"))
-    >>> chunker = selector.select_for_file(file)
-    >>> # Returns SemanticChunker for Python
-    >>>
-    >>> # Process the file
-    >>> chunks = chunker.chunk(file.path.read_text(), file_path=file.path)
+    &gt;&gt;&gt; from codeweaver.engine.chunker.base import ChunkGovernor
+    &gt;&gt;&gt; from codeweaver.core import DiscoveredFile
+    &gt;&gt;&gt; from pathlib import Path
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; governor = ChunkGovernor(capabilities=(...))
+    &gt;&gt;&gt; selector = ChunkerSelector(governor)
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # Select chunker for a Python file
+    &gt;&gt;&gt; file = DiscoveredFile.from_path(Path("script.py"))
+    &gt;&gt;&gt; chunker = selector.select_for_file(file)
+    &gt;&gt;&gt; # Returns SemanticChunker for Python
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # Process the file
+    &gt;&gt;&gt; chunks = chunker.chunk(file.path.read_text(), file_path=file.path)
 
 Selection Algorithm:
     1. Detect language from file extension using SemanticSearchLanguage
@@ -318,13 +318,13 @@ Notes:
     - Checks max_file_size_mb from settings before chunking
 
 Examples:
-    >>> from pathlib import Path
-    >>> from codeweaver.core import DiscoveredFile
-    >>>
-    >>> file = DiscoveredFile.from_path(Path("example.py"))
-    >>> chunker1 = selector.select_for_file(file)
-    >>> chunker2 = selector.select_for_file(file)
-    >>> assert chunker1 is not chunker2  # Fresh instances
+    &gt;&gt;&gt; from pathlib import Path
+    &gt;&gt;&gt; from codeweaver.core import DiscoveredFile
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; file = DiscoveredFile.from_path(Path("example.py"))
+    &gt;&gt;&gt; chunker1 = selector.select_for_file(file)
+    &gt;&gt;&gt; chunker2 = selector.select_for_file(file)
+    &gt;&gt;&gt; assert chunker1 is not chunker2  # Fresh instances
 
 ### Method: `select_for_file_path`
 
@@ -344,9 +344,9 @@ Returns:
     Fresh BaseChunker instance appropriate for file's language.
 
 Examples:
-    >>> from pathlib import Path
-    >>> file_path = Path("example.py")
-    >>> chunker = selector.select_for_file_path(file_path)
+    &gt;&gt;&gt; from pathlib import Path
+    &gt;&gt;&gt; file_path = Path("example.py")
+    &gt;&gt;&gt; chunker = selector.select_for_file_path(file_path)
 
 ## Class: `ChunkerSettings`
 
@@ -577,7 +577,7 @@ Attributes:
     nestable: Whether this delimiter can nest within itself
 
 Example:
-    >>> delimiter = Delimiter(
+    &gt;&gt;&gt; delimiter = Delimiter(
     ...     start="def ",
     ...     end=":",
     ...     kind=DelimiterKind.FUNCTION,
@@ -605,12 +605,12 @@ Returns:
     List of Delimiter instances, one per start/end combination
 
 Example:
-    >>> from codeweaver.engine.chunker.delimiters import DelimiterPattern
-    >>> pattern = DelimiterPattern(
+    &gt;&gt;&gt; from codeweaver.engine.chunker.delimiters import DelimiterPattern
+    &gt;&gt;&gt; pattern = DelimiterPattern(
     ...     starts=["if", "while"], ends=[":", "then"], kind=DelimiterKind.CONDITIONAL
     ... )
-    >>> delimiters = Delimiter.from_pattern(pattern)
-    >>> len(delimiters)
+    &gt;&gt;&gt; delimiters = Delimiter.from_pattern(pattern)
+    &gt;&gt;&gt; len(delimiters)
     4  # 2 starts * 2 ends
 
 ## Class: `DelimiterChunker`
@@ -630,10 +630,10 @@ Attributes:
     _language: Programming language being processed
 
 Example:
-    >>> from codeweaver.engine.chunker.base import ChunkGovernor
-    >>> governor = ChunkGovernor(chunk_limit=1000)
-    >>> chunker = DelimiterChunker(governor, language="python")
-    >>> chunks = chunker.chunk("def foo():\n    pass")
+    &gt;&gt;&gt; from codeweaver.engine.chunker.base import ChunkGovernor
+    &gt;&gt;&gt; governor = ChunkGovernor(chunk_limit=1000)
+    &gt;&gt;&gt; chunker = DelimiterChunker(governor, language="python")
+    &gt;&gt;&gt; chunks = chunker.chunk("def foo():\n    pass")
 
 ### Method: `chunk`
 
@@ -675,10 +675,10 @@ Attributes:
     nesting_level: Depth of nesting at this match (0 = top level)
 
 Example:
-    >>> match = DelimiterMatch(
+    &gt;&gt;&gt; match = DelimiterMatch(
     ...     delimiter=my_delimiter, start_pos=42, end_pos=None, nesting_level=0
     ... )
-    >>> match.is_start
+    &gt;&gt;&gt; match.is_start
     True
 
 ## Class: `ExtensionFilter`
@@ -855,15 +855,15 @@ Attributes:
 Examples:
     Wrapping semantic chunker with delimiter fallback:
 
-    >>> from codeweaver.engine.chunker.semantic import SemanticChunker
-    >>> from codeweaver.engine.chunker.delimiter import DelimiterChunker
-    >>>
-    >>> primary = SemanticChunker(governor, SemanticSearchLanguage.PYTHON)
-    >>> fallback = DelimiterChunker(governor, LanguageFamily.C_LIKE)
-    >>> chunker = GracefulChunker(primary, fallback)
-    >>>
-    >>> # This will try semantic first, fall back on error
-    >>> chunks = chunker.chunk(content, file_path=path)
+    &gt;&gt;&gt; from codeweaver.engine.chunker.semantic import SemanticChunker
+    &gt;&gt;&gt; from codeweaver.engine.chunker.delimiter import DelimiterChunker
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; primary = SemanticChunker(governor, SemanticSearchLanguage.PYTHON)
+    &gt;&gt;&gt; fallback = DelimiterChunker(governor, LanguageFamily.C_LIKE)
+    &gt;&gt;&gt; chunker = GracefulChunker(primary, fallback)
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # This will try semantic first, fall back on error
+    &gt;&gt;&gt; chunks = chunker.chunk(content, file_path=path)
 
 Error Handling:
     - Catches all exceptions from primary chunker
@@ -1456,9 +1456,9 @@ Raises:
 Migration state machine states.
 
 State Transitions:
-    PENDING -> IN_PROGRESS -> COMPLETED -> ROLLBACK -> PENDING
+    PENDING -&gt; IN_PROGRESS -&gt; COMPLETED -&gt; ROLLBACK -&gt; PENDING
                             ↓
-                          FAILED -> PENDING
+                          FAILED -&gt; PENDING
 
 ## Class: `OversizedChunkError`
 
@@ -1528,8 +1528,8 @@ Returns:
     - failed: Number of deletion failures
 
 Example:
-    >>> stats = await service.cleanup_old_snapshots()
-    >>> print(f"Deleted {stats['deleted']} old snapshots")
+    &gt;&gt;&gt; stats = await service.cleanup_old_snapshots()
+    &gt;&gt;&gt; print(f"Deleted &#123;stats['deleted']&#125; old snapshots")
 
 ### Method: `create_snapshot`
 
@@ -1546,9 +1546,9 @@ Returns:
     Snapshot name if successful, None otherwise
 
 Example:
-    >>> service = QdrantSnapshotBackupService(vector_store)
-    >>> snapshot_name = await service.create_snapshot()
-    >>> print(f"Created snapshot: {snapshot_name}")
+    &gt;&gt;&gt; service = QdrantSnapshotBackupService(vector_store)
+    &gt;&gt;&gt; snapshot_name = await service.create_snapshot()
+    &gt;&gt;&gt; print(f"Created snapshot: &#123;snapshot_name&#125;")
 
 ### Method: `delete_snapshot`
 
@@ -1587,9 +1587,9 @@ Returns:
     List of snapshot metadata dictionaries
 
 Example:
-    >>> snapshots = await service.list_snapshots()
-    >>> for snapshot in snapshots:
-    ...     print(f"{snapshot['name']}: {snapshot['size']} bytes")
+    &gt;&gt;&gt; snapshots = await service.list_snapshots()
+    &gt;&gt;&gt; for snapshot in snapshots:
+    ...     print(f"&#123;snapshot['name']&#125;: &#123;snapshot['size']&#125; bytes")
 
 ### Method: `restore_snapshot`
 
@@ -1609,8 +1609,8 @@ Returns:
     True if restore initiated successfully, False otherwise
 
 Example:
-    >>> success = await service.restore_snapshot("snapshot_20250127_120000")
-    >>> if success:
+    &gt;&gt;&gt; success = await service.restore_snapshot("snapshot_20250127_120000")
+    &gt;&gt;&gt; if success:
     ...     print("Restore completed successfully")
 
 ### Method: `snapshot_and_cleanup`
@@ -1634,10 +1634,10 @@ Returns:
     - cleanup_stats: Statistics from cleanup operation
 
 Example:
-    >>> result = await service.snapshot_and_cleanup()
-    >>> if result["snapshot_created"]:
-    ...     print(f"Created: {result['snapshot_name']}")
-    ...     print(f"Cleaned up: {result['cleanup_stats']['deleted']} old snapshots")
+    &gt;&gt;&gt; result = await service.snapshot_and_cleanup()
+    &gt;&gt;&gt; if result["snapshot_created"]:
+    ...     print(f"Created: &#123;result['snapshot_name']&#125;")
+    ...     print(f"Cleaned up: &#123;result['cleanup_stats']['deleted']&#125; old snapshots")
 
 ## Class: `ReconciliationResult`
 
@@ -1917,9 +1917,9 @@ Returns:
     List of point IDs missing backup vectors
 
 Example:
-    >>> service = VectorReconciliationService(vector_store)
-    >>> missing = await service.detect_missing_vectors("my_collection")
-    >>> print(f"Found {len(missing)} points missing backup vectors")
+    &gt;&gt;&gt; service = VectorReconciliationService(vector_store)
+    &gt;&gt;&gt; missing = await service.detect_missing_vectors("my_collection")
+    &gt;&gt;&gt; print(f"Found &#123;len(missing)&#125; points missing backup vectors")
 
 ### Method: `reconcile`
 
@@ -1945,9 +1945,9 @@ Returns:
     - errors: List of error messages
 
 Example:
-    >>> service = VectorReconciliationService(vector_store)
-    >>> result = await service.reconcile("my_collection", auto_repair=True)
-    >>> print(f"Detected: {result['detected']}, Repaired: {result['repaired']}")
+    &gt;&gt;&gt; service = VectorReconciliationService(vector_store)
+    &gt;&gt;&gt; result = await service.reconcile("my_collection", auto_repair=True)
+    &gt;&gt;&gt; print(f"Detected: &#123;result['detected']&#125;, Repaired: &#123;result['repaired']&#125;")
 
 ### Method: `repair_missing_vectors`
 
@@ -1971,9 +1971,9 @@ Returns:
     - errors: List of error messages encountered
 
 Example:
-    >>> missing = await service.detect_missing_vectors("collection")
-    >>> stats = await service.repair_missing_vectors("collection", missing)
-    >>> print(f"Repaired: {stats['repaired']}, Failed: {stats['failed']}")
+    &gt;&gt;&gt; missing = await service.detect_missing_vectors("collection")
+    &gt;&gt;&gt; stats = await service.repair_missing_vectors("collection", missing)
+    &gt;&gt;&gt; print(f"Repaired: &#123;stats['repaired']&#125;, Failed: &#123;stats['failed']&#125;")
 
 ## Class: `WatchfilesArgs`
 
@@ -2083,8 +2083,8 @@ Returns:
     - weighted_score: Score weighted by pattern distinctiveness
 
 Example:
-    >>> chars = detect_family_characteristics("function foo() { }")
-    >>> chars[LanguageFamily.C_STYLE]["pattern_matches"]
+    &gt;&gt;&gt; chars = detect_family_characteristics("function foo() &#123; &#125;")
+    &gt;&gt;&gt; chars[LanguageFamily.C_STYLE]["pattern_matches"]
     4
 
 ## Function: `detect_language_family`
@@ -2115,15 +2115,15 @@ Returns:
     List of DelimiterDict entries, one per start/end combination
 
 Example:
-    >>> pattern = DelimiterPattern(
+    &gt;&gt;&gt; pattern = DelimiterPattern(
     ...     starts=["if", "while"], ends=[":", "then"], kind=DelimiterKind.CONDITIONAL
     ... )
-    >>> delims = expand_pattern(pattern)
-    >>> len(delims)
+    &gt;&gt;&gt; delims = expand_pattern(pattern)
+    &gt;&gt;&gt; len(delims)
     4  # 2 starts * 2 ends
-    >>> delims[0]["start"]
+    &gt;&gt;&gt; delims[0]["start"]
     'if'
-    >>> delims[0]["end"]
+    &gt;&gt;&gt; delims[0]["end"]
     ':'
 
 ## Function: `get_family_patterns`
@@ -2141,6 +2141,6 @@ Returns:
     List of DelimiterPattern objects for the family
 
 Example:
-    >>> patterns = get_family_patterns(LanguageFamily.C_STYLE)
-    >>> len(patterns) > 10
+    &gt;&gt;&gt; patterns = get_family_patterns(LanguageFamily.C_STYLE)
+    &gt;&gt;&gt; len(patterns) &gt; 10
     True

@@ -318,7 +318,7 @@ def _quickstart_default(
                 if HAS_ST
                 else FastEmbedSparseEmbeddingProviderSettings
             )(
-                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,  # ty:ignore[invalid-argument-type]
+                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
                 model_name=sparse_model,
                 sparse_embedding_config=SentenceTransformersSparseEmbeddingConfig(
                     model_name=sparse_model

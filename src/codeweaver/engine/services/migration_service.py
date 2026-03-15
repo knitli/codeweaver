@@ -310,17 +310,38 @@ class MigrationService:
             self._migration_worker(item, migration_id, checkpoint) for item in work_items
         ]
         results = await asyncio.gather(*worker_tasks, return_exceptions=True)
-        total_vectors = 0
+        successes: list[ChunkResult] = []
+        failures: list[tuple[int, str]] = []
         for result in results:
             if isinstance(result, Exception):
-                logger.error("Worker failed: %s", result, exc_info=result)
-                raise MigrationError(f"Worker failed: {result}")
-            if not cast(ChunkResult, result).success:
-                raise MigrationError(
-                    f"Worker {cast(ChunkResult, result).worker_id} failed: {cast(ChunkResult, result).error}"
-                )
-            total_vectors += cast(ChunkResult, result).vectors_processed
-        return total_vectors
+                logger.error("Worker raised exception: %s", result, exc_info=result)
+                failures.append((-1, str(result)))
+            elif not cast(ChunkResult, result).success:
+                chunk = cast(ChunkResult, result)
+                logger.error("Worker %d returned failure: %s", chunk.worker_id, chunk.error)
+                failures.append((chunk.worker_id, chunk.error or "unknown error"))
+            else:
+                successes.append(cast(ChunkResult, result))
+        if failures and successes:
+            # Partial success: some workers wrote data, some failed — clean up
+            logger.warning(
+                "Partial migration failure: %d workers succeeded, %d failed. "
+                "Cleaning up partially-written target collection '%s'.",
+                len(successes),
+                len(failures),
+                target_collection,
+            )
+            await self._cleanup_failed_migration(target_collection)
+            failed_detail = "; ".join(f"worker {wid}: {err}" for wid, err in failures)
+            raise MigrationError(
+                f"Partial migration failure — rolled back target collection. Failures: {failed_detail}"
+            )
+        if failures:
+            # All failed: nothing was successfully written, no cleanup needed
+            failed_detail = "; ".join(f"worker {wid}: {err}" for wid, err in failures)
+            raise MigrationError(f"All workers failed: {failed_detail}")
+        # All succeeded
+        return sum(r.vectors_processed for r in successes)
 
     @retry(
         stop=stop_after_attempt(5),
@@ -658,6 +679,48 @@ class MigrationService:
     ) -> None:
         """Create target collection with new dimension."""
         logger.info("Creating collection '%s' with dimension %d", name, dimension)
+
+    async def _cleanup_failed_migration(self, target_collection: str) -> None:
+        """Remove a partially-populated target collection after a partial migration failure.
+
+        Resilient — logs cleanup failures without re-raising so the original
+        MigrationError is always the one surfaced to the caller.
+
+        Args:
+            target_collection: Name of the target collection to delete.
+        """
+        logger.warning(
+            "Cleaning up partially-written target collection '%s' after partial migration failure",
+            target_collection,
+        )
+        from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
+        try:
+            if not isinstance(self.vector_store, QdrantBaseProvider):
+                logger.warning(
+                    "Vector store is not QdrantBaseProvider; "
+                    "target collection '%s' may need manual cleanup",
+                    target_collection,
+                )
+                return
+            if hasattr(self.vector_store, "delete_collection") and callable(self.vector_store.delete_collection):
+                await self.vector_store.delete_collection(target_collection)
+            else:
+                logger.warning(
+                    "Vector store does not support delete_collection; "
+                    "target collection '%s' may need manual cleanup",
+                    target_collection,
+                )
+                return
+            logger.info(
+                "Successfully deleted partially-written target collection '%s'", target_collection
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to clean up target collection '%s' after partial migration failure: %s. "
+                "Manual cleanup may be required.",
+                target_collection,
+                exc,
+            )
 
     async def _switch_collection_alias(self, alias: str, new_target: str, old_target: str) -> None:
         """Blue-green switch of collection alias."""

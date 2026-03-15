@@ -1,3 +1,7 @@
+---
+title: "Configuration Architecture"
+---
+
 # Configuration Architecture
 
 > **TL;DR:** CodeWeaver Alpha 6 features a completely overhauled configuration system powered by Pydantic. Use it to define your providers, server settings, and performance limits. It catches setup errors at boot-time, ensuring your agent always has a reliable foundation.

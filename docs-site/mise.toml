@@ -19,4 +19,4 @@ sync = "bun install"
 
 [tasks.gen-api-docs]
 tools.uv = "latest"
-run = "uvx ../scripts/gen-api-docs.py"
+run = "uvx ../scripts/gen_api_docs.py"

@@ -5,13 +5,11 @@
 
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
-import tailwindcss from '@tailwindcss/vite';
 
 import starlightChangelogs from 'starlight-changelogs';
 import starlightLinksValidator from 'starlight-links-validator'
-import starlightSidebarTopics from 'starlight-sidebar-topics';
 import starlightScrollToTop from 'starlight-scroll-to-top';
-import starlightPluginIcons from 'starlight-plugin-icons';
+import { starlightIconsPlugin, starlightIconsIntegration } from 'starlight-plugin-icons';
 import starlightPageActions from 'starlight-page-actions';
 import astroD2 from 'astro-d2';
 import markdoc from '@astrojs/markdoc';
@@ -26,6 +24,7 @@ export default defineConfig({
       dark: './src/assets/codeweaver-reverse.svg',
     },
     favicon: '/codeweaver-favico.png',
+
     social: [
       {
         label: 'GitHub',
@@ -75,8 +74,15 @@ export default defineConfig({
         ],
       },
     ],
-  }), markdoc()],
+    plugins: [
+      starlightLinksValidator(),
+      starlightScrollToTop({showOnHomepage: false }),
+      starlightChangelogs(),
+      starlightIconsPlugin(),
+      starlightPageActions({ actions: ["copy", "view", "claude", "chatgpt"], share: true }),
+    ],
+  }), starlightIconsIntegration(), astroD2({ skipGeneration: true }), markdoc()],
   vite: {
-    plugins: [tailwindcss(), starlightLinksValidator(), starlightSidebarTopics(), starlightScrollToTop(), starlightChangelogs(), starlightPluginIcons(), astroD2(), starlightPageActions({ baseUrl: 'https://docs.knitli.com/codeweaver' })],
+    plugins: [],
   },
 });
