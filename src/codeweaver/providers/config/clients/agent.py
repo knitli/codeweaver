@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, override
+from urllib.parse import urlparse
 
 import httpx
 
@@ -98,6 +99,15 @@ class XAIClientOptions(ClientOptions):
         }
 
 
+def _test_url_for_provider(url: str, domain: str) -> bool:
+    """Test if the given URL is likely to be associated with the given provider based on its domain."""
+    try:
+        parsed_url = urlparse(url)
+        return parsed_url.netloc.endswith(domain)
+    except Exception:
+        return False
+
+
 class BaseAnthropicClientOptions(ClientOptions):
     """Base client options for Anthropic-based providers."""
 
@@ -128,8 +138,7 @@ class BaseAnthropicClientOptions(ClientOptions):
             for name in ("http_client", "default_headers", "default_query")
         } | {
             FilteredKey("base_url"): AnonymityConversion.HASH
-            if not getattr(self, "base_url", None)
-            or not str(getattr(self, "base_url", "")).endswith("anthropic.com")
+            if self.base_url and _test_url_for_provider(str(self.base_url), "anthropic.com")
             else AnonymityConversion.BOOLEAN
         }
 
@@ -340,11 +349,11 @@ def discriminate_anthropic_agent_client_options(v: Any) -> str:
     if "auth_token" in fields:
         return "anthropic"
     if base_url := str(v.get("base_url") if isinstance(v, dict) else getattr(v, "base_url", None)):
-        if "groq.com" in base_url:
+        if _test_url_for_provider(base_url, "groq.ai"):
             return "groq"
-        if "azure" in base_url:
+        if _test_url_for_provider(base_url, "azure.com"):
             return "anthropic-azure"
-        if "googleapis.com" in base_url:
+        if _test_url_for_provider(base_url, "googleapis.com"):
             return "anthropic-google"
     return "anthropic"
 

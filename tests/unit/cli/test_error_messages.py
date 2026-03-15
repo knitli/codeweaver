@@ -330,6 +330,13 @@ class TestErrorMessageActionability:
         # Must explain failure reason
         assert "timeout" in message.lower() or "failed" in message.lower()
 
+    def _test_url_for_domain(self, text: str, domain: str) -> bool:
+        """Helper to check if text contains a URL for a specific domain."""
+        from urllib.parse import urlparse
+
+        parsed_url = urlparse(text)
+        return parsed_url.netloc.endswith(domain)
+
     def test_network_timeout_has_guidance(self) -> None:
         """Network timeout error provides troubleshooting steps."""
         error = trigger_network_timeout()

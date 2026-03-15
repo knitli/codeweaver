@@ -85,6 +85,7 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
         client_options: QdrantClientOptions | None = None,
         collection: CollectionConfig | None = None,
         batch_size: PositiveInt | None = DEFAULT_VECTOR_STORE_BATCH_SIZE,
+        in_memory_config: MemoryConfig | None = None,
         *,
         project_name: str | None = None,
         project_path: Path | None = None,
@@ -97,6 +98,7 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
             client_options: Client options for the provider's client.
             collection: Collection configuration for the vector store.
             batch_size: Batch size for bulk upsert operations.
+            in_memory_config: In-memory vector store configuration.
             project_name: The name of the project.
             project_path: The path to the project.
         """
@@ -115,15 +117,14 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
             ).model_dump()
             | collection_data
         )
-        constructed = self.__class__.model_construct(
+        super().__init__(
             provider=provider,
             connection=connection,
             client_options=prepared_client_options,
-            collection=prepared_collection,
+            collection=prepared_collection,  # ty: ignore[unknown-argument]
             batch_size=batch_size,
+            in_memory_config=in_memory_config,  # ty: ignore[unknown-argument]
         )
-        for field_name in type(constructed).model_fields:
-            object.__setattr__(self, field_name, getattr(constructed, field_name))
 
     _resolved_dimension: int | None = PrivateAttr(default=None)
     _resolved_datatype: str | None = PrivateAttr(default=None)
@@ -342,17 +343,16 @@ class MemoryVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
                 project_name=project_name,
                 project_path=project_path,
             )
-        constructed = self.__class__.model_construct(
+        super().__init__(
             provider=provider,
             connection=connection,
             client_options=prepared_client_options,
             collection=prepared_collection,
             batch_size=batch_size,
             in_memory_config=in_memory_config,
+            project_name=project_name,
+            project_path=project_path,
         )
-        for field_name in constructed.model_fields:
-            object.__setattr__(self, field_name, getattr(constructed, field_name))
-        object.__setattr__(self, "__pydantic_fields_set__", set(constructed.model_fields.keys()))
 
     @staticmethod
     def _get_persist_path(
