@@ -98,7 +98,15 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
           fetch-depth: 3
-
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            pkg-config \
+            python3-dev \
+            libffi-dev \
+            libssl-dev
       - name: Setup Python environment with Mise
         uses: ./.github/actions/setup-mise-env
         with:
@@ -130,8 +138,7 @@ jobs:
       - name: Download models for real provider tests
         run: |
           uv pip install sentence-transformers
-          # Use the lightweight 30M model for faster test execution (10x faster than english-r2)
-          uv run python -c "from sentence_transformers import SentenceTransformer; print('Downloading IBM Granite 30M...'); SentenceTransformer('ibm-granite/granite-embedding-30m-english')"
+          uv run python -c "from sentence_transformers import SentenceTransformer; print('Downloading Potion 8M...'); SentenceTransformer('minishlabs/potion-base-8M')"
           uv run python -c "from sentence_transformers import CrossEncoder; print('Downloading MS MARCO...'); CrossEncoder('cross-encoder/ms-marco-MiniLM-L6-v2')"
 
       - name: Run tests with coverage
