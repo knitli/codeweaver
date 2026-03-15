@@ -356,7 +356,7 @@ class TestErrorMessageActionability:
 
         # Must reference provider status if available
         assert (
-            "status.voyageai.com" in suggestions_text
+            "https://status.voyageai.com" in suggestions_text
             or "provider status" in suggestions_text.lower()
         )
 
