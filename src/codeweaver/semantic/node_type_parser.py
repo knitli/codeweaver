@@ -604,28 +604,39 @@ class NodeTypeParser:
                 Token,
             )
 
-            # Define a local version of the cache dict to ensure all types are resolved for validation
+            # Define structures for validation using class-based TypedDict
             class RegistrationCache(TypedDict):
                 categories: list[Category]
                 tokens: list[Token]
                 composites: list[CompositeThing]
                 connections: list[DirectConnection | PositionalConnections]
 
-            PayloadType = TypedDict(
-                "PayloadType",
-                {"registration_cache": dict[SemanticSearchLanguage, RegistrationCache]},
-            )
-            adapter = TypeAdapter(PayloadType)
+            class Payload(TypedDict):
+                registration_cache: dict[SemanticSearchLanguage, RegistrationCache]
 
+            adapter = TypeAdapter(Payload)
+
+            # Load and validate JSON cache
             cache_data = adapter.validate_json(cache_resource.read_bytes())
 
             type(self)._registration_cache = cast(
                 dict[SemanticSearchLanguage, _ThingCacheDict], cache_data["registration_cache"]
             )
+
+            # Clear any stale cached_property values from instances.
+            # classification_result may have been computed and cached during cache generation
+            # before GrammarClassificationResult was fully initialized, leaving broken empty
+            # instances. Clearing it ensures fresh computation on next access.
+            for lang_cache in type(self)._registration_cache.values():
+                for obj in (*lang_cache.get("tokens", []), *lang_cache.get("composites", [])):
+                    if hasattr(obj, "__dict__"):
+                        obj.__dict__.pop("classification_result", None)
+
             type(self)._cache_loaded = True
             logger.debug("Loaded node types from cache")
+            return True
 
-        except (ValidationError, json.JSONDecodeError, AttributeError, KeyError) as e:
+        except (ValidationError, json.JSONDecodeError, AttributeError, KeyError, ImportError) as e:
             # Specific data structure or JSON errors
             logger.warning("Cache corrupted or incompatible: %s, will parse from JSON", e)
             return False
@@ -633,8 +644,6 @@ class NodeTypeParser:
             # File system errors
             logger.warning("Failed to read cache file: %s, will parse from JSON", e)
             return False
-        else:
-            return True
 
     @property
     def nodes(self) -> list[NodeArray]:
