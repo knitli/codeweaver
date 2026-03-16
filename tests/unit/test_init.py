@@ -8,11 +8,16 @@ import pytest
 
 import codeweaver
 
-_original_version = importlib.metadata.version
 
 @pytest.fixture
 def mock_no_version_file(monkeypatch):
-    """Remove _version module from sys.modules and codeweaver module."""
+    """Remove _version module from sys.modules and codeweaver module.
+
+    A reload of the codeweaver module is necessary because the `get_version()`
+    function evaluates the imports (which populate its internal values) exactly once
+    at execution time. If we don't reload the module after changing sys.modules,
+    it may continue using the previously cached module references.
+    """
     monkeypatch.delitem(sys.modules, "codeweaver._version", raising=False)
     if hasattr(codeweaver, "_version"):
         monkeypatch.delattr(codeweaver, "_version", raising=False)
@@ -26,6 +31,8 @@ def mock_no_version_file(monkeypatch):
 @pytest.fixture
 def mock_no_metadata(monkeypatch, mock_no_version_file):
     """Mock importlib.metadata to raise PackageNotFoundError for code-weaver."""
+    _original_version = importlib.metadata.version
+
     def mock_version(pkg_name):
         if pkg_name == "code-weaver":
             raise importlib.metadata.PackageNotFoundError("code-weaver")
@@ -48,6 +55,8 @@ def test_get_version_from_version_file(monkeypatch, mock_no_version_file):
 def test_get_version_from_importlib_metadata(monkeypatch, mock_no_version_file):
     """Test getting version from importlib.metadata."""
     get_version = mock_no_version_file
+    _original_version = importlib.metadata.version
+
     def mock_version(pkg_name):
         if pkg_name == "code-weaver":
             return "1.2.3-metadata"
