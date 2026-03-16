@@ -105,8 +105,6 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          allowed_non_write_users: "*"
-          allowed_bots: "github-actions[bot],copilot[bot],dependabot[bot],copilot,github-actions,gemini[bot],claude[bot]"
           trigger_phrase: "@claude"
           assignee_trigger: claude
           label_trigger: claude
@@ -142,8 +140,6 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          allowed_non_write_users: "*"
-          allowed_bots: "github-actions[bot],copilot[bot],dependabot[bot],copilot,github-actions,gemini[bot],claude[bot]"
           trigger_phrase: "@claude"
           assignee_trigger: claude
           label_trigger: claude
@@ -181,8 +177,6 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          allowed_non_write_users: "*"
-          allowed_bots: "github-actions[bot],copilot[bot],dependabot[bot],copilot,github-actions,gemini[bot],claude[bot]"
           trigger_phrase: "@claude"
           assignee_trigger: claude
           label_trigger: claude
