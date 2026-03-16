@@ -11,7 +11,7 @@ annotations, preventing arbitrary code execution while supporting
 complex Python type hints including generics, unions, and Annotated types.
 """
 
-from typing import Annotated, List, Optional, Union, get_args, get_origin
+from typing import Annotated, List, Optional, Union, get_args
 
 import pytest
 
