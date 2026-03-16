@@ -49,7 +49,7 @@ async def test_run_dispatches_to_correct_server(
             project_path=project_path,
             host=host,
             port=port,
-            transport=transport,  # type: ignore[arg-type]
+            transport=transport,
             verbose=False,
             debug=False,
         )
