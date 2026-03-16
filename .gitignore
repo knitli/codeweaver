@@ -231,3 +231,4 @@ mise.local.env
 
 .gemini/
 gha-creds-*.json
+.hypothesis/
