@@ -43,12 +43,12 @@ from codeweaver.providers.config.clients.utils import (
 )
 
 
-if has_package("google") is not None:
+if has_package("google"):
     from google.auth.credentials import Credentials as GoogleCredentials
 else:
     GoogleCredentials = Any
 
-if has_package("fastembed") is not None or has_package("fastembed_gpu") is not None:
+if has_package("fastembed") or has_package("fastembed_gpu"):
     try:
         from fastembed.common.types import OnnxProvider
     except ImportError:
@@ -56,14 +56,14 @@ if has_package("fastembed") is not None or has_package("fastembed_gpu") is not N
 else:
     OnnxProvider = Any  # type: ignore[assignment, misc]
 
-if has_package("torch") is not None:
+if has_package("torch"):
     try:
         from torch.nn import Module
     except ImportError:
         Module = Any  # type: ignore[assignment, misc]
 else:
     Module = Any  # type: ignore[assignment, misc]
-if has_package("sentence_transformers") is not None:
+if has_package("sentence_transformers"):
     # SentenceTransformerModelCardData contains these forward references:
     # - eval_results_dict: dict[SentenceEvaluator, dict[str, Any]] | None
     # - model: SentenceTransformer | None
