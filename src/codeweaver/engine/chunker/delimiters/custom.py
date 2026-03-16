@@ -362,7 +362,7 @@ HTML_TAGS_PATTERNS = [
         starts=[f"<{tag}"],
         ends=[f"</{tag}>"],
         kind=DelimiterKind.BLOCK
-        if tag in ["html", "body", "main", "section", "article"]
+        if tag in {"html", "body", "main", "section", "article"}
         else DelimiterKind.PARAGRAPH,
         inclusive=True,
         take_whole_lines=True,
