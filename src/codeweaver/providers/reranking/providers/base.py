@@ -462,7 +462,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         Note: This sync method is only called from async contexts (from the rerank method).
         """
         # voyage and cohere return token count, others do not
-        if self.provider not in (Provider.VOYAGE, Provider.COHERE):
+        if self.provider not in [Provider.VOYAGE, Provider.COHERE]:
             # We're always called from async context (rerank method), so we can safely get the loop
             try:
                 loop = loop or asyncio.get_running_loop()

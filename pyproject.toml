@@ -120,7 +120,7 @@ dependencies = [
   # So we pin it to make sure we don't break on minor releases
   "pydantic==2.12.5",
   # for, you know, platform dirs
-  "platformdirs>=4.9.4",
+  "platformdirs>=4.9.2",
   # psutil used for resource governance/limiting by engine
   "psutil>=7.2.2",
   "textcase>=0.4.5",
@@ -140,20 +140,20 @@ dependencies = [
   # for local providers (sentence-transformers, fastembed) to detect CPU/GPU features
   "py-cpuinfo>=9.0.0",
   # * ================ CLI Dependencies ==================*
-  "cyclopts>=4.10.0",
-  "rich>=14.3.3",
+  "cyclopts>=4.5.1",
+  "rich>=14.3.0",
   # * ================ Provider Clients ==================*
   # we must pin these to specific versions to ensure compatibility with our ClientOptions subclasses
   "boto3==1.42.19",
-  "cohere==5.20.7",
+  "cohere==5.20.1",
   "fastembed==0.7.4; python_version < '3.14'",
   "google-genai==1.56.0",
   # NOTE: We're waiting on pydantic-ai to update to 1.0+ before we can upgrade too
-  "huggingface-hub>=1.7.1",
+  "huggingface-hub==0.36.2",
   "mistralai==1.10.0",
-  "openai==2.28.0",
-  "qdrant-client==1.17.1",
-  "pydantic-ai-slim>=1.68.0",
+  "openai==2.17.0",
+  "qdrant-client==1.16.2",
+  "pydantic-ai-slim>=1.56.0",
   "sentence-transformers==5.2.0; python_version <= '3.14'",
   "voyageai==0.3.7",
   # * ================ Indexing and Engine ==================*
@@ -171,12 +171,12 @@ dependencies = [
   # fastmcp is the core MCP server framework
   "fastmcp>=2.14.5",
   # just used for types but we need them at runtime for Pydantic models
-  "mcp>=1.23.3",
+  "mcp>=1.19.0",
   # Runs the core admin/management server
   "uvicorn[standard]>=0.40.0",
   # * ================ Configuration and Settings ==================*
   # pydantic-settings with toml and yaml support for config files
-  "pydantic-settings[toml,yaml]>=2.13.1",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
+  "pydantic-settings[toml,yaml]>=2.12.0",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
   # For writing toml config files
   "tomli-w>=1.2.0",
   # * ================ Telemetry and Observability ==================*

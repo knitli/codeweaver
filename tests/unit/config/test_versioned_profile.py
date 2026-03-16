@@ -15,7 +15,6 @@ from codeweaver.providers.config.profiles import VersionedProfile
 from codeweaver.providers.config.sdk import VoyageEmbeddingConfig
 
 
-@pytest.mark.unit
 class TestVersionedProfile:
     """Test suite for VersionedProfile dataclass."""
 
@@ -210,7 +209,6 @@ class TestVersionedProfile:
         assert VersionedProfile.is_compatible_with(__version__, __version__)
 
 
-@pytest.mark.unit
 class TestVersionedProfileIntegrationWithCollectionMetadata:
     """Test integration between VersionedProfile and CollectionMetadata."""
 

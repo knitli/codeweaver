@@ -25,9 +25,9 @@ from codeweaver.core import (
     ConfigLanguage,
     EnvFormat,
     Provider,
-    ProviderCategory,
     ProviderEnvVarInfo,
     ProviderEnvVars,
+    ProviderCategory,
     SemanticSearchLanguage,
 )
 
