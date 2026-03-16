@@ -48,7 +48,7 @@ if has_package("google"):
 else:
     GoogleCredentials = Any
 
-if has_package("fastembed") or has_package("fastembed_gpu"):
+if has_package("fastembed") or has_package("fastembed-gpu"):
     from fastembed.common.types import OnnxProvider
 else:
     OnnxProvider = object
