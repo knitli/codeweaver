@@ -1,7 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Unit tests for file discovery functionality."""
+
+from __future__ import annotations
+
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from codeweaver.core.discovery import DiscoveredFile
+
+pytestmark = [pytest.mark.unit]
 
 
 def test_absolute_path_filenotfound(tmp_path: Path) -> None:
