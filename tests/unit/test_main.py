@@ -17,6 +17,7 @@ def test_setup_signal_handler_first_interrupt():
         with pytest.raises(KeyboardInterrupt):
             force_shutdown_handler(signal.SIGINT, None)
 
+
 def test_setup_signal_handler_second_interrupt():
     """Test that the second interrupt exits immediately."""
     with patch("signal.signal") as mock_signal:
@@ -34,6 +35,7 @@ def test_setup_signal_handler_second_interrupt():
 
             mock_warning.assert_called_with("Force shutdown requested, exiting immediately...")
             mock_exit.assert_called_with(1)
+
 
 def test_setup_signal_handler_suppress_errors():
     """Test that ValueError and OSError are suppressed when setting the signal."""
