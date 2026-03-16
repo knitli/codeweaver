@@ -153,9 +153,6 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                 await temp_path.unlink()
 
         try:
-            # Ensure parent directory exists before creating Qdrant client
-            await temp_path.parent.mkdir(parents=True, exist_ok=True)
-
             # Initialize persistent client at temp path
             # We use AsyncQdrantClient with path to create local storage
             dest_client = AsyncQdrantClient(path=str(temp_path))

@@ -1268,11 +1268,11 @@ def _build_data_provider_cards() -> list[ServiceCard]:
         service_card_factory(
             "duckduckgo",
             "data",
-            lateimport("codeweaver.providers.data.duckduckgo", "duckduckgo_search_tool"),
+            lateimport("pydantic_ai.common_tools.duckduckgo", "duck_duck_go_search_tool"),
             lateimport("ddgs.ddgs", "DDGS"),
             "duckduckgo",
             metadata=ServiceMetadata(
-                # provider_cls is duckduckgo_search_tool; called with (client, **extra_kwargs)
+                # provider_cls is duck_duck_go_search_tool; called with (client, **extra_kwargs)
                 provider_handler=lambda provider_cls, card, client=None, **kwargs: provider_cls(
                     client, max_results=15
                 )

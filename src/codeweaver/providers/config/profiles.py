@@ -349,11 +349,11 @@ def _quickstart_default(
                 agent_config=AnthropicAgentModelConfig(anthropic_thinking={"type": "disabled"}),
             ),
         ),
-        data=(TavilyProviderSettings(provider=Provider.TAVILY),)
-        if has_package("tavily") and Provider.TAVILY.has_env_auth
-        else (DuckDuckGoProviderSettings(provider=Provider.DUCKDUCKGO),)
-        if has_package("ddgs")
-        else (),
+        data=(
+            TavilyProviderSettings(provider=Provider.TAVILY)
+            if has_package("tavily") and Provider.TAVILY.has_env_auth
+            else DuckDuckGoProviderSettings(provider=Provider.DUCKDUCKGO),
+        ),
         vector_store=(
             QdrantVectorStoreProviderSettings(
                 provider=Provider.QDRANT,
