@@ -177,7 +177,12 @@ async def _resolve_indexer_from_container() -> IndexingService | None:
 
         container = get_container()
         return await container.resolve(IndexingService)
-    except Exception:
+    except Exception as e:
+        logger.warning(
+            "Failed to resolve IndexingService from container: %s",
+            e,
+            exc_info=True,
+        )
         return None
 
 
@@ -200,7 +205,7 @@ async def _ensure_index_ready(
             # We enable reconciliation by default to fix any partial indexes
             await indexer.index_project(add_dense=True, add_sparse=True)
         except Exception as e:
-            logger.warning("Auto-indexing failed: %s", e)
+            logger.warning("Auto-indexing failed: %s", e, exc_info=True)
 
 
 async def _build_search_package(package: SearchPackageDep) -> SearchPackage:
@@ -313,7 +318,7 @@ async def _finalize_response(
         strategies_used=strategies_used,
     )
 
-    if telemetry_settings.tools_over_privacy:
+    if getattr(telemetry_settings, "tools_over_privacy", False):
         feature_flags = {
             "search-ranking-v2": telemetry.client.get_feature_flag("search-ranking-v2"),
             "rerank-strategy": telemetry.client.get_feature_flag("rerank-strategy"),

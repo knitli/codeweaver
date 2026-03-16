@@ -229,6 +229,11 @@ test-results.xml
 mise.local.toml
 mise.local.env
 
+<<<<<<< Updated upstream
+.exportify/
+!.exportify/config.toml
+=======
 .gemini/
 gha-creds-*.json
 .hypothesis/
+>>>>>>> Stashed changes
