@@ -177,7 +177,8 @@ async def _resolve_indexer_from_container() -> IndexingService | None:
 
         container = get_container()
         return await container.resolve(IndexingService)
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to resolve IndexingService from container: %s", e)
         return None
 
 
