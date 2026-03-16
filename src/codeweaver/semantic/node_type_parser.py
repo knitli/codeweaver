@@ -252,7 +252,7 @@ from collections.abc import Callable, Sequence
 from importlib.resources import files
 from itertools import groupby
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, overload, override
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, overload
 
 from pydantic import DirectoryPath, Field
 from pydantic_core import from_json
