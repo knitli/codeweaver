@@ -143,18 +143,20 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         """
         # Atomic persistence via temporary directory
         persist_path = AsyncPath(str(self.persist_path))
+        await persist_path.parent.mkdir(parents=True, exist_ok=True)
         temp_path = persist_path.with_suffix(".tmp")
         if await temp_path.exists():
             import shutil
 
             if await temp_path.is_dir():
-                await asyncio.to_thread(shutil.rmtree, str(temp_path))
+                await asyncio.to_thread(shutil.rmtree, str(temp_path), ignore_errors=True)
             else:
                 await temp_path.unlink()
 
         try:
             # Initialize persistent client at temp path
             # We use AsyncQdrantClient with path to create local storage
+            await temp_path.mkdir(parents=True, exist_ok=True)
             dest_client = AsyncQdrantClient(path=str(temp_path))
 
             # Migrate data
@@ -164,22 +166,24 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             await dest_client.close()
 
             # Atomic replace
-            if await temp_path.exists():
-                if await persist_path.exists():
+            try:
+                if await temp_path.exists():
+                    if await persist_path.exists():
+                        import shutil
+                        if await persist_path.is_dir():
+                            await asyncio.to_thread(shutil.rmtree, str(self.persist_path), ignore_errors=True)
+                        else:
+                            await persist_path.unlink()
                     import shutil
-
-                    if await persist_path.is_dir():
-                        await asyncio.to_thread(shutil.rmtree, str(self.persist_path))
-                    else:
-                        await persist_path.unlink()
-
-                await temp_path.rename(str(self.persist_path))
+                    await asyncio.to_thread(shutil.move, str(temp_path), str(self.persist_path))
+            except (FileNotFoundError, OSError):
+                pass
         except Exception as e:
             if await temp_path.exists():
                 import shutil
 
                 if await temp_path.is_dir():
-                    await asyncio.to_thread(shutil.rmtree, str(temp_path))
+                    await asyncio.to_thread(shutil.rmtree, str(temp_path), ignore_errors=True)
                 else:
                     await temp_path.unlink()
             raise PersistenceError(f"Failed to persist to disk: {e}") from e
