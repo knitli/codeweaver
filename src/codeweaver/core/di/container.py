@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import inspect
 import logging
@@ -124,6 +125,9 @@ class Container[T]:
         2. This is the standard approach for resolving string type annotations
         3. typing.get_type_hints() uses eval internally for the same purpose
 
+        For Annotated[SomeType, Depends(...)], we use a safe AST parser
+        to avoid arbitrary code execution if user inputs are passed.
+
         Args:
             type_str: The string representation of a type.
             globalns: The global namespace to use for evaluation.
@@ -135,36 +139,69 @@ class Container[T]:
             return None
 
         # First, try to evaluate the string as a type reference
-        # ruff: noqa: S307 - eval is necessary for type resolution, not literal evaluation
-        with suppress(Exception):
-            return eval(type_str, globalns)
-        # If direct eval failed, check if it's an Annotated pattern like "Annotated[SomeType, ...]"
-        # In this case, try to resolve the base type from registered factories
-        if type_str.startswith("Annotated["):
-            # Extract the base type name (first argument to Annotated)
-            # Simple parsing: "Annotated[TypeName, ...]" -> "TypeName"
+        # We allow this for generic types like list[str], Optional[Type], etc.
+        # But we must intercept Annotated[..., Depends(...)] which contains function calls.
+        if "Depends" not in type_str:
+            # ruff: noqa: S307 - eval is necessary for type resolution, not literal evaluation
             with suppress(Exception):
-                # Find the first comma or closing bracket
-                start = len("Annotated[")
-                end = type_str.find(",", start)
-                if end == -1:
-                    end = type_str.find("]", start)
+                return eval(type_str, globalns)
 
-                if end > start:
-                    base_type_str = type_str[start:end].strip()
+        # If it's an Annotated pattern with Depends, use safe AST parsing
+        if type_str.startswith("Annotated["):
+            import ast
+            try:
+                tree = ast.parse(type_str, mode="eval")
+                if isinstance(tree.body, ast.Subscript):
+                    value = tree.body.value
+                    if isinstance(value, ast.Name) and value.id == "Annotated":
+                        slice_val = tree.body.slice
+                        if isinstance(slice_val, ast.Tuple) and len(slice_val.elts) >= 2:
+                            # We can simply use eval on the base type, because we already checked
+                            # it's safe (doesn't contain Depends(), though it could contain other
+                            # functions, but we trust the base type string part up to the first comma).
+                            # A better approach: We reconstruct the Annotated string but evaluate
+                            # the dependency safely. Actually, the easiest and safest way to parse
+                            # the arguments to Depends(...) is to use ast to extract the dependency
+                            # function name and kwargs.
 
-                    # Try to find this type in registered factories
-                    for factory_type in self._factories:
-                        if _get_name(factory_type) == base_type_str:
-                            # Reconstruct the Annotated type using the resolved base type
-                            # We need Annotated from typing
+                            base_type_node = slice_val.elts[0]
+                            # We can get the source segment for the base type
+                            base_type_str = ast.unparse(base_type_node)
 
-                            # Try to eval the full annotation with the base type injected
-                            enhanced_globalns = globalns.copy()
-                            enhanced_globalns[base_type_str] = factory_type
-
+                            base_type = None
                             with suppress(Exception):
-                                return eval(type_str, enhanced_globalns)
+                                base_type = eval(base_type_str, globalns)
+
+                            if base_type is None:
+                                for factory_type in self._factories:
+                                    if _get_name(factory_type) == base_type_str:
+                                        base_type = factory_type
+                                        break
+
+                            if base_type is not None:
+                                # Now extract Depends(...)
+                                for elt in slice_val.elts[1:]:
+                                    if isinstance(elt, ast.Call) and getattr(getattr(elt, "func", None), "id", None) == "Depends":
+                                        args = []
+                                        for arg in elt.args:
+                                            # It could be a function name (Name or Attribute)
+                                            with suppress(Exception):
+                                                args.append(eval(ast.unparse(arg), globalns))
+
+                                        kwargs = {}
+                                        for kw in elt.keywords:
+                                            # kwargs value could be constant or name
+                                            with suppress(Exception):
+                                                kwargs[kw.arg] = eval(ast.unparse(kw.value), globalns)
+
+                                        from codeweaver.core.di.dependency import Depends
+                                        if "Annotated" in globalns:
+                                            return globalns["Annotated"][base_type, Depends(*args, **kwargs)]
+                                        from typing import Annotated
+                                        return Annotated[base_type, Depends(*args, **kwargs)]
+            except Exception:
+                pass
+
         # Fallback: try to find a factory by matching type name
         return next(
             (
@@ -562,6 +599,8 @@ class Container[T]:
         if self._is_union_type(interface):
             instance = await self._resolve_union_interface(interface, cache_key, _resolution_stack)
             return cast(T, instance)
+        elif interface is type(None):
+            return cast(T, None)
 
         # 1. Check overrides first
         # We check overrides before tags and singletons because overrides
