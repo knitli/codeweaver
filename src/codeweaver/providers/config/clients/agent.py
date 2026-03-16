@@ -39,7 +39,7 @@ from codeweaver.providers.config.clients.utils import (
 )
 
 
-if TYPE_CHECKING and has_package("google") is not None:
+if TYPE_CHECKING and has_package("google"):
     from google.auth.credentials import Credentials as GoogleCredentials
 else:
     GoogleCredentials = Any

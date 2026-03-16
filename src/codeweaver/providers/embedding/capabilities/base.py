@@ -264,8 +264,8 @@ class EmbeddingModelCapabilities(BasedModel):
         return None
 
 
-HAS_FASTEMBED = has_package("fastembed") is not None or has_package("fastembed_gpu") is not None
-HAS_ST = has_package("sentence_transformers") is not None
+HAS_FASTEMBED = has_package("fastembed") or has_package("fastembed_gpu")
+HAS_ST = has_package("sentence_transformers")
 
 
 class SparseEmbeddingModelCapabilities(BasedModel):

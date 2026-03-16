@@ -343,7 +343,7 @@ def _get_default_reranking_settings() -> DeterminedDefaults:
     Priority: Voyage (cloud, auth required) > FastEmbed > SentenceTransformers.
     """
     for lib in ("voyageai", "fastembed_gpu", "fastembed", "sentence_transformers"):
-        if has_package(lib) is not None:
+        if has_package(lib):
             if lib == "voyageai" and Provider.VOYAGE.has_env_auth:
                 return DeterminedDefaults(
                     provider=Provider.VOYAGE,
@@ -411,7 +411,7 @@ DefaultRerankingProviderSettings: tuple[RerankingProviderSettings, ...] | None =
     None  # Will be lazy-initialized
 )
 
-HAS_ANTHROPIC = (has_package("anthropic") or has_package("claude-agent-sdk")) is not None
+HAS_ANTHROPIC = has_package("anthropic") or has_package("claude-agent-sdk")
 
 
 def _get_default_agent_provider_settings() -> tuple[AgentProviderSettingsType, ...] | None:

@@ -240,7 +240,7 @@ def _get_default_reranking_settings() -> DeterminedDefaults:
     Priority: Voyage (cloud, auth required) > FastEmbed > SentenceTransformers.
     """
     for lib in ("voyageai", "fastembed_gpu", "fastembed", "sentence_transformers"):
-        if has_package(lib) is not None:
+        if has_package(lib):
             if lib == "voyageai" and Provider.VOYAGE.has_env_auth:
                 return DeterminedDefaults(
                     provider=Provider.VOYAGE,
