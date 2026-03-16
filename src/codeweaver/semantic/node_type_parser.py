@@ -245,14 +245,14 @@ For developers familiar with tree-sitter terminology:
 
 from __future__ import annotations
 
+import json
 import logging
-import pickle
 
 from collections.abc import Callable, Sequence
 from importlib.resources import files
 from itertools import groupby
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, overload
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, overload, override
 
 from pydantic import DirectoryPath, Field
 from pydantic_core import from_json
@@ -347,7 +347,7 @@ logger = logging.getLogger()
 #
 # * Static at runtime
 #
-# In practice, CodeWeaver generates this data at build time and saves it as a pickle cache (python object) in `codeweaver.semantic.data`. This avoids the need for runtime parsing and speeds up startup.
+# In practice, CodeWeaver generates this data at build time and saves it as a JSON cache in `codeweaver.semantic.data`. This avoids the need for runtime parsing and speeds up startup.
 # We keep this capability within the code, vice in build generation, because we plan to use it dynamically in the future for new languages at runtime.
 # ===========================================================================
 
@@ -584,48 +584,49 @@ class NodeTypeParser:
     def _load_from_cache(self) -> bool:
         """Try to load pre-processed node types from cache.
 
-        Security: While pickle.loads() can execute arbitrary code, this cache is:
-        1. Generated during our build process
-        2. Shipped as part of the package (same trust level as our code)
-        3. Validated for structure and version compatibility
-
         Returns:
             True if cache was loaded successfully, False otherwise.
         """
         try:
             # Try to load cache from package resources
-            cache_resource = files("codeweaver.semantic.data") / "node_types_cache.pkl"
+            cache_resource = files("codeweaver.semantic.data") / "node_types_cache.json"
             if not cache_resource.is_file():
                 logger.debug("Node types cache not found, will parse from JSON files")
                 return False
-            # this is safe because we control it and check HMAC for validity
-            cache_data = pickle.loads(cache_resource.read_bytes())  # noqa: S301
 
-            # Validate cache structure
-            if not isinstance(cache_data, dict) or "registration_cache" not in cache_data:
-                logger.warning(
-                    "Invalid cache structure: missing 'registration_cache' key, will parse from JSON"
-                )
-                return False
+            from pydantic import TypeAdapter, ValidationError
 
-            # Validate cache data type
-            if not isinstance(cache_data["registration_cache"], dict):
-                logger.warning("Invalid cache data type, will parse from JSON")
-                return False
+            from codeweaver.semantic.grammar import (
+                Category,
+                CompositeThing,
+                DirectConnection,
+                PositionalConnections,
+                Token,
+            )
 
-            type(self)._registration_cache = cache_data["registration_cache"]
-            # Clear any stale cached_property values from pickled instances.
-            # classification_result may have been computed and cached during cache generation
-            # before GrammarClassificationResult was fully initialized, leaving broken empty
-            # instances. Clearing it ensures fresh computation on next access.
-            for lang_cache in type(self)._registration_cache.values():
-                for obj in (*lang_cache.get("tokens", []), *lang_cache.get("composites", [])):
-                    obj.__dict__.pop("classification_result", None)
+            # Define a local version of the cache dict to ensure all types are resolved for validation
+            class RegistrationCache(TypedDict):
+                categories: list[Category]
+                tokens: list[Token]
+                composites: list[CompositeThing]
+                connections: list[DirectConnection | PositionalConnections]
+
+            PayloadType = TypedDict(
+                "PayloadType",
+                {"registration_cache": dict[SemanticSearchLanguage, RegistrationCache]},
+            )
+            adapter = TypeAdapter(PayloadType)
+
+            cache_data = adapter.validate_json(cache_resource.read_bytes())
+
+            type(self)._registration_cache = cast(
+                dict[SemanticSearchLanguage, _ThingCacheDict], cache_data["registration_cache"]
+            )
             type(self)._cache_loaded = True
             logger.debug("Loaded node types from cache")
 
-        except (pickle.UnpicklingError, AttributeError, KeyError) as e:
-            # Specific pickle/data structure errors
+        except (ValidationError, json.JSONDecodeError, AttributeError, KeyError) as e:
+            # Specific data structure or JSON errors
             logger.warning("Cache corrupted or incompatible: %s, will parse from JSON", e)
             return False
         except OSError as e:
