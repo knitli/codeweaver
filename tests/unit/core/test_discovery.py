@@ -43,9 +43,7 @@ def test_absolute_path_when_path_is_absolute() -> None:
     abs_path = Path("/tmp/some_absolute_file.txt").resolve()
     df = DiscoveredFile(
         path=abs_path,
-        ext_category=
-      
-      .from_file(abs_path),
+        ext_category=ExtCategory.from_file(abs_path),
         project_path=Path("/tmp/project")
     )
     result = df.absolute_path
