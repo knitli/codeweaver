@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 import sys
 
-from typing import Literal, cast, overload
+from typing import Any, Literal, cast, overload
 
 from pydantic import UUID7
 
@@ -22,7 +22,7 @@ if sys.version_info < (3, 14):
     try:
         from uuid_extensions import uuid7 as uuid7_gen
     except ImportError:
-        def uuid7_gen(*args, **kwargs) -> UUID7:
+        def uuid7_gen(*args: Any, **kwargs: Any) -> UUID7:
             from pydantic import UUID7
             from uuid import uuid4
             return cast(UUID7, uuid4())
@@ -30,7 +30,7 @@ else:
     try:
         from uuid import uuid7 as uuid7_gen
     except ImportError:
-        def uuid7_gen(*args, **kwargs) -> UUID7:
+        def uuid7_gen(*args: Any, **kwargs: Any) -> UUID7:
             from pydantic import UUID7
             from uuid import uuid4
             return cast(UUID7, uuid4())
