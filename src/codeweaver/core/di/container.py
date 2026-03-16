@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import ast
 import asyncio
 import inspect
 import logging
@@ -113,20 +112,10 @@ class Container[T]:
     def _resolve_string_type(
         self, type_str: str, globalns: dict[str, Any] | None = None
     ) -> Any | None:
-        """Resolve a string type annotation to an actual type.
+        """Resolve a string type annotation to an actual type manually using AST.
 
-        Note: We use eval() here (not ast.literal_eval()) because we're resolving
-        type names like "EmbeddingProvider" to actual type objects, not evaluating
-        literal values. ast.literal_eval() only works for Python literals (strings,
-        numbers, lists, dicts, etc.) and cannot resolve type names.
-
-        This is safe because:
-        1. We only eval in the controlled globalns namespace from the module
-        2. This is the standard approach for resolving string type annotations
-        3. typing.get_type_hints() uses eval internally for the same purpose
-
-        For Annotated[SomeType, Depends(...)], we use a safe AST parser
-        to avoid arbitrary code execution if user inputs are passed.
+        Note: We explicitly avoid using eval() to prevent arbitrary code execution
+        from malicious string-based type annotations.
 
         Args:
             type_str: The string representation of a type.
@@ -135,72 +124,74 @@ class Container[T]:
         Returns:
             The resolved type, or None if resolution fails.
         """
-        if not globalns:
+        if not type_str or not globalns:
             return None
 
-        # First, try to evaluate the string as a type reference
-        # We allow this for generic types like list[str], Optional[Type], etc.
-        # But we must intercept Annotated[..., Depends(...)] which contains function calls.
-        if "Depends" not in type_str:
-            # ruff: noqa: S307 - eval is necessary for type resolution, not literal evaluation
-            with suppress(Exception):
-                return eval(type_str, globalns)
+        # 1. Exact match in globalns
+        if type_str in globalns:
+            return globalns[type_str]
 
-        # If it's an Annotated pattern with Depends, use safe AST parsing
-        if type_str.startswith("Annotated["):
-            import ast
-            try:
-                tree = ast.parse(type_str, mode="eval")
-                if isinstance(tree.body, ast.Subscript):
-                    value = tree.body.value
-                    if isinstance(value, ast.Name) and value.id == "Annotated":
-                        slice_val = tree.body.slice
-                        if isinstance(slice_val, ast.Tuple) and len(slice_val.elts) >= 2:
-                            # We can simply use eval on the base type, because we already checked
-                            # it's safe (doesn't contain Depends(), though it could contain other
-                            # functions, but we trust the base type string part up to the first comma).
-                            # A better approach: We reconstruct the Annotated string but evaluate
-                            # the dependency safely. Actually, the easiest and safest way to parse
-                            # the arguments to Depends(...) is to use ast to extract the dependency
-                            # function name and kwargs.
+        # 2. Parse the string into an AST safely without evaluating
+        import ast
+        try:
+            tree = ast.parse(type_str, mode="eval")
+        except SyntaxError:
+            return None
 
-                            base_type_node = slice_val.elts[0]
-                            # We can get the source segment for the base type
-                            base_type_str = ast.unparse(base_type_node)
+        # Helper function to evaluate safe AST nodes manually
+        def _safe_eval_node(node: ast.AST) -> Any:
+            if isinstance(node, ast.Name):
+                if node.id in globalns:
+                    return globalns[node.id]
+                import builtins
+                if hasattr(builtins, node.id):
+                    return getattr(builtins, node.id)
+                # Check factories
+                for factory_type in self._factories:
+                    if _get_name(factory_type) == node.id:
+                        return factory_type
+                raise ValueError(f"Unknown name: {node.id}")
+            elif isinstance(node, ast.Attribute):
+                value = _safe_eval_node(node.value)
+                return getattr(value, node.attr)
+            elif isinstance(node, ast.Subscript):
+                value = _safe_eval_node(node.value)
+                if isinstance(node.slice, ast.Tuple):
+                    slice_val = tuple(_safe_eval_node(n) for n in node.slice.elts)
+                else:
+                    slice_val = _safe_eval_node(node.slice)
+                # Handle Annotated specifically if value is Annotated
+                # Some types don't support being subscripted, so we try our best
+                return value[slice_val]
+            elif isinstance(node, ast.Constant):
+                return node.value
+            elif isinstance(node, ast.List):
+                return [_safe_eval_node(n) for n in node.elts]
+            elif isinstance(node, ast.Tuple):
+                return tuple(_safe_eval_node(n) for n in node.elts)
+            elif isinstance(node, ast.BinOp):
+                if isinstance(node.op, ast.BitOr):
+                    left = _safe_eval_node(node.left)
+                    right = _safe_eval_node(node.right)
+                    return left | right
+                raise ValueError(f"Unsupported binary operator: {type(node.op).__name__}")
+            elif isinstance(node, ast.Call):
+                func = _safe_eval_node(node.func)
+                # ONLY allow Depends(...) function calls
+                from codeweaver.core.di.dependency import Depends
+                if func is not Depends:
+                    raise ValueError(f"Function calls are not allowed in type annotations, except Depends. Got {func}")
 
-                            base_type = None
-                            with suppress(Exception):
-                                base_type = eval(base_type_str, globalns)
+                args = [_safe_eval_node(arg) for arg in node.args]
+                kwargs = {kw.arg: _safe_eval_node(kw.value) for kw in node.keywords if kw.arg is not None}
+                return Depends(*args, **kwargs)
+            else:
+                raise ValueError(f"Unsupported AST node type: {type(node).__name__}")
 
-                            if base_type is None:
-                                for factory_type in self._factories:
-                                    if _get_name(factory_type) == base_type_str:
-                                        base_type = factory_type
-                                        break
-
-                            if base_type is not None:
-                                # Now extract Depends(...)
-                                for elt in slice_val.elts[1:]:
-                                    if isinstance(elt, ast.Call) and getattr(getattr(elt, "func", None), "id", None) == "Depends":
-                                        args = []
-                                        for arg in elt.args:
-                                            # It could be a function name (Name or Attribute)
-                                            with suppress(Exception):
-                                                args.append(eval(ast.unparse(arg), globalns))
-
-                                        kwargs = {}
-                                        for kw in elt.keywords:
-                                            # kwargs value could be constant or name
-                                            with suppress(Exception):
-                                                kwargs[kw.arg] = eval(ast.unparse(kw.value), globalns)
-
-                                        from codeweaver.core.di.dependency import Depends
-                                        if "Annotated" in globalns:
-                                            return globalns["Annotated"][base_type, Depends(*args, **kwargs)]
-                                        from typing import Annotated
-                                        return Annotated[base_type, Depends(*args, **kwargs)]
-            except Exception:
-                pass
+        try:
+            return _safe_eval_node(tree.body)
+        except Exception:
+            pass
 
         # Fallback: try to find a factory by matching type name
         return next(
