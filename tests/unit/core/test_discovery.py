@@ -4,14 +4,15 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 import logging
+
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from codeweaver.core.discovery import DiscoveredFile
-from codeweaver.core.metadata import ExtCategory
 from codeweaver.core.utils import get_blake_hash
+
 
 pytestmark = [pytest.mark.unit]
 
@@ -149,6 +150,6 @@ def test_absolute_path_fallback(temp_project: Path) -> None:
     df = DiscoveredFile.from_path(test_file, project_path=temp_project)
     assert df is not None
 
-    with patch("codeweaver.core.utils.get_project_path", return_value=temp_project):
+    with patch("codeweaver.core.utils.filesystem.get_project_path", return_value=temp_project):
         object.__setattr__(df, "project_path", None)
         assert df.absolute_path == test_file
