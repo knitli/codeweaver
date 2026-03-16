@@ -395,7 +395,7 @@ type ModelMap = dict[
     ModelMaker,
     dict[
         ModelName,
-        tuple[Annotated[HFModelProviders, BeforeValidator(lambda v: Provider.from_string(v))], ...],
+        tuple[HFModelProviders, ...],
     ],
 ]
 """A mapping of model makers to their models and the providers that support each model."""
@@ -547,8 +547,6 @@ def mteb_to_capabilities(model: SimplifiedModelMeta) -> PartialCapabilities:
     """
     Convert an MTEB model metadata dictionary to a PartialCapabilities object.
     """
-    loader = getattr(model, "loader", {})
-    loader = loader if isinstance(loader, dict) else {}
     caps = {
         "name": model["name"],
         "default_dimension": model.get("embed_dim"),
