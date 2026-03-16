@@ -44,13 +44,13 @@ def main() -> int:
         "registration_cache": parser.registration_cache,
     }
 
-    # Write cache file
+    # Write cache file (no indentation to keep file size under version control limits)
     cache_file = repo_root / "src" / "codeweaver" / \
         "semantic" / "data" / "node_types_cache.json"
     print(f"Writing cache to {cache_file}...")
 
     with cache_file.open("wb") as f:
-        f.write(to_json(cache_data, indent=2))
+        f.write(to_json(cache_data))
 
     cache_size = cache_file.stat().st_size
     print(f"✓ Generated node_types cache: {cache_file}")

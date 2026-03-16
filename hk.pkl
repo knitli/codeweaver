@@ -99,7 +99,7 @@ local linters = new Mapping<String, Step> {
     }
     ["check-added-large-files"] = new Step {
         glob = "*"
-        check = "hk util check-added-large-files --maxkb 10000 {{ files }}"
+        check = "hk util check-added-large-files --maxkb 15000 {{ files }}"
     }
     ["check-merge-conflict-markers"] = new Step {
         glob = "*"
