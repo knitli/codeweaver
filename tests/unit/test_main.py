@@ -1,6 +1,5 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 import signal
-import sys
 import pytest
 
 from codeweaver.main import _setup_signal_handler
