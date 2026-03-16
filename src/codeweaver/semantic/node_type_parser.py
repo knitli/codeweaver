@@ -637,7 +637,6 @@ class NodeTypeParser:
         if type(self)._cache_adapter is not None:
             return
 
-
         # ruff cannot see them as "used" because `from __future__ import annotations` makes
         # all annotations lazy strings that are resolved at TypeAdapter construction time.
         from codeweaver.semantic.grammar import Category, CompositeThing, Token  # noqa: F401
