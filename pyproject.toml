@@ -322,7 +322,6 @@ xai = ["pydantic-ai-slim[xai]"]
 dev = [
   # black is used to format generated code
   "black>=26.1.0",
-  "qdrant-client>=1.16.2",
   "ruff>=0.15.2",
   "serena>=0.9.1",
   "ty>=0.0.18",

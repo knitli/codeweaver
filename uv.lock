@@ -838,7 +838,6 @@ build = [
 ]
 dev = [
     { name = "black" },
-    { name = "qdrant-client" },
     { name = "ruff" },
     { name = "serena" },
     { name = "ty" },
@@ -980,7 +979,6 @@ build = [
 ]
 dev = [
     { name = "black", specifier = ">=26.1.0" },
-    { name = "qdrant-client", specifier = ">=1.16.2" },
     { name = "ruff", specifier = ">=0.15.2" },
     { name = "serena", specifier = ">=0.9.1" },
     { name = "ty", specifier = ">=0.0.18" },
