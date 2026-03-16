@@ -275,8 +275,8 @@ uv run python scripts/build/prepare-build.py || {
 
 # Step 2: Check for generated artifacts
 echo -e "${CW_PREFIX} Step 2/7: Verifying generated artifacts..."
-if [ ! -f "src/codeweaver/data/node_types_cache.pkl" ]; then
-    echo -e "${YELLOW}Warning: node_types_cache.pkl not found${NC}"
+if [ ! -f "src/codeweaver/semantic/data/node_types_cache.json" ]; then
+    echo -e "${YELLOW}Warning: node_types_cache.json not found${NC}"
 fi
 
 # Step 3: Update CHANGELOG
@@ -302,7 +302,7 @@ reuse spdx --add-license-concluded --creator-person "automated[bot]" --creator-o
 # Step 6: Commit if not disabled
 if [ -z "${usage_no_commit:-}" ]; then
     echo -e "${CW_PREFIX} Step 6/7: Committing build artifacts..."
-    git add src/codeweaver/data/node_types_cache.pkl 2>/dev/null || true
+    git add src/codeweaver/semantic/data/node_types_cache.json 2>/dev/null || true
     git add CHANGELOG.md 2>/dev/null || true
     git add schema/ 2>/dev/null || true
 

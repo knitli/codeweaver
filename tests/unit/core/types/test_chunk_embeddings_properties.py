@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from uuid_extensions import uuid7
+from codeweaver.core.utils.generation import uuid7
 
 from codeweaver.core import CodeChunk, Span
 from codeweaver.core.metadata import ChunkKind, ExtCategory

@@ -7,15 +7,16 @@
 
 This script loads all tree-sitter node-types.json files, parses them into
 CodeWeaver's internal Thing/Category representation, and serializes the
-result to a pickle cache. This cache is loaded at runtime for fast startup.
+result to a JSON cache. This cache is loaded at runtime for fast startup.
 """
 
 from __future__ import annotations
 
-import pickle
 import sys
 
 from pathlib import Path
+
+from pydantic_core import to_json
 
 
 def main() -> int:
@@ -45,11 +46,11 @@ def main() -> int:
 
     # Write cache file
     cache_file = repo_root / "src" / "codeweaver" / \
-        "semantic" / "data" / "node_types_cache.pkl"
+        "semantic" / "data" / "node_types_cache.json"
     print(f"Writing cache to {cache_file}...")
 
     with cache_file.open("wb") as f:
-        pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+        f.write(to_json(cache_data, indent=2))
 
     cache_size = cache_file.stat().st_size
     print(f"✓ Generated node_types cache: {cache_file}")
