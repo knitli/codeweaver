@@ -245,3 +245,6 @@ src/codeweaver/_version.py
 .codeweaver/local.env
 mise.local.toml
 mise.local.env
+
+.exportify/
+!.exportify/config.toml
