@@ -545,9 +545,6 @@ class Container[T]:
         Raises:
             CircularDependencyError: If a circular dependency is detected.
         """
-        if interface is type(None):
-            return None  # type: ignore[return-value]
-
         from codeweaver.core.exceptions import CircularDependencyError
 
         if _resolution_stack is None:

@@ -69,8 +69,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          allowed_non_write_users: Copilot,copilot
-          allowed_bots: "github-actions[bot],copilot[bot],dependabot[bot],copilot,Copilot,github-actions,gemini[bot],claude[bot]"
+          allowed_non_write_users: Copilot
+          allowed_bots: "github-actions[bot],copilot[bot],dependabot[bot],copilot,github-actions,gemini[bot],claude[bot]"
           trigger_phrase: "@claude"
           assignee_trigger: claude[bot]
           label_trigger: claude
