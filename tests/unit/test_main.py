@@ -30,13 +30,22 @@ _TRANSPORT_CASES = [
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("config_file", "project_path"),
+    [
+        pytest.param(Path("/fake/config.yaml"), Path("/fake/project"), id="with-paths"),
+        pytest.param(None, None, id="none-paths"),
+    ],
+)
 @pytest.mark.parametrize(("transport", "expected_patch", "other_patch"), _TRANSPORT_CASES)
 async def test_run_dispatches_to_correct_server(
-    transport: str, expected_patch: str, other_patch: str
+    transport: str,
+    expected_patch: str,
+    other_patch: str,
+    config_file: Path | None,
+    project_path: Path | None,
 ) -> None:
     """Test that run() calls the correct server helper for each transport value."""
-    config_file = Path("/fake/config.yaml")
-    project_path = Path("/fake/project")
     host = "127.0.0.1"
     port = 8080
 
@@ -54,8 +63,13 @@ async def test_run_dispatches_to_correct_server(
             debug=False,
         )
 
-        mock_expected.assert_called_once()
-        kwargs = mock_expected.call_args.kwargs
-        assert kwargs.get("host") == host
-        assert kwargs.get("port") == port
-        mock_other.assert_not_called()
+        mock_expected.assert_awaited_once_with(
+            config_file=config_file,
+            project_path=project_path,
+            host=host,
+            port=port,
+            transport=transport,
+            verbose=False,
+            debug=False,
+        )
+        mock_other.assert_not_awaited()
