@@ -129,7 +129,6 @@ def test_from_path_with_git_branch_failure(temp_project: Path) -> None:
         with pytest.raises(Exception, match="Git not found"):
             DiscoveredFile.from_path(test_file, project_path=temp_project)
 
-
 def test_absolute_path_with_absolute_path(temp_project: Path) -> None:
     test_file = temp_project / "test.py"
     test_file.write_text("print('hello')")
@@ -140,7 +139,6 @@ def test_absolute_path_with_absolute_path(temp_project: Path) -> None:
 def test_absolute_path_with_relative_path(temp_project: Path) -> None:
     test_file = temp_project / "test.py"
     test_file.write_text("print('hello')")
-    # from_path sets the path to relative if project_path is provided
     df = DiscoveredFile.from_path(test_file, project_path=temp_project)
     assert df is not None
     assert df.absolute_path == test_file
@@ -150,6 +148,7 @@ def test_absolute_path_fallback(temp_project: Path) -> None:
     test_file.write_text("print('hello')")
     df = DiscoveredFile.from_path(test_file, project_path=temp_project)
     assert df is not None
-    with patch("codeweaver.core.utils.filesystem.get_project_path", return_value=temp_project):
+
+    with patch("codeweaver.core.utils.get_project_path", return_value=temp_project):
         object.__setattr__(df, "project_path", None)
         assert df.absolute_path == test_file
