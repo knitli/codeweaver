@@ -4,8 +4,6 @@ import subprocess
 import sys
 from unittest.mock import MagicMock
 
-import pytest
-
 from codeweaver import get_version
 
 def test_get_version_from_version_file(monkeypatch):
@@ -17,10 +15,11 @@ def test_get_version_from_version_file(monkeypatch):
 
     assert get_version() == "1.2.3-file"
 
+
 def test_get_version_from_importlib_metadata(monkeypatch):
     """Test getting version from importlib.metadata."""
     # Mock codeweaver._version to not exist
-    monkeypatch.setitem(sys.modules, "codeweaver._version", None)
+    monkeypatch.delitem(sys.modules, "codeweaver._version", raising=False)
 
     # Mock importlib.metadata.version to return our version
     def mock_version(pkg_name):
@@ -32,10 +31,11 @@ def test_get_version_from_importlib_metadata(monkeypatch):
 
     assert get_version() == "1.2.3-metadata"
 
+
 def test_get_version_from_git_success(monkeypatch):
     """Test getting version from git describe."""
     # Mock codeweaver._version to not exist
-    monkeypatch.setitem(sys.modules, "codeweaver._version", None)
+    monkeypatch.delitem(sys.modules, "codeweaver._version", raising=False)
 
     # Mock importlib.metadata.version to raise PackageNotFoundError
     def mock_version(pkg_name):
@@ -59,9 +59,10 @@ def test_get_version_from_git_success(monkeypatch):
 
     assert get_version() == "1.2.3-git"
 
+
 def test_get_version_from_git_failure(monkeypatch):
     """Test git describe fails and returns 0.0.0."""
-    monkeypatch.setitem(sys.modules, "codeweaver._version", None)
+    monkeypatch.delitem(sys.modules, "codeweaver._version", raising=False)
     def mock_version(pkg_name):
         raise importlib.metadata.PackageNotFoundError("code-weaver")
     monkeypatch.setattr(importlib.metadata, "version", mock_version)
@@ -71,6 +72,8 @@ def test_get_version_from_git_failure(monkeypatch):
     # Mock subprocess.run to fail
     mock_result = MagicMock()
     mock_result.returncode = 1
+    mock_result.stdout = ""
+    mock_result.stderr = ""
 
     def mock_run(*args, **kwargs):
         return mock_result
@@ -79,9 +82,10 @@ def test_get_version_from_git_failure(monkeypatch):
 
     assert get_version() == "0.0.0"
 
+
 def test_get_version_no_git(monkeypatch):
     """Test git is not installed, returns 0.0.0."""
-    monkeypatch.setitem(sys.modules, "codeweaver._version", None)
+    monkeypatch.delitem(sys.modules, "codeweaver._version", raising=False)
     def mock_version(pkg_name):
         raise importlib.metadata.PackageNotFoundError("code-weaver")
     monkeypatch.setattr(importlib.metadata, "version", mock_version)
@@ -91,9 +95,10 @@ def test_get_version_no_git(monkeypatch):
 
     assert get_version() == "0.0.0"
 
+
 def test_get_version_exception(monkeypatch):
     """Test general exception in git block returns 0.0.0."""
-    monkeypatch.setitem(sys.modules, "codeweaver._version", None)
+    monkeypatch.delitem(sys.modules, "codeweaver._version", raising=False)
     def mock_version(pkg_name):
         raise importlib.metadata.PackageNotFoundError("code-weaver")
     monkeypatch.setattr(importlib.metadata, "version", mock_version)
