@@ -138,9 +138,25 @@ class Container[T]:
 
         TypeValidator().visit(tree)
 
-        # Restricted eval: no builtins allowed
+        # Restricted eval: only allow basic builtin types to be resolved
+        # even if they are not in the module's globals.
+        safe_builtins = {
+            "int": int,
+            "float": float,
+            "str": str,
+            "bool": bool,
+            "list": list,
+            "tuple": tuple,
+            "dict": dict,
+            "set": set,
+            "frozenset": frozenset,
+            "type": type,
+            "object": object,
+            "bytes": bytes,
+        }
+
         code = compile(tree, "<string>", "eval")
-        return eval(code, {"__builtins__": {}}, globalns)
+        return eval(code, {"__builtins__": safe_builtins}, globalns)
 
     @staticmethod
     def _unwrap_annotated(annotation: Any) -> Any:

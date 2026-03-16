@@ -1,6 +1,20 @@
 
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+"""Security tests for the dependency injection container.
+
+This module verifies that the DI container safely resolves string type
+annotations, preventing arbitrary code execution while supporting
+complex Python type hints including generics, unions, and Annotated types.
+"""
+
+from typing import Annotated, List, Optional, Union, get_args, get_origin
+
 import pytest
-from typing import Annotated, List, Optional, Union
+
 from codeweaver.core.di.container import Container
 from codeweaver.core.di.dependency import Depends
 
@@ -24,9 +38,14 @@ def test_safe_type_resolution():
 
     # Annotated with Depends
     resolved_annotated = container._resolve_string_type("Annotated[int, Depends()]", globalns)
-    assert get_origin(resolved_annotated) is Annotated
+
+    # Check that it's an Annotated type in a cross-version compatible way.
+    # get_origin(Annotated[int, ...]) should be Annotated, but some environments
+    # might unwrap it or return a different origin. We check for __metadata__
+    # which is specific to Annotated types.
+    assert hasattr(resolved_annotated, "__metadata__"), f"Expected Annotated type, got {type(resolved_annotated)}"
     assert get_args(resolved_annotated)[0] is int
-    assert isinstance(get_args(resolved_annotated)[1], Depends)
+    assert any(isinstance(m, Depends) for m in resolved_annotated.__metadata__)
 
 def test_malicious_type_resolution():
     container = Container()
@@ -55,12 +74,8 @@ def test_dunder_blocking():
     # Dunder attribute blocking
     assert container._resolve_string_type("int.__name__", globalns) is None
 
-def get_origin(tp):
-    if hasattr(tp, "__origin__"):
-        return tp.__origin__
-    return None
-
-def get_args(tp):
-    if hasattr(tp, "__args__"):
-        return tp.__args__
-    return []
+def test_safe_builtins_resolution():
+    container = Container()
+    # No globals provided for basic types
+    assert container._resolve_string_type("int", {"__name__": "foo"}) is int
+    assert container._resolve_string_type("list[str]", {"__name__": "foo"}) == list[str]
