@@ -88,7 +88,10 @@ def has_package(package_name: str) -> bool:
     """
 
     def check_spec(name: str) -> bool:
-        return util.find_spec(name) is not None
+        try:
+            return util.find_spec(name) is not None
+        except (ImportError, ValueError, AttributeError, ModuleNotFoundError):
+            return False
 
     try:
         metadata.distribution(package_name.replace("_", "-").replace("codeweaver", "code-weaver"))
