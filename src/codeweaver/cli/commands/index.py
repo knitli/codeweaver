@@ -125,7 +125,7 @@ async def _perform_clear_operation(
         response = display.console.input(
             "[yellow]Are you sure you want to continue? (yes/no):[/yellow] "
         )
-        if response.lower() not in ["yes", "y"]:
+        if response.lower() not in {"yes", "y"}:
             display.print_info("Operation cancelled")
             sys.exit(0)
 

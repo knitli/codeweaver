@@ -199,8 +199,4 @@ async def http_lifespan(
         yield background_state
 
 
-# Backward compatibility alias (deprecated)
-combined_lifespan = http_lifespan
-
-
 __all__ = ("background_services_lifespan", "http_lifespan")
