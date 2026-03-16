@@ -16,20 +16,28 @@ import codeweaver
 
 @pytest.fixture
 def mock_no_version_file(monkeypatch):
-    """Remove _version module from sys.modules and codeweaver module.
+    """Remove _version module from sys.modules and block re-import from disk.
 
     A reload of the codeweaver module is necessary because the `get_version()`
     function evaluates the imports (which populate its internal values) exactly once
     at execution time. If we don't reload the module after changing sys.modules,
     it may continue using the previously cached module references.
+
+    We replace the real _version entry with an empty module (no __version__ attr)
+    so Python won't re-import the real file from disk during reload or test calls.
     """
+    import importlib
+    import types
+
+    # Remove any cached real module
     monkeypatch.delitem(sys.modules, "codeweaver._version", raising=False)
+    # Block re-import from disk: empty module has no __version__, so
+    # `from codeweaver._version import __version__` raises ImportError
+    monkeypatch.setitem(
+        sys.modules, "codeweaver._version", types.ModuleType("codeweaver._version")
+    )
     if hasattr(codeweaver, "_version"):
         monkeypatch.delattr(codeweaver, "_version", raising=False)
-
-    # We must also clear the internal import mechanisms tracking caching!
-    # A cleaner approach is simply to re-import get_version explicitly so it bounds to the current env
-    import importlib
 
     importlib.reload(codeweaver)
     return codeweaver.get_version
