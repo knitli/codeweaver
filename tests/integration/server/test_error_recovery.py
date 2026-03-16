@@ -37,7 +37,7 @@ def create_failing_provider_mock() -> MagicMock:
     mock_provider.name = Provider.OPENAI  # Set name property
     mock_provider.embed_query = AsyncMock(side_effect=ConnectionError("Simulated API failure"))
     mock_provider.embed_documents = AsyncMock(side_effect=ConnectionError("Simulated API failure"))
-    mock_provider.circuit_breaker_state = CircuitBreakerState.CLOSED.value
+    mock_provider.circuit_breaker_state = CircuitBreakerState.CLOSED.variable
     mock_provider._circuit_state = CircuitBreakerState.CLOSED
     mock_provider._failure_count = 0
     mock_provider._last_failure_time = None
@@ -67,7 +67,7 @@ def create_half_open_provider_mock() -> MagicMock:
     mock_provider = MagicMock(spec=EmbeddingProvider)
     mock_provider.embed_query = AsyncMock(side_effect=mock_embed_query)
     mock_provider.embed_documents = AsyncMock(side_effect=mock_embed_documents)
-    mock_provider.circuit_breaker_state = CircuitBreakerState.CLOSED.value
+    mock_provider.circuit_breaker_state = CircuitBreakerState.CLOSED.variable
     mock_provider._circuit_state = CircuitBreakerState.CLOSED
     mock_provider._failure_count = 0
     mock_provider._last_failure_time = None
@@ -100,7 +100,7 @@ def create_flaky_provider_mock() -> MagicMock:
     mock_provider = MagicMock(spec=EmbeddingProvider)
     mock_provider.embed_query = AsyncMock(side_effect=mock_embed_query)
     mock_provider.embed_documents = AsyncMock(side_effect=mock_embed_documents)
-    mock_provider.circuit_breaker_state = CircuitBreakerState.CLOSED.value
+    mock_provider.circuit_breaker_state = CircuitBreakerState.CLOSED.variable
     mock_provider._circuit_state = CircuitBreakerState.CLOSED
     mock_provider._failure_count = 0
     mock_provider._last_failure_time = None
@@ -261,7 +261,7 @@ async def test_circuit_breaker_opens():
             provider._last_failure_time = time.time()
             if provider._failure_count >= 3:
                 provider._circuit_state = CircuitBreakerState.OPEN
-                provider.circuit_breaker_state = CircuitBreakerState.OPEN.value
+                provider.circuit_breaker_state = CircuitBreakerState.OPEN.variable
 
         assert provider._failure_count == 3
         assert provider._circuit_state == CircuitBreakerState.OPEN
@@ -297,7 +297,7 @@ async def test_circuit_breaker_half_open():
                 provider._last_failure_time = time.time()
                 if provider._failure_count >= 3:
                     provider._circuit_state = CircuitBreakerState.OPEN
-                    provider.circuit_breaker_state = CircuitBreakerState.OPEN.value
+                    provider.circuit_breaker_state = CircuitBreakerState.OPEN.variable
 
         assert provider._circuit_state == CircuitBreakerState.OPEN
 
@@ -306,7 +306,7 @@ async def test_circuit_breaker_half_open():
 
         # Transition to half-open
         provider._circuit_state = CircuitBreakerState.HALF_OPEN
-        provider.circuit_breaker_state = CircuitBreakerState.HALF_OPEN.value
+        provider.circuit_breaker_state = CircuitBreakerState.HALF_OPEN.variable
 
         # Next request should succeed and close circuit
         result = await provider.embed_query("test_half_open")
@@ -314,7 +314,7 @@ async def test_circuit_breaker_half_open():
 
         # Success should close circuit
         provider._circuit_state = CircuitBreakerState.CLOSED
-        provider.circuit_breaker_state = CircuitBreakerState.CLOSED.value
+        provider.circuit_breaker_state = CircuitBreakerState.CLOSED.variable
         provider._failure_count = 0
         provider._last_failure_time = None
 
