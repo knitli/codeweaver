@@ -182,7 +182,7 @@ async def test_with_context(qdrant_test_manager):
 
 ```python
 async def test_provider(qdrant_test_manager):
-    from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+    from codeweaver.providers import QdrantVectorStoreProvider
 
     # Create collection
     collection = qdrant_test_manager.create_collection_name("provider-test")

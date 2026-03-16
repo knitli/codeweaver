@@ -11,13 +11,20 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from codeweaver_daemon import check_daemon_health, request_daemon_shutdown, wait_for_daemon_shutdown
 from cyclopts import App, Parameter
 from pydantic import PositiveInt
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.config.settings import get_settings_map
-from codeweaver.core.types.sentinel import Unset
-from codeweaver.daemon import check_daemon_health, request_daemon_shutdown, wait_for_daemon_shutdown
+from codeweaver.core import SettingsMapDep
+from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.di import INJECTED
+from codeweaver.core.types import UNSET, DictView
+
+
+def _settings_map(settings: SettingsMapDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
+    """Get the settings map."""
+    return settings
 
 
 _display: StatusDisplay = get_display()
@@ -26,14 +33,14 @@ app = App("stop", help="Stop CodeWeaver background services.")
 
 def _get_default_host_port() -> tuple[str, int]:
     """Get default management host/port from settings."""
-    settings_map = get_settings_map()
+    settings_map = _settings_map()
     mgmt_host = (
         settings_map["management_host"]
-        if settings_map["management_host"] is not Unset
+        if settings_map["management_host"] is not UNSET
         else "127.0.0.1"
     )
     mgmt_port = (
-        settings_map["management_port"] if settings_map["management_port"] is not Unset else 9329
+        settings_map["management_port"] if settings_map["management_port"] is not UNSET else 9329
     )
     return mgmt_host, mgmt_port
 
@@ -122,3 +129,5 @@ if __name__ == "__main__":
         app()
     except Exception as e:
         error_handler.handle_error(e, "Stop command", exit_code=1)
+
+__all__ = ()

@@ -6,34 +6,55 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
+from codeweaver.core import Provider, dependency_provider
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import (
     EmbeddingCapabilitiesDict,
     PartialCapabilities,
 )
-from codeweaver.providers.provider import Provider
-
-
-if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 type JinaaiProvider = Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS]
 
 CAP_MAP: dict[
     Literal[
+        "jinaai/jina-embeddings-v2-small-en",
         "jinaai/jina-embeddings-v2-base-code",
         "jinaai/jina-embeddings-v3",
         "jinaai/jina-embeddings-v4",
     ],
     tuple[JinaaiProvider, ...],
 ] = {
+    "jinaai/jina-embeddings-v2-small-en": (Provider.FASTEMBED,),
     "jinaai/jina-embeddings-v2-base-code": (Provider.FASTEMBED,),
     "jinaai/jina-embeddings-v3": (Provider.FASTEMBED,),
     "jinaai/jina-embeddings-v4": (Provider.SENTENCE_TRANSFORMERS,),
 }
 
+JINAAI_JINA_EMBEDDINGS_V2_SMALL_EN_CAPABILITIES: PartialCapabilities = {
+    "name": "jinaai/jina-embeddings-v2-small-en",
+    "default_dimension": 512,
+    "context_window": 8192,
+    "preferred_metrics": ("cosine", "dot", "euclidean"),
+    "supports_context_chunk_embedding": False,
+    "tokenizer": "tokenizers",
+    "tokenizer_model": "Xenova/jina-embeddings-v2-small-en",
+    "default_dtype": "float",
+    "output_dtypes": ("float",),
+    "version": 2,
+    "supports_custom_prompts": False,
+    "custom_query_prompt": None,
+    "custom_document_prompt": None,
+    "other": {
+        "adapted_from": "jina-bert-base-en-v1",
+        "modalities": ["text"],
+        "open_weights": True,
+        "reference": "https://huggingface.co/Xenova/jina-embeddings-v2-small-en",
+        "release_date": "2023-09-27",
+    },
+}
 
 JINAAI_JINA_EMBEDDINGS_V2_BASE_CODE_CAPABILITIES: PartialCapabilities = {
     "name": "jinaai/jina-embeddings-v2-base-code",
@@ -159,23 +180,30 @@ JINAAI_JINA_EMBEDDINGS_V4_CAPABILITIES: PartialCapabilities = {
 
 
 ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
+    JINAAI_JINA_EMBEDDINGS_V2_SMALL_EN_CAPABILITIES,
     JINAAI_JINA_EMBEDDINGS_V2_BASE_CODE_CAPABILITIES,
     JINAAI_JINA_EMBEDDINGS_V3_CAPABILITIES,
     JINAAI_JINA_EMBEDDINGS_V4_CAPABILITIES,
 )
 
 
-def get_jinaai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
-    """Get the capabilities for jinaai embedding models."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+class JinaaiEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for jinaai embedding models."""
 
+
+@dependency_provider(JinaaiEmbeddingCapabilities, scope="singleton", collection=True)
+def get_jinaai_embedding_capabilities() -> tuple[JinaaiEmbeddingCapabilities, ...]:
+    """Get the capabilities for jinaai embedding models."""
     capabilities: list[EmbeddingCapabilitiesDict] = []
     for cap in ALL_CAPABILITIES:
+        model_name = cap["name"]
+        assert isinstance(model_name, str)  # noqa: S101
+        assert model_name in CAP_MAP, f"Invalid model name: {model_name}"  # noqa: S101
         capabilities.extend([
             EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
-            for provider in CAP_MAP[cap["name"]]  # ty: ignore[invalid-argument-type]
+            for provider in CAP_MAP[model_name]
         ])
-    return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
+    return tuple(JinaaiEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
-__all__ = ("get_jinaai_embedding_capabilities",)
+__all__ = ("JinaaiEmbeddingCapabilities", "JinaaiProvider", "get_jinaai_embedding_capabilities")

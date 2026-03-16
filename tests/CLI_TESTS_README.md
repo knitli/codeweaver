@@ -56,7 +56,7 @@ tests/
 - ✅ Dependency checks
 
 **Key Tests**:
-- `test_unset_handling_correct` - Correctly checks isinstance(x, Unset)
+- `test_unset_handling_correct` - Correctly checks x is UNSET
 - `test_import_paths_correct` - Imports from correct modules
 - `test_provider_env_vars_used` - Uses Provider enum for API keys
 - `test_qdrant_cloud_detection` - Detects cloud.qdrant.io
@@ -204,7 +204,7 @@ def test_something(cli_test_project, cli_api_keys, clean_cli_env):
 ### Correctness (All Passing)
 - ✅ 0 hardcoded provider lists - All use registries
 - ✅ 0 hardcoded env var names - All use Provider.other_env_vars
-- ✅ 0 Unset handling errors - All use isinstance(x, Unset)
+- ✅ 0 Unset handling errors - All use x is UNSET
 - ✅ 100% registry coverage - List shows all available providers
 - ✅ Sparse embeddings visible - List includes sparse models
 - ✅ Settings construction correct - Respects precedence hierarchy

@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING, Annotated
 from ast_grep_py import SgNode
 from pydantic import Field, NonNegativeFloat, NonNegativeInt
 
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core import BasedModel
+from codeweaver.core.constants import ONE_POINT_ZERO, ZERO_POINT_ZERO
 
 
 if TYPE_CHECKING:
@@ -25,7 +26,11 @@ class SemanticScorer(BasedModel):
     # Configuration for contextual adjustments
     depth_penalty_factor: Annotated[
         NonNegativeFloat,
-        Field(ge=0.0, le=0.1, description="""Penalty per depth level (0.04 = 4% per level)"""),
+        Field(
+            ge=ZERO_POINT_ZERO,
+            le=0.1,
+            description="""Penalty per depth level (0.04 = 4% per level)""",
+        ),
     ] = 0.04
 
     size_bonus_threshold: Annotated[
@@ -33,11 +38,13 @@ class SemanticScorer(BasedModel):
     ] = 50
 
     size_bonus_factor: Annotated[
-        NonNegativeFloat, Field(ge=0.0, le=0.3, description="""Bonus factor for large nodes""")
+        NonNegativeFloat,
+        Field(ge=ZERO_POINT_ZERO, le=0.3, description="""Bonus factor for large nodes"""),
     ] = 0.1
 
     file_thing_bonus: Annotated[
-        NonNegativeFloat, Field(ge=0.0, le=0.2, description="""Bonus for top-level definitions""")
+        NonNegativeFloat,
+        Field(ge=ZERO_POINT_ZERO, le=0.2, description="""Bonus for top-level definitions"""),
     ] = 0.05
 
     def _telemetry_keys(self) -> None:
@@ -53,6 +60,8 @@ class SemanticScorer(BasedModel):
         Returns:
             Final importance score incorporating base score and contextual adjustments
         """
+        from codeweaver.semantic.classifications import ImportanceScores
+
         # Start with base semantic score
         base_scores = (
             thing.classification.importance_scores
@@ -74,25 +83,25 @@ class SemanticScorer(BasedModel):
         - Size bonus: Larger things get slight boost
         - Root bonus: Top-level definitions get boost
         """
-        adjusted_score = 1.0
+        adjusted_score = ONE_POINT_ZERO
 
         # Calculate depth from ancestors
         depth = len(list(thing.ancestors()))
 
         # Apply depth penalty (deeper = less important)
-        adjusted_score *= 1.0 - (depth * self.depth_penalty_factor)
+        adjusted_score *= ONE_POINT_ZERO - (depth * self.depth_penalty_factor)
 
         # Apply size bonus for substantial things
         text_length = len(thing.text)
         if text_length > self.size_bonus_threshold:
             size_multiplier = min(2.0, text_length / self.size_bonus_threshold)
-            adjusted_score += (size_multiplier - 1.0) * self.size_bonus_factor
+            adjusted_score += (size_multiplier - ONE_POINT_ZERO) * self.size_bonus_factor
 
         # Apply root bonus for top-level definitions
         if depth <= 1 and thing.is_composite and thing.is_file_thing:
             adjusted_score += self.file_thing_bonus
 
-        return adjusted_score - 1.0
+        return adjusted_score - ONE_POINT_ZERO
 
 
 __all__ = ("SemanticScorer",)

@@ -20,6 +20,8 @@ type LiteralStringT = Annotated[
 """A string that is known at type-checking time. This alias for LiteralString is also compatible with Pydantic schemas, unlike LiteralString itself.
 
 We occasionally skirt the restrictions on LiteralString, such as for config settings. In those cases, we just want to indicate that the string is intended to be a literal string, even if we can't enforce it. But they effectively are known strings because they must validate against a set of known values.
+
+Put another way: We use LiteralStringT to tell you 'this string should be specifically known', not generated programmatically.
 """
 
 SentinelName = NewType("SentinelName", LiteralStringT)
@@ -58,6 +60,12 @@ UUID7HexT = Annotated[
         max_length=32,
     ),
 ]
+
+BlakeKey = NewType("BlakeKey", str)
+BlakeHashKey = Annotated[
+    BlakeKey, Field(description="""A blake3 hash key string""", min_length=64, max_length=64)
+]
+
 
 # ================================================
 # *       File and Directory NewTypes/Aliases
@@ -166,10 +174,10 @@ ModelName = NewType("ModelName", LiteralStringT)
 type ModelNameT = Annotated[
     ModelName,
     Field(
-        description="""The name of a model as the `ModelName` NewType, e.g. 'gpt-4', 'bert-base-uncased'.""",
-        pattern=r"^[A-Za-z0-9_+-]+$",
+        description="""The name of a model as the `ModelName` NewType, e.g. 'gpt-4', 'bert-base-uncased', 'org/model-name'.""",
+        pattern=r"^[A-Za-z0-9_+:./-]+$",  # Support org/model, provider:org/model, and version numbers (dots)
         min_length=1,
-        max_length=50,
+        max_length=100,  # Increased to accommodate longer org/model names
     ),
 ]
 
@@ -268,8 +276,9 @@ type LlmToolNameT = Annotated[
     ),
 ]
 
-
 __all__ = (
+    "BlakeHashKey",
+    "BlakeKey",
     "CategoryName",
     "CategoryNameT",
     "DevToolName",

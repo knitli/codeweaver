@@ -1,0 +1,229 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+"""The `sdk` package provides method and function-level configuration for each provider category (e.g. embedding).
+
+This package contains submodules for different provider categories' SDKs, such as `agent` and `data`, each defining configuration models and utilities specific to their function type. For each configuration model, there is a field or fields that offer provider-specific configurations for the primary method/function calls (for example, `EmbeddingConfig` has `embed` and `query` fields for arguments to the embedding and query methods, respectively, for that provider). Each provider implements a `typing.TypedDict` for these parameters, and a corresponding method to convert the config into the format expected by the provider's SDK.
+
+The abstraction isn't perfect, as there's not always a clear function-level mapping for every provider, but think of it this way: it's SDK-level configuration for configurable details that aren't part of the SDK client's constructor (which are covered in `client_options` in the provider settings, see `codeweaver.providers.config.clients` package), but that are still relevant to how the provider is used in a function-level context.
+
+Data providers differ the most, as functionally in CodeWeaver, they are tools. So the `data` submodule contains configuration models for data provider tools, and the corresponding conversion methods to the provider's expected format for those tools (though we define the API for all current tools in `codeweaver.providers.data` package).
+"""
+
+from __future__ import annotations
+
+from types import MappingProxyType
+
+# === MANAGED EXPORTS ===
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
+from typing import TYPE_CHECKING
+
+from lateimport import create_late_getattr
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.config.sdk.agent import (
+        AgentModelConfig,
+        AgentModelConfigT,
+        CohereAgentModelConfig,
+    )
+    from codeweaver.providers.config.sdk.data import (
+        BaseToolConfig,
+        DataToolConfigT,
+        DuckDuckGoSearchToolConfig,
+        ExaAnswerToolOptions,
+        ExaContentsOptions,
+        ExaFindSimilarToolOptions,
+        ExaGetContentsToolOptions,
+        ExaSearchToolOptions,
+        ExaToolConfig,
+        TavilySearchContextToolConfig,
+    )
+    from codeweaver.providers.config.sdk.embedding import (
+        INCOMPATIBLE_FIELDS,
+        BaseEmbeddingConfig,
+        BedrockCohereConfigDict,
+        BedrockEmbeddingConfig,
+        BedrockEmbeddingRequestParams,
+        BedrockModelConfig,
+        BedrockTitanV2ConfigDict,
+        CohereEmbeddingConfig,
+        CohereEmbeddingOptionsDict,
+        EmbeddingConfigT,
+        EmbeddingMixin,
+        FastEmbedEmbeddingConfig,
+        GoogleEmbeddingConfig,
+        GoogleEmbeddingRequestParams,
+        HuggingFaceEmbeddingConfig,
+        HuggingFaceEmbeddingOptionsDict,
+        MistralEmbeddingConfig,
+        MistralEmbeddingOptionsDict,
+        OpenAIEmbeddingConfig,
+        OpenAIEmbeddingRequestParams,
+        SentenceTransformersEmbeddingConfig,
+        SentenceTransformersEncodeDict,
+        SerializedEmbeddingOptionsDict,
+        VoyageEmbeddingConfig,
+        VoyageEmbeddingOptionsDict,
+    )
+    from codeweaver.providers.config.sdk.reranking import (
+        BaseRerankingConfig,
+        BedrockRerankingConfig,
+        BedrockRerankingModelConfig,
+        BedrockRerankingOptionsDict,
+        CohereRerankingConfig,
+        CohereRerankingOptionsDict,
+        FastEmbedRerankingConfig,
+        FastEmbedRerankingOptionsDict,
+        RerankingConfigT,
+        SentenceTransformersRerankingConfig,
+        SentenceTransformersRerankingOptionsDict,
+        SerializedRerankingOptionsDict,
+        VoyageRerankingConfig,
+        VoyageRerankingOptionsDict,
+    )
+    from codeweaver.providers.config.sdk.sparse_embedding import (
+        BaseSparseEmbeddingConfig,
+        FastEmbedSparseEmbeddingConfig,
+        SentenceTransformersSparseEmbeddingConfig,
+        SparseEmbeddingConfigT,
+    )
+    from codeweaver.providers.config.sdk.vector_store import (
+        CollectionConfig,
+        QdrantCollectionConfig,
+        get_embedding_group,
+    )
+
+_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "INCOMPATIBLE_FIELDS": (__spec__.parent, "embedding"),
+    "AgentModelConfig": (__spec__.parent, "agent"),
+    "AgentModelConfigT": (__spec__.parent, "agent"),
+    "BaseEmbeddingConfig": (__spec__.parent, "embedding"),
+    "BaseRerankingConfig": (__spec__.parent, "reranking"),
+    "BaseSparseEmbeddingConfig": (__spec__.parent, "sparse_embedding"),
+    "BaseToolConfig": (__spec__.parent, "data"),
+    "BedrockCohereConfigDict": (__spec__.parent, "embedding"),
+    "BedrockEmbeddingConfig": (__spec__.parent, "embedding"),
+    "BedrockEmbeddingRequestParams": (__spec__.parent, "embedding"),
+    "BedrockModelConfig": (__spec__.parent, "embedding"),
+    "BedrockRerankingConfig": (__spec__.parent, "reranking"),
+    "BedrockRerankingModelConfig": (__spec__.parent, "reranking"),
+    "BedrockRerankingOptionsDict": (__spec__.parent, "reranking"),
+    "BedrockTitanV2ConfigDict": (__spec__.parent, "embedding"),
+    "CohereAgentModelConfig": (__spec__.parent, "agent"),
+    "CohereEmbeddingConfig": (__spec__.parent, "embedding"),
+    "CohereEmbeddingOptionsDict": (__spec__.parent, "embedding"),
+    "CohereRerankingConfig": (__spec__.parent, "reranking"),
+    "CohereRerankingOptionsDict": (__spec__.parent, "reranking"),
+    "CollectionConfig": (__spec__.parent, "vector_store"),
+    "DataToolConfigT": (__spec__.parent, "data"),
+    "DuckDuckGoSearchToolConfig": (__spec__.parent, "data"),
+    "EmbeddingConfigT": (__spec__.parent, "embedding"),
+    "EmbeddingMixin": (__spec__.parent, "embedding"),
+    "ExaAnswerToolOptions": (__spec__.parent, "data"),
+    "ExaContentsOptions": (__spec__.parent, "data"),
+    "ExaFindSimilarToolOptions": (__spec__.parent, "data"),
+    "ExaGetContentsToolOptions": (__spec__.parent, "data"),
+    "ExaSearchToolOptions": (__spec__.parent, "data"),
+    "ExaToolConfig": (__spec__.parent, "data"),
+    "FastEmbedEmbeddingConfig": (__spec__.parent, "embedding"),
+    "FastEmbedRerankingConfig": (__spec__.parent, "reranking"),
+    "FastEmbedRerankingOptionsDict": (__spec__.parent, "reranking"),
+    "FastEmbedSparseEmbeddingConfig": (__spec__.parent, "sparse_embedding"),
+    "GoogleEmbeddingConfig": (__spec__.parent, "embedding"),
+    "GoogleEmbeddingRequestParams": (__spec__.parent, "embedding"),
+    "HuggingFaceEmbeddingConfig": (__spec__.parent, "embedding"),
+    "HuggingFaceEmbeddingOptionsDict": (__spec__.parent, "embedding"),
+    "MistralEmbeddingConfig": (__spec__.parent, "embedding"),
+    "MistralEmbeddingOptionsDict": (__spec__.parent, "embedding"),
+    "QdrantCollectionConfig": (__spec__.parent, "vector_store"),
+    "RerankingConfigT": (__spec__.parent, "reranking"),
+    "SentenceTransformersEmbeddingConfig": (__spec__.parent, "embedding"),
+    "SentenceTransformersEncodeDict": (__spec__.parent, "embedding"),
+    "SentenceTransformersRerankingConfig": (__spec__.parent, "reranking"),
+    "SentenceTransformersRerankingOptionsDict": (__spec__.parent, "reranking"),
+    "SentenceTransformersSparseEmbeddingConfig": (__spec__.parent, "sparse_embedding"),
+    "SerializedEmbeddingOptionsDict": (__spec__.parent, "embedding"),
+    "SerializedRerankingOptionsDict": (__spec__.parent, "reranking"),
+    "SparseEmbeddingConfigT": (__spec__.parent, "sparse_embedding"),
+    "TavilySearchContextToolConfig": (__spec__.parent, "data"),
+    "VoyageEmbeddingConfig": (__spec__.parent, "embedding"),
+    "VoyageEmbeddingOptionsDict": (__spec__.parent, "embedding"),
+    "VoyageRerankingConfig": (__spec__.parent, "reranking"),
+    "VoyageRerankingOptionsDict": (__spec__.parent, "reranking"),
+    "get_embedding_group": (__spec__.parent, "vector_store"),
+    "OpenAIEmbeddingConfig": (__spec__.parent, "embedding"),
+    "OpenAIEmbeddingRequestParams": (__spec__.parent, "embedding"),
+})
+
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
+
+__all__ = (
+    "INCOMPATIBLE_FIELDS",
+    "AgentModelConfig",
+    "AgentModelConfigT",
+    "BaseEmbeddingConfig",
+    "BaseRerankingConfig",
+    "BaseSparseEmbeddingConfig",
+    "BaseToolConfig",
+    "BedrockCohereConfigDict",
+    "BedrockEmbeddingConfig",
+    "BedrockEmbeddingRequestParams",
+    "BedrockModelConfig",
+    "BedrockRerankingConfig",
+    "BedrockRerankingModelConfig",
+    "BedrockRerankingOptionsDict",
+    "BedrockTitanV2ConfigDict",
+    "CohereAgentModelConfig",
+    "CohereEmbeddingConfig",
+    "CohereEmbeddingOptionsDict",
+    "CohereRerankingConfig",
+    "CohereRerankingOptionsDict",
+    "CollectionConfig",
+    "DataToolConfigT",
+    "DuckDuckGoSearchToolConfig",
+    "EmbeddingConfigT",
+    "EmbeddingMixin",
+    "ExaAnswerToolOptions",
+    "ExaContentsOptions",
+    "ExaFindSimilarToolOptions",
+    "ExaGetContentsToolOptions",
+    "ExaSearchToolOptions",
+    "ExaToolConfig",
+    "FastEmbedEmbeddingConfig",
+    "FastEmbedRerankingConfig",
+    "FastEmbedRerankingOptionsDict",
+    "FastEmbedSparseEmbeddingConfig",
+    "GoogleEmbeddingConfig",
+    "GoogleEmbeddingRequestParams",
+    "HuggingFaceEmbeddingConfig",
+    "HuggingFaceEmbeddingOptionsDict",
+    "MistralEmbeddingConfig",
+    "MistralEmbeddingOptionsDict",
+    "OpenAIEmbeddingConfig",
+    "OpenAIEmbeddingRequestParams",
+    "QdrantCollectionConfig",
+    "RerankingConfigT",
+    "SentenceTransformersEmbeddingConfig",
+    "SentenceTransformersEncodeDict",
+    "SentenceTransformersRerankingConfig",
+    "SentenceTransformersRerankingOptionsDict",
+    "SentenceTransformersSparseEmbeddingConfig",
+    "SerializedEmbeddingOptionsDict",
+    "SerializedRerankingOptionsDict",
+    "SparseEmbeddingConfigT",
+    "TavilySearchContextToolConfig",
+    "VoyageEmbeddingConfig",
+    "VoyageEmbeddingOptionsDict",
+    "VoyageRerankingConfig",
+    "VoyageRerankingOptionsDict",
+    "get_embedding_group",
+)
+
+
+def __dir__() -> list[str]:
+    """List available attributes for the package."""
+    return list(__all__)

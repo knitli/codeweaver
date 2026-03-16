@@ -6,14 +6,11 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
+from codeweaver.core import Provider, dependency_provider
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
-from codeweaver.providers.provider import Provider
-
-
-if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 type MixedbreadAiProvider = Literal[Provider.OLLAMA]
@@ -62,11 +59,18 @@ MXBAI_EMBED_LARGE_CAPABILITIES: PartialCapabilities = {
 ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (MXBAI_EMBED_LARGE_CAPABILITIES,)
 
 
-def get_mixedbread_ai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
+class MixedbreadAiEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for mixedbread-ai embedding models."""
+
+
+@dependency_provider(MixedbreadAiEmbeddingCapabilities, scope="singleton", collection=True)
+def get_mixedbread_ai_embedding_capabilities() -> tuple[MixedbreadAiEmbeddingCapabilities, ...]:
     """Get the capabilities for mixedbread-ai embedding models."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-
-    return (EmbeddingModelCapabilities.model_validate(MXBAI_EMBED_LARGE_CAPABILITIES),)
+    return (MixedbreadAiEmbeddingCapabilities.model_validate(MXBAI_EMBED_LARGE_CAPABILITIES),)
 
 
-__all__ = ("get_mixedbread_ai_embedding_capabilities",)
+__all__ = (
+    "MixedbreadAiEmbeddingCapabilities",
+    "MixedbreadAiProvider",
+    "get_mixedbread_ai_embedding_capabilities",
+)

@@ -8,21 +8,18 @@
 
 from __future__ import annotations
 
-import os
-
 from collections.abc import Iterator, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import SkipValidation
 
-from codeweaver.common.utils.utils import rpartial
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+from codeweaver.core import Provider, rpartial
+from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
 
 try:
@@ -30,7 +27,7 @@ try:
     from cohere.v2.types.v2rerank_response import V2RerankResponse
     from cohere.v2.types.v2rerank_response_results_item import V2RerankResponseResultsItem
 except ImportError as e:
-    from codeweaver.exceptions import ConfigurationError
+    from codeweaver.core import ConfigurationError
 
     raise ConfigurationError(
         r'Please install the `cohere` package to use the Cohere provider, \nyou can use the `cohere` optional group -- `pip install "code-weaver\[cohere]"`'
@@ -78,46 +75,12 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
     """Cohere reranking provider."""
 
     client: SkipValidation[CohereClient]
-    _provider = Provider.COHERE
-    caps: RerankingModelCapabilities
-
-    def __init__(
-        self, caps: RerankingModelCapabilities, client: CohereClient | None = None, **kwargs: Any
-    ) -> None:
-        """Initialize the Cohere reranking provider."""
-        # Prepare client options before calling super().__init__()
-        kwargs = kwargs or {}
-
-        # Initialize client if not provided
-        if client is None:
-            if "client_options" in kwargs:
-                client_options = kwargs["client_options"]
-            else:
-                client_options = kwargs.copy()
-            client_options["client_name"] = "codeweaver"
-
-            provider = caps.provider or Provider.COHERE
-
-            if not client_options.get("api_key"):
-                if provider == Provider.COHERE:
-                    client_options["api_key"] = kwargs.get("api_key") or os.getenv("COHERE_API_KEY")
-
-                if not client_options.get("api_key"):
-                    from codeweaver.exceptions import ConfigurationError
-
-                    raise ConfigurationError(
-                        f"API key not found for {provider.value} provider. Please set the API key in the client kwargs or as an environment variable."
-                    )
-
-            client = CohereClient(**client_options)
-
-        # Call super().__init__() first with client and caps to initialize Pydantic model
-        super().__init__(client=client, caps=caps, **kwargs)
+    _provider: ClassVar[Provider] = Provider.COHERE
 
     def _initialize(self) -> None:
         """Initialize the Cohere reranking provider after Pydantic setup."""
         # Set up the output transformer to use cohere_reranking_output_transformer
-        type(self)._output_transformer = rpartial(
+        self._output_transformer = rpartial(  # ty:ignore[invalid-assignment]
             cohere_reranking_output_transformer, _instance=self
         )
 
@@ -127,10 +90,22 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         return "https://api.cohere.com"
 
     async def _execute_rerank(
-        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
+        self,
+        query: str,
+        documents: Sequence[str],
+        *,
+        top_n: int = DEFAULT_RERANKING_MAX_RESULTS,
+        **kwargs: Any,
     ) -> V2RerankResponse:
         return await self.client.rerank(
-            model=self.model_name or self.caps.name,
+            model=str(
+                self.model_name
+                or self.config.model_name
+                or self.config.rerank.model_name
+                or self.caps.name
+                if self.caps
+                else ""
+            ),
             query=query,
             documents=documents,
             top_n=top_n,
@@ -138,4 +113,4 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         )
 
 
-__all__ = ("CohereRerankingProvider",)
+__all__ = ("CohereRerankingProvider", "cohere_reranking_output_transformer")

@@ -12,7 +12,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from codeweaver.engine.chunker.selector import ChunkerSelector
+from codeweaver.engine import ChunkerSelector
 
 
 pytestmark = [pytest.mark.integration]
@@ -34,36 +34,29 @@ def mock_governor():
 @pytest.fixture
 def mock_discovered_file():
     """Create mock DiscoveredFile."""
-    from codeweaver.common.utils import uuid7
+    from codeweaver.core import uuid7
 
     def _make_file(path_str):
-        path = Path(path_str)
+        path = Path(path_str).resolve()  # Get absolute path
 
         # Create mock stat result
         mock_stat = Mock()
         mock_stat.st_size = 1024  # 1KB file size
 
-        # Create mock path with stat() method
-        # Use real Path for integration test since semantic chunker needs to parse the file
-        mock_path = path
+        # Create mock ExtCategory
+        from codeweaver.core import SemanticSearchLanguage
 
-        # Override stat() to use mock if needed
-        # For integration tests, we want to use the real file path for parsing
-        # but may need to mock stat for files that don't exist yet
-
-        # Create mock ExtKind
-        from codeweaver.core.language import SemanticSearchLanguage
-
-        mock_ext_kind = Mock()
+        mock_ext_category = Mock()
         if path.suffix == ".py":
-            mock_ext_kind.language = SemanticSearchLanguage.PYTHON
+            mock_ext_category.language = SemanticSearchLanguage.PYTHON
         else:
-            mock_ext_kind.language = path.suffix.lstrip(".")
+            mock_ext_category.language = path.suffix.lstrip(".")
 
         # Create mock DiscoveredFile
         file = Mock()
-        file.path = mock_path
-        file.ext_kind = mock_ext_kind
+        file.path = path
+        file.absolute_path = path  # Add absolute_path attribute pointing to real path
+        file.ext_category = mock_ext_category
         file.source_id = uuid7()  # Add source_id for Span validation (UUID7)
 
         return file
@@ -97,11 +90,12 @@ def test_e2e_degradation_chain(mock_governor, mock_discovered_file):
     selector = ChunkerSelector(mock_governor)
     file = mock_discovered_file(str(fixture_path))
 
-    # Should gracefully degrade and still produce chunks
-    # (implementation will add fallback logic)
-    with pytest.raises(Exception):  # Will fail until fallback implemented
-        chunker = selector.select_for_file(file)
-        chunker.chunk(content, file=file)
+    # Should gracefully degrade and still produce chunks via fallback
+    chunker = selector.select_for_file(file)
+    chunks = chunker.chunk(content, file=file)
+
+    # Should produce at least some chunks through degradation
+    assert len(chunks) > 0, "Degradation should produce chunks"
 
 
 # =============================================================================
@@ -112,7 +106,7 @@ def test_e2e_degradation_chain(mock_governor, mock_discovered_file):
 @pytest.fixture
 def sample_files():
     """Create list of real test fixture files for parallel processing."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     fixture_dir = Path("tests/fixtures")
     files = []
@@ -134,8 +128,9 @@ def sample_files():
     return files
 
 
+@pytest.mark.asyncio
 @pytest.mark.slow
-def test_e2e_multiple_files_parallel_process(sample_files):
+async def test_e2e_multiple_files_parallel_process(sample_files):
     """Integration test: Process multiple files in parallel with ProcessPoolExecutor.
 
     Tests true parallel processing using ProcessPoolExecutor with fixed pickling support.
@@ -143,10 +138,13 @@ def test_e2e_multiple_files_parallel_process(sample_files):
     1. Converting positional_connections from generator to tuple
     2. Adding __getstate__/__setstate__ to SemanticMetadata to exclude AST nodes
     """
-    from codeweaver.config.chunker import ChunkerSettings, PerformanceSettings
-    from codeweaver.engine.chunker.base import ChunkGovernor
-    from codeweaver.engine.chunker.parallel import chunk_files_parallel
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.engine import (
+        ChunkerSettings,
+        ChunkGovernor,
+        PerformanceSettings,
+        chunk_files_parallel,
+    )
+    from codeweaver.providers import EmbeddingModelCapabilities
 
     # Skip if no files available
     if not sample_files:
@@ -162,9 +160,12 @@ def test_e2e_multiple_files_parallel_process(sample_files):
     governor = ChunkGovernor(capabilities=(capabilities,), settings=settings)
 
     # Process files in parallel
-    results = dict(
-        chunk_files_parallel(sample_files, governor, max_workers=2, executor_type="process")
-    )
+    results = {
+        k: v
+        async for k, v in chunk_files_parallel(
+            sample_files, governor, max_workers=2, executor_type="process"
+        )
+    }
 
     # Verify results
     assert results, "Should process at least one file"
@@ -184,13 +185,17 @@ def test_e2e_multiple_files_parallel_process(sample_files):
         _assert_chunk_quality(file_path, chunks)
 
 
+@pytest.mark.asyncio
 @pytest.mark.slow
-def test_e2e_multiple_files_parallel_thread(sample_files):
+async def test_e2e_multiple_files_parallel_thread(sample_files):
     """Integration test: Process multiple files in parallel with ThreadPoolExecutor."""
-    from codeweaver.config.chunker import ChunkerSettings, PerformanceSettings
-    from codeweaver.engine.chunker.base import ChunkGovernor
-    from codeweaver.engine.chunker.parallel import chunk_files_parallel
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.engine import (
+        ChunkerSettings,
+        ChunkGovernor,
+        PerformanceSettings,
+        chunk_files_parallel,
+    )
+    from codeweaver.providers import EmbeddingModelCapabilities
 
     # Skip if no files available
     if not sample_files:
@@ -206,9 +211,12 @@ def test_e2e_multiple_files_parallel_thread(sample_files):
     governor = ChunkGovernor(capabilities=(capabilities,), settings=settings)
 
     # Process files in parallel with threads
-    results = dict(
-        chunk_files_parallel(sample_files, governor, max_workers=2, executor_type="thread")
-    )
+    results = {
+        k: v
+        async for k, v in chunk_files_parallel(
+            sample_files, governor, max_workers=2, executor_type="thread"
+        )
+    }
 
     # Verify results
     assert results, "Should process at least one file"
@@ -220,13 +228,12 @@ def test_e2e_multiple_files_parallel_thread(sample_files):
         assert len(chunks) > 0, f"File {file_path} should produce chunks"
 
 
-def test_e2e_parallel_error_handling(tmp_path):
+@pytest.mark.asyncio
+async def test_e2e_parallel_error_handling(tmp_path):
     """Verify parallel processing continues when individual files fail."""
-    from codeweaver.config.chunker import ChunkerSettings
-    from codeweaver.core.discovery import DiscoveredFile
-    from codeweaver.engine.chunker.base import ChunkGovernor
-    from codeweaver.engine.chunker.parallel import chunk_files_parallel
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.core import DiscoveredFile
+    from codeweaver.engine import ChunkerSettings, ChunkGovernor, chunk_files_parallel
+    from codeweaver.providers import EmbeddingModelCapabilities
 
     # Create mix of valid and invalid files
     good_file = tmp_path / "good.py"
@@ -255,7 +262,12 @@ def test_e2e_parallel_error_handling(tmp_path):
 
     # Process in parallel - should continue despite bad file
     # Use thread executor to avoid process pickling issues
-    results = dict(chunk_files_parallel(files, governor, max_workers=2, executor_type="thread"))
+    results = {
+        k: v
+        async for k, v in chunk_files_parallel(
+            files, governor, max_workers=2, executor_type="thread"
+        )
+    }
 
     # Should have processed the good files even though one failed
     # Note: Depending on error handling, bad file might produce chunks via fallback
@@ -272,34 +284,36 @@ def test_e2e_parallel_error_handling(tmp_path):
     )
 
 
-def test_e2e_parallel_empty_file_list():
+@pytest.mark.asyncio
+async def test_e2e_parallel_empty_file_list():
     """Verify parallel processing handles empty file list gracefully."""
-    from codeweaver.engine.chunker.base import ChunkGovernor
-    from codeweaver.engine.chunker.parallel import chunk_files_parallel
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.engine import ChunkGovernor, chunk_files_parallel
+    from codeweaver.providers import EmbeddingModelCapabilities
 
     capabilities = EmbeddingModelCapabilities(context_window=8192, default_dimension=1536)
     governor = ChunkGovernor(capabilities=(capabilities,))
 
     # Process empty list
-    results = list(chunk_files_parallel([], governor))
+    results = [result async for result in chunk_files_parallel([], governor)]
 
     # Should return empty without error
     assert not results, "Empty input should yield no results"
 
 
-def test_e2e_parallel_dict_convenience():
+@pytest.mark.asyncio
+async def test_e2e_parallel_dict_convenience():
     """Test parallel_dict convenience wrapper."""
-    from codeweaver.config.chunker import ChunkerSettings
-    from codeweaver.core.discovery import DiscoveredFile
-    from codeweaver.engine.chunker.base import ChunkGovernor
-    from codeweaver.engine.chunker.parallel import chunk_files_parallel_dict
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    import anyio
+
+    from codeweaver.core import DiscoveredFile
+    from codeweaver.engine import ChunkerSettings, ChunkGovernor, chunk_files_parallel_dict
+    from codeweaver.providers import EmbeddingModelCapabilities
 
     # Get sample files
     fixture_dir = Path("tests/fixtures")
     files = [
-        DiscoveredFile.from_path(fixture_path) for fixture_path in fixture_dir.glob("sample*.py")
+        DiscoveredFile.from_path(Path(fixture_path))  # Convert anyio.Path → pathlib.Path
+        async for fixture_path in anyio.Path(fixture_dir).glob("sample*.py")
     ]
 
     if not files:
@@ -311,8 +325,10 @@ def test_e2e_parallel_dict_convenience():
 
     if not files:
         pytest.skip("No fixture files available for parallel dict test")
-    # Get results as dict
-    results = chunk_files_parallel_dict(files, governor, max_workers=2)  # ty: ignore[invalid-argument-type]
+    # Get results as dict (use thread executor to avoid pickling issues with dev/venv mismatch)
+    results = await chunk_files_parallel_dict(
+        files, governor, max_workers=2, executor_type="thread"
+    )
 
     # Verify it's a dictionary
     assert isinstance(results, dict), "Should return dictionary"

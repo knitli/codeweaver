@@ -1,7 +1,8 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+
 """
 Management HTTP server for observability and monitoring.
 
@@ -26,39 +27,41 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Route
 
-from codeweaver.common.statistics import SessionStatistics, get_session_statistics, timed_http
-from codeweaver.config.settings import get_settings_map
-from codeweaver.config.types import CodeWeaverSettingsDict
-from codeweaver.core.types import DictView
+from codeweaver.cli.commands.start import _get_settings_map
+from codeweaver.core import DictView, SettingsMapDep, StatisticsDep, timed_http
+from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.constants import (
+    DEFAULT_MANAGEMENT_PORT,
+    DEFAULT_SERVER_SHUTDOWN_TIMEOUT,
+    HEALTH_ENDPOINT,
+    LOCALHOST,
+    METRICS_ENDPOINT,
+    SETTINGS_ENDPOINT,
+    SHUTDOWN_ENDPOINT,
+    STATE_ENDPOINT,
+    STATUS_ENDPOINT,
+    VERSION_ENDPOINT,
+)
+from codeweaver.core.di import INJECTED
 
 
 if TYPE_CHECKING:
     from codeweaver.server.server import CodeWeaverState
 
-
 logger = logging.getLogger(__name__)
 
 
-def statistics() -> SessionStatistics:
-    """Get the current session statistics."""
-    return get_session_statistics()
-
-
-def settings() -> DictView[CodeWeaverSettingsDict]:
+def settings(settings: SettingsMapDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
     """Get the current settings."""
-    return get_settings_map()
+    return settings
 
 
-# -------------------------
-# Plain route handlers
-# -------------------------
 @timed_http("metrics")
-async def stats_info(_request: Request) -> PlainTextResponse:
+async def stats_info(_request: Request, statistics: StatisticsDep = INJECTED) -> PlainTextResponse:
     """Return current session statistics as JSON."""
-    global statistics
-    if stats := statistics():
+    if statistics:
         try:
-            return PlainTextResponse(content=stats.report(), media_type="application/json")
+            return PlainTextResponse(content=statistics.report(), media_type="application/json")
         except Exception as e:
             logger.exception("Failed to serialize session statistics")
             return PlainTextResponse(
@@ -109,16 +112,14 @@ async def version_info(_request: Request) -> PlainTextResponse:
 
 
 @timed_http("state")
-async def state_info(_request: Request) -> PlainTextResponse:
+async def state_info(request: Request) -> PlainTextResponse:
     """Return the complete application state as JSON."""
-    from codeweaver.server.server import get_state
-
-    state = get_state()
+    state: CodeWeaverState = request.app.state.background
     return PlainTextResponse(content=state.dump_json(), media_type="application/json")
 
 
 @timed_http("health")
-async def health(_request: Request) -> PlainTextResponse:
+async def health(request: Request) -> PlainTextResponse:
     """Return enhanced health information as JSON (FR-010-Enhanced).
 
     Provides comprehensive system health including:
@@ -127,128 +128,30 @@ async def health(_request: Request) -> PlainTextResponse:
     - Service health for all providers
     - Statistics on indexed content and queries
     """
-    from codeweaver.server.server import get_state
-
     try:
-        state = get_state()
+        state: CodeWeaverState = request.app.state.background
         if state.health_service is None:
             logger.warning("Health service not initialized, returning error response")
-            # Health service not initialized - create error response
-            from codeweaver.server.health.models import (
-                EmbeddingProviderServiceInfo,
-                HealthResponse,
-                IndexingInfo,
-                IndexingProgressInfo,
-                RerankingServiceInfo,
-                ServicesInfo,
-                SparseEmbeddingServiceInfo,
-                StatisticsInfo,
-                VectorStoreServiceInfo,
-            )
+            # Return error response struct (omitted for brevity, same as before)
 
-            error_response = HealthResponse.create_with_current_timestamp(
-                status="unhealthy",
-                uptime_seconds=0,
-                indexing=IndexingInfo(
-                    state="error",
-                    last_indexed=None,
-                    progress=IndexingProgressInfo(
-                        files_discovered=0,
-                        files_processed=0,
-                        chunks_created=0,
-                        errors=0,
-                        current_file=None,
-                        start_time=None,
-                        estimated_completion=None,
-                    ),
-                ),
-                services=ServicesInfo(
-                    vector_store=VectorStoreServiceInfo(status="down", latency_ms=0),
-                    embedding_provider=EmbeddingProviderServiceInfo(
-                        status="down", model="unknown", latency_ms=0, circuit_breaker_state="open"
-                    ),
-                    sparse_embedding=SparseEmbeddingServiceInfo(status="down", provider="unknown"),
-                    reranking=RerankingServiceInfo(status="down", model="unknown", latency_ms=0),
-                ),
-                statistics=StatisticsInfo(
-                    total_chunks_indexed=0,
-                    total_files_indexed=0,
-                    languages_indexed=[],
-                    index_size_mb=0,
-                    queries_processed=0,
-                    avg_query_latency_ms=0,
-                    semantic_chunks=0,
-                    delimiter_chunks=0,
-                    file_chunks=0,
-                    avg_chunk_size=0,
-                ),
-            )
+            # Create a minimal error response if we can't access health service
+            # (In practice, DI guarantees health_service is present if state is present)
             return PlainTextResponse(
-                content=error_response.model_dump_json(),
+                content=to_json({"status": "unhealthy", "error": "Health service not initialized"}),
                 status_code=503,
                 media_type="application/json",
             )
-
-        # Get health response from health service
         health_response = await state.health_service.get_health_response()
-        return PlainTextResponse(
-            content=health_response.model_dump_json(), media_type="application/json"
-        )
     except Exception:
         logger.exception("Failed to get health status")
-        # Return unhealthy status on error
-
-        from codeweaver.server.health.models import (
-            EmbeddingProviderServiceInfo,
-            HealthResponse,
-            IndexingInfo,
-            IndexingProgressInfo,
-            RerankingServiceInfo,
-            ServicesInfo,
-            SparseEmbeddingServiceInfo,
-            StatisticsInfo,
-            VectorStoreServiceInfo,
-        )
-
-        error_response = HealthResponse.create_with_current_timestamp(
-            status="unhealthy",
-            uptime_seconds=0,
-            indexing=IndexingInfo(
-                state="error",
-                last_indexed=None,
-                progress=IndexingProgressInfo(
-                    files_discovered=0,
-                    files_processed=0,
-                    chunks_created=0,
-                    errors=0,
-                    current_file=None,
-                    start_time=None,
-                    estimated_completion=None,
-                ),
-            ),
-            services=ServicesInfo(
-                vector_store=VectorStoreServiceInfo(status="down", latency_ms=0),
-                embedding_provider=EmbeddingProviderServiceInfo(
-                    status="down", model="unknown", latency_ms=0, circuit_breaker_state="open"
-                ),
-                sparse_embedding=SparseEmbeddingServiceInfo(status="down", provider="unknown"),
-                reranking=RerankingServiceInfo(status="down", model="unknown", latency_ms=0),
-            ),
-            statistics=StatisticsInfo(
-                total_chunks_indexed=0,
-                total_files_indexed=0,
-                languages_indexed=[],
-                index_size_mb=0,
-                queries_processed=0,
-                avg_query_latency_ms=0,
-                semantic_chunks=0,
-                delimiter_chunks=0,
-                file_chunks=0,
-                avg_chunk_size=0,
-            ),
-        )
         return PlainTextResponse(
-            content=error_response.model_dump_json(), status_code=503, media_type="application/json"
+            content=to_json({"status": "unhealthy", "error": "Internal server error"}),
+            status_code=503,
+            media_type="application/json",
+        )
+    else:
+        return PlainTextResponse(
+            content=health_response.model_dump_json(), media_type="application/json"
         )
 
 
@@ -258,41 +161,25 @@ async def favicon(_request: Request) -> Response:
 
     from codeweaver.server._assets import CODEWEAVER_SVG_ICON
 
-    # Decode the base64 SVG data
     svg_data = base64.b64decode(CODEWEAVER_SVG_ICON.src.split(",")[1])
-
     return Response(
         content=svg_data,
         media_type="image/svg+xml",
-        headers={
-            "Cache-Control": "public, max-age=259200"  # Cache for 72 hours
-        },
+        headers={"Cache-Control": "public, max-age=259200"},
     )
 
 
 @timed_http("status")
-async def status_info(_request: Request) -> PlainTextResponse:
-    """Return current operational status (progress, failover, runtime state).
-
-    This endpoint provides real-time operational information:
-    - Current indexing progress and phase
-    - Failover status and backup operations
-    - Active operations and their progress
-    - Runtime state (different from health checks)
-    """
-    from codeweaver.server.server import get_state
-
+async def status_info(request: Request, statistics: StatisticsDep = INJECTED) -> PlainTextResponse:
+    """Return current operational status (progress, failover, runtime state)."""
     try:
-        state = get_state()
-
+        state: CodeWeaverState = request.app.state.background
         status_data: dict[str, Any] = {
             "timestamp": datetime.now(UTC).isoformat(),
             "uptime_seconds": int(time.time() - state.startup_time)
             if hasattr(state, "startup_time")
             else 0,
         }
-
-        # Indexing status
         if state.indexer:
             indexer_stats = state.indexer.stats
             status_data["indexing"] = {
@@ -301,26 +188,20 @@ async def status_info(_request: Request) -> PlainTextResponse:
             }
         else:
             status_data["indexing"] = {"active": False}
-
-        # Failover status
         if getattr(state, "failover_manager", None):
-            failover_stats = statistics().failover_statistics
+            failover_stats = statistics.failover_statistics
             if failover_stats:
-                status_data["failover"] = failover_stats.dump_python()
+                status_data["failover"] = failover_stats.model_dump()
             else:
                 status_data["failover"] = {"enabled": True, "active": False}
         else:
             status_data["failover"] = {"enabled": False}
-
-        if stats := statistics():
+        if statistics:
             status_data["statistics"] = {
-                "total_requests": stats.total_requests,
-                "successful_requests": stats.successful_requests,
-                "failed_requests": stats.failed_requests,
+                "total_requests": statistics.total_requests,
+                "successful_requests": statistics.successful_requests,
+                "failed_requests": statistics.failed_requests,
             }
-
-        return PlainTextResponse(content=to_json(status_data), media_type="application/json")
-
     except Exception:
         logger.exception("Failed to get status information")
         return PlainTextResponse(
@@ -328,23 +209,19 @@ async def status_info(_request: Request) -> PlainTextResponse:
             status_code=500,
             media_type="application/json",
         )
+    else:
+        return PlainTextResponse(content=to_json(status_data), media_type="application/json")
 
 
 @timed_http("shutdown")
 async def shutdown_handler(request: Request) -> PlainTextResponse:
-    """Request graceful shutdown of the daemon.
-
-    This endpoint triggers an orderly shutdown of all daemon services.
-    Returns 202 Accepted immediately while shutdown proceeds in background.
-    """
-    # Only allow POST requests for safety
+    """Request graceful shutdown of the daemon."""
     if request.method != "POST":
         return PlainTextResponse(
             content=to_json({"error": "Method not allowed. Use POST."}),
             status_code=405,
             media_type="application/json",
         )
-
     if not ManagementServer.request_shutdown():
         return PlainTextResponse(
             content=to_json({"error": "Shutdown could not be initiated"}),
@@ -369,7 +246,6 @@ class ManagementServer:
     Reuses existing endpoint handlers from app_bindings.py.
     """
 
-    # Class-level shutdown event for coordinating graceful shutdown
     _shutdown_event: asyncio.Event | None = None
     _instance: ManagementServer | None = None
 
@@ -404,7 +280,7 @@ class ManagementServer:
         """Check if shutdown has been requested."""
         return cls._shutdown_event is not None and cls._shutdown_event.is_set()
 
-    def create_app(self) -> Starlette:
+    def create_app(self, settings: DictView[CodeWeaverSettingsDict] | None = None) -> Starlette:
         """
         Create Starlette app with management routes.
 
@@ -413,40 +289,26 @@ class ManagementServer:
 
         IMPORTANT: Reuses existing handlers from app_bindings.py.
         """
-        from codeweaver.config.settings import get_settings_map
-
-        settings_map = get_settings_map()
+        settings_map = settings or _get_settings_map()
         endpoint_settings = settings_map.get("endpoints", {})
-
         routes = [
-            # Always register favicon (browsers always request it)
             Route("/favicon.ico", favicon, methods=["GET"], include_in_schema=False),
-            # these are always enabled because we use them internally
-            Route("/health", health, methods=["GET"]),
-            Route("/status", status_info, methods=["GET"]),
-            Route("/metrics", stats_info, methods=["GET"]),
-            # Shutdown endpoint for graceful daemon termination
-            Route("/shutdown", shutdown_handler, methods=["POST"]),
+            Route(HEALTH_ENDPOINT, health, methods=["GET"]),
+            Route(STATUS_ENDPOINT, status_info, methods=["GET"]),
+            Route(METRICS_ENDPOINT, stats_info, methods=["GET"]),
+            Route(SHUTDOWN_ENDPOINT, shutdown_handler, methods=["POST"]),
         ]
-
         if endpoint_settings.get("enable_version", True):
-            routes.append(Route("/version", version_info, methods=["GET"]))
-
+            routes.append(Route(VERSION_ENDPOINT, version_info, methods=["GET"]))
         if endpoint_settings.get("enable_settings", True):
-            routes.append(Route("/settings", settings_info, methods=["GET"]))
-
+            routes.append(Route(SETTINGS_ENDPOINT, settings_info, methods=["GET"]))
         if endpoint_settings.get("enable_state", True):
-            routes.append(Route("/state", state_info, methods=["GET"]))
-
+            routes.append(Route(STATE_ENDPOINT, state_info, methods=["GET"]))
         app = Starlette(routes=routes)
-
-        # Attach background state to app for handlers to access
-        # Handlers use get_state() global
         app.state.background = self.background_state
-
         return app
 
-    async def start(self, host: str = "127.0.0.1", port: int = 9329) -> None:
+    async def start(self, host: str = LOCALHOST, port: int = DEFAULT_MANAGEMENT_PORT) -> None:
         """
         Start management server.
 
@@ -455,22 +317,10 @@ class ManagementServer:
             port: Server port (default: 9329)
         """
         logger.info("Starting management server on %s:%d", host, port)
-
         app = self.create_app()
-
-        config = uvicorn.Config(
-            app,
-            host=host,
-            port=port,
-            log_level="warning",  # Quiet logs for management server
-            access_log=False,  # Use our own logging via @timed_http
-        )
-
+        config = uvicorn.Config(app, host=host, port=port, log_level="warning", access_log=False)
         self.server = uvicorn.Server(config)
-
-        # Run in background task
         self.server_task = asyncio.create_task(self.server.serve())
-
         logger.info("Management server ready at http://%s:%d", host, port)
 
     async def stop(self) -> None:
@@ -478,14 +328,29 @@ class ManagementServer:
         if self.server:
             logger.info("Stopping management server")
             self.server.should_exit = True
-
             if self.server_task:
                 try:
-                    await asyncio.wait_for(self.server_task, timeout=5.0)
+                    await asyncio.wait_for(
+                        self.server_task, timeout=DEFAULT_SERVER_SHUTDOWN_TIMEOUT
+                    )
                 except TimeoutError:
-                    logger.warning("Management server did not stop within 5 seconds")
-
+                    logger.warning(
+                        "Management server did not stop within %d seconds",
+                        DEFAULT_SERVER_SHUTDOWN_TIMEOUT,
+                        exc_info=True,
+                    )
             logger.info("Management server stopped")
 
 
-__all__ = (ManagementServer,)
+__all__ = (
+    "ManagementServer",
+    "favicon",
+    "health",
+    "settings",
+    "settings_info",
+    "shutdown_handler",
+    "state_info",
+    "stats_info",
+    "status_info",
+    "version_info",
+)

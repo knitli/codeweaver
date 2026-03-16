@@ -6,17 +6,14 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
+from codeweaver.core import Provider, dependency_provider
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import (
     EmbeddingCapabilitiesDict,
     PartialCapabilities,
 )
-from codeweaver.providers.provider import Provider
-
-
-if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 type WhereisaiProvider = Literal[
@@ -120,17 +117,24 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
 )
 
 
-def get_whereisai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
-    """Get the capabilities for WhereIsAI embedding models."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+class WhereisaiEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for WhereIsAI embedding models."""
 
+
+@dependency_provider(WhereisaiEmbeddingCapabilities, scope="singleton", collection=True)
+def get_whereisai_embedding_capabilities() -> tuple[WhereisaiEmbeddingCapabilities, ...]:
+    """Get the capabilities for WhereIsAI embedding models."""
     capabilities: list[EmbeddingCapabilitiesDict] = []
     for cap in ALL_CAPABILITIES:
         capabilities.extend([
             EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore
-            for provider in CAP_MAP[cap["name"]]  # ty: ignore[invalid-argument-type]
+            for provider in CAP_MAP[cap["name"]]
         ])
-    return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
+    return tuple(WhereisaiEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
-__all__ = ("get_whereisai_embedding_capabilities",)
+__all__ = (
+    "WhereisaiEmbeddingCapabilities",
+    "WhereisaiProvider",
+    "get_whereisai_embedding_capabilities",
+)

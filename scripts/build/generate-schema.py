@@ -25,7 +25,7 @@ def main() -> int:
     if src_path not in sys.path:
         sys.path.insert(0, str(src_path))
 
-    from codeweaver.config.settings import get_settings
+    from codeweaver.config import get_settings
     # Get the schema version from CodeWeaverSettings
     settings = get_settings()
     version = settings.__version__

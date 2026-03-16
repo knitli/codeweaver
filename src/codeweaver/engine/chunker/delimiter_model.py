@@ -20,8 +20,8 @@ from typing import TYPE_CHECKING, Annotated
 
 from pydantic import Field, PositiveInt
 
-from codeweaver.core.types.models import BasedModel
-from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
+from codeweaver.core import BasedModel
+from codeweaver.core.types import DelimiterKind
 
 
 if TYPE_CHECKING:

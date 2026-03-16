@@ -12,6 +12,9 @@ on:
         required: false
         default: true
         type: boolean
+permissions:
+  contents: read
+  packages: write
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
@@ -43,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/codeweaver
+      url: https://test.pypi.org/p/code-weaver
     permissions:
       id-token: write
       contents: read

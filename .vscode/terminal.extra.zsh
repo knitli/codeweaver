@@ -11,14 +11,17 @@
 
 full_setup() {
   mise -q -y trust || {
-    print -P "%F{209}[codeweaver]%f %F{red}Failed to trust the Mise environment!%f"
+    print -P "%F{66}[codeweaver]%f %F{red}Failed to trust the Mise environment!%f"
   }
   mise run setup
 }
 
+prefix_color="%F{66}"
+prefix="${prefix_color}[codeweaver]%f"
+
 # Make sure Mise is installed and available
-print -P "%F{209}[codeweaver]%f Welcome to the%f %F{209}CodeWeaver%f development environment!"
-print -P "%F{209}[codeweaver]%f If you run into any issues, please visit %F{cyan}https://github.com/knitli/codeweaver/issues%f for assistance."
+print -P "${prefix} Welcome to the ${prefix_color}CodeWeaver%f development environment!"
+print -P "${prefix} If you run into any issues, please visit %F{cyan}https://github.com/knitli/codeweaver/issues%f for assistance."
 
 # set a few aliases for convenience
 alias mx='mise exec'
@@ -26,16 +29,16 @@ alias mr='mise run'
 
 if command -v mise >/dev/null 2>&1; then
   # We have Mise installed, check if it's initialized for this workspace
-  print -P "%F{209}[codeweaver]%f You're all set!"
+  print -P "${prefix} You're all set!"
 else
   REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "${PWD}")"
   # Mise is not installed, run the install script
   chmod -R +x "${REPO_ROOT}/scripts" || {
-      print -P "%F{209}[codeweaver]%f %F{red}Failed to make install scripts executable!%f"
+      print -P "${prefix} %F{red}Failed to make install scripts executable!%f"
     }
-    print -P "%F{209}[codeweaver]%f Installing Mise for the first time..."
+    print -P "${prefix} Installing Mise for the first time..."
     "${REPO_ROOT}/scripts/install-mise.sh" || {
-      print -P "%F{209}[codeweaver]%f %F{red}Failed to install Mise!%f Try running the install script manually: %F{cyan}${REPO_ROOT}/scripts/install-mise.sh%f"
+      print -P "${prefix} %F{red}Failed to install Mise!%f Try running the install script manually: %F{cyan}${REPO_ROOT}/scripts/install-mise.sh%f"
     }
     full_setup
 fi

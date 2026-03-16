@@ -21,9 +21,8 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.engine.chunker.base import ChunkGovernor
-from codeweaver.engine.chunker.delimiter import DelimiterChunker
-from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
+from codeweaver.core.types import DelimiterKind
+from codeweaver.engine import ChunkGovernor, DelimiterChunker
 
 
 pytestmark = [pytest.mark.unit]
@@ -35,6 +34,7 @@ def delimiter_chunker(chunk_governor: ChunkGovernor) -> DelimiterChunker:
     return DelimiterChunker(governor=chunk_governor)
 
 
+@pytest.mark.unit
 class TestDelimiterChunksJavaScriptNested:
     """Test delimiter chunker with JavaScript nested functions."""
 
@@ -93,7 +93,7 @@ function createDataProcessor(config) {
         test_file.write_text(js_code)
 
         # Create DiscoveredFile and chunk the code
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(js_code, file=discovered_file)
@@ -121,7 +121,7 @@ function createDataProcessor(config) {
 
         # Verify nesting metadata is tracked
         assert "nesting_level" in outer_chunk.metadata, "Should track nesting level"
-        assert outer_chunk.metadata["nesting_level"] >= 0, "Nesting level should be non-negative"
+        assert outer_chunk.metadata["nesting_level"] >= 0, "Nesting level should be non-negative"  # ty:ignore[unsupported-operator]
 
         # Verify complete function block
         assert outer_chunk.content.startswith("function createDataProcessor"), (
@@ -135,6 +135,7 @@ function createDataProcessor(config) {
         assert open_braces == close_braces, "Braces should be balanced in function chunk"
 
 
+@pytest.mark.unit
 class TestDelimiterPriorityResolution:
     """Test delimiter priority resolution for overlapping boundaries."""
 
@@ -170,7 +171,7 @@ class DataProcessor:
         test_file.write_text(py_code)
 
         # Create DiscoveredFile and chunk the code
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(py_code, file=discovered_file)
@@ -190,7 +191,7 @@ class DataProcessor:
 
             # Verify priority in metadata
             assert "priority" in class_chunk.metadata, "Should have priority in metadata"
-            assert class_chunk.metadata["priority"] >= 70, "Class priority should be high"
+            assert class_chunk.metadata["priority"] >= 70, "Class priority should be high"  # ty:ignore[unsupported-operator]
 
         # Verify no chunks overlap
         sorted_chunks = sorted(chunks, key=lambda c: c.start_line)
@@ -205,6 +206,7 @@ class DataProcessor:
             )
 
 
+@pytest.mark.unit
 class TestDelimiterChunksPython:
     """Test delimiter chunker with Python code."""
 
@@ -266,7 +268,7 @@ def validate_config(config: dict) -> bool:
         _ = test_file.write_text(py_code)
 
         # Create DiscoveredFile and chunk the code
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(py_code, file=discovered_file)
@@ -324,6 +326,7 @@ def validate_config(config: dict) -> bool:
             assert chunk.end_line - chunk.start_line >= 0, "Line range should be non-negative"
 
 
+@pytest.mark.unit
 class TestDelimiterNestingHandling:
     """Test nesting handling for nested delimiters."""
 
@@ -350,7 +353,7 @@ function processData(items) {
         test_file.write_text(code)
 
         # Create DiscoveredFile and chunk the code
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(code, file=discovered_file)
@@ -371,6 +374,7 @@ function processData(items) {
             assert "nesting_level" in func_chunk.metadata, "Should track nesting level"
 
 
+@pytest.mark.unit
 class TestDelimiterBoundaryDetection:
     """Test boundary detection accuracy."""
 
@@ -390,7 +394,7 @@ def another_function():
         _ = test_file.write_text(code)
 
         # Create DiscoveredFile and chunk the code
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(code, file=discovered_file)

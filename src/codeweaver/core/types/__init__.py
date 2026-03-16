@@ -1,18 +1,49 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Type aliases and base models used throughout the CodeWeaver project."""
 
 from __future__ import annotations
 
-from importlib import import_module
-from types import MappingProxyType
+import types as _types
+
+
+MappingProxyType = _types.MappingProxyType
+
+from codeweaver.core.types.provider import (
+    LiteralProvider,
+    LiteralProviderCategory,
+    LiteralSDKClient,
+)
+from codeweaver.core.types.service_cards import (
+    ProviderCategoryLiteralString,
+    ProviderLiteralString,
+    SDKClientLiteralString,
+)
+
+
+type LiteralProviderCategoryType = ProviderCategoryLiteralString | LiteralProviderCategory
+
+type LiteralProviderType = ProviderLiteralString | LiteralProvider
+
+type LiteralSDKClientType = SDKClientLiteralString | LiteralSDKClient
+
+# === MANAGED EXPORTS ===
+
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
+
 from typing import TYPE_CHECKING
+
+from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
     from codeweaver.core.types.aliases import (
+        BlakeHashKey,
+        BlakeKey,
         CategoryName,
         CategoryNameT,
         DevToolName,
@@ -52,41 +83,140 @@ if TYPE_CHECKING:
         UUID7Hex,
         UUID7HexT,
     )
+    from codeweaver.core.types.dataclasses import (
+        DATACLASS_CONFIG,
+        BaseEnumData,
+        DataclassSerializationMixin,
+        DeserializationKwargs,
+        SerializationKwargs,
+    )
+    from codeweaver.core.types.delimiter import (
+        LANGUAGE_TO_FAMILY,
+        DelimiterDict,
+        DelimiterKind,
+        DelimiterPattern,
+        LanguageFamily,
+        LineStrategy,
+    )
     from codeweaver.core.types.dictview import DictView
+    from codeweaver.core.types.embeddings import (
+        ChunkEmbeddings,
+        CodeWeaverSparseEmbedding,
+        DataType,
+        EmbeddingBatchInfo,
+        EmbeddingKind,
+        QueryResult,
+        RawEmbeddingVectors,
+        SparseEmbedding,
+        StoredEmbeddingVectors,
+    )
     from codeweaver.core.types.enum import (
         AnonymityConversion,
         BaseDataclassEnum,
         BaseEnum,
-        BaseEnumData,
+        FilteredCallable,
+        FilteredReturn,
     )
+    from codeweaver.core.types.env import EnvFormat, EnvVarInfo, ProviderEnvVars, VariableInfo
     from codeweaver.core.types.models import (
         BASEDMODEL_CONFIG,
-        DATACLASS_CONFIG,
+        FILTERED_KEYS,
         FROZEN_BASEDMODEL_CONFIG,
         BasedModel,
-        DataclassSerializationMixin,
-        DeserializationKwargs,
-        EnvVarInfo,
         RootedRoot,
-        SerializationKwargs,
+    )
+    from codeweaver.core.types.provider import (
+        Provider,
+        ProviderCategory,
+        SDKClient,
+        get_categories,
+        get_default_provider_import_for_category,
+    )
+    from codeweaver.core.types.search import SearchResult, SearchStrategy, StrategizedQuery
+    from codeweaver.core.types.sentinel import (
+        MISSING,
+        UNSET,
+        DontGenerateJsonSchema,
+        Missing,
+        Sentinel,
+        Unset,
+    )
+    from codeweaver.core.types.service_cards import (
+        ServiceCard,
+        ServiceMetadata,
+        get_local_only_provider_members,
+        get_local_only_providers,
+        get_openai_provider_members,
+        get_openai_providers,
+        get_provider_capabilities_map,
+        get_provider_category_sdk_clients_for_provider,
+        get_provider_clients,
+        get_provider_literals,
+        get_providers_for_category,
+        get_sdk_client,
+        get_sdk_client_map,
+        get_service_card,
+        get_service_cards,
+        get_sometimes_local_provider_members,
+        get_sometimes_local_providers,
+        service_card_factory,
+    )
+    from codeweaver.core.types.settings_model import (
+        DEFAULT_BASE_SETTINGS_CONFIG,
+        BaseCodeWeaverSettings,
+    )
+    from codeweaver.core.types.statistics import (
+        CallHookTimingDict,
+        CategoryKey,
+        HttpRequestsDict,
+        McpComponentRequests,
+        McpComponentTimingDict,
+        McpOperationRequests,
+        McpTimingDict,
+        OperationsKey,
+        RequestKind,
+        ResourceUri,
+        SummaryKey,
+        TimingStatisticsDict,
+        ToolOrPromptName,
+    )
+    from codeweaver.core.types.utils import (
+        add_enum_alias,
+        add_enum_member,
+        clean_sentinel_from_schema,
         generate_field_title,
         generate_title,
     )
-    from codeweaver.core.types.sentinel import UNSET, Sentinel, Unset
-
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "AnonymityConversion": (__spec__.parent, "enum"),
     "BASEDMODEL_CONFIG": (__spec__.parent, "models"),
+    "DATACLASS_CONFIG": (__spec__.parent, "dataclasses"),
+    "DEFAULT_BASE_SETTINGS_CONFIG": (__spec__.parent, "settings_model"),
+    "FILTERED_KEYS": (__spec__.parent, "models"),
+    "FROZEN_BASEDMODEL_CONFIG": (__spec__.parent, "models"),
+    "LANGUAGE_TO_FAMILY": (__spec__.parent, "delimiter"),
+    "MISSING": (__spec__.parent, "sentinel"),
+    "UNSET": (__spec__.parent, "sentinel"),
+    "AnonymityConversion": (__spec__.parent, "enum"),
+    "BaseCodeWeaverSettings": (__spec__.parent, "settings_model"),
     "BaseDataclassEnum": (__spec__.parent, "enum"),
-    "BaseEnum": (__spec__.parent, "enum"),
-    "BaseEnumData": (__spec__.parent, "enum"),
     "BasedModel": (__spec__.parent, "models"),
+    "BaseEnum": (__spec__.parent, "enum"),
+    "BaseEnumData": (__spec__.parent, "dataclasses"),
+    "BlakeHashKey": (__spec__.parent, "aliases"),
+    "BlakeKey": (__spec__.parent, "aliases"),
+    "CallHookTimingDict": (__spec__.parent, "statistics"),
+    "CategoryKey": (__spec__.parent, "statistics"),
     "CategoryName": (__spec__.parent, "aliases"),
     "CategoryNameT": (__spec__.parent, "aliases"),
-    "DATACLASS_CONFIG": (__spec__.parent, "models"),
-    "DataclassSerializationMixin": (__spec__.parent, "models"),
-    "DeserializationKwargs": (__spec__.parent, "models"),
+    "ChunkEmbeddings": (__spec__.parent, "embeddings"),
+    "CodeWeaverSparseEmbedding": (__spec__.parent, "embeddings"),
+    "DataclassSerializationMixin": (__spec__.parent, "dataclasses"),
+    "DataType": (__spec__.parent, "embeddings"),
+    "DelimiterDict": (__spec__.parent, "delimiter"),
+    "DelimiterKind": (__spec__.parent, "delimiter"),
+    "DelimiterPattern": (__spec__.parent, "delimiter"),
+    "DeserializationKwargs": (__spec__.parent, "dataclasses"),
     "DevToolName": (__spec__.parent, "aliases"),
     "DevToolNameT": (__spec__.parent, "aliases"),
     "DictView": (__spec__.parent, "dictview"),
@@ -94,10 +224,13 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "DirectoryNameT": (__spec__.parent, "aliases"),
     "DirectoryPath": (__spec__.parent, "aliases"),
     "DirectoryPathT": (__spec__.parent, "aliases"),
+    "DontGenerateJsonSchema": (__spec__.parent, "sentinel"),
+    "EmbeddingBatchInfo": (__spec__.parent, "embeddings"),
+    "EmbeddingKind": (__spec__.parent, "embeddings"),
     "EmbeddingModelName": (__spec__.parent, "aliases"),
     "EmbeddingModelNameT": (__spec__.parent, "aliases"),
-    "EnvVarInfo": (__spec__.parent, "models"),
-    "FROZEN_BASEDMODEL_CONFIG": (__spec__.parent, "models"),
+    "EnvFormat": (__spec__.parent, "env"),
+    "EnvVarInfo": (__spec__.parent, "env"),
     "FileExt": (__spec__.parent, "aliases"),
     "FileExtensionT": (__spec__.parent, "aliases"),
     "FileGlob": (__spec__.parent, "aliases"),
@@ -106,62 +239,115 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FileNameT": (__spec__.parent, "aliases"),
     "FilePath": (__spec__.parent, "aliases"),
     "FilePathT": (__spec__.parent, "aliases"),
+    "FilteredCallable": (__spec__.parent, "enum"),
     "FilteredKey": (__spec__.parent, "aliases"),
     "FilteredKeyT": (__spec__.parent, "aliases"),
+    "FilteredReturn": (__spec__.parent, "enum"),
+    "HttpRequestsDict": (__spec__.parent, "statistics"),
+    "LanguageFamily": (__spec__.parent, "delimiter"),
     "LanguageName": (__spec__.parent, "aliases"),
     "LanguageNameT": (__spec__.parent, "aliases"),
+    "LineStrategy": (__spec__.parent, "delimiter"),
     "LiteralStringT": (__spec__.parent, "aliases"),
     "LlmToolName": (__spec__.parent, "aliases"),
     "LlmToolNameT": (__spec__.parent, "aliases"),
+    "McpComponentRequests": (__spec__.parent, "statistics"),
+    "McpComponentTimingDict": (__spec__.parent, "statistics"),
+    "McpOperationRequests": (__spec__.parent, "statistics"),
+    "McpTimingDict": (__spec__.parent, "statistics"),
+    "Missing": (__spec__.parent, "sentinel"),
     "ModelName": (__spec__.parent, "aliases"),
     "ModelNameT": (__spec__.parent, "aliases"),
+    "OperationsKey": (__spec__.parent, "statistics"),
+    "Provider": (__spec__.parent, "provider"),
+    "ProviderCategory": (__spec__.parent, "provider"),
+    "ProviderEnvVars": (__spec__.parent, "env"),
+    "QueryResult": (__spec__.parent, "embeddings"),
+    "RawEmbeddingVectors": (__spec__.parent, "embeddings"),
+    "RequestKind": (__spec__.parent, "statistics"),
     "RerankingModelName": (__spec__.parent, "aliases"),
     "RerankingModelNameT": (__spec__.parent, "aliases"),
+    "ResourceUri": (__spec__.parent, "statistics"),
     "Role": (__spec__.parent, "aliases"),
     "RoleT": (__spec__.parent, "aliases"),
     "RootedRoot": (__spec__.parent, "models"),
+    "SearchResult": (__spec__.parent, "search"),
+    "SearchStrategy": (__spec__.parent, "search"),
     "Sentinel": (__spec__.parent, "sentinel"),
     "SentinelName": (__spec__.parent, "aliases"),
     "SentinelNameT": (__spec__.parent, "aliases"),
-    "SerializationKwargs": (__spec__.parent, "models"),
+    "SerializationKwargs": (__spec__.parent, "dataclasses"),
+    "ServiceCard": (__spec__.parent, "service_cards"),
+    "ServiceMetadata": (__spec__.parent, "service_cards"),
+    "SparseEmbedding": (__spec__.parent, "embeddings"),
+    "StoredEmbeddingVectors": (__spec__.parent, "embeddings"),
+    "StrategizedQuery": (__spec__.parent, "search"),
+    "SummaryKey": (__spec__.parent, "statistics"),
     "ThingName": (__spec__.parent, "aliases"),
     "ThingNameT": (__spec__.parent, "aliases"),
     "ThingOrCategoryNameT": (__spec__.parent, "aliases"),
-    "UNSET": (__spec__.parent, "sentinel"),
+    "TimingStatisticsDict": (__spec__.parent, "statistics"),
+    "ToolOrPromptName": (__spec__.parent, "statistics"),
+    "Unset": (__spec__.parent, "sentinel"),
+    "VariableInfo": (__spec__.parent, "env"),
+    "add_enum_alias": (__spec__.parent, "utils"),
+    "add_enum_member": (__spec__.parent, "utils"),
+    "clean_sentinel_from_schema": (__spec__.parent, "utils"),
+    "generate_field_title": (__spec__.parent, "utils"),
+    "generate_title": (__spec__.parent, "utils"),
+    "get_categories": (__spec__.parent, "provider"),
+    "get_default_provider_import_for_category": (__spec__.parent, "provider"),
+    "get_local_only_provider_members": (__spec__.parent, "service_cards"),
+    "get_local_only_providers": (__spec__.parent, "service_cards"),
+    "get_openai_provider_members": (__spec__.parent, "service_cards"),
+    "get_openai_providers": (__spec__.parent, "service_cards"),
+    "get_provider_capabilities_map": (__spec__.parent, "service_cards"),
+    "get_provider_category_sdk_clients_for_provider": (__spec__.parent, "service_cards"),
+    "get_provider_clients": (__spec__.parent, "service_cards"),
+    "get_provider_literals": (__spec__.parent, "service_cards"),
+    "get_providers_for_category": (__spec__.parent, "service_cards"),
+    "get_sdk_client": (__spec__.parent, "service_cards"),
+    "get_sdk_client_map": (__spec__.parent, "service_cards"),
+    "get_service_card": (__spec__.parent, "service_cards"),
+    "get_service_cards": (__spec__.parent, "service_cards"),
+    "get_sometimes_local_provider_members": (__spec__.parent, "service_cards"),
+    "get_sometimes_local_providers": (__spec__.parent, "service_cards"),
+    "SDKClient": (__spec__.parent, "provider"),
+    "service_card_factory": (__spec__.parent, "service_cards"),
     "UUID7Hex": (__spec__.parent, "aliases"),
     "UUID7HexT": (__spec__.parent, "aliases"),
-    "Unset": (__spec__.parent, "sentinel"),
-    "generate_field_title": (__spec__.parent, "models"),
-    "generate_title": (__spec__.parent, "models"),
 })
 
-
-def __getattr__(name: str) -> object:
-    """Dynamically import submodules and classes for the core types package."""
-    if name in _dynamic_imports:
-        module_name, submodule_name = _dynamic_imports[name]
-        module = import_module(f"{module_name}.{submodule_name}")
-        result = getattr(module, name)
-        globals()[name] = result  # Cache in globals for future access
-        return result
-    if globals().get(name) is not None:
-        return globals()[name]
-    raise AttributeError(f"module {__name__} has no attribute {name}")
-
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "BASEDMODEL_CONFIG",
     "DATACLASS_CONFIG",
+    "DEFAULT_BASE_SETTINGS_CONFIG",
+    "FILTERED_KEYS",
     "FROZEN_BASEDMODEL_CONFIG",
+    "LANGUAGE_TO_FAMILY",
+    "MISSING",
     "UNSET",
     "AnonymityConversion",
+    "BaseCodeWeaverSettings",
     "BaseDataclassEnum",
     "BaseEnum",
     "BaseEnumData",
     "BasedModel",
+    "BlakeHashKey",
+    "BlakeKey",
+    "CallHookTimingDict",
+    "CategoryKey",
     "CategoryName",
     "CategoryNameT",
+    "ChunkEmbeddings",
+    "CodeWeaverSparseEmbedding",
+    "DataType",
     "DataclassSerializationMixin",
+    "DelimiterDict",
+    "DelimiterKind",
+    "DelimiterPattern",
     "DeserializationKwargs",
     "DevToolName",
     "DevToolNameT",
@@ -170,8 +356,12 @@ __all__ = (
     "DirectoryNameT",
     "DirectoryPath",
     "DirectoryPathT",
+    "DontGenerateJsonSchema",
+    "EmbeddingBatchInfo",
+    "EmbeddingKind",
     "EmbeddingModelName",
     "EmbeddingModelNameT",
+    "EnvFormat",
     "EnvVarInfo",
     "FileExt",
     "FileExtensionT",
@@ -181,35 +371,96 @@ __all__ = (
     "FileNameT",
     "FilePath",
     "FilePathT",
+    "FilteredCallable",
     "FilteredKey",
     "FilteredKeyT",
+    "FilteredReturn",
+    "HttpRequestsDict",
+    "LanguageFamily",
     "LanguageName",
     "LanguageNameT",
+    "LineStrategy",
+    "LiteralProvider",
+    "LiteralProviderCategory",
+    "LiteralProviderCategoryType",
+    "LiteralProviderType",
+    "LiteralSDKClient",
+    "LiteralSDKClientType",
     "LiteralStringT",
     "LlmToolName",
     "LlmToolNameT",
+    "MappingProxyType",
+    "McpComponentRequests",
+    "McpComponentTimingDict",
+    "McpOperationRequests",
+    "McpTimingDict",
+    "Missing",
     "ModelName",
     "ModelNameT",
+    "OperationsKey",
+    "Provider",
+    "ProviderCategory",
+    "ProviderCategoryLiteralString",
+    "ProviderEnvVars",
+    "ProviderLiteralString",
+    "QueryResult",
+    "RawEmbeddingVectors",
+    "RequestKind",
     "RerankingModelName",
     "RerankingModelNameT",
+    "ResourceUri",
     "Role",
     "RoleT",
     "RootedRoot",
+    "SDKClient",
+    "SDKClientLiteralString",
+    "SearchResult",
+    "SearchStrategy",
     "Sentinel",
     "SentinelName",
     "SentinelNameT",
     "SerializationKwargs",
+    "ServiceCard",
+    "ServiceMetadata",
+    "SparseEmbedding",
+    "StoredEmbeddingVectors",
+    "StrategizedQuery",
+    "SummaryKey",
     "ThingName",
     "ThingNameT",
     "ThingOrCategoryNameT",
+    "TimingStatisticsDict",
+    "ToolOrPromptName",
     "UUID7Hex",
     "UUID7HexT",
     "Unset",
+    "VariableInfo",
+    "add_enum_alias",
+    "add_enum_member",
+    "clean_sentinel_from_schema",
     "generate_field_title",
     "generate_title",
+    "get_categories",
+    "get_default_provider_import_for_category",
+    "get_local_only_provider_members",
+    "get_local_only_providers",
+    "get_openai_provider_members",
+    "get_openai_providers",
+    "get_provider_capabilities_map",
+    "get_provider_category_sdk_clients_for_provider",
+    "get_provider_clients",
+    "get_provider_literals",
+    "get_providers_for_category",
+    "get_sdk_client",
+    "get_sdk_client_map",
+    "get_service_card",
+    "get_service_cards",
+    "get_sometimes_local_provider_members",
+    "get_sometimes_local_providers",
+    "service_card_factory",
 )
 
 
 def __dir__() -> list[str]:
-    """List available attributes for the core types package."""
+    """List available attributes for the package."""
     return list(__all__)

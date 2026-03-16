@@ -5,14 +5,11 @@
 
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
-import tailwindcss from '@tailwindcss/vite';
 
 import starlightChangelogs from 'starlight-changelogs';
 import starlightLinksValidator from 'starlight-links-validator'
-import starlightSidebarTopics from 'starlight-sidebar-topics';
 import starlightScrollToTop from 'starlight-scroll-to-top';
-import starlightPluginIcons from 'starlight-plugin-icons';
-import starlightContributorList from 'starlight-contributor-list';
+import { starlightIconsPlugin, starlightIconsIntegration } from 'starlight-plugin-icons';
 import starlightPageActions from 'starlight-page-actions';
 import astroD2 from 'astro-d2';
 import markdoc from '@astrojs/markdoc';
@@ -27,6 +24,7 @@ export default defineConfig({
       dark: './src/assets/codeweaver-reverse.svg',
     },
     favicon: '/codeweaver-favico.png',
+
     social: [
       {
         label: 'GitHub',
@@ -42,16 +40,49 @@ export default defineConfig({
         label: 'Getting Started',
         items: [
           { label: 'Why CodeWeaver?', slug: 'why' },
-          { label: 'CLI Reference', slug: 'cli' },
+          { label: 'Installation & Setup', slug: 'guides/installation' },
         ],
       },
       {
-        label: 'API Reference',
-        link: '/api/',
+        label: 'Core Concepts',
+        items: [
+          { label: 'Exquisite Context', slug: 'concepts/exquisite-context' },
+          { label: 'DI Architecture', slug: 'concepts/di-system' },
+          { label: 'Language Support', slug: 'concepts/languages' },
+          { label: 'Roadmap to Alpha 7', slug: 'concepts/roadmap' },
+        ],
+      },
+      {
+        label: 'Guides',
+        items: [
+          { label: 'Configuration', slug: 'guides/configuration' },
+          { label: 'Choosing a Profile', slug: 'guides/profiles' },
+          { label: 'Resilience & Fallbacks', slug: 'guides/resilience' },
+          { label: 'Local-Only Operation', slug: 'guides/local-only' },
+          { label: 'Custom Providers', slug: 'guides/custom-providers' },
+        ],
+      },
+      {
+        label: 'Reference',
+        items: [
+          { label: 'CLI Reference', slug: 'cli' },
+          { label: 'Provider Registry', slug: 'api/providers' },
+          {
+            label: 'API Reference',
+            autogenerate: { directory: 'api' },
+          },
+        ],
       },
     ],
-  }), markdoc()],
+    plugins: [
+      starlightLinksValidator(),
+      starlightScrollToTop({showOnHomepage: false }),
+      starlightChangelogs(),
+      starlightIconsPlugin(),
+      starlightPageActions({ actions: ["copy", "view", "claude", "chatgpt"], share: true }),
+    ],
+  }), starlightIconsIntegration(), astroD2({ skipGeneration: true }), markdoc()],
   vite: {
-    plugins: [tailwindcss(), starlightLinksValidator(), starlightSidebarTopics(), starlightScrollToTop(), starlightChangelogs(), starlightPluginIcons(), starlightContributorList(), astroD2(), starlightPageActions({ baseUrl: 'https://docs.knitli.com/codeweaver' })],
+    plugins: [],
   },
 });

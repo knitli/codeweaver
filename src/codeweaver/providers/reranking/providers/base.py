@@ -7,26 +7,14 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import importlib
 import logging
 import time
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from types import MappingProxyType
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    ClassVar,
-    Literal,
-    NamedTuple,
-    cast,
-    overload,
-    override,
-)
+from typing import TYPE_CHECKING, Annotated, Any, Literal, overload, override
 
+from codeweaver_tokenizers import Tokenizer, get_tokenizer
 from pydantic import ConfigDict, Field, PositiveInt, PrivateAttr, SkipValidation, TypeAdapter
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.main import IncEx
@@ -39,60 +27,47 @@ from tenacity import (
     wait_exponential,
 )
 
-from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.models import BasedModel
-from codeweaver.exceptions import RerankingProviderError, ValidationError
-from codeweaver.providers.provider import Provider
+from codeweaver.core import (
+    INJECTED,
+    BasedModel,
+    CodeChunk,
+    Provider,
+    RerankingProviderError,
+    StatisticsDep,
+    ValidationError,
+)
+from codeweaver.core.constants import (
+    DEFAULT_OPEN_BREAKER_DURATION,
+    DEFAULT_RERANKING_MAX_RESULTS,
+    MAX_RETRY_ATTEMPTS,
+    ZERO,
+)
+from codeweaver.core.types import ModelName, ModelNameT
+from codeweaver.providers.config import RerankingConfigT, RerankingProviderSettings
+from codeweaver.providers.exceptions import CircuitBreakerOpenError
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-from codeweaver.tokenizers import Tokenizer, get_tokenizer
+from codeweaver.providers.reranking.providers.types import RerankingResult
+from codeweaver.providers.types import CircuitBreakerState
 
 
 if TYPE_CHECKING:
-    from codeweaver.common.statistics import SessionStatistics
-    from codeweaver.core.chunks import CodeChunk, StructuredDataInput
-    from codeweaver.core.types.aliases import FilteredKeyT
-    from codeweaver.core.types.enum import AnonymityConversion
+    from codeweaver.core import (
+        AnonymityConversion,
+        FilteredKeyT,
+        SessionStatistics,
+        StructuredDataInput,
+    )
 
 logger = logging.getLogger(__name__)
 
 
-class CircuitBreakerState(BaseEnum):
-    """Circuit breaker states for provider resilience."""
-
-    CLOSED = "closed"  # Normal operation
-    OPEN = "open"  # Failing, rejecting requests
-    HALF_OPEN = "half_open"  # Testing if service recovered
-
-
-class CircuitBreakerOpenError(Exception):
-    """Raised when circuit breaker is open and rejecting requests."""
-
-
-class RerankingResult(NamedTuple):
-    """Result of a reranking operation."""
-
-    original_index: int
-    batch_rank: int
-    score: float
-    chunk: CodeChunk
-    # Optional search metadata preserved from vector search results
-    original_score: float | None = None
-    dense_score: float | None = None
-    sparse_score: float | None = None
-
-
-def _get_statistics() -> SessionStatistics:
+def _get_statistics(stats: StatisticsDep = INJECTED) -> SessionStatistics:
     """Get the statistics source for the reranking provider."""
-    statistics_module = importlib.import_module("codeweaver.common.statistics")
-    # we need SessionStatistics in this namespace at runtime for pydantic to find it
-    SessionStatistics = statistics_module.SessionStatistics  # type: ignore # noqa: F841, N806
-    return statistics_module.get_session_statistics()
+    return stats
 
 
 def default_reranking_input_transformer(documents: StructuredDataInput) -> Iterator[str]:
     """Default input transformer that converts documents to strings."""
-    from codeweaver.core.chunks import CodeChunk
-
     try:
         yield from CodeChunk.dechunkify(documents, for_embedding=True)
     except (PydanticValidationError, ValueError) as e:
@@ -128,13 +103,6 @@ def default_reranking_output_transformer(
     return processed_results
 
 
-class QueryType(NamedTuple):
-    """Represents a query and its associated metadata."""
-
-    query: str
-    docs: Sequence[CodeChunk]
-
-
 class RerankingProvider[RerankingClient](BasedModel, ABC):
     """Base class for reranking providers."""
 
@@ -150,17 +118,18 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             validation_alias="_client",
         ),
     ]
-    _provider: Provider
+
+    config: Annotated[
+        RerankingProviderSettings | RerankingConfigT,
+        Field(description="Configuration for the reranking model, including all request options."),
+    ]
+
     caps: Annotated[
         RerankingModelCapabilities,
         Field(description="The capabilities of the reranking model.", validation_alias="_caps"),
     ]
-    prompt: Annotated[
-        str | None,
-        Field(description="The prompt for the reranking provider.", validation_alias="_prompt"),
-    ]
 
-    _rerank_kwargs: ClassVar[MappingProxyType[str, Any]]
+    _provider: Provider
     # transforms the input documents into a format suitable for the provider
     _input_transformer: Callable[[StructuredDataInput], Any] = PrivateAttr(
         default_factory=lambda: default_reranking_input_transformer
@@ -174,49 +143,54 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     )
     """The output transformer is a function that takes the raw results from the provider and returns a Sequence of RerankingResult."""
 
-    _chunk_store: tuple[CodeChunk, ...] | None = PrivateAttr(default=None)
+    _chunk_store: tuple[CodeChunk, ...] | None = PrivateAttr(default_factory=tuple)
     """Stores the chunks while they are processed. We do this because we don't send the whole chunk to the provider, so we save them for later, like squirrels."""
 
     # Circuit breaker state tracking
     _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
-    _failure_count: int = 0
+    _failure_count: int = ZERO
     _last_failure_time: float | None = None
-    _circuit_open_duration: float = 30.0  # 30 seconds as per spec FR-008a
+    _circuit_open_duration: float = DEFAULT_OPEN_BREAKER_DURATION  # 30 seconds as per spec FR-008a
 
     def __init__(
         self,
         client: RerankingClient,
+        config: RerankingProviderSettings,
         caps: RerankingModelCapabilities,
-        prompt: str | None = None,
-        top_n: PositiveInt = 40,
         **kwargs: Any,
     ) -> None:
-        """Initialize the RerankingProvider."""
-        # Store values we'll need after super().__init__()
-        # Get _rerank_kwargs safely - it might not be defined in the subclass
-        _rerank_kwargs = kwargs or {}
-        with contextlib.suppress(AttributeError, TypeError):
-            class_rerank_kwargs = type(self)._rerank_kwargs
-            if class_rerank_kwargs and isinstance(class_rerank_kwargs, dict):
-                _rerank_kwargs = {**class_rerank_kwargs, **_rerank_kwargs}
+        """Initialize the RerankingProvider.
 
-        _top_n = cast(int, _rerank_kwargs.get("top_n", top_n))
-
+        Args:
+            client: The SDK client for the reranking provider
+            config: Configuration settings including reranking options
+            caps: Model capabilities
+            **kwargs: Additional keyword arguments to override config
+        """
         # Use object.__setattr__ to bypass Pydantic's validation for pre-super() initialization
         object.__setattr__(self, "_model_dump_json", super().model_dump_json)
+
+        # Initialize circuit breaker state
+        object.__setattr__(self, "_circuit_state", CircuitBreakerState.CLOSED)
+        object.__setattr__(self, "_failure_count", ZERO)
+        object.__setattr__(self, "_last_failure_time", None)
+
+        # Extract rerank options from config
+        rerank_options = (
+            config.reranking_config._as_options().get("rerank", {})
+            if config and hasattr(config, "reranking_config")
+            else {}
+        )
+        _rerank_kwargs = dict(rerank_options) | kwargs
+        _top_n = _rerank_kwargs.get("top_n", DEFAULT_RERANKING_MAX_RESULTS)
 
         logger.debug("RerankingProvider kwargs", extra=_rerank_kwargs)
         logger.debug("Initialized RerankingProvider with top_n=%d", _top_n)
 
-        # Initialize circuit breaker state using object.__setattr__
-        object.__setattr__(self, "_circuit_state", CircuitBreakerState.CLOSED)
-        object.__setattr__(self, "_failure_count", 0)
-        object.__setattr__(self, "_last_failure_time", None)
+        # Initialize pydantic model with the proper fields
+        super().__init__(client=client, config=config, caps=caps)
 
-        # Initialize pydantic model with the proper fields BEFORE _initialize
-        super().__init__(client=client, caps=caps, prompt=prompt)
-
-        # Now that Pydantic is initialized, set kwargs as normal attributes
+        # Set instance attributes after Pydantic initialization
         self.kwargs = _rerank_kwargs
         self._top_n = _top_n
 
@@ -230,6 +204,16 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     def top_n(self) -> PositiveInt:
         """Get the top_n value."""
         return self._top_n
+
+    @property
+    def prompt(self) -> str | None:
+        """Get the prompt value if provided."""
+        return self.kwargs.get("prompt")
+
+    @property
+    def model_capabilities(self) -> RerankingModelCapabilities:
+        """Get the model capabilities for the reranking provider."""
+        return self.caps
 
     def _check_circuit_breaker(self) -> None:
         """Check circuit breaker state before making API calls.
@@ -261,7 +245,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
                 "Circuit breaker closing for %s after successful operation", type(self)._provider
             )
         self._circuit_state = CircuitBreakerState.CLOSED
-        self._failure_count = 0
+        self._failure_count = ZERO
         self._last_failure_time = None
 
     def _record_failure(self) -> None:
@@ -269,7 +253,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         self._failure_count += 1
         self._last_failure_time = time.time()
 
-        if self._failure_count >= 3:  # 3 failures threshold as per spec FR-008a
+        if self._failure_count >= MAX_RETRY_ATTEMPTS:
             logger.warning(
                 "Circuit breaker opening for %s after %d consecutive failures",
                 type(self)._provider,
@@ -280,10 +264,10 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     @property
     def circuit_breaker_state(self) -> str:
         """Get current circuit breaker state for health monitoring."""
-        return self._circuit_state.value
+        return self._circuit_state.variable
 
     @retry(
-        stop=stop_after_attempt(5),
+        stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
         wait=wait_exponential(
             multiplier=1, min=1, max=16
         ),  # 1s, 2s, 4s, 8s, 16s as per spec FR-009c
@@ -291,7 +275,12 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         reraise=True,
     )
     async def _execute_rerank_with_retry(
-        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
+        self,
+        query: str,
+        documents: Sequence[str],
+        *,
+        top_n: int = DEFAULT_RERANKING_MAX_RESULTS,
+        **kwargs: Any,
     ) -> Any:
         """Wrapper around _execute_rerank with retry logic and circuit breaker.
 
@@ -305,10 +294,11 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         except (ConnectionError, TimeoutError, OSError) as e:
             self._record_failure()
             logger.warning(
-                "Reranking API call failed for %s: %s (attempt %d/5)",
+                "Reranking API call failed for %s: %s (attempt %d/%d)",
                 type(self)._provider,
                 str(e),
                 self._failure_count,
+                MAX_RETRY_ATTEMPTS,
             )
             raise
         except Exception:
@@ -320,7 +310,12 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
 
     @abstractmethod
     async def _execute_rerank(
-        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
+        self,
+        query: str,
+        documents: Sequence[str],
+        *,
+        top_n: int = DEFAULT_RERANKING_MAX_RESULTS,
+        **kwargs: Any,
     ) -> Any:
         """Execute the reranking process.
 
@@ -329,11 +324,20 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         """
         raise NotImplementedError
 
+    async def _get_loop(self) -> asyncio.AbstractEventLoop | None:
+        """Get the current event loop, if available."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return None
+        else:
+            return loop
+
     async def rerank(
         self, query: str, documents: StructuredDataInput, **kwargs: Any
     ) -> Sequence[RerankingResult]:
         """Rerank the given documents based on the query."""
-        from codeweaver.core.chunks import CodeChunk
+        from codeweaver.core import CodeChunk
 
         processed_kwargs = self._set_kwargs(**kwargs)
         transformed_docs = CodeChunk.chunkify(documents)
@@ -358,8 +362,8 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             # Return empty results on other errors
             return []
 
-        loop = asyncio.get_running_loop()
-        processed_results = self._process_results(reranked, processed_docs)
+        loop = await self._get_loop()
+        processed_results = self._process_results(reranked, processed_docs, loop)
         if len(processed_results) > self.top_n:
             # results already sorted in descending order
             processed_results = processed_results[: self.top_n]
@@ -370,7 +374,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             r.original_index
             for r in sorted(
                 processed_results,
-                key=lambda r: (r.batch_rank if r.batch_rank != -1 else float("inf")),
+                key=lambda r: r.batch_rank if r.batch_rank != -1 else float("inf"),
             )
         ]
         included_set = set(included_indices)
@@ -396,22 +400,22 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         return provider_value
 
     @property
-    def model_name(self) -> str:
+    def model_name(self) -> ModelNameT:
         """Get the model name for the reranking provider."""
-        return self.caps.name
+        return ModelName(self.config.model_name)
 
     @property
-    def model_capabilities(self) -> RerankingModelCapabilities:
+    def capabilities(self) -> RerankingModelCapabilities:
         """Get the model capabilities for the reranking provider."""
         return self.caps
 
     def _tokenizer(self) -> Tokenizer[Any]:
         """Retrieves the tokenizer associated with the reranking model."""
-        if tokenizer := self.model_capabilities.tokenizer:
+        if tokenizer := self.capabilities.tokenizer:
             return get_tokenizer(
-                tokenizer, self.model_capabilities.tokenizer_model or self.model_capabilities.name
+                tokenizer, self.capabilities.tokenizer_model or self.capabilities.name
             )
-        return get_tokenizer("tiktoken", "cl100k_base")
+        return get_tokenizer("tiktoken", "o200k_base")
 
     @property
     def tokenizer(self) -> Tokenizer[Any]:
@@ -436,17 +440,23 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     ) -> None:
         """Update token statistics for the embedding provider."""
         statistics = _get_statistics()
+        # Skip if statistics not available (e.g., in test contexts)
+        if not hasattr(statistics, "add_token_usage"):
+            return
+
         if token_count is not None:
             statistics.add_token_usage(reranking_generated=token_count)
         elif from_docs and all(isinstance(doc, str) for doc in from_docs):
             token_count = (
-                self.tokenizer.estimate_batch(from_docs)  # ty: ignore[invalid-argument-type]
+                self.tokenizer.estimate_batch(from_docs)  # ty:ignore[invalid-argument-type]
                 if all(isinstance(doc, str) for doc in from_docs)
-                else sum(self.tokenizer.estimate_batch(item) for item in from_docs)  # type: ignore
+                else sum(self.tokenizer.estimate_batch(item) for item in from_docs)
             )
             statistics.add_token_usage(reranking_generated=token_count)
 
-    def _process_results(self, results: Any, raw_docs: Sequence[str]) -> Sequence[RerankingResult]:
+    def _process_results(
+        self, results: Any, raw_docs: Sequence[str], loop: asyncio.AbstractEventLoop | None = None
+    ) -> Sequence[RerankingResult]:
         """Process the results from the reranking.
 
         Note: This sync method is only called from async contexts (from the rerank method).
@@ -454,18 +464,22 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         # voyage and cohere return token count, others do not
         if self.provider not in [Provider.VOYAGE, Provider.COHERE]:
             # We're always called from async context (rerank method), so we can safely get the loop
-            loop = asyncio.get_running_loop()
-            _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=raw_docs))
+            try:
+                loop = loop or asyncio.get_running_loop()
+                _ = loop.call_soon_threadsafe(lambda: self._update_token_stats(from_docs=raw_docs))
+            except RuntimeError:
+                # just fallback to synchronous update
+                self._update_token_stats(from_docs=raw_docs)
 
-        from codeweaver.core.chunks import CodeChunk
+        from codeweaver.core import CodeChunk
 
         chunks = self._chunk_store or CodeChunk.chunkify(raw_docs)
-        return type(self)._output_transformer(results, iter(chunks))
+        return self._output_transformer(results, iter(chunks))
 
     @staticmethod
     def to_code_chunk(text: StructuredDataInput) -> Sequence[CodeChunk]:
         """Convenience wrapper around `CodeChunk.chunkify`."""
-        from codeweaver.core.chunks import CodeChunk
+        from codeweaver.core import CodeChunk
 
         return tuple(CodeChunk.chunkify(text))
 
@@ -475,6 +489,9 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         """Report token savings from the reranking process."""
         if (context_saved := self._calculate_context_saved(results, processed_chunks)) > 0:
             statistics = _get_statistics()
+            # Skip if statistics not available (e.g., in test contexts)
+            if not hasattr(statistics, "add_token_usage"):
+                return
             # * Note: We aren't double counting tokens between here and `self.rerank`.
             # * This is for `saved_by_reranking`, while the other count in the pipeline is for `reranking_generated`.
             # * Put differently, `self.rerank` counts *spending* while this counts *savings*.
@@ -489,13 +506,14 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         followed by all excluded (discarded) chunks. Token savings equals the token count of the tail
         after the number of kept results.
 
-        We use `tiktoken` with `cl100k_base` as a reasonable default tokenizer for estimating the user LLM's token usage (we're not estimating based on the reranking model's tokenizer).
+        We use `tiktoken` with `o200k_base` as a reasonable default tokenizer for estimating the user LLM's token usage (we're not estimating based on the reranking model's tokenizer).
+        TODO: We have the latent capability to use the LLM's actual tokenizer through its API; we just need to figure out how best to hook it up. Low priority because this gets us 95% there.
         """
         if not processed_chunks or not results or len(results) >= len(processed_chunks):
             return 0
         # All discarded chunks are in the tail after the kept results
         discarded_chunks = processed_chunks[len(results) :]
-        tokenizer = get_tokenizer("tiktoken", "cl100k_base")
+        tokenizer = get_tokenizer("tiktoken", "o200k_base")
         return tokenizer.estimate_batch(discarded_chunks)
 
     @classmethod
@@ -522,18 +540,18 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
 
         Defines which fields should be filtered/anonymized when sending telemetry data.
         """
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
-            FilteredKey("_client"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("client"): AnonymityConversion.FORBIDDEN,
             FilteredKey("_input_transformer"): AnonymityConversion.FORBIDDEN,
             FilteredKey("_output_transformer"): AnonymityConversion.FORBIDDEN,
-            FilteredKey("_rerank_kwargs"): AnonymityConversion.COUNT,
             FilteredKey("_chunk_store"): AnonymityConversion.COUNT,
+            FilteredKey("config"): AnonymityConversion.AGGREGATE,
         }
 
     @override
-    def model_dump_json(  # type: ignore
+    def model_dump_json(
         self,
         *,
         indent: int | None = None,
@@ -550,10 +568,10 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         serialize_as_any: bool = False,
     ) -> str:
         """Serialize the model to JSON, excluding certain fields."""
-        return self._model_dump_json(  # ty: ignore[unresolved-attribute]
+        return self._model_dump_json(
             indent=indent,
             include=include,
-            exclude={"_client", "_input_transformer", "_output_transformer"},
+            exclude={"client", "_input_transformer", "_output_transformer"},
             context=context,
             by_alias=by_alias,
             exclude_unset=exclude_unset,
@@ -566,4 +584,9 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         )
 
 
-__all__ = ("RerankingProvider", "RerankingResult")
+__all__ = (
+    "RerankingProvider",
+    "RerankingResult",
+    "default_reranking_input_transformer",
+    "default_reranking_output_transformer",
+)

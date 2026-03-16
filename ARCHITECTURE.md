@@ -273,7 +273,7 @@ cw server             # Run MCP server (stdio by default)
 **Design Decision**: Comprehensive semantic metadata classification system.
 
 **Components**:
-- `ExtKind`: Enumerates language and chunk types
+- `ExtCategory`: Enumerates language and chunk types
 - `SemanticMetadata`: Tracks AST nodes and classifications
 - Task-based priority ranking for nuanced searches
 - Support for 26 programming languages
@@ -504,13 +504,15 @@ async def find_code(query: str, **dynamic_filters): ...
 ```
 
 #### Dependency Injection
-Explicit dependencies, organized pipelines
+Explicit dependencies, organized pipelines. Type-safe injection with `INJECTED[Type]` syntax.
 
 ```python
+from codeweaver.di import INJECTED
+
 async def search(
     query: str,
-    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
-    vector_store: VectorStore = Depends(get_vector_store),
+    embedding_provider: EmbeddingProvider = INJECTED[EmbeddingProvider],
+    vector_store: VectorStore = INJECTED[VectorStore],
 ): ...
 ```
 
@@ -660,7 +662,7 @@ async def test_find_code_authentication_query():
 - Specify exception types (no bare `except:`)
 - Use `raise from` to maintain exception context
 - Use `contextlib.suppress` for intentional suppression
-- Raise to specific CodeWeaver exceptions (`codeweaver.exceptions`)
+- Raise to specific CodeWeaver exceptions (`codeweaver.core`)
 
 **Functions**:
 - Type all parameters and returns (including `-> None`)

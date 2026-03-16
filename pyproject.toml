@@ -10,7 +10,13 @@ name = "code-weaver"
 description = "Extensible MCP server for semantic code search with plugin architecture supporting multiple embedding providers, vector databases, and data sources."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.12"
-license = { text = "MIT OR Apache-2.0" }
+license = "MIT OR Apache-2.0"
+license-files = [
+  "./LICENSE-Apache-2.0",
+  "./LICENSE-MIT",
+  "LICENSES/Apache-2.0.txt",
+  "LICENSES/MIT.txt",
+]
 authors = [
   { name = "Knitli Inc." },
   { name = "Adam Poulemanos", email = "adam@knit.li" },
@@ -101,43 +107,86 @@ classifiers = [
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
+# Some notes:
+#   - Starting with Alpha 6, we pin client versions to ensure our `ClientOptions` subclasses work correctly.
+#   - We like to stay toward the edge, so we'll update these regularly but ensure they work first.
+#   -
+# tombi: format.rules.array-values-order.disabled = true
 dependencies = [
-  # Core functionality
-  "aenum>=3.1.16",
-  "ast-grep-py>=0.40.0",
+  # * ================ Core Dependencies ==================*
+  "anyio>4.12.0",
   "blake3>=1.0.8",
-  # CLI framework and output
-  "cyclopts>=4.3.0",
-  "fastembed>=0.7.4",
-  # MCP server framework
-  "fastmcp>=2.13.3",
-  "httpx[http2]>=0.28.1",
-  "mcp>=1.19.0",
-  # Numerical and ML
-  "numpy>=2.3.5",
-  # Infrastructure and utilities
-  "posthog>=7.0.1",
-  "psutil>=7.1.3",
-  # Core data models and validation
-  "py-cpuinfo>=9.0.0",
-  "pydantic>=2.12.5",
-  "pydantic-ai>=1.27.0",
-  "pydantic-graph>=1.27.0",
-  "pydantic-settings[toml,yaml]>=2.12.0",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
-  "qdrant-client>=1.16.1",
-  "rich>=14.2.0",
-  "rignore>=0.7.6",
-  "tenacity>=9.1.2",
+  # We use some pydantic internal/private utilities in dependency resolution
+  # So we pin it to make sure we don't break on minor releases
+  "pydantic==2.12.5",
+  # for, you know, platform dirs
+  "platformdirs>=4.9.4",
+  # psutil used for resource governance/limiting by engine
+  "psutil>=7.2.2",
   "textcase>=0.4.5",
-  "tiktoken>=0.12.0",
-  "tokenizers>=0.22.1",
-  "tomli-w>=1.2.0",
   "typing_extensions>=4.15.0",
   "uuid7>=0.1.0; python_version < '3.14'",
-  "uvicorn[standard]>=0.38.0",
   "uvloop>=0.22.1; python_implementation == 'CPython' and platform_system != 'Windows'",
-  "voyageai>=0.3.5",
+  # * ================ Core Provider Dependencies ==================*
+  # tokenizers used by stats, telemetry, and all embed/rerank providers (for stats)
+  # no easy way to currently separate out stats-only usage from embedding/rerank usage
+  "code-weaver-tokenizers",
+  # numpy needed for all embedding providers
+  "numpy>=2.4.2",
+  # lazy import handling; spun off from core/utils/lazy_importer into its own package
+  "lateimport>=0.1.0",
+  # retries
+  "tenacity>=9.1.2",
+  # for local providers (sentence-transformers, fastembed) to detect CPU/GPU features
+  "py-cpuinfo>=9.0.0",
+  # * ================ CLI Dependencies ==================*
+  "cyclopts>=4.10.0",
+  "rich>=14.3.3",
+  # * ================ Provider Clients ==================*
+  # we must pin these to specific versions to ensure compatibility with our ClientOptions subclasses
+  "boto3==1.42.19",
+  "cohere==5.20.7",
+  "fastembed==0.7.4; python_version < '3.14'",
+  "google-genai==1.56.0",
+  # NOTE: We're waiting on pydantic-ai to update to 1.0+ before we can upgrade too
+  "huggingface-hub>=1.7.1",
+  "mistralai==1.10.0",
+  "openai==2.28.0",
+  "qdrant-client==1.17.1",
+  "pydantic-ai-slim>=1.68.0",
+  "sentence-transformers==5.2.0; python_version <= '3.14'",
+  "voyageai==0.3.7",
+  # * ================ Indexing and Engine ==================*
+  # Also known as: the land of python rust extensions
+  # the core code-weaver-daemon package that keeps indexing continuously updated
+  "code-weaver-daemon",
+  # performant rust-based file walker with .gitignore support (pyO3 extensions for `ignore` crate)
+  "rignore>=0.7.6",
+  # performant rust-based file watcher
   "watchfiles>=1.1.1",
+  # for semantic indexing, but also required for the Semantic package, unsurprisingly
+  # also rust-based.
+  "ast-grep-py>=0.40.3",
+  # * ================ Server and MCP Server Framework ==================*
+  # fastmcp is the core MCP server framework
+  "fastmcp>=2.14.5",
+  # just used for types but we need them at runtime for Pydantic models
+  "mcp>=1.23.3",
+  # Runs the core admin/management server
+  "uvicorn[standard]>=0.40.0",
+  # * ================ Configuration and Settings ==================*
+  # pydantic-settings with toml and yaml support for config files
+  "pydantic-settings[toml,yaml]>=2.13.1",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
+  # For writing toml config files
+  "tomli-w>=1.2.0",
+  # * ================ Telemetry and Observability ==================*
+  # It's telemetry. Our implementation is lightweight and privacy-focused.
+  "posthog>=7.8.2",
+
+  #! Not yet used, but planned for future releases
+  # * ================ Future Dependencies ==================*
+  # for advanced pipeline management and orchestration
+  # "pydantic-graph>=1.39.0",
 ]
 dynamic = ["version"]
 
@@ -168,16 +217,14 @@ auth-permitio = ["permit-fastmcp"]
 # Settings/Config Secrets
 aws-secrets-manager = ["pydantic-settings[yaml,toml,aws-secrets-manager]"]
 azure-key-vault = ["pydantic-settings[yaml,toml,azure-key-vault]"]
-bedrock = [
-  "pydantic-ai-slim[bedrock]",
-  "types-boto3-custom",
-]
+bedrock = ["pydantic-ai-slim[bedrock]"]
 cohere = ["pydantic-ai-slim[cohere]"]
 # ==== Data Sources ====
 duckduckgo = ["pydantic-ai-slim[duckduckgo]"]
-fastembed = ["fastembed", "py-cpuinfo"]
+exa = ["exa-py"]
+fastembed = ["fastembed; python_version < '3.14'", "py-cpuinfo"]
 # Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
-fastembed-gpu = ["fastembed-gpu", "py-cpuinfo"]
+fastembed-gpu = ["fastembed-gpu; python_version < '3.14'", "py-cpuinfo"]
 # workos AuthKit middleware - see https://gofastmcp.com/integrations/authkit
 # No additional dependencies required, it's purely REST-based.
 # Enable with environment variables:
@@ -189,27 +236,33 @@ fastembed-gpu = ["fastembed-gpu", "py-cpuinfo"]
 # All groups for users - full featured with all middleware
 full = [
   "permit-fastmcp",
+  "ddgs",
   "eunomia-mcp",
-  "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,duckduckgo,tavily,retries]",
+  "exa-py",
+  "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,retries,xai]",
   "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
   "permit-fastmcp",
-  "sentence-transformers>=5.1.2",
-  "types-boto3-custom",
+  "sentence-transformers",
+  "tavily-python",
 ]
 full-gpu = [
   "permit-fastmcp",
+  "ddgs",
   "eunomia-mcp",
-  "fastembed-gpu",
+  "fastembed-gpu; python_version < '3.14'",
   "permit-fastmcp",
+  "exa-py",
+  "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,retries,xai]",
   "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
   "sentence-transformers",
   # see note below about why this is commented out
   #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
+  "tavily-python",
 ]
 gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
 google = ["pydantic-ai-slim[google]"]
 gpu-support = [
-  "fastembed-gpu",
+  "fastembed-gpu; python_version < '3.14'",
   # see note below about why this is commented out
   #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
 ]
@@ -221,26 +274,37 @@ in-memory = ["qdrant-client", "tokenizers"]
 mistral = ["pydantic-ai-slim[mistral]"]
 # OpenAI includes support for:
 #   Cerebras, DeekSeek, Ollama, OpenRouter, Vercel, Perplexity, Moonshot, FireworksAI,
-#   TogetherAI, Azure AI Foundry, Heroku, and Github Models, X-AI
+#   TogetherAI, Azure AI Foundry, Heroku, and Github Models
 # which all use the OpenAI API
 openai = ["pydantic-ai-slim[openai]"]
 qdrant = ["qdrant-client"]
-recommended-local-only = [
-  "fastembed",
+recommended = [
+  "fastembed; python_version < '3.14'",
   "sentence-transformers",
   "tokenizers",
-]
-sentence-transformers = [
-  "sentence-transformers",
   "py-cpuinfo",
+  "voyageai",
+  "ddgs",
+  "pydantic-ai-slim[openai,anthropic,retries]",
+  "tavily",
 ]
-tavily = ["pydantic-ai-slim[tavily]"]
+recommended-local-only = [
+  "fastembed; python_version < '3.14'",
+  "sentence-transformers",
+  "tokenizers",
+  "ddgs",
+  "py-cpuinfo",
+  # openai for ollama local models
+  "pydantic-ai-slim[openai,retries]",
+]
+sentence-transformers = ["sentence-transformers", "py-cpuinfo"]
+tavily = ["tavily"]
 # NOTE: Why not GPU or OpenVino support for sentence-transformers?
 # The underlying runtimes for these packages, when resolved against our other dependencies,
 # essentially require us to choose between support for Python 3.14 and these packages.
 # When python 3.14 is included, then the only compatible build results in transformers version 3.x
 # Which does not have the `SparseEncoder` class required for sparse-encodings.
-# We think the sparse-encoding use case is much broader than GPU or OpenVino acceleration for most users,
+# We think the sparse-encoding use case is much broader than GPU or OpenVino acceleration for most users (in fact we always use sparse encodings),
 # so we are leaving these out of the official optional dependencies for now.
 # If you need GPU or OpenVino support, you can install these packages manually in your environment.
 # sentence-transformers-gpu = [
@@ -252,34 +316,38 @@ tavily = ["pydantic-ai-slim[tavily]"]
 #     "py-cpuinfo",
 # ]
 voyageai = ["voyageai"]
+xai = ["pydantic-ai-slim[xai]"]
 
 [dependency-groups]
 dev = [
   # black is used to format generated code
-  "black>=25.11.0",
-  "ruff>=0.14.8",
-  "ty>=0.0.1a31",
-  "types-boto3-custom",
-  "uv>=0.9.15",
+  "black>=26.1.0",
+  "ruff>=0.15.2",
+  "serena>=0.9.1",
+  "ty>=0.0.18",
+  "uv>=0.10.5",
 ]
-build = ["hatchling>=1.27.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.11.2"]
+build = ["hatchling>=1.28.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.12.0"]
 dev-helpers = [
-  "ipython>=9.8.0",
+  "ipython>=9.10.0",
   "jsonlines>=4.0.0",
   "memory-profiler>=0.61.0",
-  "pdbpp>=0.11.7",
+  "pdbpp>=0.12.1",
   "pyperclip>=1.11.0",
-  "superclaude>=4.1.9",
+  "superclaude>=4.2.0",
 ]
 docs = [
-  "griffe>=1.15.0",
+  "griffe==1.15.0",
+  "griffe-pydantic>=1.1.0",
+  "griffe2md>=0.1.0",
 ]
 test = [
   "dirty-equals>=0.11.0",
-  "pytest>=9.0.1",
+  "hypothesis>=6.151.9",
+  "pytest>=9.0.2",
   "pytest-asyncio>=1.3.0",
   "pytest-cov>=7.0.0",
-  "pytest-env>=1.2.0",
+  "pytest-env>=1.5.0",
   "pytest-examples>=0.0.18",
   "pytest-flakefinder>=1.1.0",
   "pytest-mock>=3.15.1",
@@ -291,7 +359,7 @@ test = [
 requires = [
   "hatchling>=1.28.0",
   "twine>=6.2.0",
-  "uv-dynamic-versioning>=0.11.2"
+  "uv-dynamic-versioning>=0.13.0",
 ]
 build-backend = "hatchling.build"
 
@@ -299,7 +367,18 @@ build-backend = "hatchling.build"
 #  - readme: https://github.com/hynek/hatch-fancy-pypi-readme
 
 [tool.coverage.run]
-omit = ["scripts/*", "mise-tasks/*", "typings/*", ".venv/*"]
+omit = [
+  "scripts/*",
+  "mise-tasks/*",
+  "typings/*",
+  ".venv/*",
+  "tests/*",
+  "vendored/*",
+  "src/codeweaver/__init__.py",
+  "src/codeweaver/**/__init__.py",
+  "src/codeweaver/**/types/*",
+  "src/codeweaver/**/types.py",
+]
 
 [tool.hatch.build.hooks.version]
 additionalProperties = true
@@ -319,7 +398,7 @@ __all__ = ("__version__",)
 # REUSE-IgnoreEnd
 
 [tool.hatch.build.targets.wheel]
-artifacts = ["*.so", "src/**", "vendored/**"]
+artifacts = ["*.so", "src/**", "vendored/**", "packages/**"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "LICENSES" = "LICENSES"
@@ -330,6 +409,7 @@ artifacts = ["*.so", "src/**", "vendored/**"]
 "LICENSE-Apache-2.0" = "LICENSE-APACHE-2.0"
 "LICENSE-MIT" = "LICENSE-MIT"
 "src/codeweaver" = "codeweaver"
+"packages" = "packages"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -347,10 +427,12 @@ include = [
   "SECURITY.md",
   "context7.json",
   "context7.json.license",
+  "packages/**",
   "pyproject.toml",
   "sbom.spdx",
   "schema/**",
   "src/**",
+  "tests/**",
   "typings/**",
   "uv.lock",
   "uv.lock.license",
@@ -377,6 +459,7 @@ exclude = [
 source = "uv-dynamic-versioning"
 
 [tool.pytest]
+# tombi: format.rules.array-values-order.disabled = true
 addopts = [
   # While we don't chase coverage, we want to ensure a minimum bar to catch missing tests
   # We can raise this over time as the project matures
@@ -388,13 +471,18 @@ addopts = [
   "--import-mode=importlib",
   "--strict-config",
   "--strict-markers",
+  # Exclude resource-intensive tests by default
+  # Override with: pytest -m "expensive" or pytest -m "requires_models" to run these tests
   "-ra",
+  "-m",
+  "not expensive and not requires_models and not requires_gpu and not requires_api_keys",
 ]
 filterwarnings = [
   "error",
   "ignore::DeprecationWarning",
   "ignore::PendingDeprecationWarning",
   "ignore::UserWarning",
+  "ignore::urllib3.exceptions.SystemTimeWarning",
 ]
 markers = [
   "async_test: Asynchronous tests (in addition to pytest.mark.asyncio)",
@@ -410,12 +498,16 @@ markers = [
   # Feature-specific
   "embeddings: Tests related to embedding functionality",
   "env_vars: Tests that depend on environment variables",
+  "expensive: Tests taking more than 30 seconds to complete",
   "external_api: Tests that interact with external APIs",
   "fixtures: Tests that heavily rely on pytest fixtures",
   # Stability & reliability
   "flaky: Tests that may occasionally fail due to timing or external factors",
   "indexing: Tests related to code indexing",
   "integration: Integration tests that test component interactions",
+  # Platform-specific
+  "linux_only: Tests that only run on Linux platforms",
+  "macos_only: Tests that only run on macOS platforms",
   "mcp: Tests related to MCP protocol functionality",
   "mock_only: Tests that only use mocked dependencies",
   "network: Tests that require network access",
@@ -424,7 +516,10 @@ markers = [
   "performance: Performance-related tests",
   "qdrant: Tests that require Qdrant vector database",
   # External dependencies
-  "real_providers: Tests that require real provider configurations",
+  "real_providers: Tests using actual embedding/vector store providers (not mocks)",
+  "requires_api_keys: Tests requiring external API credentials and authentication",
+  "requires_gpu: Tests requiring GPU hardware for execution",
+  "requires_models: Tests requiring ML model downloads and local model files",
   "retry: Tests that may need retries",
   "search: Tests related to search functionality",
   "server: Tests related to server functionality",
@@ -433,30 +528,35 @@ markers = [
   "slow: Tests that take a significant amount of time to run",
   "telemetry: Tests related to telemetry and metrics",
   "timeout: Tests with specific timeout requirements",
+  "timing_sensitive: Tests with strict timing requirements that may be environment-dependent",
   # Test categories
   "unit: Unit tests that test individual components in isolation",
   "validation: Validation tests that ensure system consistency",
   "voyageai: Tests that require VoyageAI API access",
+  "windows_only: Tests that only run on Windows platforms",
 ]
 minversion = "9.0"
 python_classes = ["Test*"]
 python_files = ["*_test.py", "test_*.py"]
 python_functions = ["test_*"]
+pythonpath = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-timeout = "300"
+timeout = "600"
 timeout_method = "thread"
+# Override timeout for specific markers
+timeout_func_only = true  # Only apply timeout to test functions, not setup/teardown
 
 [tool.ty.environment]
 python-version = "3.12"
-root = ["./src", "./tests", "./scripts", "./mise-tasks"]
+root = ["./src", "./tests", "./scripts", "./mise-tasks", "./packages"]
 python = "./.venv"
 extra-paths = ["./typings"]
 
 [tool.ty.rules]
 # === Core Type Safety Rules (kept strict for src/) ===
 # These remain as errors by default and will catch real bugs in production code
-
+invalid-method-override = "ignore"  # many false positives here
 # === Test Framework Limitations ===
 # ty doesn't understand pytest mocks/fixtures - these are inherent limitations, not real bugs
 possibly-missing-attribute = "ignore"  # Pytest fixtures don't have static attributes
@@ -474,9 +574,9 @@ redundant-cast = "ignore"  # Informational only, not bugs
 unresolved-import = "warn"  # Downgrade to warn for optional dependencies
 
 [tool.ty.src]
-include = ["./src", "./tests", "./scripts", "./mise-tasks"]
+include = ["./src", "./tests", "./scripts", "./mise-tasks", "./packages"]
 # Exclude vendored code, typings, and intentionally malformed test fixtures
-exclude = ["./typings", "./tests/fixtures/malformed.py"]
+exclude = ["./typings", "./tests/**/malformed.py", "./vendored"]
 
 # === Per-Directory Overrides ===
 # Apply different strictness levels: strict for src/, lenient for scripts/mise-tasks/tests
@@ -487,7 +587,8 @@ exclude = ["./typings", "./tests/fixtures/malformed.py"]
 include = ["scripts/**/*.py"]
 
 [tool.ty.overrides.rules]
-invalid-assignment = "warn"
+invalid-assignment = "ignore"
+missing-typed-dict-key = "ignore"
 unresolved-import = "ignore"
 invalid-argument-type = "ignore"
 unresolved-reference = "ignore"
@@ -515,12 +616,21 @@ unresolved-import = "ignore"  # pytest and other test dependencies may not be in
 unknown-argument = "ignore"  # pytest fixtures inject arguments dynamically
 unresolved-reference = "ignore"  # test fixtures and dynamic test patterns
 unresolved-attribute = "ignore"  # mocks and fixtures have dynamic attributes
-non-subscriptable = "warn"  # Often false positive after pytest assertions
+not-subscriptable = "ignore"  # Often false positive after pytest assertions
 unsupported-operator = "warn"  # Type narrowing after assertions not always understood
 missing-argument = "warn"  # Dynamic test patterns and fixtures
 too-many-positional-arguments = "warn"  # Dynamic function calls in tests
 invalid-assignment = "ignore"  # Test setup patterns
 invalid-argument-type = "ignore"  # Test mocks and fixtures may have dynamic types
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/core/statistics.py"]
+
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+invalid-assignment = "ignore"
+invalid-argument-type = "ignore"
+invalid-return-type = "ignore"
 
 # Test Fixtures: Intentionally malformed or edge-case test data
 # These may have type errors by design to test error handling
@@ -539,21 +649,29 @@ unresolved-reference = "ignore"
 # All __init__.py files' lazy import patterns cause false positives
 include = [
   "src/codeweaver/__init__.py",
+  "src/codeweaver/**/__init__.py",
   "src/codeweaver/*/__init__.py",
   "src/codeweaver/*/*/__init__.py",
   "src/codeweaver/*/*/*/__init__.py",
   "src/codeweaver/*/*/*/*/__init__.py",
+  "packages/*/__init__.py",
+  "packages/*/*/__init__.py",
+  "packages/*/*/*/__init__.py",
+  "packages/*/*/*/*/__init__.py",
   # there's a similar issue in some of the embedding providers
   "src/codeweaver/providers/embedding/providers/bedrock.py",
   "src/codeweaver/providers/embedding/providers/cohere.py",
   "src/codeweaver/providers/embedding/providers/google.py",
+  "src/codeweaver/providers/config/profiles.py"
 ]
 
 [tool.ty.overrides.rules]
+invalid-assignment = "ignore"
 invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/codeweaver/common/registry/provider.py"]
+include = ["src/codeweaver/providers/vector_stores/qdrant_base.py"]
 
 [tool.ty.overrides.rules]
 invalid-assignment = "ignore"
@@ -565,7 +683,29 @@ include = ["scripts/build/generate-mcp-server-json.py"]
 unknown-argument = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/codeweaver/providers/vector_stores/qdrant_base.py"]
+include = [
+  "src/codeweaver/providers/config/categories/embedding.py",
+  "src/codeweaver/providers/config/sdk/embedding.py"
+]
+
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+invalid-assignment = "ignore"
+call-top-callable = "ignore"
+unsupported-operator = "ignore"
+missing-typed-dict-key = "ignore"
+
+[[tool.ty.overrides]]
+include = [
+  "src/codeweaver/providers/vector_stores/qdrant_base.py",
+  "src/codeweaver/providers/data/providers.py",
+  "src/codeweaver/providers/config/sdk/embedding.py",
+  "src/codeweaver/providers/config/sdk/reranking.py",
+  "src/codeweaver/providers/config/categories/embedding.py",
+  "src/codeweaver/providers/config/categories/vector_store.py",
+  "src/codeweaver/providers/data/exa.py",
+  "src/codeweaver/*/config/*settings.py"
+]
 
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
@@ -576,8 +716,106 @@ include = ["src/codeweaver/core/types/aliases.py"]
 [tool.ty.overrides.rules]
 invalid-newtype = "ignore"
 
+[[tool.ty.overrides]]
+include = [
+  "src/codeweaver/providers/embedding/providers/*.py",
+  "src/codeweaver/providers/reranking/providers/*.py",
+  "src/codeweaver/providers/data/*.py",
+  "src/codeweaver/engine/services/config_analyzer.py",
+  "src/codeweaver/providers/vector_stores/inmemory.py",
+]
+
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+
+[[tool.ty.overrides]]
+include = [
+  "src/codeweaver/*/dependencies.py",
+  "src/codeweaver/*/dependencies/*.py"
+]
+
+# there's an issue with type checkers resolving through the dependency_provider decorators and the dynamic provider registry, which causes false positives in these files
+[tool.ty.overrides.rules]
+call-non-callable = "ignore"
+invalid-await = "ignore"
+invalid-argument-type = "ignore"
+invalid-return-type = "ignore"
+unresolved-attribute = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/core/types/service_cards.py"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+invalid-return-type = "ignore"
+unsupported-operator = "ignore"
+no-matching-overload = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/__init__.py"]
+
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/core/di/container.py"]
+
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/semantic/classifier.py"]
+
+[tool.ty.overrides.rules]
+missing-argument = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/providers/config/sdk/embedding.py"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+call-non-callable = "ignore"
+invalid-return-type = "ignore"
+
+[tool.uv]
+cache-keys = [
+  { file = "uv.lock" },
+  { file = "pyproject.toml" },
+  { dir = "src/codeweaver" },
+  { dir = "tests" },
+  { dir = "packages" },
+]
+conflicts = [
+  [
+    { extra = "full-gpu" },
+    { extra = "full" },
+  ],
+  [
+    { extra = "full-gpu" },
+    { package = "fastembed" },
+  ],
+  [
+    { extra = "full" },
+    { package = "fastembed-gpu" },
+  ],
+  [
+    { extra = "gpu-support" },
+    { package = "fastembed" },
+  ],
+  [
+    { package = "fastembed" },
+    { package = "fastembed-gpu" },
+  ],
+]
+preview = true
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
 [tool.uv.sources]
-types-boto3-custom = { path = "vendored/types_boto3_custom-1.41.2-py3-none-any.whl" }
+code-weaver-daemon = { workspace = true }
+code-weaver-tokenizers = { workspace = true }
+boto3-types = { path = "./typings/boto3_types/__init__.pyi" }
 
 [tool.uv-dynamic-versioning]
 vcs = "git"

@@ -73,7 +73,7 @@ class DictView[TypedDictT: (Mapping[str, Any])](Mapping[str, Any]):
 
     def get_subview[KeyToMappingT: str, MappingT: Mapping[str, Any]](
         self, key: KeyToMappingT
-    ) -> DictView[MappingT]:  # ty: ignore[invalid-argument-type]
+    ) -> DictView[MappingT]:
         """Return a DictView of the sub-mapping at the given key."""
         sub_mapping = self._mapping[key]
         if not isinstance(sub_mapping, Mapping | dict | MappingProxyType):

@@ -30,7 +30,7 @@ This POC demonstrates a complete migration path from Material for MkDocs to Star
 - **Dark mode**: Full theme support with color inversions
 
 ### 3. Griffe-based API Documentation Generator ✅
-**Script**: `/scripts/gen-api-docs.py`
+**Script**: `/scripts/gen_api_docs.py`
 
 **Features:**
 - Extracts Python module/class/function documentation
@@ -59,8 +59,8 @@ This POC demonstrates a complete migration path from Material for MkDocs to Star
 **Scripts configured:**
 ```json
 {
-  "gen-api-docs": "python3 ../scripts/gen-api-docs.py",
-  "prebuild": "npm run gen-api-docs",  // Auto-runs before build
+  "gen-api-docs": "python3 ../scripts/gen_api_docs.py",
+  "prebuild": "bun run gen_api_docs",  // Auto-runs before build
   "build": "astro check && astro build"
 }
 ```
@@ -93,7 +93,7 @@ docs-site/
     └── codeweaver-favico.png
 
 scripts/
-└── gen-api-docs.py            # Griffe-based generator
+└── gen_api_docs.py            # Griffe-based generator
 ```
 
 ## Testing the POC
@@ -103,8 +103,8 @@ The POC is complete but cannot be built without npm package installation. All so
 
 ### With Internet Access
 1. Whitelist `registry.npmjs.org`
-2. Run `npm install` in `docs-site/`
-3. Run `npm run dev` to start dev server
+2. Run `bun install` in `docs-site/`
+3. Run `bun run dev` to start dev server
 4. Visit `http://localhost:4321`
 
 ## Key Achievements
@@ -133,7 +133,7 @@ The POC is complete but cannot be built without npm package installation. All so
 ## Limitations & Notes
 
 ### Known Issues
-1. **No internet in environment**: Cannot run `npm install` or test build
+1. **No internet in environment**: Cannot run `bun install` or test build
 2. **Pydantic field extraction**: Not tested (pydantic not in import path during generation)
 3. **API docs depth**: Currently only top-level modules, not nested submodules
 
@@ -151,8 +151,8 @@ This POC demonstrates:
 ## Next Steps
 
 ### Immediate (Complete Migration)
-1. **Install dependencies**: Whitelist npm registry and run `npm install`
-2. **Test build**: Run `npm run build` and verify output
+1. **Install dependencies**: Whitelist bun registry and run `bun install`
+2. **Test build**: Run `bun run build` and verify output
 3. **Migrate remaining docs**: Convert all markdown files from `/docs/`
 4. **Enhance API docs**:
    - Add nested module support

@@ -12,14 +12,14 @@ Tests validate real user scenarios:
 
 from __future__ import annotations
 
+import sys
+
 from pathlib import Path
 
 import pytest
 import tomli
 
-from codeweaver.cli.commands.config import app as config_app
-from codeweaver.cli.commands.init import app as init_app
-from codeweaver.cli.commands.list import app as list_app
+from codeweaver.cli.__main__ import main
 
 
 @pytest.fixture
@@ -57,19 +57,27 @@ class TestNewUserQuickStart:
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 
         # Step 1: Quick init
-        func, bound_args, _ = init_app.parse_args(
-            ["--quickstart", "--client", "claude_code", "--project", str(project)],
-            exit_on_error=False,
-        )
-        # Execute - successful execution doesn't raise exception
-        func(**bound_args.arguments)
+        with monkeypatch.context() as m:
+            m.setattr(
+                sys,
+                "argv",
+                [
+                    "cw",
+                    "init",
+                    "--quickstart",
+                    "--client",
+                    "claude_code",
+                    "--project",
+                    str(project),
+                ],
+            )
+            with pytest.raises(SystemExit) as init_result:
+                main()
+            assert init_result.value.code == 0
 
         # Step 2: Verify config created
         config_path = project / "codeweaver.toml"
         assert config_path.exists()
-
-        # Step 3: Doctor check (may have warnings about dependencies or services)
-        # We don't assert on exit code since it's environment-dependent
 
     def test_quick_start_with_config_show(
         self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
@@ -79,16 +87,22 @@ class TestNewUserQuickStart:
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 
         # Init
-        func, bound_args, _ = init_app.parse_args(
-            ["--quickstart", "--config-only", "--project", str(project)], exit_on_error=False
-        )
-        # Execute - successful execution doesn't raise exception
-        func(**bound_args.arguments)
+        with monkeypatch.context() as m:
+            m.setattr(
+                sys,
+                "argv",
+                ["cw", "init", "--quickstart", "--config-only", "--project", str(project)],
+            )
+            with pytest.raises(SystemExit) as init_result:
+                main()
+            assert init_result.value.code == 0
 
         # Show config
-        with pytest.raises(SystemExit) as config_result:
-            config_app([])
-        assert config_result.value.code == 0
+        with monkeypatch.context() as m:
+            m.setattr(sys, "argv", ["cw", "config"])
+            with pytest.raises(SystemExit) as config_result:
+                main()
+            assert config_result.value.code == 0
 
     def test_quick_start_list_capabilities(
         self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
@@ -98,20 +112,29 @@ class TestNewUserQuickStart:
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 
         # Init
-        func, bound_args, _ = init_app.parse_args(
-            ["--quickstart", "--config-only", "--project", str(project)], exit_on_error=False
-        )
-        func(**bound_args.arguments)
+        with monkeypatch.context() as m:
+            m.setattr(
+                sys,
+                "argv",
+                ["cw", "init", "--quickstart", "--config-only", "--project", str(project)],
+            )
+            with pytest.raises(SystemExit) as init_result:
+                main()
+            assert init_result.value.code == 0
 
         # List providers
-        with pytest.raises(SystemExit) as list_result:
-            list_app(["providers"])
-        assert list_result.value.code == 0
+        with monkeypatch.context() as m:
+            m.setattr(sys, "argv", ["cw", "list", "providers"])
+            with pytest.raises(SystemExit) as list_result:
+                main()
+            assert list_result.value.code == 0
 
         # List models
-        with pytest.raises(SystemExit) as models_result:
-            list_app(["models", "--provider-name", "voyage"])
-        assert models_result.value.code == 0
+        with monkeypatch.context() as m:
+            m.setattr(sys, "argv", ["cw", "list", "models", "--provider-name", "voyage"])
+            with pytest.raises(SystemExit) as models_result:
+                main()
+            assert models_result.value.code == 0
 
 
 @pytest.mark.e2e
@@ -126,12 +149,25 @@ class TestOfflineDeveloperWorkflow:
         project = user_environment["project"]
 
         # Step 1: Quickstart profile (free/offline providers)
-        func, bound_args, _ = init_app.parse_args(
-            ["--profile", "quickstart", "--config-only", "--force", "--project", str(project)],
-            exit_on_error=False,
-        )
-        # Execute - should succeed even without API keys
-        func(**bound_args.arguments)
+        with monkeypatch.context() as m:
+            m.setattr(
+                sys,
+                "argv",
+                [
+                    "cw",
+                    "init",
+                    "--profile",
+                    "quickstart",
+                    "--config-only",
+                    "--force",
+                    "--project",
+                    str(project),
+                ],
+            )
+            with pytest.raises(SystemExit) as init_result:
+                main()
+            # Should succeed even without API keys
+            assert init_result.value.code == 0
 
         # Step 2: Verify config created
         assert (project / "codeweaver.toml").exists()
@@ -145,16 +181,31 @@ class TestOfflineDeveloperWorkflow:
         project = user_environment["project"]
 
         # Init with quickstart (free/offline)
-        func, bound_args, _ = init_app.parse_args(
-            ["--profile", "quickstart", "--config-only", "--force", "--project", str(project)],
-            exit_on_error=False,
-        )
-        func(**bound_args.arguments)
+        with monkeypatch.context() as m:
+            m.setattr(
+                sys,
+                "argv",
+                [
+                    "cw",
+                    "init",
+                    "--profile",
+                    "quickstart",
+                    "--config-only",
+                    "--force",
+                    "--project",
+                    str(project),
+                ],
+            )
+            with pytest.raises(SystemExit) as init_result:
+                main()
+            assert init_result.value.code == 0
 
         # List local providers
-        with pytest.raises(SystemExit) as list_result:
-            list_app(["providers"])
-        assert list_result.value.code == 0
+        with monkeypatch.context() as m:
+            m.setattr(sys, "argv", ["cw", "list", "providers"])
+            with pytest.raises(SystemExit) as list_result:
+                main()
+            assert list_result.value.code == 0
 
     def test_offline_config_modifications(
         self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
@@ -163,11 +214,24 @@ class TestOfflineDeveloperWorkflow:
         project = user_environment["project"]
 
         # Init
-        func, bound_args, _ = init_app.parse_args(
-            ["--profile", "quickstart", "--config-only", "--force", "--project", str(project)],
-            exit_on_error=False,
-        )
-        func(**bound_args.arguments)
+        with monkeypatch.context() as m:
+            m.setattr(
+                sys,
+                "argv",
+                [
+                    "cw",
+                    "init",
+                    "--profile",
+                    "quickstart",
+                    "--config-only",
+                    "--force",
+                    "--project",
+                    str(project),
+                ],
+            )
+            with pytest.raises(SystemExit) as init_result:
+                main()
+            assert init_result.value.code == 0
 
         # Modify config
         config_path = project / "codeweaver.toml"
@@ -179,9 +243,11 @@ class TestOfflineDeveloperWorkflow:
         config_path.write_text(tomli_w.dumps(config))
 
         # Show modified config
-        with pytest.raises(SystemExit) as show_result:
-            config_app([])
-        assert show_result.value.code == 0
+        with monkeypatch.context() as m:
+            m.setattr(sys, "argv", ["cw", "config"])
+            with pytest.raises(SystemExit) as show_result:
+                main()
+            assert show_result.value.code == 0
 
 
 @pytest.mark.e2e
@@ -232,9 +298,11 @@ provider = "fastembed"
         monkeypatch.setenv("VOYAGE_API_KEY", "prod-key")
 
         # Config show should reflect env var override
-        with pytest.raises(SystemExit) as show_result:
-            config_app([])
-        assert show_result.value.code == 0
+        with monkeypatch.context() as m:
+            m.setattr(sys, "argv", ["cw", "config"])
+            with pytest.raises(SystemExit) as show_result:
+                main()
+            assert show_result.value.code == 0
 
     def test_production_multiple_environments(
         self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch
@@ -284,12 +352,23 @@ class TestCompleteUserJourneys:
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 
         # 1. Init (quick setup)
-        func, bound_args, _ = init_app.parse_args(
-            ["--quickstart", "--client", "claude_code", "--project", str(project)],
-            exit_on_error=False,
-        )
-        # Execute - successful execution doesn't raise exception
-        func(**bound_args.arguments)
+        with monkeypatch.context() as m:
+            m.setattr(
+                sys,
+                "argv",
+                [
+                    "cw",
+                    "init",
+                    "--quickstart",
+                    "--client",
+                    "claude_code",
+                    "--project",
+                    str(project),
+                ],
+            )
+            with pytest.raises(SystemExit) as init_result:
+                main()
+            assert init_result.value.code == 0
 
         # 2. Verify both configs created
         assert (project / "codeweaver.toml").exists()
@@ -301,14 +380,18 @@ class TestCompleteUserJourneys:
         # 3. Config created successfully
 
         # 4. List capabilities
-        with pytest.raises(SystemExit) as list_result:
-            list_app(["providers"])
-        assert list_result.value.code == 0
+        with monkeypatch.context() as m:
+            m.setattr(sys, "argv", ["cw", "list", "providers"])
+            with pytest.raises(SystemExit) as list_result:
+                main()
+            assert list_result.value.code == 0
 
         # 5. View configuration
-        with pytest.raises(SystemExit) as config_result:
-            config_app([])
-        assert config_result.value.code == 0
+        with monkeypatch.context() as m:
+            m.setattr(sys, "argv", ["cw", "config"])
+            with pytest.raises(SystemExit) as config_result:
+                main()
+            assert config_result.value.code == 0
 
     def test_power_user_custom_setup(
         self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch
@@ -340,16 +423,20 @@ collection = "my_code"
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 
         # 3. Verify config
-        with pytest.raises(SystemExit) as show_result:
-            config_app([])
-        assert show_result.value.code == 0
+        with monkeypatch.context() as m:
+            m.setattr(sys, "argv", ["cw", "config"])
+            with pytest.raises(SystemExit) as show_result:
+                main()
+            assert show_result.value.code == 0
 
         # 4. Custom config validated
 
         # 5. List available models
-        with pytest.raises(SystemExit) as models_result:
-            list_app(["models", "--provider-name", "voyage"])
-        assert models_result.value.code == 0
+        with monkeypatch.context() as m:
+            m.setattr(sys, "argv", ["cw", "list", "models", "--provider-name", "voyage"])
+            with pytest.raises(SystemExit) as models_result:
+                main()
+            assert models_result.value.code == 0
 
     def test_team_collaboration_workflow(
         self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch
@@ -374,8 +461,10 @@ type = "qdrant"
         monkeypatch.setenv("VOYAGE_API_KEY", "dev1-key")
 
         # 3. Config show should merge file + env
-        with pytest.raises(SystemExit) as show_result:
-            config_app([])
-        assert show_result.value.code == 0
+        with monkeypatch.context() as m:
+            m.setattr(sys, "argv", ["cw", "config"])
+            with pytest.raises(SystemExit) as show_result:
+                main()
+            assert show_result.value.code == 0
 
         # 4. Team config validated

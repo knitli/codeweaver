@@ -1,10 +1,11 @@
-"""CodeWeaver CLI - Search Command."""
-
-# sourcery skip: avoid-global-variables, no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+
+"""CodeWeaver CLI - Search Command."""
+
+# sourcery skip: avoid-global-variables, no-complex-if-expressions
 from __future__ import annotations
 
 import logging
@@ -12,7 +13,7 @@ import sys
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import Annotated, Literal
 
 import cyclopts
 
@@ -20,105 +21,21 @@ from cyclopts import App
 from pydantic import FilePath
 from rich.table import Table
 
-from codeweaver.agent_api.find_code import find_code
-from codeweaver.agent_api.find_code.intent import IntentType
-from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
+from codeweaver.cli.dependencies import setup_cli_di
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.cli.utils import resolve_project_root
-from codeweaver.config.settings import get_settings_map
-from codeweaver.exceptions import CodeWeaverError
+from codeweaver.core import CodeWeaverError
+from codeweaver.core.config.loader import CodeWeaverSettingsType
+from codeweaver.server.agent_api.search import (
+    CodeMatch,
+    FindCodeResponseSummary,
+    IntentType,
+    find_code,
+)
 
-
-if TYPE_CHECKING:
-    from codeweaver.config.settings import CodeWeaverSettings
-    from codeweaver.config.types import CodeWeaverSettingsDict
-    from codeweaver.core.types.dictview import DictView
 
 _display: StatusDisplay = get_display()
 logger = logging.getLogger(__name__)
 app = App(help="Search your codebase from the command line.")
-
-
-async def _index_exists(settings: DictView[CodeWeaverSettingsDict]) -> bool:
-    """Check if an index exists for this project.
-
-    Args:
-        settings: Settings dictionary or CodeWeaverSettings object
-
-    Returns:
-        True if a valid index exists with indexed files
-    """
-    try:
-        from codeweaver.engine.indexer.manifest import FileManifestManager
-
-        project_path = (
-            settings.get("project_path")
-            if isinstance(settings.get("project_path"), Path)
-            else resolve_project_root()
-        )
-        if not project_path:
-            return False
-
-        # Use same logic as Indexer - just pass project_path, let FileManifestManager use default manifest_dir
-        manifest_manager = FileManifestManager(Path(project_path))
-        manifest = manifest_manager.load()
-
-    except Exception as e:
-        logger.debug("Error checking index existence: %s", e)
-        return False
-    else:
-        # Index exists if manifest has files
-        return manifest is not None and manifest.total_files > 0
-
-
-async def _run_search_indexing(
-    settings: CodeWeaverSettings | DictView[CodeWeaverSettingsDict],
-) -> None:
-    """Run indexing for search command (standalone, no server).
-
-    Args:
-        settings: Settings object containing configuration
-
-    Raises:
-        Exception: On indexing failure
-    """
-    from codeweaver.core.types.dictview import DictView
-    from codeweaver.engine.indexer import Indexer, IndexingProgressTracker
-
-    display = _display
-    display.print_warning("No index found. Indexing project...")
-
-    try:
-        # Convert to DictView if needed (same as index.py pattern)
-        settings_view = (
-            settings if isinstance(settings, DictView) else DictView(settings.model_dump())
-        )
-
-        # Create and run indexer
-        indexer = await Indexer.from_settings_async(settings=settings_view)
-
-        # Create progress tracker for live feedback
-        progress_tracker = IndexingProgressTracker(console=display.console)
-
-        def progress_callback(
-            phase: str, current: int, total: int, *, extra: dict[str, Any] | None = None
-        ) -> None:
-            progress_tracker.update(indexer.stats, phase)  # ty: ignore[invalid-argument-type]
-
-        await indexer.prime_index(
-            force_reindex=False, progress_callback=progress_callback, status_display=display
-        )
-
-        # Show quick summary
-        stats = indexer.stats
-        display.print_success(
-            f"Indexing complete! ({stats.files_processed} files, {stats.chunks_indexed} chunks)"
-        )
-
-    except Exception as e:
-        display.print_warning(f"Indexing failed: {e}")
-        display.print_warning("Attempting search anyway...")
-        # Don't exit - let search try anyway in case there's a partial index
 
 
 @app.default
@@ -135,37 +52,39 @@ async def search(
         ),
     ] = None,
     output_format: Literal["json", "table", "markdown"] = "table",
+    verbose: Annotated[
+        bool,
+        cyclopts.Parameter(name=["--verbose", "-v"], help="Enable verbose logging with timestamps"),
+    ] = False,
+    debug: Annotated[
+        bool, cyclopts.Parameter(name=["--debug", "-d"], help="Enable debug logging")
+    ] = False,
 ) -> None:
     """Search your codebase from the command line with plain language."""
-    from codeweaver.exceptions import ConfigurationError
+    from codeweaver.core import ConfigurationError
 
     display = _display
-    error_handler = CLIErrorHandler(display, verbose=False, debug=False)
+    error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
 
     try:
-        settings = get_settings_map()
-        if project_path or config_file:
-            from codeweaver.config.settings import update_settings
+        # Setup DI Container
+        container = setup_cli_di(config_file, project_path, verbose=verbose)
 
-            settings = update_settings(project_path=project_path, config_file=config_file)  # type: ignore
+        # Resolve Settings
+        settings = await container.resolve(CodeWeaverSettingsType)
 
-        # Check if index exists, auto-index if needed
-        if not await _index_exists(settings):
-            from codeweaver.config.settings import get_settings
-
-            settings_obj = get_settings()
-            await _run_search_indexing(settings_obj)
-            # Reload settings after indexing
-            settings = get_settings_map()
-
-        display.print_info(f"Searching in: {settings['project_path']}")
+        display.print_info(f"Searching in: {settings.project_path}")
         display.print_info(f"Query: {query}")
         display.print_info("")  # Empty line for spacing
+
+        # Resolve Providers
+        # We explicitly resolve this because find_code expects a dictionary-like object (ProviderDict),
+        # but if we don't pass it, the default value is the INJECTED marker, which doesn't behave like a dict.
 
         response = await find_code(
             query=query,
             intent=intent,
-            token_limit=settings.get("token_limit", 30000),
+            token_limit=settings.token_limit or 30000,
             focus_languages=None,
             context=None,
         )
@@ -256,7 +175,7 @@ def _display_match_details(matches: Sequence[CodeMatch], display: StatusDisplay)
         else:
             table.add_row(
                 str(match_data.get("file", {}).get("path", "unknown")),
-                str(match_data.get("file", {}).get("ext_kind", {}).get("language", "unknown")),
+                str(match_data.get("file", {}).get("ext_category", {}).get("language", "unknown")),
                 f"{match.relevance_score:.2f}",
                 f"{match.span!s}",
                 preview,
@@ -286,7 +205,7 @@ def _display_markdown_results(
         match_data = match.serialize_for_cli()
 
         file_path = match_data.get("file", {}).get("path", "unknown")
-        language = match_data.get("file", {}).get("ext_kind", {}).get("language", "unknown")
+        language = match_data.get("file", {}).get("ext_category", {}).get("language", "unknown")
 
         display.console.print(f"## {i}. {file_path}")
         display.console.print(
@@ -311,4 +230,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-__all__ = ("app", "search")
+__all__ = ()

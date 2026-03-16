@@ -18,7 +18,14 @@ Stephen Simmons, v0.1.0, 2021-12-27
 """
 __all__ = ("uuid7", "uuid7str", "time_ns", "check_timing_precision", "uuid_to_datetime")
 time_ns = ...
-def uuid7(ns: Optional[int] = ..., as_type: Optional[str] = ..., time_func: Callable[[], int] = ..., _last=..., _last_as_of=...) -> Union[uuid.UUID, str, int, bytes]:
+
+def uuid7(
+    ns: Optional[int] = ...,
+    as_type: Optional[str] = ...,
+    time_func: Callable[[], int] = ...,
+    _last=...,
+    _last_as_of=...,
+) -> Union[uuid.UUID, str, int, bytes]:
     """
     UUID v7, following the proposed extension to RFC4122 described in
     https://www.ietf.org/id/draft-peabody-dispatch-new-uuid-format-02.html.
@@ -90,7 +97,7 @@ def uuid7(ns: Optional[int] = ..., as_type: Optional[str] = ..., time_func: Call
     >>> uuid7(0)
     UUID('00000000-0000-0000-0000-00000000000')
 
-    >>> for fmt in ('bytes', 'hex', 'int', 'str', 'uuid', None):
+    >>> for fmt in ("bytes", "hex", "int", "str", "uuid", None):
     ...     print(fmt, repr(uuid7(as_type=fmt)))
     bytes b'\x06\x1c\xb8\xfe\x0f\x0b|9\x80\x00\tjt\x85\xb3\xbb'
     hex '061cb8fe0f0b7c3980011863b956b758'
@@ -147,6 +154,6 @@ def timestamp_ns(s: Union[str, uuid.UUID, int], suppress_error=...) -> Optional[
     """
     ...
 
-def uuid_to_datetime(s: Union[str, uuid.UUID, int], suppress_error=...) -> Optional[datetime.datetime]:
-    ...
-
+def uuid_to_datetime(
+    s: Union[str, uuid.UUID, int], suppress_error=...
+) -> Optional[datetime.datetime]: ...

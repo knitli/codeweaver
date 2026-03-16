@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from typing import Literal
 
+from codeweaver.core import Provider, dependency_provider
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import (
     EmbeddingCapabilitiesDict,
     PartialCapabilities,
 )
-from codeweaver.providers.provider import Provider
 
 
 type AlibabaNlpProvider = Literal[
@@ -110,7 +110,12 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
 )
 
 
-def get_alibaba_nlp_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
+class AlibabaNlpEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for Alibaba-NLP embedding models."""
+
+
+@dependency_provider(AlibabaNlpEmbeddingCapabilities, scope="singleton", collection=True)
+def get_alibaba_nlp_embedding_capabilities() -> tuple[AlibabaNlpEmbeddingCapabilities, ...]:
     """Get the capabilities for Alibaba-NLP embedding models."""
     capabilities: list[EmbeddingCapabilitiesDict] = []
     for cap in ALL_CAPABILITIES:
@@ -119,9 +124,13 @@ def get_alibaba_nlp_embedding_capabilities() -> tuple[EmbeddingModelCapabilities
         assert model_name in CAP_MAP, f"Invalid model name: {model_name}"  # noqa: S101
         capabilities.extend([
             EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
-            for provider in CAP_MAP[model_name]  # ty: ignore[invalid-argument-type]
+            for provider in CAP_MAP[model_name]
         ])
-    return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
+    return tuple(AlibabaNlpEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
-__all__ = ("get_alibaba_nlp_embedding_capabilities",)
+__all__ = (
+    "AlibabaNlpEmbeddingCapabilities",
+    "AlibabaNlpProvider",
+    "get_alibaba_nlp_embedding_capabilities",
+)

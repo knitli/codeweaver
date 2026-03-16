@@ -6,17 +6,15 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
+from codeweaver.core import Provider, dependency_provider
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import (
     EmbeddingCapabilitiesDict,
     PartialCapabilities,
 )
-from codeweaver.providers.provider import Provider
 
-
-if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 type IntfloatProvider = Literal[
     Provider.FASTEMBED,
@@ -121,17 +119,27 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
 )
 
 
-def get_intfloat_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
-    """Get the capabilities for intfloat embedding models."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+class IntfloatEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for intfloat embedding models."""
 
+
+@dependency_provider(IntfloatEmbeddingCapabilities, scope="singleton", collection=True)
+def get_intfloat_embedding_capabilities() -> tuple[IntfloatEmbeddingCapabilities, ...]:
+    """Get the capabilities for intfloat embedding models."""
     capabilities: list[EmbeddingCapabilitiesDict] = []
     for cap in ALL_CAPABILITIES:
+        model_name = cap["name"]
+        assert isinstance(model_name, str)  # noqa: S101
+        assert model_name in CAP_MAP, f"Invalid model name: {model_name}"  # noqa: S101
         capabilities.extend([
             EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
-            for provider in CAP_MAP[cap["name"]]  # ty: ignore[invalid-argument-type]
+            for provider in CAP_MAP[model_name]
         ])
-    return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
+    return tuple(IntfloatEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
-__all__ = ("get_intfloat_embedding_capabilities",)
+__all__ = (
+    "IntfloatEmbeddingCapabilities",
+    "IntfloatProvider",
+    "get_intfloat_embedding_capabilities",
+)

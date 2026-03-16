@@ -22,10 +22,21 @@ from uuid import UUID
 
 import pytest
 
-from codeweaver.agent_api.find_code.types import StrategizedQuery
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.spans import Span
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+from pydantic import AnyUrl
+from qdrant_client import AsyncQdrantClient
+
+from codeweaver.core import CodeChunk, Span
+from codeweaver.core.types import Provider, SearchStrategy, StrategizedQuery
+from codeweaver.providers import (
+    CollectionConfig,
+    ConfiguredCapability,
+    EmbeddingCapabilityGroup,
+    EmbeddingModelCapabilities,
+    EmbeddingProviderSettings,
+    QdrantClientOptions,
+    QdrantVectorStoreProvider,
+    QdrantVectorStoreProviderSettings,
+)
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
@@ -34,7 +45,6 @@ pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 @pytest.fixture
 async def qdrant_provider(qdrant_test_manager):
     """Create a QdrantVectorStoreProvider instance using test manager."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
     # Create test collection with both dense and sparse vectors
     collection_name = qdrant_test_manager.create_collection_name("codeweaver-test-contract")
@@ -48,26 +58,34 @@ async def qdrant_provider(qdrant_test_manager):
     )
 
     # Create config for provider
-    config = {
-        "url": qdrant_test_manager.url,
-        "collection_name": collection_name,
-        "batch_size": 64,
-        "dense_vector_name": "dense",
-        "sparse_vector_name": "sparse",
-    }
-
-    # Use model_construct to bypass validation and create instance with proper embedding caps
-    provider = QdrantVectorStoreProvider.model_construct(
-        config=config,
-        _client=None,
-        _metadata=None,
-        _embedding_caps={
-            "dense": dense_caps,
-            "sparse": None,
-            "backup_dense": dense_caps,
-            "backup_sparse": None,
-        },
+    config = QdrantVectorStoreProviderSettings(
+        provider=Provider.QDRANT,
+        client_options=QdrantClientOptions(url=AnyUrl(qdrant_test_manager.url)),
+        collection=CollectionConfig(collection_name=collection_name),
+        batch_size=64,
     )
+
+    # Create capability group
+    from codeweaver.providers.config.embedding import FastEmbedEmbeddingConfig
+
+    # Create proper embedding config for the provider settings
+    embedding_config = FastEmbedEmbeddingConfig(
+        tag="fastembed", provider=Provider.FASTEMBED, model_name="test-dense-model"
+    )
+
+    mock_settings = EmbeddingProviderSettings(
+        provider=Provider.FASTEMBED,
+        model_name="test-dense-model",
+        embedding_config=embedding_config,
+    )
+
+    configured_dense = ConfiguredCapability(capability=dense_caps, config=mock_settings)
+
+    caps = EmbeddingCapabilityGroup(dense=configured_dense, sparse=None)
+
+    # Use standard instantiation
+    client = AsyncQdrantClient(url=qdrant_test_manager.url)
+    provider = QdrantVectorStoreProvider(client=client, config=config, caps=caps)
     await provider._initialize()
 
     yield provider  # noqa: PT022  # The fixture is an async context manager, so it cleans up after yield
@@ -77,9 +95,8 @@ async def qdrant_provider(qdrant_test_manager):
 
 def _register_chunk_embeddings(chunk, dense=None, sparse=None):
     """Helper to register embeddings for a test chunk in the global registry."""
-    from codeweaver.common.utils.utils import uuid7
-    from codeweaver.providers.embedding.registry import get_embedding_registry
-    from codeweaver.providers.embedding.types import ChunkEmbeddings, EmbeddingBatchInfo
+    from codeweaver.core import uuid7
+    from codeweaver.providers import ChunkEmbeddings, EmbeddingBatchInfo, get_embedding_registry
 
     registry = get_embedding_registry()
 
@@ -102,9 +119,9 @@ def _register_chunk_embeddings(chunk, dense=None, sparse=None):
 
     sparse_info = None
     if sparse is not None:
-        from codeweaver.providers.embedding.types import SparseEmbedding
+        from codeweaver.providers import CodeWeaverSparseEmbedding
 
-        sparse_emb = SparseEmbedding(indices=sparse["indices"], values=sparse["values"])
+        sparse_emb = CodeWeaverSparseEmbedding(indices=sparse["indices"], values=sparse["values"])
         sparse_info = EmbeddingBatchInfo.create_sparse(
             batch_id=cast(UUID, sparse_batch_id),
             batch_index=batch_index,
@@ -113,11 +130,16 @@ def _register_chunk_embeddings(chunk, dense=None, sparse=None):
             embeddings=sparse_emb,
         )
 
-    # Register the embeddings - ChunkEmbeddings is a NamedTuple (sparse, dense, chunk)
-    registry[chunk.chunk_id] = ChunkEmbeddings(sparse=sparse_info, dense=dense_info, chunk=chunk)
+    # Register the embeddings - Create ChunkEmbeddings then add each embedding
+    chunk_embeddings = ChunkEmbeddings(chunk=chunk)
+    if dense_info:
+        chunk_embeddings = chunk_embeddings.add(dense_info)
+    if sparse_info:
+        chunk_embeddings = chunk_embeddings.add(sparse_info)
+    registry[chunk.chunk_id] = chunk_embeddings
 
     # Update chunk with batch keys - need to add both dense and sparse keys
-    from codeweaver.core.chunks import BatchKeys
+    from codeweaver.core import BatchKeys
 
     # Start with the chunk
     result_chunk = chunk
@@ -138,13 +160,13 @@ def _register_chunk_embeddings(chunk, dense=None, sparse=None):
 @pytest.fixture
 def sample_chunk():
     """Create a sample CodeChunk for testing with proper embedding registration."""
-    from codeweaver.common.utils.utils import uuid7
+    from codeweaver.core import uuid7
 
     chunk = CodeChunk.model_construct(
         chunk_name="test.py:test_function",
         file_path=Path("test.py"),
         content="def test_function():\n    pass",
-        line_range=Span(start=1, end=2, _source_id=uuid7()),
+        line_range=Span(start=1, end=2, source_id=uuid7()),
     )
 
     # Register embeddings properly in the registry
@@ -160,7 +182,7 @@ class TestQdrantProviderContract:
 
     async def test_implements_vector_store_provider(self):
         """Verify QdrantVectorStoreProvider implements VectorStoreProvider interface."""
-        from codeweaver.providers.vector_stores.base import VectorStoreProvider
+        from codeweaver.providers import VectorStoreProvider
 
         assert issubclass(QdrantVectorStoreProvider, VectorStoreProvider)
 
@@ -253,8 +275,7 @@ class TestQdrantProviderContract:
         """Test upserting a batch of chunks and verify they can be retrieved via search."""
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
-        from codeweaver.core.chunks import CodeChunk, Span
+        from codeweaver.core import CodeChunk, Span, uuid7
 
         chunks = []
         for i in range(10):
@@ -263,7 +284,7 @@ class TestQdrantProviderContract:
                 chunk_name=f"test_{i}.py:func",
                 file_path=Path(f"test_{i}.py"),
                 content=f"def func_{i}(): pass",
-                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                line_range=Span(start=1, end=1, source_id=uuid7()),
             )
             # Register embeddings properly
             chunk_with_emb = _register_chunk_embeddings(chunk, dense=[float(i)] * 768)
@@ -276,7 +297,6 @@ class TestQdrantProviderContract:
         await asyncio.sleep(1.0)
 
         # Verify chunks were stored
-        from codeweaver.agent_api.find_code.types import SearchStrategy
 
         results = await qdrant_provider.search(
             StrategizedQuery(
@@ -306,6 +326,34 @@ class TestQdrantProviderContract:
         """Test delete_by_file doesn't error on non-existent file."""
         # Should not raise even if file has no chunks
         await qdrant_provider.delete_by_file(Path("nonexistent.py"))
+
+    @pytest.mark.qdrant
+    @pytest.mark.asyncio
+    async def test_delete_by_files(self, qdrant_provider, sample_chunk):
+        """Test delete_by_files removes chunks for multiple files."""
+        from codeweaver.core import Span, uuid7
+
+        # Create another chunk in a different file
+        chunk2 = CodeChunk.model_construct(
+            chunk_id=uuid7(),
+            chunk_name="test2.py:func",
+            file_path=Path("test2.py"),
+            content="def func2(): pass",
+            line_range=Span(start=1, end=1, source_id=uuid7()),
+        )
+        chunk2_with_emb = _register_chunk_embeddings(chunk2, dense=[0.5] * 768)
+
+        await qdrant_provider.upsert([sample_chunk, chunk2_with_emb])
+
+        # Delete both by file paths
+        await qdrant_provider.delete_by_files([sample_chunk.file_path, chunk2_with_emb.file_path])
+
+        # Verify chunks are gone
+        results = await qdrant_provider.search(vector={"dense": [0.1, 0.2, 0.3] * 256})
+        assert len(results) == 0 or all(
+            r.chunk.file_path not in [sample_chunk.file_path, chunk2_with_emb.file_path]
+            for r in results
+        )
 
     async def test_delete_by_id(self, qdrant_provider, sample_chunk):
         """Test delete_by_id removes specific chunks."""

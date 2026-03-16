@@ -1,7 +1,3 @@
-// SPDX-FileCopyrightText: 2025 Knitli Inc.
-// SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-//
-// SPDX-License-Identifier: MIT OR Apache-2.0
-
 /// <reference types="astro/client" />
+/// <reference path="integrations/_astrojs_starlight/i18n-plugins.d.ts" />
 /// <reference path="content.d.ts" />

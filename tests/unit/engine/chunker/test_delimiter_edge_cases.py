@@ -16,8 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.engine.chunker.base import ChunkGovernor
-from codeweaver.engine.chunker.delimiter import DelimiterChunker
+from codeweaver.engine import ChunkGovernor, DelimiterChunker
 
 
 pytestmark = [pytest.mark.unit]
@@ -29,6 +28,7 @@ def delimiter_chunker(chunk_governor: ChunkGovernor) -> DelimiterChunker:
     return DelimiterChunker(governor=chunk_governor)
 
 
+@pytest.mark.unit
 class TestGenericFallback:
     """Test generic delimiter fallback behavior."""
 
@@ -63,7 +63,7 @@ for multiple chunks if the generic patterns work correctly.
         file_path.write_text(content)
 
         # Create DiscoveredFile and execute chunking
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
@@ -87,6 +87,7 @@ for multiple chunks if the generic patterns work correctly.
             assert len(chunks) > 1, "Generic patterns should split content into multiple chunks"
 
 
+@pytest.mark.unit
 class TestDelimiterBehavior:
     """Test inclusive vs exclusive delimiter behavior."""
 
@@ -116,7 +117,7 @@ def function_three():
         file_path.write_text(content)
 
         # Create DiscoveredFile and test with default configuration
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
@@ -139,6 +140,7 @@ def function_three():
                     )
 
 
+@pytest.mark.unit
 class TestLineExpansion:
     """Test line boundary expansion behavior."""
 
@@ -165,7 +167,7 @@ a, b, c = 1, 2, 3; total = a + b + c  # Another multi-statement line
         file_path.write_text(content)
 
         # Create DiscoveredFile and chunk with default configuration
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
@@ -182,11 +184,11 @@ a, b, c = 1, 2, 3; total = a + b + c  # Another multi-statement line
 
             # metadata should be a dict here, so we can use 'in' operator
             # Verify line range metadata is present
-            assert "line_start" in chunk.metadata, "Chunks should have line_start metadata"  # ty: ignore[unsupported-operator]
-            assert "line_end" in chunk.metadata, "Chunks should have line_end metadata"  # ty: ignore[unsupported-operator]
+            assert "line_start" in chunk.metadata, "Chunks should have line_start metadata"
+            assert "line_end" in chunk.metadata, "Chunks should have line_end metadata"
 
-            line_start = chunk.metadata["line_start"]  # ty: ignore[non-subscriptable]
-            line_end = chunk.metadata["line_end"]  # ty: ignore[non-subscriptable]
+            line_start = chunk.metadata["line_start"]
+            line_end = chunk.metadata["line_end"]
 
             assert isinstance(line_start, int), "line_start should be integer"
             assert isinstance(line_end, int), "line_end should be integer"
@@ -202,6 +204,7 @@ a, b, c = 1, 2, 3; total = a + b + c  # Another multi-statement line
             )
 
 
+@pytest.mark.unit
 class TestUnusualPatterns:
     """Test delimiter chunker with unusual patterns."""
 
@@ -232,7 +235,7 @@ function outer() {
         file_path.write_text(content)
 
         # Create DiscoveredFile and chunk
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
@@ -269,7 +272,7 @@ class MyClass:
         file_path.write_text(content)
 
         # Create DiscoveredFile and chunk
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
@@ -289,6 +292,7 @@ class MyClass:
             assert next_start >= current_end, "Chunks should not overlap"
 
 
+@pytest.mark.unit
 class TestEdgeCaseContent:
     """Test delimiter chunker with edge case content."""
 
@@ -312,7 +316,7 @@ function alsoEmpty() {
         file_path.write_text(content)
 
         # Create DiscoveredFile and chunk
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
@@ -343,7 +347,7 @@ function another() {
         file_path.write_text(content)
 
         # Create DiscoveredFile - should not crash, should produce some chunks
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)

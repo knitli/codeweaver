@@ -19,23 +19,29 @@ from pydantic_core import from_json
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.config.server_defaults import DefaultFastMcpHttpRunArgs
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.core import UNSET, SettingsMapDep
+from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.di.dependency import INJECTED
+from codeweaver.core.types.dictview import DictView
+from codeweaver.server.config import DefaultFastMcpHttpRunArgs
 
 
 _display: StatusDisplay = get_display()
 app = App("status", help="Show CodeWeaver runtime status.")
 
 
+def _settings_map(settings: SettingsMapDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
+    """Get the settings map."""
+    return settings
+
+
 def get_url() -> str:
     """Get the MCP server URL from settings (http transport)."""
-    from codeweaver.config.settings import get_settings_map
-
-    settings_map = get_settings_map()
+    settings_map = _settings_map()
     mcp_server_settings = settings_map["mcp_server"]
     run_args = (
         DefaultFastMcpHttpRunArgs
-        if mcp_server_settings["run_args"] is Unset
+        if mcp_server_settings["run_args"] is UNSET
         else mcp_server_settings["run_args"]
     )
     host = run_args["host"] or "127.0.0.1"
@@ -45,16 +51,14 @@ def get_url() -> str:
 
 def get_management_url() -> str:
     """Get the management server URL from settings."""
-    from codeweaver.config.settings import get_settings_map
-
-    settings_map = get_settings_map()
+    settings_map = _settings_map()
     mgmt_host = (
         settings_map["management_host"]
-        if settings_map["management_host"] is not Unset
+        if settings_map["management_host"] is not UNSET
         else "127.0.0.1"
     )
     mgmt_port = (
-        settings_map["management_port"] if settings_map["management_port"] is not Unset else 9329
+        settings_map["management_port"] if settings_map["management_port"] is not UNSET else 9329
     )
     return f"http://{mgmt_host}:{mgmt_port}"
 
@@ -143,7 +147,7 @@ async def _query_server_status(server_url: str) -> dict[str, Any] | None:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(f"{server_url}/status")
             response.raise_for_status()
-            return from_json(response.content)  # type: ignore[no-any-return]
+            return from_json(response.content)
     except (httpx.ConnectError, httpx.TimeoutException):
         return None
     except httpx.HTTPStatusError:
@@ -368,3 +372,5 @@ if __name__ == "__main__":
         app()
     except Exception as e:
         error_handler.handle_error(e, "Status command", exit_code=1)
+
+__all__ = ()

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from codeweaver.exceptions import CodeWeaverError
+from codeweaver.core import CodeWeaverError
 
 
 class ChunkingError(CodeWeaverError):

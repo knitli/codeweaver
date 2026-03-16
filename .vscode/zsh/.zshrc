@@ -7,23 +7,46 @@
 # Loaded because VS Code sets ZDOTDIR to this directory for integrated terminals.
 
 typeset -i _mise_updated
+typeset current_branch
+
+cw_blue="{66}"
+cw_copper="{173}"
+cw_offwhite="{231}"
+
+nerd_branch=""
+nerd_path=""
+nerd_mise=""
+
+function _check_git_branch {
+  branch="$(git branch --show-current 2>/dev/null || echo '')"
+  echo "${branch}"
+}
+
+current_branch=""
+_check_git_branch
 
 # replace default mise hook
 function _mise_hook {
   local diff=${__MISE_DIFF}
+  current_branch="$(_check_git_branch)"
   source <(command mise hook-env -s zsh)
   [[ ${diff} == ${__MISE_DIFF} ]]
   _mise_updated=$?
 }
 
-_PROMPT="❱ "  # or _PROMPT=${PROMPT} to keep the default
-
 function _prompt {
-  if (( ${_mise_updated} )); then
-    PROMPT='%F{blue}${_PROMPT}%f'
-  else
-    PROMPT='%(?.%F{green}${_PROMPT}%f.%F{red}${_PROMPT}%f)'
+  local branch="$(_check_git_branch)"
+  local branch_seg=""
+  if [[ -n "${branch}" ]]; then
+    branch_seg=" %F${cw_copper}${nerd_branch} ${branch}%f"
   fi
+
+  local mise_seg=""
+  if (( _mise_updated )); then
+    mise_seg=" %F${cw_copper}${nerd_mise}%f"
+  fi
+
+  PROMPT="%(?.%F{120}%f.%F{196}%f) %F${cw_blue}${nerd_path}%f %F${cw_offwhite}%~%f${branch_seg}${mise_seg} %F${cw_blue}❯%f "
 }
 
 

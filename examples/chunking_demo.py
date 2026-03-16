@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 def main() -> None:
     """Run chunking demo."""
     from codeweaver.config.chunker import ChunkerSettings, ConcurrencySettings
+
     from codeweaver.core.discovery import DiscoveredFile
     from codeweaver.engine import ChunkGovernor, ChunkingService
     from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities

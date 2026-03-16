@@ -15,8 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from codeweaver.engine.chunker.exceptions import ChunkingTimeoutError, ChunkLimitExceededError
-from codeweaver.engine.chunker.governance import ResourceGovernor
+from codeweaver.engine import ChunkingTimeoutError, ChunkLimitExceededError, ResourceGovernor
 
 
 pytestmark = [pytest.mark.unit]

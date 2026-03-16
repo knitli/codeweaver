@@ -18,9 +18,6 @@ pytestmark = [pytest.mark.e2e]
 
 @pytest.mark.external_api
 @pytest.mark.network
-@pytest.mark.skip(
-    reason="Requires package published to PyPI - run manually after production publish"
-)
 def test_install_from_pypi():
     """
     Smoke test for production PyPI installation.
@@ -37,10 +34,30 @@ def test_install_from_pypi():
     3. Verify all checks pass
 
     NOTE: Requires:
-    - Package published to pypi.org
     - Network access
     - Clean Python environment
     """
+    # Skip if the local version has not been published to PyPI yet.
+    # This is common during development: the source may reference dependencies
+    # (e.g. lateimport) not yet present in the last published release.
+    try:
+        import importlib.metadata
+
+        local_version = importlib.metadata.version("code-weaver")
+    except importlib.metadata.PackageNotFoundError:
+        local_version = None
+
+    check = subprocess.run(
+        ["pip", "index", "versions", "code-weaver"], capture_output=True, text=True, check=False
+    )
+    if check.returncode != 0 or "code-weaver" not in check.stdout:
+        pytest.skip("code-weaver not found on PyPI — package may not be published yet")
+    if local_version and local_version not in check.stdout:
+        pytest.skip(
+            f"Local version {local_version!r} not yet published to PyPI; "
+            "smoke test skipped until the current release is available"
+        )
+
     with tempfile.TemporaryDirectory() as tmpdir:
         venv_path = Path(tmpdir) / "venv"
 
@@ -54,7 +71,7 @@ def test_install_from_pypi():
         python = venv_path / "bin" / "python"
 
         # Install from PyPI
-        install_cmd = [str(pip), "install", "codeweaver"]
+        install_cmd = [str(pip), "install", "code-weaver"]
 
         result = subprocess.run(install_cmd, capture_output=True, text=True, check=False)
         assert result.returncode == 0, f"Installation failed: {result.stderr}"
@@ -88,7 +105,7 @@ def test_pypi_metadata():
     Verify package metadata is correct on production PyPI.
 
     Manual validation:
-    1. Visit https://pypi.org/project/codeweaver/
+    1. Visit https://pypi.org/project/code-weaver/
     2. Verify metadata fields:
        - Description matches README
        - License: MIT OR Apache-2.0
@@ -107,8 +124,8 @@ def test_pypi_search():
     Verify package is discoverable via PyPI search.
 
     Manual validation:
-    1. Search for "codeweaver" on pypi.org
-    2. Verify codeweaver appears in results
+    1. Search for "code-weaver" on pypi.org
+    2. Verify code-weaver appears in results
     3. Verify description is visible
     4. Verify keywords aid discoverability
     """

@@ -49,8 +49,9 @@ from typing_extensions import TypeIs
 # make sure codeweaver is importable
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
 from codeweaver.providers.provider import Provider
+
+from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
 
 
 # TODO: Finish refactor to use these inline constants and eliminate the hf-models.json
@@ -99,9 +100,7 @@ OLLAMA_ALIASES = {
 Note: FastEmbed also has some aliases, but we handle those dynamically below.
 """
 
-KNOWN_ALIASES: dict[str, dict[ModelName, ModelName]] = {
-    "ollama": OLLAMA_ALIASES,
-}
+KNOWN_ALIASES: dict[str, dict[ModelName, ModelName]] = {"ollama": OLLAMA_ALIASES}
 """A mapping of provider names to their HF name → provider alias mappings.
 
 Keys are provider name strings (e.g. "ollama") and values are dicts mapping HF model names
@@ -391,13 +390,7 @@ type AliasMap = dict[
 
 type DataMap = dict[ModelName, SimplifiedModelMeta]
 
-type ModelMap = dict[
-    ModelMaker,
-    dict[
-        ModelName,
-        tuple[HFModelProviders, ...],
-    ],
-]
+type ModelMap = dict[ModelMaker, dict[ModelName, tuple[HFModelProviders, ...]]]
 """A mapping of model makers to their models and the providers that support each model."""
 
 

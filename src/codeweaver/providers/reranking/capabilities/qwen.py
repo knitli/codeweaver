@@ -7,18 +7,23 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
+
+from codeweaver.core import dependency_provider
+from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
     from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
+
+
+class QwenRerankingCapabilities(RerankingModelCapabilities):
+    """Capabilities for Qwen reranking models."""
 
 
 def _get_shared_capabilities() -> PartialRerankingCapabilitiesDict:
     """Returns shared_capabilities across all Qwen reranking models."""
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core import Provider
 
     return {  # ty: ignore[invalid-return-type]
         "name": "Qwen/Qwen3-Reranking-",
@@ -35,24 +40,23 @@ def _get_shared_capabilities() -> PartialRerankingCapabilitiesDict:
     }
 
 
-def get_qwen_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
+@dependency_provider(QwenRerankingCapabilities, scope="singleton", collection=True)
+def get_qwen_reranking_capabilities() -> tuple[QwenRerankingCapabilities, ...]:
     """
     Get the Qwen reranking capabilities.
     """
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-
     shared_capabilities = _get_shared_capabilities()
     models = ("06B", "4B", "8B")
-    assembled_capabilities: list[RerankingModelCapabilities] = []
+    assembled_capabilities: list[QwenRerankingCapabilities] = []
     assembled_capabilities.extend(
-        RerankingModelCapabilities.model_validate({
+        QwenRerankingCapabilities.model_validate({
             **shared_capabilities,
             "name": f"{shared_capabilities['name']}{model}",
             "tokenizer_model": f"Qwen/Qwen3-Reranking-{model}",
         })
         for model in models
     )
-    return assembled_capabilities
+    return tuple(assembled_capabilities)
 
 
-__all__ = ("get_qwen_reranking_capabilities",)
+__all__ = ("QwenRerankingCapabilities", "get_qwen_reranking_capabilities")

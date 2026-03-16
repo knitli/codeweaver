@@ -23,9 +23,10 @@ on:
 permissions:
   actions: read
   checks: read
-  issues: write
   contents: write
-  discussions: write
+  discussions: read
+  id-token: write
+  issues: write
   pull-requests: write
 
 env:
@@ -69,14 +70,15 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           allowed_non_write_users: Copilot
-          trigger_phrase: '@claude'
-          assignee_trigger: claude
+          allowed_bots: "github-actions[bot],copilot[bot],dependabot[bot],copilot,github-actions,gemini[bot],claude[bot]"
+          trigger_phrase: "@claude"
+          assignee_trigger: claude[bot]
           label_trigger: claude
           base_branch: main
           use_commit_signing: true
           claude_args: |
             --max-turns 100
-            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,WebFetch,WebSearch,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,mcp__tavily__tavily_search,
+            --allowedTools Bash,TaskOutput,Batch,Glob,Grep,MCPSearch,Read,Skill,TaskCreate,TaskGet,TaskList,TaskUpdate,WebFetch,WebSearch,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,mcp__tavily__tavily_search,
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}
@@ -103,7 +105,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: '@claude'
+          trigger_phrase: "@claude"
           assignee_trigger: claude
           label_trigger: claude
           track_progress: true
@@ -111,7 +113,7 @@ jobs:
           base_branch: main
           claude_args: |
             --max-turns 100
-            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,WebFetch,WebSearch,mcp__tavily__tavily_search
+            --allowedTools Bash,TaskOutput,Edit,Glob,Grep,KillShell,MCPSearch,Read,Skill,Agent,TaskCreate,TaskGet,TaskList,TaskUpdate,WebFetch,WebSearch,Write,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,WebFetch,WebSearch,mcp__tavily__tavily_search
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}
@@ -138,14 +140,14 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: '@claude'
+          trigger_phrase: "@claude"
           assignee_trigger: claude
           label_trigger: claude
           use_commit_signing: true
           base_branch: main
           claude_args: |
             --max-turns 50
-            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,mcp__tavily__tavily_search,WebFetch,WebSearch
+            --allowedTools Bash,TaskOutput,Glob,Grep,KillShell,MCPSearch,Read,Skill,Agent,TaskCreate,TaskGet,TaskList,TaskUpdate,WebFetch,WebSearch,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,mcp__tavily__tavily_search,WebFetch,WebSearch
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}
@@ -170,12 +172,12 @@ jobs:
           skip-checkout: "true"
       - name: Issue Assigned or Labeled Claude
         if: |
-          (github.event_name == 'issues' && github.event.action == 'assigned') || (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude') || (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'claude')
+          ((github.event_name == 'issues' && github.event.action == 'assigned') || (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude') || (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'claude')) && (github.event.label.name != 'upstream-sync')
         uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: '@claude'
+          trigger_phrase: "@claude"
           assignee_trigger: claude
           label_trigger: claude
           track_progress: true
@@ -183,7 +185,7 @@ jobs:
           base_branch: main
           claude_args: |
             --max-turns 200
-            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,WebFetch,WebSearch
+            --allowedTools Bash,TaskOutput,Edit,ExitPlanMode,Glob,Grep,KillShell,MCPSearch,Read,Skill,Agent,TaskCreate,TaskGet,TaskList,TaskUpdate,WebFetch,WebSearch,Write,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,WebFetch,WebSearch
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}

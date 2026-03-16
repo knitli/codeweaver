@@ -15,12 +15,26 @@ from uuid import uuid4
 
 import pytest
 
-from codeweaver.agent_api.find_code.types import StrategizedQuery
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.core.spans import Span
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+from anyio import Path as AsyncPath
+from qdrant_client import AsyncQdrantClient
+
+from codeweaver.core import CodeChunk, SemanticSearchLanguage, Span
+from codeweaver.core.types import Provider, SearchStrategy, StrategizedQuery
+from codeweaver.providers import (
+    ConfiguredCapability,
+    EmbeddingCapabilityGroup,
+    EmbeddingModelCapabilities,
+    MemoryVectorStoreProvider,
+    MemoryVectorStoreProviderSettings,
+)
+
+
+# Resolve Pydantic forward references
+MemoryVectorStoreProvider.model_rebuild()
+from codeweaver.core.types import ChunkEmbeddings
+
+
+ChunkEmbeddings.model_rebuild()
 
 
 pytestmark = [pytest.mark.validation]
@@ -39,18 +53,23 @@ def temp_persist_path():
 @pytest.fixture
 async def memory_config(temp_persist_path):
     """Provide test Memory configuration."""
-    return {
-        "persist_path": str(temp_persist_path / "vector_store.json"),  # Full file path
-        "auto_persist": True,
-        "persist_interval": None,  # Disable periodic persistence for tests
-        "collection_name": f"test_memory_{uuid4().hex[:8]}",
-    }
+    from codeweaver.providers.config import CollectionConfig
+
+    return MemoryVectorStoreProviderSettings(
+        provider=Provider.MEMORY,
+        collection=CollectionConfig(collection_name=f"test_memory_{uuid4().hex[:8]}"),
+        in_memory_config={
+            "persist_path": str(temp_persist_path / "vector_store"),
+            "auto_persist": True,
+            "persist_interval": None,
+        },
+    )
 
 
 @pytest.fixture
 async def test_embedding_caps():
     """Provide test embedding capabilities with 768 dimensions."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.providers.config import EmbeddingProviderSettings, FastEmbedEmbeddingConfig
 
     dense_caps = EmbeddingModelCapabilities(
         name="test-dense-model",
@@ -59,30 +78,47 @@ async def test_embedding_caps():
         preferred_metrics=("cosine", "dot"),
     )
 
-    return {"dense": dense_caps, "sparse": None}
+    # Create proper embedding config with explicit dimension in embedding dict
+    embedding_config = FastEmbedEmbeddingConfig(
+        tag="fastembed",
+        provider=Provider.FASTEMBED,
+        model_name="test-dense-model",
+        embedding={"dimensions": 768},  # Explicitly set dimension to avoid capability resolution
+    )
+
+    # Create provider settings with the proper embedding config
+    mock_settings = EmbeddingProviderSettings(
+        provider=Provider.FASTEMBED,
+        model_name="test-dense-model",
+        embedding_config=embedding_config,
+    )
+
+    configured_dense = ConfiguredCapability(capability=dense_caps, config=mock_settings)
+
+    return EmbeddingCapabilityGroup(dense=configured_dense, sparse=None)
 
 
 @pytest.fixture
 async def memory_provider(memory_config, test_embedding_caps):
     """Create a MemoryVectorStoreProvider instance for testing."""
-    from codeweaver.providers.provider import Provider
+    client = AsyncQdrantClient(location=":memory:")
 
     provider = MemoryVectorStoreProvider(
-        _provider=Provider.MEMORY, config=memory_config, embedding_caps=test_embedding_caps
+        client=client, config=memory_config, caps=test_embedding_caps
     )
     await provider._initialize()
-    return provider
+    yield provider
+    await provider.close()
+
     # Cleanup handled by temp directory
 
 
 @pytest.fixture
-def sample_chunk():
-    """Create a sample CodeChunk for testing."""
-    from codeweaver.common.utils.utils import uuid7
-    from codeweaver.core.chunks import BatchKeys
-    from codeweaver.core.metadata import ChunkKind, ExtKind
-    from codeweaver.providers.embedding.registry import get_embedding_registry
-    from codeweaver.providers.embedding.types import ChunkEmbeddings, EmbeddingBatchInfo
+async def sample_chunk(clean_container):
+    """Create a sample CodeChunk for testing with embeddings registered in DI container."""
+    from codeweaver.core import BatchKeys, ChunkKind, ExtCategory, uuid7
+    from codeweaver.core.types import ChunkEmbeddings, EmbeddingBatchInfo
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry
 
     chunk_id = uuid7()
 
@@ -91,16 +127,14 @@ def sample_chunk():
         chunk_id=chunk_id,
         chunk_name="memory_test.py:test_func",
         file_path=Path("memory_test.py"),
-        language=Language.PYTHON,
-        ext_kind=ExtKind.from_language(Language.PYTHON, ChunkKind.CODE),
+        language=SemanticSearchLanguage.PYTHON,
+        ext_category=ExtCategory.from_language(SemanticSearchLanguage.PYTHON, ChunkKind.CODE),
         content="def test_func():\n    return True",
-        line_range=Span(start=1, end=2, _source_id=chunk_id),
+        line_range=Span(start=1, end=2, source_id=chunk_id),
     )
 
-    # Register embeddings in the registry
-    registry = get_embedding_registry()
-
     # Create dense embeddings (768 dimensions to match default)
+    # IMPORTANT: intent must match between EmbeddingBatchInfo and chunk.set_batch_keys
     dense_batch_id = uuid7()
     dense_info = EmbeddingBatchInfo.create_dense(
         batch_id=dense_batch_id,
@@ -109,25 +143,29 @@ def sample_chunk():
         model="test-dense-model",
         embeddings=[0.5] * 768,  # 768 dimensions
         dimension=768,
+        intent="primary",  # Use "primary" as the vector name (role-based architecture)
     )
 
-    # Set batch key on chunk
+    # Set batch key on chunk BEFORE registering embeddings
     dense_batch_key = BatchKeys(id=dense_batch_id, idx=0, sparse=False)
-    chunk = chunk.set_batch_keys(dense_batch_key)
+    chunk = chunk.set_batch_keys(dense_batch_key, intent="primary")
 
-    # Register in the embedding registry
-    registry[chunk_id] = ChunkEmbeddings(sparse=None, dense=dense_info, chunk=chunk)
+    # Register embeddings: resolve the registry from DI container (will create singleton if needed)
+    registry = await clean_container.resolve(EmbeddingRegistry)
+    registry[chunk.chunk_id] = ChunkEmbeddings(chunk=chunk).add(dense_info)
 
     return chunk
 
 
 @pytest.mark.async_test
+@pytest.mark.external_api
+@pytest.mark.qdrant
 class TestMemoryProviderContract:
     """Contract tests for MemoryVectorStoreProvider implementation."""
 
     async def test_implements_vector_store_provider(self):
         """Verify MemoryVectorStoreProvider implements VectorStoreProvider interface."""
-        from codeweaver.providers.vector_stores.base import VectorStoreProvider
+        from codeweaver.providers import VectorStoreProvider
 
         assert issubclass(MemoryVectorStoreProvider, VectorStoreProvider)
 
@@ -143,7 +181,14 @@ class TestMemoryProviderContract:
         """Test search functionality."""
         await memory_provider.upsert([sample_chunk])
 
-        results = await memory_provider.search(vector={"dense": [0.5] * 768})
+        results = await memory_provider.search(
+            vector=StrategizedQuery(
+                query="test search",
+                dense=[0.5] * 768,
+                sparse=None,
+                strategy=SearchStrategy.DENSE_ONLY,
+            )
+        )
 
         assert isinstance(results, list)
         if results:
@@ -154,7 +199,14 @@ class TestMemoryProviderContract:
         await memory_provider.upsert([sample_chunk])
 
         # Verify chunk can be retrieved
-        results = await memory_provider.search(vector={"dense": [0.5] * 768})
+        results = await memory_provider.search(
+            vector=StrategizedQuery(
+                query="test upsert",
+                dense=[0.5] * 768,
+                sparse=None,
+                strategy=SearchStrategy.DENSE_ONLY,
+            )
+        )
         assert len(results) > 0
 
     async def test_delete_by_file(self, memory_provider, sample_chunk):
@@ -162,17 +214,75 @@ class TestMemoryProviderContract:
         await memory_provider.upsert([sample_chunk])
         await memory_provider.delete_by_file(sample_chunk.file_path)
 
-        results = await memory_provider.search(vector={"dense": [0.5] * 768})
+        results = await memory_provider.search(
+            vector=StrategizedQuery(
+                query="test delete",
+                dense=[0.5] * 768,
+                sparse=None,
+                strategy=SearchStrategy.DENSE_ONLY,
+            )
+        )
         assert len(results) == 0 or all(
             r.chunk.file_path != sample_chunk.file_path for r in results
         )
+
+    async def test_delete_by_files(self, memory_provider, sample_chunk):
+        """Test delete_by_files removes chunks for multiple files."""
+        # Create a second chunk for a different file
+        from codeweaver.core import Span, uuid7
+
+        chunk2 = sample_chunk.model_copy(
+            update={
+                "chunk_id": uuid7(),
+                "file_path": Path("other_file.py"),
+                "chunk_name": "other_file.py:func",
+                "line_range": Span(start=1, end=2, source_id=uuid7()),
+            }
+        )
+        # Register embeddings for second chunk
+        from codeweaver.core.types import ChunkEmbeddings, EmbeddingBatchInfo
+
+        registry = await memory_provider._get_registry()
+        dense_info = EmbeddingBatchInfo.create_dense(
+            batch_id=uuid7(),
+            batch_index=0,
+            chunk_id=chunk2.chunk_id,
+            model="test-dense-model",
+            embeddings=[0.5] * 768,
+            dimension=768,
+            intent="primary",
+        )
+        registry[chunk2.chunk_id] = ChunkEmbeddings(chunk=chunk2).add(dense_info)
+
+        await memory_provider.upsert([sample_chunk, chunk2])
+
+        # Delete both files
+        await memory_provider.delete_by_files([sample_chunk.file_path, chunk2.file_path])
+
+        # Verify both are gone
+        results = await memory_provider.search(
+            vector=StrategizedQuery(
+                query="test delete",
+                dense=[0.5] * 768,
+                sparse=None,
+                strategy=SearchStrategy.DENSE_ONLY,
+            )
+        )
+        assert len(results) == 0
 
     async def test_delete_by_id(self, memory_provider, sample_chunk):
         """Test delete_by_id removes chunks."""
         await memory_provider.upsert([sample_chunk])
         await memory_provider.delete_by_id([sample_chunk.chunk_id])
 
-        results = await memory_provider.search(vector={"dense": [0.5] * 768})
+        results = await memory_provider.search(
+            vector=StrategizedQuery(
+                query="test delete",
+                dense=[0.5] * 768,
+                sparse=None,
+                strategy=SearchStrategy.DENSE_ONLY,
+            )
+        )
         assert len(results) == 0 or all(r.chunk.chunk_id != sample_chunk.chunk_id for r in results)
 
     async def test_delete_by_name(self, memory_provider, sample_chunk):
@@ -180,42 +290,54 @@ class TestMemoryProviderContract:
         await memory_provider.upsert([sample_chunk])
         await memory_provider.delete_by_name([sample_chunk.chunk_name])
 
-        results = await memory_provider.search(vector={"dense": [0.5] * 768})
+        results = await memory_provider.search(
+            vector=StrategizedQuery(
+                query="test delete",
+                dense=[0.5] * 768,
+                sparse=None,
+                strategy=SearchStrategy.DENSE_ONLY,
+            )
+        )
         assert len(results) == 0 or all(
             r.chunk.chunk_name != sample_chunk.chunk_name for r in results
         )
 
     async def test_persist_to_disk(self, memory_provider, memory_config, sample_chunk):
-        """Test _persist_to_disk creates JSON file."""
+        """Test _persist_to_disk creates persistence directory."""
         await memory_provider.upsert([sample_chunk])
         await memory_provider._persist_to_disk()
 
-        persist_path = Path(memory_config["persist_path"])
-        assert persist_path.exists(), "Persistence file should be created"
-        assert persist_path.stat().st_size > 0, "Persistence file should not be empty"
+        persist_path = AsyncPath(memory_config.in_memory_config["persist_path"])
+        assert await persist_path.exists(), "Persistence directory should be created"
+        assert await persist_path.is_dir(), "Persistence path should be a directory"
+        # Check if Qdrant files exist inside (simple check)
+        assert any([p async for p in persist_path.iterdir()]), (
+            "Persistence directory should not be empty"
+        )
 
     async def test_restore_from_disk(
         self, memory_config, sample_chunk, temp_persist_path, test_embedding_caps
     ):
         """Test _restore_from_disk loads data from JSON."""
-        from codeweaver.providers.provider import Provider
-
         # Create and persist data
+        client1 = AsyncQdrantClient(location=":memory:")
         provider1 = MemoryVectorStoreProvider(
-            _provider=Provider.MEMORY, config=memory_config, embedding_caps=test_embedding_caps
+            client=client1, config=memory_config, caps=test_embedding_caps
         )
         await provider1._initialize()
         await provider1.upsert([sample_chunk])
         await provider1._persist_to_disk()
 
         # Create new provider and restore
+        client2 = AsyncQdrantClient(location=":memory:")
         provider2 = MemoryVectorStoreProvider(
-            _provider=Provider.MEMORY, config=memory_config, embedding_caps=test_embedding_caps
+            client=client2, config=memory_config, caps=test_embedding_caps
         )
         await provider2._initialize()
+        # Explicitly restore from disk (skipped in test mode by default)
+        await provider2._restore_from_disk()
 
         # Verify data was restored
-        from codeweaver.agent_api.find_code.types import SearchStrategy
 
         results = await provider2.search(
             StrategizedQuery(
@@ -233,49 +355,52 @@ class TestMemoryProviderContract:
             for r in results
         )
 
-    async def test_persistence_file_format(self, memory_provider, memory_config, sample_chunk):
-        """Test persistence file has correct JSON structure."""
-        import json
-
-        await memory_provider.upsert([sample_chunk])
-        await memory_provider._persist_to_disk()
-
-        persist_path = Path(memory_config["persist_path"])
-        data = json.loads(persist_path.read_text())
-        # Verify top-level structure
-        assert "version" in data
-        assert "collections" in data or "metadata" in data
-        assert data["version"] == "1.0"
-
     async def test_auto_persist_on_upsert(
         self, memory_config, sample_chunk, temp_persist_path, test_embedding_caps
     ):
         """Test auto_persist triggers persistence on upsert."""
-        config_with_auto = memory_config.copy()
-        config_with_auto["auto_persist"] = True
+        # Config is already a settings object, we need to create a new one with modified inner config
+        # or just modify the dict used to create it if we were doing that.
+        # Since memory_config is a Pydantic model, we should use model_copy with update if possible,
+        # but in_memory_config is a dict inside.
 
+        # Easiest way is to create a new settings object
+        new_config = memory_config.in_memory_config.copy()
+        new_config["auto_persist"] = True
+
+        config_with_auto = MemoryVectorStoreProviderSettings(
+            provider=Provider.MEMORY, in_memory_config=new_config
+        )
+
+        client = AsyncQdrantClient(location=":memory:")
         provider = MemoryVectorStoreProvider(
-            _provider=Provider.MEMORY, config=config_with_auto, embedding_caps=test_embedding_caps
+            client=client, config=config_with_auto, caps=test_embedding_caps
         )
         await provider._initialize()
         await provider.upsert([sample_chunk])
 
         # Auto-persist should have created the file
-        persist_file = Path(memory_config["persist_path"])
-        assert persist_file.exists()
+        persist_file = AsyncPath(memory_config.in_memory_config["persist_path"])
+        assert await persist_file.exists()
+        assert await persist_file.is_dir()
 
     async def test_collection_property(self, memory_provider, memory_config):
-        """Test collection property returns configured collection name."""
-        # Collection name can be either:
-        # 1. Custom name from config (e.g., test_memory_{8_char_hex})
-        # 2. Generated name: project_name-{8_char_hash} (e.g., codeweaver-test-751748d4)
-        assert memory_provider.collection is not None
-        # Either format should have an 8-character hex suffix
+        """Test collection property contract (may be None after DI refactoring)."""
+        # After DI refactoring, the base VectorStoreProvider.collection property returns None
+        # Collection name is now in config.collection.collection_name
         collection_name = memory_provider.collection
-        # Check the last segment (after last underscore or hyphen) is 8-char hex
-        parts = collection_name.replace("-", "_").split("_")
-        last_part = parts[-1]
-        assert len(last_part) == 8, f"Expected 8-char hex suffix, got '{last_part}'"
-        assert all(c in "0123456789abcdef" for c in last_part), (
-            f"Expected hex characters, got '{last_part}'"
-        )
+
+        # Contract: collection property returns str | None
+        assert collection_name is None or isinstance(collection_name, str)
+
+        # If implementation provides collection name via config
+        if hasattr(memory_provider.config, "collection") and memory_provider.config.collection:
+            config_collection = memory_provider.config.collection.collection_name
+            assert isinstance(config_collection, str)
+            # Either format should have an 8-character hex suffix
+            parts = config_collection.replace("-", "_").split("_")
+            last_part = parts[-1]
+            assert len(last_part) == 8, f"Expected 8-char hex suffix, got '{last_part}'"
+            assert all(c in "0123456789abcdef" for c in last_part), (
+                f"Expected hex characters, got '{last_part}'"
+            )

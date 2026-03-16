@@ -37,7 +37,7 @@ from typing import Any
 try:
     import tomllib
 except ModuleNotFoundError:
-    import tomli as tomllib  # type: ignore[no-redef]
+    import tomli as tomllib
 
 
 def load_overrides(overrides_dir: Path, lang: str) -> dict[str, str]:

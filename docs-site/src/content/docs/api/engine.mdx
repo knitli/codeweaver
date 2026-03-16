@@ -1,0 +1,2146 @@
+---
+title: engine
+description: API reference for codeweaver.engine
+---
+
+# engine
+
+The engine package contains core functionality for indexing, chunking, and searching code and documentation data, but also for other data providers 🚋.
+
+## Class: `ASTDepthExceededError`
+
+Abstract syntax tree nesting exceeds safe depth limit.
+
+Raised when the AST contains deeply nested structures that may cause
+stack overflow or excessive memory usage during traversal. This limit
+protects against pathological input and ensures robust operation.
+
+Excessive AST depth typically indicates generated code, obfuscation,
+or unusual coding patterns that require special handling.
+
+## Class: `AdaptiveChunkBehavior`
+
+Actions for adaptive chunk sizing.
+
+The adaptive chunking system classifies each chunk by size and determines
+the appropriate action:
+
+- KEEP: Chunk is within acceptable range, use as-is
+- MERGE: Chunk is too small, should combine with neighbors
+- TRY_CHILDREN: Chunk exceeds optimal, try semantic split first
+- FORCE_SPLIT: Chunk exceeds hard limit, must split mechanically
+
+## Class: `BaseChunker`
+
+Base class for chunkers.
+
+### Method: `chunk`
+
+```python
+chunk()
+```
+
+Chunk the given content into code chunks using `self._governor` settings.
+
+Args:
+    content: The text content to chunk.
+    file: The DiscoveredFile object containing file metadata and source_id.
+    context: Additional context for chunking.
+
+Returns:
+    List of CodeChunk objects with source_id from the DiscoveredFile.
+
+## Class: `BinaryFileError`
+
+Binary or non-text content detected in file.
+
+Raised when the chunking system encounters binary data that cannot be
+processed as text. This prevents corruption and ensures only appropriate
+content enters the semantic search index.
+
+Binary files should be filtered during discovery, but this exception
+provides a safety net for edge cases.
+
+## Class: `Boundary`
+
+A complete delimiter boundary (start + end matched).
+
+Represents a fully matched delimiter pair, defining a chunk boundary with
+both start and end positions. Boundaries are used to extract chunk content
+and metadata.
+
+Attributes:
+    start: Character position of boundary start
+    end: Character position of boundary end
+    delimiter: The delimiter that defines this boundary
+    nesting_level: Depth of nesting for this boundary (0 = top level)
+
+Raises:
+    ValueError: If start &gt;= end (invalid boundary)
+
+Example:
+    &gt;&gt;&gt; boundary = Boundary(start=0, end=100, delimiter=my_delimiter, nesting_level=0)
+    &gt;&gt;&gt; boundary.length
+    100
+
+## Class: `ChangeImpact`
+
+Classification of configuration change impact on index validity.
+
+Defines how configuration changes affect the need for reindexing operations.
+Each level represents increasingly severe impacts requiring different handling strategies.
+
+## Class: `CheckpointManager`
+
+Manages checkpoint save/load operations for indexing pipeline.
+
+PURE state management. No default configuration fetching.
+
+This manager now includes unified compatibility checking that bridges:
+- CheckpointSettingsFingerprint (new family-aware comparison)
+- IndexingCheckpoint.matches_settings() (existing validation)
+
+### Method: `delete`
+
+```python
+delete()
+```
+
+Delete checkpoint file.
+
+### Method: `is_index_valid_for_config`
+
+```python
+is_index_valid_for_config()
+```
+
+Unified compatibility check connecting fingerprint and checkpoint logic.
+
+This method bridges the gap between:
+- CheckpointSettingsFingerprint (new family-aware comparison)
+- IndexingCheckpoint.matches_settings() (existing validation)
+
+It implements family-aware compatibility checking for asymmetric embedding
+configurations while maintaining backward compatibility with existing
+checkpoint validation logic.
+
+Args:
+    checkpoint: Existing indexing checkpoint
+    new_config: New embedding configuration to check against
+
+Returns:
+    Tuple of (is_valid: bool, impact: ChangeImpact)
+    - is_valid: True if checkpoint can be reused with new config
+    - impact: Classification of the configuration change impact
+
+### Method: `load`
+
+```python
+load()
+```
+
+Load checkpoint from disk if available.
+
+### Method: `save`
+
+```python
+save()
+```
+
+Save checkpoint to disk.
+
+## Class: `CheckpointSettingsFingerprint`
+
+Family-aware configuration fingerprint for checkpoint compatibility checking.
+
+This dataclass captures the critical configuration elements that determine whether
+an existing index can be reused. It supports asymmetric embedding configurations
+where query models can change without invalidating the index if they stay within
+the same model family.
+
+Attributes:
+    embedding_config_type: Whether config is "symmetric" or "asymmetric"
+    embed_model: Document embedding model name
+    embed_model_family: Model family ID for compatibility checks (optional)
+    query_model: Query embedding model name (required for asymmetric configs)
+    sparse_model: Sparse embedding model name (optional)
+    vector_store: Vector store provider name
+    config_hash: Hash of full configuration for validation
+
+### Method: `is_compatible_with`
+
+```python
+is_compatible_with()
+```
+
+Check compatibility and classify change impact with family-aware logic.
+
+Implements comprehensive compatibility checking that handles:
+- Asymmetric embedding configs with model families
+- Symmetric embedding model changes
+- Sparse model changes
+- Vector store changes
+
+For asymmetric configs:
+- Same family + same embed model + different query model = COMPATIBLE
+- Different families or embed models = BREAKING
+
+For symmetric configs:
+- Different model = BREAKING
+
+Args:
+    other: The other fingerprint to compare against (typically from checkpoint)
+
+Returns:
+    Tuple of (is_compatible: bool, impact: ChangeImpact)
+
+## Class: `CheckpointSettingsMap`
+
+Subset of settings relevant for checkpoint hashing.
+
+This is the complete settings map used for hash generation, distinct from
+the CheckpointSettingsFingerprint which is used for compatibility checking.
+
+## Class: `ChunkGovernor`
+
+Configuration for chunking behavior.
+
+### Method: `classify_chunk_size`
+
+```python
+classify_chunk_size()
+```
+
+Determine what action to take for a chunk of given size.
+
+Args:
+    tokens: Estimated token count of the chunk
+
+Returns:
+    AdaptiveChunkBehavior indicating the recommended action:
+    - MERGE: tokens &lt; floor_tokens (too small, combine with neighbors)
+    - KEEP: floor_tokens &lt;= tokens &lt;= acceptable_max_tokens (good size)
+    - TRY_CHILDREN: acceptable_max_tokens &lt; tokens &lt;= chunk_limit (try semantic split)
+    - FORCE_SPLIT: tokens &gt; chunk_limit (must split mechanically)
+
+### Method: `from_settings`
+
+```python
+from_settings()
+```
+
+Create a ChunkGovernor from ChunkerSettings.
+
+Args:
+    settings: The ChunkerSettings to create the governor from.
+
+Returns:
+    A ChunkGovernor instance.
+
+## Class: `ChunkLimitExceededError`
+
+File produced more chunks than the configured maximum.
+
+Raised when a single file generates an excessive number of chunks,
+potentially indicating overly aggressive chunking or pathological input.
+This limit prevents resource exhaustion and index bloat.
+
+Exceeding chunk limits typically suggests the file should be processed
+differently or excluded from semantic search.
+
+## Class: `ChunkResult`
+
+Result from migrating a chunk.
+
+## Class: `ChunkerSelector`
+
+Selects appropriate chunker based on file language and capabilities.
+
+The selector uses language detection from file extensions to determine which
+chunking strategy to employ. It prefers semantic (AST-based) chunking for
+supported languages and gracefully falls back to delimiter-based chunking
+when semantic parsing fails or the language is unsupported.
+
+Attributes:
+    governor: ChunkGovernor instance providing resource limits and configuration
+
+Examples:
+    Basic usage with file discovery:
+
+    &gt;&gt;&gt; from codeweaver.engine.chunker.base import ChunkGovernor
+    &gt;&gt;&gt; from codeweaver.core import DiscoveredFile
+    &gt;&gt;&gt; from pathlib import Path
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; governor = ChunkGovernor(capabilities=(...))
+    &gt;&gt;&gt; selector = ChunkerSelector(governor)
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # Select chunker for a Python file
+    &gt;&gt;&gt; file = DiscoveredFile.from_path(Path("script.py"))
+    &gt;&gt;&gt; chunker = selector.select_for_file(file)
+    &gt;&gt;&gt; # Returns SemanticChunker for Python
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # Process the file
+    &gt;&gt;&gt; chunks = chunker.chunk(file.path.read_text(), file_path=file.path)
+
+Selection Algorithm:
+    1. Detect language from file extension using SemanticSearchLanguage
+    2. If language is in SemanticSearchLanguage enum:
+       - Attempt to create SemanticChunker
+       - On ParseError or NotImplementedError, log warning and fall back
+    3. Fall back to DelimiterChunker
+    4. Return fresh chunker instance (never reused across files)
+
+### Method: `select_for_file`
+
+```python
+select_for_file()
+```
+
+Select best chunker for given file (creates fresh instance).
+
+Analyzes the file's extension to determine the appropriate chunking
+strategy. Always creates a new chunker instance to ensure isolation
+between file operations.
+
+Args:
+    file: DiscoveredFile with path attribute for language detection
+
+Returns:
+    Fresh BaseChunker instance appropriate for file's language.
+    Returns SemanticChunker for supported languages or
+    DelimiterChunker for unsupported languages.
+
+Notes:
+    - Each call creates a new chunker instance (no reuse)
+    - Falls back to DelimiterChunker for unsupported languages
+    - Falls back to delimiter chunking on semantic parse errors
+    - Logs warnings when fallback occurs
+    - Checks max_file_size_mb from settings before chunking
+
+Examples:
+    &gt;&gt;&gt; from pathlib import Path
+    &gt;&gt;&gt; from codeweaver.core import DiscoveredFile
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; file = DiscoveredFile.from_path(Path("example.py"))
+    &gt;&gt;&gt; chunker1 = selector.select_for_file(file)
+    &gt;&gt;&gt; chunker2 = selector.select_for_file(file)
+    &gt;&gt;&gt; assert chunker1 is not chunker2  # Fresh instances
+
+### Method: `select_for_file_path`
+
+```python
+select_for_file_path()
+```
+
+Select best chunker for given file path (convenience method).
+
+Creates a DiscoveredFile from the path and delegates to select_for_file.
+This is a convenience method for when you only have a Path object.
+
+Args:
+    file_path: Path to the file (Path object or path-like)
+
+Returns:
+    Fresh BaseChunker instance appropriate for file's language.
+
+Examples:
+    &gt;&gt;&gt; from pathlib import Path
+    &gt;&gt;&gt; file_path = Path("example.py")
+    &gt;&gt;&gt; chunker = selector.select_for_file_path(file_path)
+
+## Class: `ChunkerSettings`
+
+Configuration for chunker system.
+
+You can use these settings to customize how CodeWeaver chunks files for indexing, and to add support for custom languages or delimiters.
+
+Note: If you're adding support for another language, we'd love you to open a pull request to add it to our built-in language definitions! See `codeweaver.core` and `codeweaver.engine` for more details.
+
+### Method: `ensure_models_rebuilt`
+
+```python
+ensure_models_rebuilt()
+```
+
+Ensure forward references are resolved before first use.
+
+This method must be called at module level after all class definitions
+to resolve forward references to LanguageFamily and DelimiterPattern types
+used in CustomLanguage and CustomDelimiter models.
+
+### Method: `model_post_init`
+
+```python
+model_post_init()
+```
+
+Post-initialization hook.
+
+## Class: `ChunkerSettingsDict`
+
+TypedDict for Chunker settings.
+
+Not intended to be used directly; used for internal type checking and validation.
+
+## Class: `ChunkingError`
+
+Base exception for all chunking operation failures.
+
+This exception serves as the root of the chunking exception hierarchy
+and should be caught when handling any chunking-related errors generically.
+
+Attributes:
+    message: Human-readable error description
+    details: Additional context about the failure
+    suggestions: Actionable guidance for resolving the error
+
+## Class: `ChunkingService`
+
+Service for chunking discovered files with parallel processing support.
+
+### Method: `chunk_file`
+
+```python
+chunk_file()
+```
+
+Chunk a single file.
+
+### Method: `chunk_files`
+
+```python
+chunk_files()
+```
+
+Chunk multiple files with optional parallel processing.
+
+## Class: `ChunkingTimeoutError`
+
+Chunking operation exceeded the configured time limit.
+
+Raised when processing a file takes longer than the maximum allowed
+duration. This typically indicates pathological input, performance issues,
+or misconfigured timeout settings.
+
+The system enforces timeouts to prevent resource exhaustion and ensure
+responsive operation across large codebases.
+
+## Class: `CodeWeaverEngineSettings`
+
+Root settings wrapper for engine-only installation.
+
+When only the engine package is installed (with core and providers),
+this provides configuration for indexing and chunking operations. The config structure is identical to CodeWeaverSettings, but without server-specific settings.
+
+Configuration structure:
+    ```toml
+    [indexer]
+    batch_size = 100
+    parallel_workers = 4
+
+    [chunker]
+    max_chunk_size = 1000
+    overlap = 200
+
+    [provider]
+    embedding.provider = "voyage"
+    embedding.model_name = "voyage-code-3"
+
+    [logging]
+    level = "INFO"
+    ```
+
+Note:
+    This is the root settings class for engine-only installations.
+    When the full server package is installed, CodeWeaverSettings
+    should be used instead, which nests IndexerSettings and
+    ChunkerSettings under their respective fields.
+
+## Class: `ConcurrencySettings`
+
+Concurrency configuration.
+
+## Class: `ConcurrencySettingsDict`
+
+TypedDict for concurrency settings.
+
+Not intended to be used directly; used for internal type checking and validation.
+
+## Class: `ConfigChangeAnalysis`
+
+Results of configuration change analysis.
+
+## Class: `ConfigChangeAnalyzer`
+
+Analyzes configuration changes for compatibility with policy enforcement.
+
+Integrates with the collection policy system to enforce configuration change
+restrictions before analyzing compatibility. Policy validation happens before
+technical compatibility checks.
+
+ARCHITECTURE NOTE: This is a PLAIN CLASS with no DI in constructor.
+Factory function in engine/dependencies.py handles DI integration.
+
+### Method: `analyze_config_change`
+
+```python
+analyze_config_change()
+```
+
+Comprehensive config change analysis with policy enforcement and impact classification.
+
+Validates configuration changes against collection policy before performing
+technical compatibility analysis. Policy enforcement happens first to ensure
+changes are allowed before analyzing their technical impact.
+
+Args:
+    old_fingerprint: Existing checkpoint fingerprint
+    new_config: New embedding configuration
+    vector_count: Number of vectors in collection
+
+Returns:
+    Detailed analysis with impact classification and recommendations
+
+Note:
+    Policy validation occurs before compatibility checks. A STRICT policy
+    may block changes that would otherwise be technically compatible.
+
+### Method: `analyze_current_config`
+
+```python
+analyze_current_config()
+```
+
+Analyze current config against existing collection.
+
+Returns:
+    Analysis result, or None if no collection exists yet.
+
+### Method: `validate_config_change`
+
+```python
+validate_config_change()
+```
+
+Validate config change before applying (proactive validation).
+
+Called by `cw config set` command for early warning.
+
+Args:
+    key: Configuration key being changed (e.g., "provider.embedding.dimension")
+    value: New value for the key
+
+Returns:
+    Analysis result if change affects index validity, None otherwise
+
+## Class: `CustomDelimiter`
+
+A custom delimiter for separating multiple prompts in a single input string. If you only want to define a new language and extensions but not a delimiter, use the `CustomLanguage` class instead.
+
+### Method: `validate_instance`
+
+```python
+validate_instance()
+```
+
+Validate the instance after initialization.
+
+## Class: `CustomLanguage`
+
+A custom programming language for language specific parsing.
+
+By default, CodeWeaver only indexes extensions it recognizes. There are a lot (~170 languages and 200+ extensions) but not everything. If you want it to index files with extensions it doesn't recognize, you can define a custom language here. You only need to do this if you **don't** want to define a custom delimiter for your language. CodeWeaver will try to detect the best chunking strategy for your language, and will probably do a decent job, but if you want to define custom delimiters, use the `CustomDelimiter` class instead.
+
+## Class: `DefaultExtensionFilter`
+
+Filter with a default excluded extension set augmented by provided ones.
+
+## Class: `DefaultFilter`
+
+A default filter that ignores common unwanted files and directories.
+
+## Class: `Delimiter`
+
+Concrete delimiter definition with semantic metadata.
+
+Represents a specific delimiter pattern that can be used for code chunking.
+Delimiters define start/end patterns along with semantic classification and
+processing rules.
+
+Attributes:
+    start: Start delimiter pattern
+    end: End delimiter pattern
+    kind: Semantic classification of the delimiter
+    priority: Processing priority (higher values processed first)
+    inclusive: Whether to include delimiters in chunk content
+    take_whole_lines: Whether to expand chunks to line boundaries
+    nestable: Whether this delimiter can nest within itself
+
+Example:
+    &gt;&gt;&gt; delimiter = Delimiter(
+    ...     start="def ",
+    ...     end=":",
+    ...     kind=DelimiterKind.FUNCTION,
+    ...     priority=70,
+    ...     inclusive=True,
+    ...     take_whole_lines=True,
+    ...     nestable=True,
+    ... )
+
+### Method: `from_pattern`
+
+```python
+from_pattern()
+```
+
+Expand pattern to concrete delimiters.
+
+Converts a DelimiterPattern (which may specify multiple start/end combinations)
+into a list of concrete Delimiter instances.
+
+Args:
+    pattern: The delimiter pattern to expand
+
+Returns:
+    List of Delimiter instances, one per start/end combination
+
+Example:
+    &gt;&gt;&gt; from codeweaver.engine.chunker.delimiters import DelimiterPattern
+    &gt;&gt;&gt; pattern = DelimiterPattern(
+    ...     starts=["if", "while"], ends=[":", "then"], kind=DelimiterKind.CONDITIONAL
+    ... )
+    &gt;&gt;&gt; delimiters = Delimiter.from_pattern(pattern)
+    &gt;&gt;&gt; len(delimiters)
+    4  # 2 starts * 2 ends
+
+## Class: `DelimiterChunker`
+
+Pattern-based chunker using delimiter pairs.
+
+Extracts code chunks based on delimiter patterns (braces, parentheses, etc.)
+with support for nesting and priority-based overlap resolution.
+
+Algorithm:
+    Phase 1: Match Detection - Find all delimiter occurrences
+    Phase 2: Boundary Extraction - Match starts with ends, handle nesting
+    Phase 3: Priority Resolution - Keep highest-priority non-overlapping boundaries
+
+Attributes:
+    _delimiters: List of delimiter patterns for the target language
+    _language: Programming language being processed
+
+Example:
+    &gt;&gt;&gt; from codeweaver.engine.chunker.base import ChunkGovernor
+    &gt;&gt;&gt; governor = ChunkGovernor(chunk_limit=1000)
+    &gt;&gt;&gt; chunker = DelimiterChunker(governor, language="python")
+    &gt;&gt;&gt; chunks = chunker.chunk("def foo():\n    pass")
+
+### Method: `chunk`
+
+```python
+chunk()
+```
+
+Chunk content using delimiter patterns.
+
+Implements complete delimiter chunking with edge case handling and
+size constraint enforcement.
+
+Args:
+    content: Source code to chunk
+    file: Optional DiscoveredFile with metadata and source_id
+    context: Optional additional context
+
+Returns:
+    List of CodeChunk objects
+
+Raises:
+    BinaryFileError: If content contains binary data
+    ChunkLimitExceededError: If chunk count exceeds governor limit
+    OversizedChunkError: If individual chunks exceed token limit
+    ParseError: If delimiter matching fails
+
+## Class: `DelimiterMatch`
+
+A matched delimiter occurrence in source code.
+
+Represents a single delimiter match found during scanning, tracking its
+position and nesting context. Matches are paired during boundary extraction
+to form complete Boundary objects.
+
+Attributes:
+    delimiter: The delimiter that was matched
+    start_pos: Character position of the match start
+    end_pos: Character position of the match end (None for start delimiters)
+    nesting_level: Depth of nesting at this match (0 = top level)
+
+Example:
+    &gt;&gt;&gt; match = DelimiterMatch(
+    ...     delimiter=my_delimiter, start_pos=42, end_pos=None, nesting_level=0
+    ... )
+    &gt;&gt;&gt; match.is_start
+    True
+
+## Class: `ExtensionFilter`
+
+Filter files by extension on top of the default directory/path ignores.
+
+## Class: `FailoverDetector`
+
+Abstract interface for detecting whether failover should be disabled.
+
+This abstraction breaks the circular dependency between FailoverSettings
+and ProviderSettings by inverting the dependency. FailoverSettings depends
+on this abstract interface, while concrete implementations depend on
+ProviderSettings.
+
+The detector pattern follows the Dependency Inversion Principle (SOLID),
+allowing high-level failover logic to remain independent of provider
+configuration details.
+
+### Method: `should_disable_failover`
+
+```python
+should_disable_failover()
+```
+
+Determine whether failover should be automatically disabled.
+
+Returns:
+    True if failover should be disabled based on provider configuration,
+    False otherwise.
+
+## Class: `FailoverService`
+
+Coordinates failover between primary and backup vector stores.
+
+Responsibilities:
+- Monitor primary store health
+- Activate backup when primary fails
+- Sync backup periodically
+- Restore to primary when recovered
+
+### Method: `start_monitoring`
+
+```python
+start_monitoring()
+```
+
+Start health monitoring and automatic failover.
+
+Note: Backup maintenance removed in Phase 2 - new three-phase maintenance loop
+(in indexing service) handles vector reconciliation and snapshots.
+
+## Class: `FailoverSettings`
+
+Settings for vector store failover and service resilience.
+
+CodeWeaver's backup system is intelligent in that it only activates if you may need it. It is automatically disabled if:
+  - Your configured embedding provider is local.
+  - Your vector store provider is local.
+
+## Features
+
+- **Reranking**. Automatically injects a backup local reranking model, which is simply accessed at query time if the primary model is unavailable. This is *always* on.
+- **Backup Vectors**. If your embedding provider is remote, and your vector store is local, the system will add a backup vector to each stored point using the backup local model, ensuring that queries can still be served even if the primary embedding provider is unavailable. The system will automatically manage the synchronization of these backup vectors (it simply checks if all expected vectors are on all points and adds any missing ones).
+- **Write-Ahead Logging (WAL)**. If your embedding provider is remote, it uses write-ahead-logging (WAL) to store a local copy of the vectors each time it writes to the primary store. This uses Qdrant's built-in ability to use vectors stored in a directory using RocksDB. When the primary returns, the system will reconcile the local WAL with the primary store to ensure consistency.
+- **Resolves Asymmetric Models**. If your embedding model is capable of asymmetric retrieval (currently only `voyage-4` series models), the system will automatically switch from your primary to a locally compatible model (for voyage-4 series, `voyage-4-nano`). Since embeddings are compatible across these models, you can continue to retrieve and generate new embeddings without interruption, albeit at a slight loss of accuracy for generated embeddings assuming your primary is `voyage-4-large` (about 6 points on RTEB-Code from 86 to 80, which is still better than any other currently available alternative). The advantage here is that you don't need to generate and keep a third set of embeddings for the local model (the second being your sparse embeddings).
+
+## Class: `FailoverSettingsDict`
+
+TypedDict for failover settings.
+
+## Class: `FileManifestEntry`
+
+Single file entry in the manifest.
+
+## Class: `FileManifestManager`
+
+Manages file manifest save/load operations.
+
+PURE state management.
+
+### Method: `create_new`
+
+```python
+create_new()
+```
+
+Create a new empty manifest.
+
+### Method: `delete`
+
+```python
+delete()
+```
+
+Delete manifest file.
+
+### Method: `load`
+
+```python
+load()
+```
+
+Load manifest from disk if available.
+
+### Method: `save`
+
+```python
+save()
+```
+
+Save manifest to disk.
+
+## Class: `FileManifestStats`
+
+Statistics about the file manifest.
+
+## Class: `FileWatchingService`
+
+Service that monitors file system changes and triggers indexing updates.
+
+### Method: `run`
+
+```python
+run()
+```
+
+Run the file watcher.
+
+This performs an initial index check (via IndexingService) and then starts
+watching for changes.
+
+### Method: `update_logging`
+
+```python
+update_logging()
+```
+
+Update watchfiles logging configuration.
+
+## Class: `FilteredPaths`
+
+Tuple of included and excluded file paths.
+
+### Method: `from_settings`
+
+```python
+from_settings()
+```
+
+Resolve included and excluded files based on filter settings.
+
+Resolves glob patterns for include and exclude paths, filtering includes for excluded extensions.
+
+If a file is specifically included in the `forced_includes`, it will not be excluded even if it matches an excluded extension or excludes.
+
+"Specifically included" means that it was defined directly in the `forced_includes`, and **not** as a glob pattern.
+
+This constructor is async so that it can resolve quietly in the background without slowing initialization.
+
+## Class: `GracefulChunker`
+
+Wraps chunker with graceful degradation to fallback.
+
+This wrapper implements a fallback pattern where a primary chunker is
+attempted first, and on any failure a fallback chunker is used instead.
+This enables robust chunking with seamless degradation from sophisticated
+strategies (semantic) to simpler ones (delimiter, text splitting).
+
+Attributes:
+    primary: First chunker to attempt
+    fallback: Backup chunker to use on primary failure
+
+Examples:
+    Wrapping semantic chunker with delimiter fallback:
+
+    &gt;&gt;&gt; from codeweaver.engine.chunker.semantic import SemanticChunker
+    &gt;&gt;&gt; from codeweaver.engine.chunker.delimiter import DelimiterChunker
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; primary = SemanticChunker(governor, SemanticSearchLanguage.PYTHON)
+    &gt;&gt;&gt; fallback = DelimiterChunker(governor, LanguageFamily.C_LIKE)
+    &gt;&gt;&gt; chunker = GracefulChunker(primary, fallback)
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # This will try semantic first, fall back on error
+    &gt;&gt;&gt; chunks = chunker.chunk(content, file_path=path)
+
+Error Handling:
+    - Catches all exceptions from primary chunker
+    - Logs warning with error details
+    - Attempts fallback chunker
+    - Propagates fallback chunker exceptions (no double-fallback)
+
+### Method: `chunk`
+
+```python
+chunk()
+```
+
+Try primary chunker, fall back on error.
+
+## Class: `IgnoreFilter`
+
+A filter that uses rignore to exclude files based on .gitignore and other rules.
+
+`IgnoreFilter` can be initialized with either:
+- An `rignore.Walker` instance, which is a pre-configured walker that
+  applies ignore rules.
+- A `base_path` and `settings` dictionary to create a new `rignore.Walker`.
+
+The filter checks if a file should be included based on the rules defined
+in the walker. It caches results to avoid redundant checks for previously
+seen paths.
+
+### Method: `from_settings`
+
+```python
+from_settings()
+```
+
+Create an IgnoreFilter instance from settings (sync version).
+
+Note: This method cannot set inc_exc patterns asynchronously.
+Use from_settings_async() for proper async initialization, or
+manually configure the walker's inc_exc patterns after creation.
+
+Args:
+    project_path: The resolved project path dependency
+    index_settings: The resolved indexer settings dependency
+
+Returns:
+    Configured IgnoreFilter instance (may need async initialization)
+
+### Method: `from_settings_async`
+
+```python
+from_settings_async()
+```
+
+Create an IgnoreFilter instance from settings with full async initialization.
+
+This method properly awaits all async operations including inc_exc pattern setting.
+Recommended over from_settings() for production use.
+
+Args:
+    settings: Optional settings dictionary
+
+Returns:
+    Fully initialized IgnoreFilter instance
+
+## Class: `IndexFileManifest`
+
+Persistent manifest of indexed files for incremental indexing.
+
+### Method: `add_file`
+
+```python
+add_file()
+```
+
+Add or update a file in the manifest.
+
+### Method: `add_files_batch`
+
+```python
+add_files_batch()
+```
+
+Add or update multiple files in the manifest in a single operation.
+
+Args:
+    entries: List of dicts, each containing:
+        - path: Path object (relative)
+        - content_hash: BlakeHashKey
+        - chunk_ids: list[str]
+        - dense_embedding_provider: str | None (optional)
+        - dense_embedding_model: str | None (optional)
+        - sparse_embedding_provider: str | None (optional)
+        - sparse_embedding_model: str | None (optional)
+        - has_dense_embeddings: bool (optional)
+        - has_sparse_embeddings: bool (optional)
+
+### Method: `file_changed`
+
+```python
+file_changed()
+```
+
+Check if file content has changed.
+
+### Method: `file_needs_reindexing`
+
+```python
+file_needs_reindexing()
+```
+
+Check if file needs reindexing.
+
+### Method: `get_all_chunk_ids`
+
+```python
+get_all_chunk_ids()
+```
+
+Get all chunk IDs from all files in the manifest.
+
+Returns:
+    Set of all chunk IDs across all files
+
+### Method: `get_all_file_paths`
+
+```python
+get_all_file_paths()
+```
+
+Get set of all file paths in the manifest.
+
+### Method: `get_chunk_ids_for_file`
+
+```python
+get_chunk_ids_for_file()
+```
+
+Get chunk IDs for a specific file.
+
+Args:
+    path: Path to the file
+
+Returns:
+    List of chunk IDs, empty list if file not found
+
+### Method: `get_embedding_model_info`
+
+```python
+get_embedding_model_info()
+```
+
+Get embedding model information for a file.
+
+Args:
+    path: Path to the file
+
+Returns:
+    Dict with embedding model info, empty dict if file not found
+
+### Method: `get_file`
+
+```python
+get_file()
+```
+
+Get manifest entry for a file.
+
+### Method: `get_files_by_embedding_config`
+
+```python
+get_files_by_embedding_config()
+```
+
+Get files matching embedding configuration criteria.
+
+Args:
+    has_dense: Filter by dense embedding presence (None = don't filter)
+    has_sparse: Filter by sparse embedding presence (None = don't filter)
+
+Returns:
+    Set of file paths matching the criteria
+
+### Method: `get_files_needing_embeddings`
+
+```python
+get_files_needing_embeddings()
+```
+
+Get files that need embeddings added.
+
+Categorizes files by what type of embeddings they need:
+- dense_only: Files needing dense embeddings (processed first)
+- sparse_only: Files needing sparse embeddings (but not dense)
+
+Args:
+    current_dense_provider: Currently configured dense provider
+    current_dense_model: Currently configured dense model
+    current_sparse_provider: Currently configured sparse provider
+    current_sparse_model: Currently configured sparse model
+
+Returns:
+    Dict with 'dense_only' and 'sparse_only' keys containing sets of file paths
+
+### Method: `get_stats`
+
+```python
+get_stats()
+```
+
+Get manifest statistics.
+
+### Method: `has_file`
+
+```python
+has_file()
+```
+
+Check if file exists in manifest.
+
+### Method: `remove_file`
+
+```python
+remove_file()
+```
+
+Remove a file from the manifest.
+
+## Class: `IndexerSettings`
+
+Settings for indexing and file filtering.
+
+## How File Filtering Works
+
+CodeWeaver uses the `rignore` library (a Python wrapper for Rust's `ignore` crate) to
+efficiently walk directories while respecting various ignore rules. The filtering
+happens in this order:
+
+1. **Override patterns** (highest priority): Whitelist patterns for tooling dirs,
+   ignore patterns for excluded dirs (note: any positive whitelist here -- meaning not beginning with a `!` -- is treated as an *only* -- files not matching them will be ignored entirely.)
+2. **Ignore files**: .gitignore, .ignore, .git/info/exclude, global gitignore
+3. **Hidden files**: Files/dirs starting with . are ignored by default
+4. **Extension filter**: Only files with known extensions are included
+
+## Default Behavior
+
+With default settings, CodeWeaver will:
+- Respect .gitignore files (including parent directories and global gitignore)
+- Ignore hidden files and directories
+- Include .github, .circleci, and common tooling dirs (.vscode, .claude, etc.)
+- Exclude common build/cache dirs (node_modules, __pycache__, .git, etc.)
+- Only index files with known extensions (~360 supported file types)
+
+## Key Settings
+
+- `use_gitignore`: Respect .gitignore rules (default: True)
+- `ignore_hidden`: Ignore hidden files/dirs (default: True)
+- `include_tooling_dirs`: Whitelist common tooling dirs despite ignore_hidden (default: True)
+- `excludes`: Additional directories to exclude (default: common build/cache dirs)
+- `excluded_extensions`: File extensions to exclude (default: binaries, media, etc.)
+
+## Path Resolution
+
+All paths should be relative to the project root. CodeWeaver deconflicts paths:
+- Files in `forced_includes` are always included, even if they match excludes
+- Tooling directories are whitelisted via overrides, still respecting .gitignore
+- The `excludes` list is converted to ignore patterns
+
+### Method: `construct_filter`
+
+```python
+construct_filter()
+```
+
+Construct the filter function for rignore's `should_exclude_entry` parameter.
+
+Returns a function that returns True for paths that should be EXCLUDED.
+
+This filter:
+1. Allows directories to pass through (rignore handles dir filtering)
+2. Allows files in whitelisted tooling directories
+3. Excludes hidden files not in tooling directories (when ignore_hidden=True)
+4. Excludes files with explicitly excluded extensions
+5. Excludes files with extensions not in our known extensions list
+
+### Method: `model_post_init`
+
+```python
+model_post_init()
+```
+
+Post-initialization processing.
+
+### Method: `set_inc_exc`
+
+```python
+set_inc_exc()
+```
+
+Set that includes and excludes have been configured.
+
+### Method: `to_settings`
+
+```python
+to_settings()
+```
+
+Serialize to `RignoreSettings`.
+
+## Class: `IndexerSettingsDict`
+
+A serialized `IndexerSettings` object.
+
+## Class: `IndexingCheckpoint`
+
+Persistent checkpoint for indexing pipeline state.
+
+### Method: `current_settings_hash`
+
+```python
+current_settings_hash()
+```
+
+Compute Blake3 hash of current settings.
+
+### Method: `is_stale`
+
+```python
+is_stale()
+```
+
+Check if checkpoint is too old or settings mismatch.
+
+### Method: `matches_settings`
+
+```python
+matches_settings()
+```
+
+Check if checkpoint settings match current configuration.
+
+## Class: `IndexingErrorDict`
+
+Structured error information for failed file indexing.
+
+## Class: `IndexingPhase`
+
+Enum representing different phases of the indexing process.
+
+## Class: `IndexingProgressTracker`
+
+Pure state tracker for indexing progress.
+
+No UI code. Maintains IndexingStats and phase.
+
+### Method: `get_stats`
+
+```python
+get_stats()
+```
+
+Return the current stats.
+
+### Method: `update_phase`
+
+```python
+update_phase()
+```
+
+Update the current indexing phase.
+
+## Class: `IndexingProgressUI`
+
+Progress tracker UI for indexing operations with Rich visualizations.
+
+### Method: `display_summary`
+
+```python
+display_summary()
+```
+
+Display final summary.
+
+### Method: `start`
+
+```python
+start()
+```
+
+Start the progress tracking interface.
+
+### Method: `stop`
+
+```python
+stop()
+```
+
+Stop the progress tracking interface.
+
+### Method: `update`
+
+```python
+update()
+```
+
+Update progress based on current indexing statistics.
+
+## Class: `IndexingService`
+
+Orchestrates the indexing workflow.
+
+Responsibilities:
+- Coordinate file discovery → chunking → embedding → storage
+- Manage checkpointing at intervals
+- Update file manifest
+- Report progress
+
+### Method: `index_project`
+
+```python
+index_project()
+```
+
+Index the project codebase.
+
+Args:
+    force_reindex: If True, skip persistence checks and reindex everything
+    add_dense: Whether to add dense embeddings
+    add_sparse: Whether to add sparse embeddings
+    progress_callback: Optional granular progress callback
+
+Returns:
+    Number of files indexed
+
+### Method: `process_changes`
+
+```python
+process_changes()
+```
+
+Process a batch of file changes (incremental indexing).
+
+### Method: `reconcile_from_backup`
+
+```python
+reconcile_from_backup()
+```
+
+Reconcile primary index from backup store after failover recovery.
+
+This handles the "Smart Promote" logic:
+1. If models match, zero-cost copy vectors.
+2. If chunks are compatible (fit in context), reuse text and re-embed.
+3. If incompatible, fall back to standard indexing (via manifest status).
+
+## Class: `IndexingStats`
+
+Statistics tracking for indexing progress.
+
+### Method: `add_error`
+
+```python
+add_error()
+```
+
+Add a structured error to the tracking system.
+
+### Method: `elapsed_time`
+
+```python
+elapsed_time()
+```
+
+Calculate elapsed time since indexing started.
+
+### Method: `get_error_summary`
+
+```python
+get_error_summary()
+```
+
+Get summary of errors by phase and type.
+
+### Method: `human_elapsed_time`
+
+```python
+human_elapsed_time()
+```
+
+Get human-readable elapsed time.
+
+### Method: `processing_rate`
+
+```python
+processing_rate()
+```
+
+Files processed per second.
+
+### Method: `total_errors`
+
+```python
+total_errors()
+```
+
+Total number of files with errors.
+
+## Class: `InvalidStateTransitionError`
+
+Invalid state transition attempted.
+
+## Class: `LocalEmbeddingDetector`
+
+Detect whether to disable failover based on local embedding provider.
+
+This implementation disables failover when the primary embedding provider
+is local, as local providers don't require network failover mechanisms.
+
+The detector is registered with the DI container to provide the
+FailoverDetector interface, enabling automatic injection into consumers.
+
+### Method: `should_disable_failover`
+
+```python
+should_disable_failover()
+```
+
+Check if the primary embedding provider is local.
+
+Failover is automatically disabled when:
+- The embedding provider list is non-empty AND
+- The first (primary) embedding provider is marked as local
+
+If no embedding providers are configured (empty list), failover
+remains enabled as a safety measure.
+
+Returns:
+    True if the primary embedding provider is local and failover
+    should be disabled, False otherwise.
+
+## Class: `MigrationCheckpoint`
+
+Persistent checkpoint for migration state.
+
+## Class: `MigrationError`
+
+Base exception for migration errors.
+
+## Class: `MigrationResult`
+
+Results of migration operation.
+
+## Class: `MigrationService`
+
+Comprehensive migration service with parallel workers.
+
+ARCHITECTURE NOTE: This is a PLAIN CLASS with no DI in constructor.
+Factory function in engine/dependencies.py handles DI integration.
+
+Implements:
+- CRITICAL #3: Parallel processing with worker pool
+- CRITICAL #4: Data integrity validation (4 layers)
+- CRITICAL #5: Resume capability with checkpoints
+
+### Method: `migrate_dimensions_parallel`
+
+```python
+migrate_dimensions_parallel()
+```
+
+Main entry point for parallel dimension migration.
+
+Implements CRITICAL #3 (parallel processing), CRITICAL #4 (data integrity),
+and CRITICAL #5 (resume capability).
+
+Args:
+    new_dimension: Target dimension for migration
+    worker_count: Number of parallel workers (default: 4)
+    batch_size: Vectors per batch (default: 1000)
+    resume: Whether to resume from checkpoint (default: True)
+
+Returns:
+    MigrationResult with timing and statistics
+
+Raises:
+    ValidationError: Data integrity validation failed
+    MigrationError: Migration operation failed
+
+## Class: `MigrationState`
+
+Migration state machine states.
+
+State Transitions:
+    PENDING -&gt; IN_PROGRESS -&gt; COMPLETED -&gt; ROLLBACK -&gt; PENDING
+                            ↓
+                          FAILED -&gt; PENDING
+
+## Class: `OversizedChunkError`
+
+Chunk exceeds token limit after applying all reduction strategies.
+
+Raised when a code segment cannot be reduced below the maximum allowed
+token count even after applying aggressive chunking strategies. This
+typically indicates extremely dense or complex code that requires manual
+intervention or alternative processing approaches.
+
+The system has exhausted all automatic strategies including structural
+decomposition, overlap reduction, and content trimming.
+
+## Class: `ParseError`
+
+AST parsing failed for the provided source code.
+
+Raised when the parser cannot create an abstract syntax tree from the
+source file, typically due to syntax errors or unsupported language
+constructs. The system may fall back to alternative chunking strategies.
+
+Common causes include malformed code, encoding issues, or parser bugs.
+
+## Class: `PerformanceSettings`
+
+Performance and resource limit configuration.
+
+## Class: `PerformanceSettingsDict`
+
+TypedDict for performance settings.
+
+Not intended to be used directly; used for internal type checking and validation.
+
+## Class: `ProgressCallback`
+
+Protocol for progress callback functions.
+
+## Class: `QdrantSnapshotBackupService`
+
+Service for creating and managing Qdrant vector store snapshots.
+
+This service provides periodic snapshot creation for disaster recovery,
+with automatic retention management and support for local/cloud storage.
+
+Features:
+- Periodic snapshot creation
+- Automatic retention management (keep N most recent snapshots)
+- Local and cloud storage support
+- Graceful error handling
+- Integration with failover maintenance loop
+
+### Method: `cleanup_old_snapshots`
+
+```python
+cleanup_old_snapshots()
+```
+
+Delete old snapshots beyond retention count.
+
+Keeps the N most recent snapshots (configured by retention_count).
+
+Returns:
+    Dictionary with cleanup statistics:
+    - total: Total snapshots found
+    - kept: Number of snapshots retained
+    - deleted: Number of snapshots deleted
+    - failed: Number of deletion failures
+
+Example:
+    &gt;&gt;&gt; stats = await service.cleanup_old_snapshots()
+    &gt;&gt;&gt; print(f"Deleted &#123;stats['deleted']&#125; old snapshots")
+
+### Method: `create_snapshot`
+
+```python
+create_snapshot()
+```
+
+Create a new snapshot of the collection.
+
+Args:
+    wait: Whether to wait for snapshot creation to complete
+
+Returns:
+    Snapshot name if successful, None otherwise
+
+Example:
+    &gt;&gt;&gt; service = QdrantSnapshotBackupService(vector_store)
+    &gt;&gt;&gt; snapshot_name = await service.create_snapshot()
+    &gt;&gt;&gt; print(f"Created snapshot: &#123;snapshot_name&#125;")
+
+### Method: `delete_snapshot`
+
+```python
+delete_snapshot()
+```
+
+Delete a specific snapshot.
+
+Args:
+    snapshot_name: Name of the snapshot to delete
+
+Returns:
+    True if successfully deleted, False otherwise
+
+### Method: `get_latest_snapshot`
+
+```python
+get_latest_snapshot()
+```
+
+Get metadata for the most recent snapshot.
+
+Returns:
+    Snapshot metadata dictionary, or None if no snapshots exist
+
+### Method: `list_snapshots`
+
+```python
+list_snapshots()
+```
+
+List all available snapshots for the collection.
+
+Returns:
+    List of snapshot metadata dictionaries
+
+Example:
+    &gt;&gt;&gt; snapshots = await service.list_snapshots()
+    &gt;&gt;&gt; for snapshot in snapshots:
+    ...     print(f"&#123;snapshot['name']&#125;: &#123;snapshot['size']&#125; bytes")
+
+### Method: `restore_snapshot`
+
+```python
+restore_snapshot()
+```
+
+Restore the collection from a snapshot.
+
+WARNING: This operation replaces the entire collection with the snapshot state.
+
+Args:
+    snapshot_name: Name of the snapshot to restore
+    wait: Whether to wait for restore operation to complete
+
+Returns:
+    True if restore initiated successfully, False otherwise
+
+Example:
+    &gt;&gt;&gt; success = await service.restore_snapshot("snapshot_20250127_120000")
+    &gt;&gt;&gt; if success:
+    ...     print("Restore completed successfully")
+
+### Method: `snapshot_and_cleanup`
+
+```python
+snapshot_and_cleanup()
+```
+
+Create a new snapshot and clean up old ones.
+
+This is the main method for periodic snapshot maintenance.
+It combines snapshot creation and retention management.
+
+Args:
+    wait: Whether to wait for snapshot creation to complete
+
+Returns:
+    Dictionary with operation results:
+    - snapshot_created: Whether new snapshot was created successfully
+    - snapshot_name: Name of new snapshot (None if failed)
+    - cleanup_stats: Statistics from cleanup operation
+
+Example:
+    &gt;&gt;&gt; result = await service.snapshot_and_cleanup()
+    &gt;&gt;&gt; if result["snapshot_created"]:
+    ...     print(f"Created: &#123;result['snapshot_name']&#125;")
+    ...     print(f"Cleaned up: &#123;result['cleanup_stats']['deleted']&#125; old snapshots")
+
+## Class: `ReconciliationResult`
+
+Results from reconciliation operations.
+
+## Class: `RepairStats`
+
+Statistics for repair operations.
+
+## Class: `ResourceGovernor`
+
+Enforces resource limits during chunking operations.
+
+This context manager tracks operation timing and chunk counts to prevent
+resource exhaustion. It enforces two critical limits:
+
+1. **Timeout limit**: Maximum time allowed for chunking a single file
+2. **Chunk count limit**: Maximum chunks that can be generated per file
+
+The governor uses a context manager protocol to automatically initialize
+and clean up resource tracking. All resource checks are thread-safe through
+the use of instance-local state with no shared mutable data.
+
+Usage:
+    ```python
+    with ResourceGovernor(settings) as governor:
+        for node in nodes:
+            governor.check_timeout()  # Verify not timed out
+            chunk = create_chunk(node)
+            governor.register_chunk()  # Track and check limits
+    ```
+
+Attributes:
+    settings: Performance configuration containing timeout and limit values
+    _start_time: Timestamp when context manager was entered (None when inactive)
+    _chunk_count: Number of chunks registered in current operation
+
+Raises:
+    ChunkingTimeoutError: When operation exceeds configured timeout
+    ChunkLimitExceededError: When chunk count exceeds configured maximum
+
+### Method: `check_chunk_limit`
+
+```python
+check_chunk_limit()
+```
+
+Check if chunk count has exceeded configured limit.
+
+Compares current chunk count against maximum allowed per file.
+This prevents memory exhaustion and index bloat from pathological input.
+
+Raises:
+    ChunkLimitExceededError: When chunk count exceeds maximum
+
+### Method: `check_timeout`
+
+```python
+check_timeout()
+```
+
+Check if operation has exceeded timeout limit.
+
+Compares elapsed time against configured timeout threshold.
+Safe to call even if context manager is not active (no-op).
+
+Raises:
+    ChunkingTimeoutError: When elapsed time exceeds timeout_seconds
+
+### Method: `register_chunk`
+
+```python
+register_chunk()
+```
+
+Register a new chunk and enforce all resource limits.
+
+Increments the chunk counter and checks both timeout and chunk limits.
+This is the primary method to call after creating each chunk.
+
+Call this after successfully creating each chunk to maintain accurate
+resource tracking and enforcement.
+
+Raises:
+    ChunkingTimeoutError: If timeout limit exceeded
+    ChunkLimitExceededError: If chunk count limit exceeded
+
+## Class: `RignoreSettings`
+
+Settings for the rignore library.
+
+Maps to parameters of rignore.Walker. See https://pypi.org/project/rignore/
+
+Key parameters:
+- path: Root directory to walk
+- ignore_hidden: If True, ignore hidden files/directories (starting with .)
+- read_git_ignore: If True, respect .gitignore files
+- read_ignore_files: If True, respect .ignore files (ripgrep-style)
+- overrides: Glob patterns for whitelist/ignore. Plain patterns whitelist,
+             patterns starting with ! ignore (e.g., "**/.github/**" whitelists,
+             "!**/node_modules/**" ignores)
+- should_exclude_entry: Callback returning True to exclude a path
+
+## Class: `SemanticChunker`
+
+AST-based chunker with rich semantic metadata and intelligent deduplication.
+
+Provides semantic chunking for 26+ languages using tree-sitter grammars.
+Leverages sophisticated semantic analysis to extract meaningful code segments
+with importance scoring, classification metadata, and hierarchical tracking.
+
+The chunker applies multi-tiered token size management with graceful degradation:
+1. AST nodes within token limit → semantic chunks
+2. Oversized composite nodes → recursive child chunking
+3. Still oversized → delimiter-based fallback
+4. Last resort → return single chunk as-is (may exceed limit for indivisible content)
+
+Features:
+- Importance-weighted node filtering (default threshold: 0.3)
+- Content-based deduplication using Blake3 hashing
+- Comprehensive edge case handling (empty, binary, whitespace, single-line)
+- Resource governance (timeout and chunk count limits)
+- Rich metadata optimized for AI context delivery
+
+Attributes:
+    language: Target language for semantic parsing
+    _importance_threshold: Minimum importance score for node inclusion
+    _store: UUID store for chunk batches
+    _hash_store: BlakeStore[UUID7] = make_blake_store(
+
+### Method: `chunk`
+
+```python
+chunk()
+```
+
+Chunk content into semantic code segments with resource governance.
+
+Main entry point for semantic chunking. Handles edge cases, parses AST,
+filters nodes by importance, manages token limits, deduplicates content,
+and tracks metrics.
+
+Args:
+    content: Source code content to chunk
+    file: Optional DiscoveredFile with metadata and source_id
+    context: Optional additional context (currently unused)
+
+Returns:
+    List of CodeChunk objects with rich semantic metadata
+
+Raises:
+    BinaryFileError: If binary content detected in input
+    ParseError: If AST parsing fails for the content
+    ChunkingTimeoutError: If operation exceeds configured timeout
+    ChunkLimitExceededError: If chunk count exceeds configured maximum
+    ASTDepthExceededError: If AST nesting exceeds safe depth limit
+
+### Method: `clear_deduplication_stores`
+
+```python
+clear_deduplication_stores()
+```
+
+Clear class-level deduplication stores.
+
+This is primarily useful for testing to ensure clean state between test runs.
+In production, stores persist across chunking operations to detect duplicates
+across files within a session.
+
+## Class: `SourceIdRegistry`
+
+Maintains per-file source IDs to ensure span consistency within files.
+
+This registry ensures that all spans from the same file share the same source_id, enabling set-like span operations and clean merging/splitting.
+
+### Method: `clear`
+
+```python
+clear()
+```
+
+Clear the registry.
+
+### Method: `file_from_path`
+
+```python
+file_from_path()
+```
+
+Get the DiscoveredFile instance for a given file path.
+
+### Method: `remove`
+
+```python
+remove()
+```
+
+Remove a file from the registry.
+
+Args:
+    value: UUID7 source ID or DiscoveredFile instance to remove
+
+Returns:
+    True if the file was in the registry, False otherwise
+
+### Method: `source_id_for`
+
+```python
+source_id_for()
+```
+
+Get or create a source ID for the given file.
+
+Uses the DiscoveredFile's existing source_id instead of generating a new one.
+This ensures consistency across the codeweaver system where DiscoveredFile
+objects serve as the canonical source of truth for file identity.
+
+Args:
+    file: DiscoveredFile instance with existing source_id
+
+Returns:
+    Hex string (newtype) representation of the file's UUID7 source_id
+
+## Class: `StringParseState`
+
+State for tracking string boundaries during parsing.
+
+Attributes:
+    in_string: Whether currently inside a string literal
+    delimiter: The string delimiter character ('"', "'", or '`'), or None if not in string
+
+## Class: `TransformationDetails`
+
+Strongly typed transformation metadata (not dict!).
+
+## Class: `ValidationError`
+
+Data integrity validation failed.
+
+## Class: `VectorReconciliationService`
+
+Service for reconciling backup vectors in the vector store.
+
+This service ensures that all points have the required backup vectors for
+failover scenarios. It operates in two modes:
+
+1. Detection: Identify points missing backup vectors
+2. Repair: Generate and add missing backup vectors
+
+The service uses batch processing for efficiency and integrates with
+the failover maintenance loop for periodic execution.
+
+### Method: `cleanup`
+
+```python
+cleanup()
+```
+
+Cleanup service resources.
+
+### Method: `detect_missing_vectors`
+
+```python
+detect_missing_vectors()
+```
+
+Detect points missing backup vectors.
+
+This method scrolls through the collection and identifies points that
+don't have the backup vector field populated.
+
+Args:
+    collection_name: Name of collection to check
+    limit: Maximum number of missing points to detect (None = all)
+
+Returns:
+    List of point IDs missing backup vectors
+
+Example:
+    &gt;&gt;&gt; service = VectorReconciliationService(vector_store)
+    &gt;&gt;&gt; missing = await service.detect_missing_vectors("my_collection")
+    &gt;&gt;&gt; print(f"Found &#123;len(missing)&#125; points missing backup vectors")
+
+### Method: `reconcile`
+
+```python
+reconcile()
+```
+
+Perform full reconciliation: detect and optionally repair missing vectors.
+
+This is the main entry point for the reconciliation service. It detects
+points missing backup vectors and optionally repairs them.
+
+Args:
+    collection_name: Collection to reconcile
+    auto_repair: Whether to automatically repair detected issues
+    detection_limit: Maximum points to detect (None = all)
+
+Returns:
+    Dictionary with reconciliation results:
+    - detected: Number of points missing backup vectors
+    - repaired: Number of successfully repaired points
+    - failed: Number of points that failed to repair
+    - errors: List of error messages
+
+Example:
+    &gt;&gt;&gt; service = VectorReconciliationService(vector_store)
+    &gt;&gt;&gt; result = await service.reconcile("my_collection", auto_repair=True)
+    &gt;&gt;&gt; print(f"Detected: &#123;result['detected']&#125;, Repaired: &#123;result['repaired']&#125;")
+
+### Method: `repair_missing_vectors`
+
+```python
+repair_missing_vectors()
+```
+
+Repair points by generating and adding missing backup vectors.
+
+This method retrieves the points, generates backup embeddings from their
+content, and updates the vector store with the new backup vectors.
+
+Args:
+    collection_name: Name of collection containing points
+    point_ids: List of point IDs to repair
+
+Returns:
+    Dictionary with repair statistics:
+    - repaired: Number of successfully repaired points
+    - failed: Number of points that failed to repair
+    - errors: List of error messages encountered
+
+Example:
+    &gt;&gt;&gt; missing = await service.detect_missing_vectors("collection")
+    &gt;&gt;&gt; stats = await service.repair_missing_vectors("collection", missing)
+    &gt;&gt;&gt; print(f"Repaired: &#123;stats['repaired']&#125;, Failed: &#123;stats['failed']&#125;")
+
+## Class: `WatchfilesArgs`
+
+Arguments for watchfiles module.
+
+## Class: `WatchfilesLogManager`
+
+Manage watchfiles logging with filtering, routing, and Rich handler support.
+
+Integrates watchfiles logging output with CodeWeaver's logging infrastructure:
+- SerializableLoggingFilter for pattern-based filtering
+- Rich handler support via setup_logger
+- FastMCP context routing via log_to_client_or_fallback
+- Configurable log levels and output destinations
+
+### Method: `add_filter`
+
+```python
+add_filter()
+```
+
+Add or update filtering patterns.
+
+Args:
+    include_pattern: Only log messages matching this pattern
+    exclude_pattern: Exclude messages matching this pattern
+
+### Method: `clear_filters`
+
+```python
+clear_filters()
+```
+
+Remove all filters from the logger.
+
+### Method: `set_level`
+
+```python
+set_level()
+```
+
+Change the log level.
+
+Args:
+    level: New logging level (e.g., logging.DEBUG, logging.INFO)
+
+### Method: `update_context`
+
+```python
+update_context()
+```
+
+Update the FastMCP context for log routing.
+
+Args:
+    context: New FastMCP context or None to disable context routing
+
+## Class: `WorkItem`
+
+Work item for parallel migration.
+
+## Function: `chunk_files_parallel`
+
+```python
+chunk_files_parallel()
+```
+
+Chunk multiple files in parallel using process or thread pool.
+
+Distributes file chunking across multiple workers for efficient processing
+of large codebases. Uses an iterator pattern to yield results as they
+complete, preventing memory exhaustion from loading all chunks at once.
+
+Args:
+    files: List of DiscoveredFile objects to chunk
+    governor: ChunkGovernor providing resource limits and configuration
+    max_workers: Maximum number of parallel workers. If None, uses settings
+        from governor or defaults to CPU count. For process executor, limited
+        to available CPUs. For thread executor, can exceed CPU count.
+    executor_type: Type of executor to use - "process" or "thread" or None.
+        If None, uses settings from governor or defaults to "process".
+        Process-based is better for CPU-bound parsing, thread-based for I/O.
+    tokenizer: Optional tokenizer for accurate token counting
+
+Yields:
+    Tuples of (file_path, chunks) for successfully chunked files.
+    Files that fail to chunk are logged but not yielded.
+
+## Function: `detect_family_characteristics`
+
+```python
+detect_family_characteristics()
+```
+
+Analyze family characteristics in code sample.
+
+Provides detailed scoring breakdown for all families, useful for
+debugging classifier performance or understanding mixed-language files.
+
+Args:
+    content: Code sample to analyze
+
+Returns:
+    Dictionary mapping families to their characteristics:
+    - pattern_matches: Number of delimiter patterns found
+    - confidence: Normalized confidence score (0.0-1.0)
+    - weighted_score: Score weighted by pattern distinctiveness
+
+Example:
+    &gt;&gt;&gt; chars = detect_family_characteristics("function foo() &#123; &#125;")
+    &gt;&gt;&gt; chars[LanguageFamily.C_STYLE]["pattern_matches"]
+    4
+
+## Function: `detect_language_family`
+
+```python
+detect_language_family()
+```
+
+Detect language family from code sample asynchronously.
+
+Runs in a thread pool to avoid blocking the event loop.
+
+## Function: `expand_pattern`
+
+```python
+expand_pattern()
+```
+
+Expand a DelimiterPattern into concrete DelimiterDict entries.
+
+Generates all combinations of start/end delimiters specified in the pattern,
+with consistent semantic properties across all combinations.
+
+Args:
+    pattern: The delimiter pattern to expand
+
+Returns:
+    List of DelimiterDict entries, one per start/end combination
+
+Example:
+    &gt;&gt;&gt; pattern = DelimiterPattern(
+    ...     starts=["if", "while"], ends=[":", "then"], kind=DelimiterKind.CONDITIONAL
+    ... )
+    &gt;&gt;&gt; delims = expand_pattern(pattern)
+    &gt;&gt;&gt; len(delims)
+    4  # 2 starts * 2 ends
+    &gt;&gt;&gt; delims[0]["start"]
+    'if'
+    &gt;&gt;&gt; delims[0]["end"]
+    ':'
+
+## Function: `get_family_patterns`
+
+```python
+get_family_patterns()
+```
+
+Get delimiter patterns for a language family.
+
+Args:
+    family: The language family to get patterns for
+
+Returns:
+    List of DelimiterPattern objects for the family
+
+Example:
+    &gt;&gt;&gt; patterns = get_family_patterns(LanguageFamily.C_STYLE)
+    &gt;&gt;&gt; len(patterns) &gt; 10
+    True

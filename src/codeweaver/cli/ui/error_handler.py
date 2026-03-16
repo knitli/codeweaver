@@ -10,8 +10,8 @@ import sys
 
 from typing import TYPE_CHECKING
 
-from codeweaver.common import CODEWEAVER_PREFIX
-from codeweaver.exceptions import CodeWeaverError
+from codeweaver.core import CodeWeaverError
+from codeweaver.core.utils import get_codeweaver_prefix
 
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ class CLIErrorHandler:
         *,
         verbose: bool = False,
         debug: bool = False,
-        prefix: str = CODEWEAVER_PREFIX,
+        prefix: str | None = None,
     ) -> None:
         """Initialize error handler.
 
@@ -41,6 +41,8 @@ class CLIErrorHandler:
             debug: Enable debug error output (includes verbose)
             prefix: Prefix to use in messages
         """
+        if not prefix:
+            prefix: str = get_codeweaver_prefix()
         self.display = display
         self.verbose = verbose
         self.debug = debug

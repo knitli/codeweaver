@@ -2,7 +2,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-
+# $schema: https://www.schemastore.org/sourcery_yaml_schema.json
 rule_settings:
   enable:
     - default
@@ -13,26 +13,29 @@ rule_settings:
     - avoid-global-variables
     - docstrings-for-functions
     - don't-import-test-modules
-  python_version: "3.12"
+  python_version:
+    major: 3
+    minor: 12
   rule_types:
     - refactoring
     - suggestion
     - comment
 ignore:
   - .env
-  - .git
-  - .github
+  - .git/
+  - .github/
   - .tox
-  - .venv
+  - .venv/
   - /usr
-  - build
-  - dist
-  - docs
+  - build/
+  - dist/
+  - docs/
   - env
-  - external
-  - node_modules
+  - external/
+  - node_modules/
   - tox
-  - typings
-  - vendor
+  - typings/
+  - vendor/
   - welcome-to-sourcery.py
   - '*.pyi'
+  - tests/

@@ -13,33 +13,47 @@ from __future__ import annotations
 import os
 import sys
 
-from importlib.util import find_spec
 from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
-from urllib.parse import urlparse
 
 import cyclopts
 
 from cyclopts import App
-from pydantic import FilePath, ValidationError
+from pydantic import AnyUrl, FilePath, ValidationError
 from rich.table import Table
 
+from codeweaver.cli.dependencies import setup_cli_di
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.cli.utils import get_codeweaver_config_paths
-from codeweaver.common.utils.git import get_project_path, is_git_dir
-from codeweaver.core.types.sentinel import Unset
-from codeweaver.providers.provider import ProviderKind
+from codeweaver.cli.utils import check_provider_package_available
+from codeweaver.core import (
+    ProviderCategory,
+    SettingsMapDep,
+    get_codeweaver_config_paths,
+    get_project_path,
+    is_git_dir,
+)
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.di import INJECTED
+from codeweaver.core.types import UNSET, DictView
+from codeweaver.core.utils import has_package
+from codeweaver.engine import ConfigChangeAnalyzerDep
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.providers import ProviderSettings
-    from codeweaver.config.settings import CodeWeaverSettings
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core import Provider
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+    from codeweaver.providers import ProviderSettings
 
 
 # Module-level display for check functions
 _display: StatusDisplay = get_display()
+
+
+def _get_settings_map(settings: SettingsMapDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
+    """Get the settings map for CodeWeaver provider settings."""
+    return settings
 
 
 def _get_display() -> StatusDisplay:
@@ -213,17 +227,20 @@ def _identify_missing_dependencies(
         and match["name"]
         != "py-cpuinfo"  # it's technically required, but it's for optimizations; not strictly required
     ]
+    python_version = sys.version_info
+    if python_version >= (3, 14) and any(pkg[0] == "uuid_extensions" for pkg in required_packages):
+        required_packages = [pkg for pkg in required_packages if pkg[0] != "uuid_extensions"]
 
     for display_name, module_name, _version in required_packages:
-        if find_spec(module_name):
-            pkg_version = metadata.version(display_name)  # ty: ignore[unresolved-attribute]
+        if has_package(module_name):
+            pkg_version = metadata.version(display_name)
             installed.append((display_name, pkg_version))
         else:
             missing.append(display_name)
     return missing, installed
 
 
-def check_project_path(settings: CodeWeaverSettings) -> DoctorCheck:
+def check_project_path(settings: CodeWeaverSettingsType) -> DoctorCheck:
     """Check if project path exists and is accessible."""
     project_path = (
         settings.project_path if isinstance(settings.project_path, Path) else get_project_path()
@@ -260,16 +277,11 @@ def check_project_path(settings: CodeWeaverSettings) -> DoctorCheck:
     )
 
 
-def check_configuration_file(settings: CodeWeaverSettings | None = None) -> DoctorCheck:
+def check_configuration_file(settings: CodeWeaverSettingsType) -> DoctorCheck:
     """Check if configuration file exists and is valid."""
     check = DoctorCheck("Configuration File")
 
     try:
-        if settings is None:
-            from codeweaver.config.settings import get_settings
-
-            settings = get_settings()
-
         possible_config_locations = get_codeweaver_config_paths()
 
         # The function also checks for environment variable config file
@@ -278,8 +290,8 @@ def check_configuration_file(settings: CodeWeaverSettings | None = None) -> Doct
             check.message = f"Valid config at {found_config}"
         elif (
             settings.config_file
-            and not isinstance(settings.config_file, Unset)
-            and settings.config_file.exists()
+            and settings.config_file is not UNSET
+            and cast(Path, settings.config_file).exists()
         ):
             # Fallback to settings.config_file if set
             check.status = "✅"
@@ -345,7 +357,7 @@ async def _qdrant_running_at_url(url: Any | None = None) -> bool:
         return False
     else:
         return response.status_code == 200 and bool(
-            re.search(r'app_info\{name="qdrant"\}', response.text)
+            re.search(r'app_info{name="qdrant"}', response.text)
         )
 
 
@@ -353,13 +365,14 @@ type DeploymentType = Literal["local docker", "cloud", "local", "remote", "in-me
 
 
 async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
+    # sourcery skip: low-code-quality
     """Check vector store configuration with Docker/Cloud detection."""
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core import Provider
 
     check = DoctorCheck("Vector Store Configuration")
 
     # Check if vector store is configured in provider settings
-    if isinstance(settings.vector_store, Unset):
+    if settings.vector_store is UNSET:
         return DoctorCheck.set_check(
             check.name,
             "warn",
@@ -376,16 +389,17 @@ async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     # Detect deployment type
     deployment_type = "unknown"
     url = None
-    vector_provider_config = vector_config["provider_settings"]
-    # this is intentionally generalized to cover other providers in the future
-    if (provider := vector_config["provider"]) != Provider.MEMORY and (
-        url := vector_provider_config.get("url")
+    if (
+        vector_config
+        and (provider := vector_config.provider) != Provider.MEMORY
+        and vector_config.client_options
+        and (url := vector_config.client_options.url)
     ):
-        host = urlparse(url).hostname
+        host = cast(url, AnyUrl)  # ty:ignore[invalid-type-form]
         if host and (host == "qdrant.io" or host.endswith(".qdrant.io")):
             deployment_type = "cloud"
         # if they have port in the path we need to check for inclusion, not membership or equality
-        elif "localhost" not in url and "127.0.0.1" not in url:
+        elif "localhost" not in str(url) and "127.0.0.1" not in str(url):
             deployment_type = "remote"
         else:
             deployment_type = (
@@ -398,7 +412,7 @@ async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     elif provider == Provider.QDRANT:
         deployment_type = "local" if await _qdrant_running_at_url() else "unknown"
     elif provider == Provider.MEMORY:
-        deployment_type = "in-memory"
+        deployment_type = "local"
     else:
         deployment_type = "unknown"
     _display.console.print(
@@ -410,7 +424,7 @@ async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     # Deployment-specific checks
     match deployment_type:
         case "cloud":
-            return _check_qdrant_cloud_api_key(provider, settings, check, url)
+            return _check_qdrant_cloud_api_key(provider, settings, check, str(url))
         case "local" | "local docker":
             _display.console.print(
                 f"  [green]✓[/green] Local Qdrant {'docker container' if deployment_type == 'local docker' else 'install'} detected"
@@ -471,7 +485,7 @@ def _check_qdrant_cloud_api_key(
     return check
 
 
-def _check_qdrant_api_key_env_vars(provider, check) -> DoctorCheck:
+def _check_qdrant_api_key_env_vars(provider: Provider, check: DoctorCheck) -> DoctorCheck:
     possible_keys = cast(tuple[str, ...], provider.api_key_env_vars)
 
     # Check if env vars are actually set (for debugging)
@@ -492,13 +506,13 @@ def _check_qdrant_api_key_env_vars(provider, check) -> DoctorCheck:
         _display.console.print(
             f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using one of these environment variables: {', '.join(possible_keys)}"
             if len(possible_keys) > 1
-            else f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using the environment variable: {possible_keys[0]}"  # type: ignore
+            else f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using the environment variable: {possible_keys[0]}"
         )
     check.status = "⚠️"
     check.suggestions = [
         "Check provider authentication logic"
         if set_vars
-        else f"Set {possible_keys[0]} environment variable",  # type: ignore
+        else f"Set {possible_keys[0]} environment variable",
         "Or configure api_key in your codeweaver.toml file",
     ]
     return check
@@ -518,14 +532,14 @@ def _set_warning_status(check: DoctorCheck, message: str, suggestion: str) -> No
     check.suggestions = [suggestion]
 
 
-def check_indexer_config(settings: CodeWeaverSettings) -> DoctorCheck:
+def check_indexer_config(settings: CodeWeaverSettingsType) -> DoctorCheck:
     """Check if the indexer is properly configured and cache directory is writable."""
-    from codeweaver.config.indexer import IndexerSettings
+    from codeweaver.engine.config import IndexerSettings
 
     check = DoctorCheck("Indexer Configuration")
 
     try:
-        if not isinstance(settings.indexer, IndexerSettings):
+        if not hasattr(settings, "indexer") or not isinstance(settings.indexer, IndexerSettings):
             return DoctorCheck.set_check(
                 check.name,
                 "warn",
@@ -562,13 +576,13 @@ def check_indexer_config(settings: CodeWeaverSettings) -> DoctorCheck:
 
 
 def _report_unimplemented_status(
-    kind: ProviderKind, provider: Provider, *, is_available: bool, has_auth: bool
+    category: ProviderCategory, provider: Provider, *, is_available: bool, has_auth: bool
 ) -> DoctorCheck | None:
     """Report unimplemented provider status checks for DATA and AGENT providers."""
-    if kind not in {ProviderKind.DATA, ProviderKind.AGENT}:
+    if category not in {ProviderCategory.DATA, ProviderCategory.AGENT}:
         return None
-    name = f"{kind.as_title} ({provider.as_title})"
-    if kind == ProviderKind.DATA:
+    name = f"{category.as_title} ({provider.as_title})"
+    if category == ProviderCategory.DATA:
         message = "We're still integrating data providers into CodeWeaver. Stay tuned!"
         return DoctorCheck.set_check(name, "warn", message, [])
     message = (
@@ -586,9 +600,6 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
     check = DoctorCheck("Provider Availability")
 
     try:
-        from codeweaver.common.registry import get_provider_registry
-
-        registry = get_provider_registry()
         tested_providers: list[DoctorCheck] = []
 
         if not (configs := settings.provider_configs):
@@ -600,21 +611,21 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
                     ["Configure providers in your codeweaver configuration."],
                 )
             ]
-        from codeweaver.providers.provider import ProviderKind
+        from codeweaver.core import ProviderCategory
 
-        for kind, provider_configs in configs.items():
+        for category, provider_configs in configs.items():
             if not provider_configs:
                 continue
             for provider_config in provider_configs:
-                kind = ProviderKind.from_string(cast(str, kind))
+                category = ProviderCategory.from_string(cast(str, category))
                 provider = provider_config["provider"]
-                # Let users know these aren't fully available
-                is_package_available = registry.is_provider_available(provider, kind)
+                # Check package availability manually (Registry replacement)
+                is_package_available = check_provider_package_available(provider, category)
                 has_auth = provider.has_env_auth or provider.is_local_provider
-                if kind in {ProviderKind.DATA, ProviderKind.AGENT}:
+                if category in {ProviderCategory.DATA, ProviderCategory.AGENT}:
                     tested_providers.append(
                         _report_unimplemented_status(
-                            kind, provider, is_available=is_package_available, has_auth=has_auth
+                            category, provider, is_available=is_package_available, has_auth=has_auth
                         )  # type: ignore
                     )
                     continue
@@ -623,7 +634,7 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
                     # Package installed AND credentials configured
                     tested_providers.append(
                         DoctorCheck.set_check(
-                            f"{kind.as_title} ({provider.as_title})",
+                            f"{category.as_title} ({provider.as_title})",
                             "success",
                             "Package installed and configured",
                             [],
@@ -634,7 +645,7 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
                     env_vars = provider.api_key_env_vars
                     tested_providers.append(
                         DoctorCheck.set_check(
-                            f"{kind.as_title} ({provider.as_title})",
+                            f"{category.as_title} ({provider.as_title})",
                             "warn",
                             "Package installed but missing credentials",
                             [
@@ -649,7 +660,7 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
                     # Package not installed
                     tested_providers.append(
                         DoctorCheck.set_check(
-                            f"{kind.as_title} ({provider.as_title})",
+                            f"{category.as_title} ({provider.as_title})",
                             "fail",
                             "Package not installed",
                             [
@@ -683,9 +694,7 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
 
 
 def _get_health_endpoint():
-    from codeweaver.config.settings import get_settings_map
-
-    settings_map = get_settings_map()
+    settings_map = _get_settings_map()
     host = settings_map.get("management_host", "localhost")
     port = settings_map.get("management_port", 9329)
     return f"http://{host}:{port}/health/"
@@ -746,26 +755,130 @@ def _print_summary(has_failures: bool, has_warnings: bool, display: StatusDispla
         sys.exit(1)
 
 
-async def process_checks(display: StatusDisplay) -> list[DoctorCheck]:
+async def check_embedding_compatibility(
+    config_analyzer: ConfigChangeAnalyzerDep = INJECTED,
+) -> DoctorCheck:
+    """Check if current embedding config matches collection.
+
+    This check validates that the current embedding configuration is compatible
+    with any existing indexed collection. It identifies:
+    - No changes (index remains valid)
+    - Compatible changes (query model changes in asymmetric config)
+    - Transformations (quantization or dimension reduction possible)
+    - Breaking changes (requires reindexing)
+
+    ARCHITECTURE NOTE: Service automatically injected by DI container.
+    Service itself has plain __init__ with no DI markers.
+    """
+    try:
+        # Analyze current configuration
+        analysis = await config_analyzer.analyze_current_config()
+
+        if analysis is None:
+            return DoctorCheck.set_check(
+                "Embedding Configuration",
+                "warn",
+                "No existing collection found",
+                ["Run 'cw index' to create initial index"],
+            )
+
+        from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
+
+        match analysis.impact:
+            case ChangeImpact.NONE:
+                return DoctorCheck.set_check(
+                    "Embedding Configuration",
+                    "success",
+                    "Configuration matches indexed collection",
+                    [],
+                )
+
+            case ChangeImpact.COMPATIBLE:
+                return DoctorCheck.set_check(
+                    "Embedding Configuration",
+                    "success",
+                    "Configuration change is compatible with indexed collection",
+                    ["No reindex needed (same family)"],
+                )
+
+            case ChangeImpact.QUANTIZABLE:
+                if analysis.transformations:
+                    trans = analysis.transformations[0]
+                    return DoctorCheck.set_check(
+                        "Embedding Configuration",
+                        "warn",
+                        "Quantization available",
+                        [
+                            f"Can quantize {trans.old_value} → {trans.new_value}",
+                            f"Time: {trans.time_estimate}",
+                            f"Accuracy: {trans.accuracy_impact}",
+                            "Run: cw migrate --quantize-only",
+                        ],
+                    )
+                return DoctorCheck.set_check(
+                    "Embedding Configuration",
+                    "warn",
+                    "Quantization possible",
+                    ["No quantization transformations found"],
+                )
+
+            case ChangeImpact.TRANSFORMABLE:
+                return DoctorCheck.set_check(
+                    "Embedding Configuration",
+                    "warn",
+                    "Dimension reduction available",
+                    [
+                        "Can transform without full reindexing",
+                        f"Time: ~{analysis.estimated_time.total_seconds():.0f}s",
+                        f"Cost: ${analysis.estimated_cost:.4f}",
+                        f"Accuracy: {analysis.accuracy_impact}",
+                        "Run: cw migrate --dimension-reduction",
+                    ],
+                )
+
+            case ChangeImpact.BREAKING:
+                return DoctorCheck.set_check(
+                    "Embedding Configuration",
+                    "fail",
+                    "Incompatible configuration change detected",
+                    [
+                        f"Reason: {analysis.accuracy_impact}",
+                        f"Reindex required (~{analysis.estimated_time.total_seconds():.0f}s)",
+                        "Options:",
+                        "  1. Revert config: cw config revert",
+                        "  2. Reindex: cw index --force",
+                        "  3. Migrate: cw migrate",
+                    ],
+                )
+
+    except Exception as e:
+        return DoctorCheck.set_check(
+            "Embedding Configuration",
+            "fail",
+            f"Error checking compatibility: {e}",
+            ["Check logs for details"],
+        )
+
+
+async def process_checks(
+    display: StatusDisplay, settings: CodeWeaverSettingsType, container: Any = None
+) -> list[DoctorCheck]:
     """Process all doctor checks and return the results.
 
     Args:
         display: StatusDisplay for output
+        settings: CodeWeaver settings object
+        container: Optional DI container for resolving services
 
     Returns:
         List of DoctorCheck results
     """
-    from codeweaver.exceptions import CodeWeaverError
-
-    settings: CodeWeaverSettings | None = None
+    from codeweaver.core import CodeWeaverError
 
     checks: list[DoctorCheck] = [check_python_version(), check_required_dependencies()]
     # Configuration checks
     config_failed = False
     try:
-        from codeweaver.config.settings import get_settings
-
-        settings = get_settings()
         checks.append(check_configuration_file(settings))
 
     except CodeWeaverError as e:
@@ -788,10 +901,14 @@ async def process_checks(display: StatusDisplay) -> list[DoctorCheck]:
                 ["Check logs for details", "Report issue if this persists"],
             )
         )
-    if config_failed or settings is None or isinstance(settings, Unset):
+    if config_failed or settings is None or settings is UNSET:
         return checks
     checks.extend((check_project_path(settings), check_indexer_config(settings)))
-    if not (provider_settings := settings.provider) or isinstance(provider_settings, Unset):
+    if (
+        not hasattr(settings, "provider")
+        or not (provider_settings := settings.provider)
+        or provider_settings is UNSET
+    ):
         checks.append(
             DoctorCheck.set_check(
                 "Provider Settings",
@@ -802,14 +919,37 @@ async def process_checks(display: StatusDisplay) -> list[DoctorCheck]:
         )
         return checks
     checks.extend((
-        await check_vector_store_config(provider_settings),
-        *check_provider_availability(provider_settings),
+        await check_vector_store_config(cast(ProviderSettings, provider_settings)),
+        *check_provider_availability(cast(ProviderSettings, provider_settings)),
     ))
+
+    # Check embedding configuration compatibility if container is available
+    if container:
+        try:
+            embedding_check = await container.resolve(check_embedding_compatibility)
+            checks.append(embedding_check)
+        except Exception as e:
+            checks.append(
+                DoctorCheck.set_check(
+                    "Embedding Configuration",
+                    "warn",
+                    f"Could not check embedding compatibility: {e}",
+                    ["This check is optional and doesn't affect core functionality"],
+                )
+            )
+    if (
+        not hasattr(settings, "provider")
+        or not (provider_settings := settings.provider)
+        or provider_settings is UNSET
+    ):
+        return checks
     if remote_providers := {
-        provider for provider in provider_settings.providers if provider.requires_auth
+        provider
+        for provider in cast(ProviderSettings, provider_settings).providers
+        if provider.requires_auth
     }:
         for provider in remote_providers:
-            if not _has_auth_configured(provider, provider_settings):
+            if not _has_auth_configured(provider, provider_settings):  # ty:ignore[invalid-argument-type]
                 checks.append(
                     DoctorCheck.set_check(
                         f"{provider.as_title} Authentication",
@@ -860,17 +1000,15 @@ async def doctor(
         display = _display
     _display = display  # Set module-level display for check functions
 
-    # Update settings if config_file or project_path provided
-    if config_file or project_path:
-        from codeweaver.config.settings import update_settings
-
-        _ = update_settings(config_file=config_file, project_path=project_path)  # type: ignore
-
     display.console.print()
     display.print_section("Running diagnostic checks...")
     display.console.print()
 
-    checks: list[DoctorCheck] = await process_checks(display)
+    # Setup DI Container
+    container = setup_cli_di(config_file, project_path, verbose=verbose)
+    settings = await container.resolve(CodeWeaverSettingsType)
+
+    checks: list[DoctorCheck] = await process_checks(display, settings, container)
     # Display results table
     table = Table(show_header=True, header_style="bold blue", box=None)
     table.add_column("Status", style="white", no_wrap=True, width=6)
@@ -906,3 +1044,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     app()
+
+__all__ = ()

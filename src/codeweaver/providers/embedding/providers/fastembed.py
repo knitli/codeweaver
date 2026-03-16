@@ -15,29 +15,29 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import multiprocessing
 
 from collections.abc import Callable, Iterable, Sequence
-from typing import TYPE_CHECKING, Any, ClassVar, cast, override
+from typing import Any, ClassVar, Literal, cast, override
 
 import numpy as np
 
 from pydantic import SkipValidation
 
-from codeweaver.common.utils.utils import rpartial
-from codeweaver.exceptions import ConfigurationError
-from codeweaver.providers.embedding.capabilities.base import (
-    EmbeddingModelCapabilities,
-    SparseEmbeddingModelCapabilities,
+from codeweaver.core import (
+    CodeChunk,
+    CodeWeaverSparseEmbedding,
+    ConfigurationError,
+    Provider,
+    rpartial,
 )
-from codeweaver.providers.embedding.providers import EmbeddingProvider
-from codeweaver.providers.embedding.providers.base import SparseEmbeddingProvider
-from codeweaver.providers.provider import Provider
+from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
+from codeweaver.providers.embedding.providers.base import (
+    EmbeddingCustomDeps,
+    EmbeddingImplementationDeps,
+    EmbeddingProvider,
+    SparseEmbeddingProvider,
+)
 
-
-if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
-    from codeweaver.providers.embedding.types import SparseEmbedding
 
 try:
     from fastembed.sparse import SparseTextEmbedding
@@ -59,62 +59,31 @@ _SparseTextEmbedding = get_sparse_embedder()
 logger = logging.getLogger(__name__)
 
 
-def fastembed_all_kwargs(**kwargs: Any) -> dict[str, Any]:
-    """Get all possible kwargs for FastEmbed embedding methods."""
-    default_kwargs: dict[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
-    if kwargs:
-        device_ids: list[int] | None = kwargs.get("device_ids")
-        cuda: bool | None = kwargs.get("cuda")
-        if cuda == False:  # user **explicitly** disabled cuda  # noqa: E712
-            return default_kwargs | kwargs
-        cuda = bool(cuda)
-        from codeweaver.providers.optimize import decide_fastembed_runtime
-
-        decision = decide_fastembed_runtime(explicit_cuda=cuda, explicit_device_ids=device_ids)
-        if isinstance(decision, tuple) and len(decision) == 2:
-            cuda = True
-            device_ids = decision[1]
-        elif decision == "gpu":
-            cuda = True
-            device_ids = [0]
-        else:
-            cuda = False
-            device_ids = None
-        if cuda:
-            kwargs["cuda"] = True
-            kwargs["device_ids"] = device_ids
-            kwargs["providers"] = ["CUDAExecutionProvider"]
-        return default_kwargs | kwargs
-    return default_kwargs
-
-
 def fastembed_output_transformer(output: list[np.ndarray]) -> list[list[float]] | list[list[int]]:
     """Transform the output of FastEmbed into a more usable format."""
     return [emb.tolist() for emb in output]
 
 
 def fastembed_sparse_output_transformer(
-    output: list[np.ndarray] | list[SparseEmbedding],
-) -> list[SparseEmbedding]:
+    output: list[np.ndarray] | list[CodeWeaverSparseEmbedding],
+) -> list[CodeWeaverSparseEmbedding]:
     """Transform the sparse output of FastEmbed into indices and values format.
 
     FastEmbed's SparseTextEmbedding returns SparseEmbedding objects with
     indices and values attributes. We transform them into CodeWeaver SparseEmbedding objects.
     """
-    from codeweaver.providers.embedding.types import SparseEmbedding
-
     if not output:
-        return [SparseEmbedding(indices=[], values=[])]
+        return [CodeWeaverSparseEmbedding(indices=[], values=[])]
 
-    if isinstance(output[0], SparseEmbedding):
-        return cast(list[SparseEmbedding], output)
+    if isinstance(output[0], CodeWeaverSparseEmbedding):
+        return cast(list[CodeWeaverSparseEmbedding], output)
 
     return [
-        SparseEmbedding(
+        CodeWeaverSparseEmbedding(
             cast(np.ndarray, emb.indices).tolist(), cast(np.ndarray, emb.values).tolist()
         )
         if isinstance(emb, np.ndarray)
-        else SparseEmbedding(emb.indices, emb.values)
+        else CodeWeaverSparseEmbedding(emb.indices, emb.values)
         for emb in output
     ]
 
@@ -127,32 +96,19 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
     """
 
     client: SkipValidation[TextEmbedding]
-    _provider: Provider = Provider.FASTEMBED
-    caps: EmbeddingModelCapabilities
+    _provider: ClassVar[Literal[Provider.FASTEMBED]] = Provider.FASTEMBED
 
-    _doc_kwargs: ClassVar[dict[str, Any]] = fastembed_all_kwargs()
-    _query_kwargs: ClassVar[dict[str, Any]] = fastembed_all_kwargs()
-    _output_transformer: ClassVar[Callable[[Any], list[list[float]] | list[list[int]]]] = (
+    _output_transformer: Callable[[Any], list[list[float]] | list[list[int]]] = (
         fastembed_output_transformer
     )
 
-    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
+    def _initialize(
+        self,
+        impl_deps: EmbeddingImplementationDeps = None,
+        custom_deps: EmbeddingCustomDeps = None,
+        **kwargs: Any,
+    ) -> None:
         """Initialize the FastEmbed client."""
-        # 1. Set caps from parameter
-        self.caps = caps
-
-        # 2. Configure model name in kwargs if not already set
-        if "model_name" not in type(self)._doc_kwargs:
-            model = caps.name  # Use caps parameter, not self.caps
-            self.doc_kwargs["model_name"] = model
-            # Note: model_name should NOT be in query_kwargs - it's only for client init
-
-        # 3. Initialize the client
-        self.client = _TextEmbedding(**self.doc_kwargs)
-
-        # 4. Remove model_name from runtime kwargs - it was only needed for initialization
-        self.doc_kwargs.pop("model_name", None)
-        self.query_kwargs.pop("model_name", None)
 
     @property
     def base_url(self) -> str | None:
@@ -176,12 +132,10 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None,
-            lambda: list(
-                self.client.passage_embed(texts=cast(Iterable[str], ready_documents), **kwargs)
-            ),
+            lambda: list(self.client.embed(texts=cast(Iterable[str], ready_documents), **kwargs)),
         )
         partial_tokens = rpartial(self._update_token_stats, from_docs=ready_documents)
-        self._fire_and_forget(partial_tokens)
+        self._fire_and_forget(partial_tokens, loop=loop)
         return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
 
     async def _embed_query(
@@ -192,7 +146,8 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         embeddings = await loop.run_in_executor(
             None, lambda: list(self.client.query_embed(query=query, **kwargs))
         )
-        self._update_token_stats(from_docs=query)
+        await asyncio.sleep(0)
+        self._fire_and_forget(lambda: self._update_token_stats(from_docs=query), loop=loop)
         return self._process_output(embeddings)
 
     @property
@@ -206,33 +161,50 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
     FastEmbed implementation for sparse embeddings.
     """
 
-    client: type[SparseTextEmbedding] | SparseTextEmbedding = _SparseTextEmbedding  # type: ignore
-    caps: SparseEmbeddingModelCapabilities
-    _output_transformer: ClassVar[Callable[[Any], list[SparseEmbedding]]] = (  # type: ignore
+    client: type[SparseTextEmbedding] | SparseTextEmbedding = _SparseTextEmbedding
+    caps: SparseEmbeddingModelCapabilities | None = None
+    _output_transformer: Callable[[Any], list[CodeWeaverSparseEmbedding]] = (
         fastembed_sparse_output_transformer
-    )  # type: ignore
+    )
 
     @override
-    def _initialize(self, caps: SparseEmbeddingModelCapabilities) -> None:  # type: ignore
-        """Initialize the FastEmbed client."""
-        # 1. Set _caps from parameter, not from self
-        self.caps = caps
+    def _initialize(
+        self,
+        impl_deps: Any = None,
+        custom_deps: Any = None,
+        caps: SparseEmbeddingModelCapabilities | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the FastEmbed sparse client."""
+        # impl_deps and custom_deps are ignored for FastEmbed sparse provider;
+        # caps may be passed as a keyword argument via **kwargs from the base class.
+        # 1. Set caps using object.__setattr__ because pydantic model isn't fully initialized yet
+        object.__setattr__(self, "caps", caps)
 
-        # 2. Configure model name in kwargs if not already set
-        if "model_name" not in self.doc_kwargs:
-            model = caps.name  # Use caps parameter, not self.caps
-            self.doc_kwargs["model_name"] = model
-            # Note: model_name should NOT be in query_kwargs - it's only for client init
+        # 2. Configure model name in kwargs if not already set.
+        # caps may be None if not yet resolved (base class sets it after _initialize);
+        # fall back to model_name already in embed_options or from self.config.
+        if "model_name" not in self.embed_options:
+            if caps is not None:
+                model = caps.name
+            elif hasattr(self, "config") and hasattr(self.config, "model_name"):
+                model = self.config.model_name
+            else:
+                model = None
+            if model:
+                self.embed_options["model_name"] = model
+            # Note: model_name should NOT be in query_options - it's only for client init
 
         # 3. Initialize client if it's still a class (not an instance)
-        # The _client class variable is set to the class type, so we need to instantiate it
+        # The _client class variable is set to the class type, so we need to instantiate it.
+        # Use object.__setattr__ because pydantic model isn't fully initialized yet.
         if isinstance(self.client, type):
-            client_options = self.doc_kwargs.get("client_options") or self.doc_kwargs
-            self.client = self.client(**client_options)
+            client_options = self.embed_options.get("client_options") or self.embed_options
+            object.__setattr__(self, "client", self.client(**client_options))
 
         # 4. Remove model_name from runtime kwargs - it was only needed for initialization
-        self.doc_kwargs.pop("model_name", None)
-        self.query_kwargs.pop("model_name", None)
+        self.embed_options.pop("model_name", None)
+        self.query_options.pop("model_name", None)
 
     def base_url(self) -> str | None:
         """FastEmbed does not use a base URL."""
@@ -240,7 +212,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
-    ) -> list[SparseEmbedding]:  # ty:ignore[invalid-method-override]
+    ) -> list[CodeWeaverSparseEmbedding]:
         """Embed a list of documents into sparse vectors."""
         ready_documents = self.chunks_to_strings(documents)
         loop = asyncio.get_running_loop()
@@ -254,9 +226,11 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         )
         features = sum(len(emb.indices) for emb in embeddings)
         self._update_token_stats(token_count=features, sparse=True)
-        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # type: ignore
+        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
 
-    async def _embed_query(self, query: Sequence[str], **kwargs: Any) -> list[SparseEmbedding]:  # ty:ignore[invalid-method-override]
+    async def _embed_query(
+        self, query: Sequence[str], **kwargs: Any
+    ) -> list[CodeWeaverSparseEmbedding]:
         """Embed a query into a sparse vector."""
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
@@ -264,7 +238,12 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         )
         features = sum(len(emb.indices) for emb in embeddings)
         self._update_token_stats(token_count=features, sparse=True)
-        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # type: ignore
+        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
 
 
-__all__ = ("FastEmbedEmbeddingProvider", "FastEmbedSparseProvider")
+__all__ = (
+    "FastEmbedEmbeddingProvider",
+    "FastEmbedSparseProvider",
+    "fastembed_output_transformer",
+    "fastembed_sparse_output_transformer",
+)

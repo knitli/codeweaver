@@ -111,15 +111,15 @@ class TestStartDaemonBackground:
 
     def test_start_daemon_background_finds_executable(self, temp_project: Path) -> None:
         """Test that _start_daemon_background finds the codeweaver executable."""
+        from codeweaver.cli import StatusDisplay
         from codeweaver.cli.commands.start import _start_daemon_background
-        from codeweaver.cli.ui import StatusDisplay
 
         display = StatusDisplay()
 
         # Mock subprocess.Popen and shutil.which in the daemon module
         with (
-            patch("codeweaver.daemon.shutil.which") as mock_which,
-            patch("codeweaver.daemon.subprocess.Popen") as mock_popen,
+            patch("codeweaver_daemon.shutil.which") as mock_which,
+            patch("codeweaver_daemon.subprocess.Popen") as mock_popen,
         ):
             # Simulate finding cw executable
             mock_which.return_value = "/usr/local/bin/cw"
@@ -144,14 +144,14 @@ class TestStartDaemonBackground:
 
     def test_start_daemon_background_uses_python_fallback(self, temp_project: Path) -> None:
         """Test fallback to python when cw/codeweaver executable not found."""
+        from codeweaver.cli import StatusDisplay
         from codeweaver.cli.commands.start import _start_daemon_background
-        from codeweaver.cli.ui import StatusDisplay
 
         display = StatusDisplay()
 
         with (
-            patch("codeweaver.daemon.shutil.which") as mock_which,
-            patch("codeweaver.daemon.subprocess.Popen") as mock_popen,
+            patch("codeweaver_daemon.shutil.which") as mock_which,
+            patch("codeweaver_daemon.subprocess.Popen") as mock_popen,
         ):
             # Simulate not finding cw executable
             mock_which.return_value = None
@@ -168,22 +168,22 @@ class TestStartDaemonBackground:
 
             assert result is True
             call_args = mock_popen.call_args[0][0]
-            # Should use sys.executable with the CLI __main__.py path
+            # Should use sys.executable with the CLI module
             assert sys.executable in call_args[0]
-            # Should run the CLI __main__.py file directly
-            assert any("__main__.py" in str(arg) for arg in call_args)
+            # Should run the CLI module
+            assert any("codeweaver.cli" in str(arg) for arg in call_args)
             assert "start" in call_args
 
     def test_start_daemon_background_passes_options(self, temp_project: Path) -> None:
         """Test that custom options are passed to the spawned daemon."""
+        from codeweaver.cli import StatusDisplay
         from codeweaver.cli.commands.start import _start_daemon_background
-        from codeweaver.cli.ui import StatusDisplay
 
         display = StatusDisplay()
 
         with (
-            patch("codeweaver.daemon.shutil.which") as mock_which,
-            patch("codeweaver.daemon.subprocess.Popen") as mock_popen,
+            patch("codeweaver_daemon.shutil.which") as mock_which,
+            patch("codeweaver_daemon.subprocess.Popen") as mock_popen,
         ):
             mock_which.return_value = "/usr/local/bin/cw"
             mock_popen.return_value = MagicMock()
@@ -214,7 +214,7 @@ class TestInitServiceCommand:
 
     def test_init_service_command_exists(self) -> None:
         """Test that init service command is registered."""
-        from codeweaver.cli.commands.init import app as init_app
+        from codeweaver.cli import app as init_app
 
         # Check that 'service' is a registered command
         # cyclopts stores commands differently, check the app has the command
@@ -340,7 +340,7 @@ class TestStartPersistAlias:
 
     def test_persist_command_exists(self) -> None:
         """Test that start persist command is registered."""
-        from codeweaver.cli.commands.start import app as start_app
+        from codeweaver.cli import app as start_app
 
         # Check that 'persist' is a registered command
         assert hasattr(start_app, "command")
@@ -383,8 +383,8 @@ class TestServiceInstallationBehavior:
         """Test that systemd installation creates service file in correct location."""
         import subprocess as subprocess_module
 
+        from codeweaver.cli import StatusDisplay
         from codeweaver.cli.commands.init import _install_systemd_service
-        from codeweaver.cli.ui import StatusDisplay
 
         display = StatusDisplay()
 
@@ -414,12 +414,12 @@ class TestServiceInstallationBehavior:
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS-specific test")
     def test_launchd_install_creates_plist_file(self, temp_home: Path) -> None:
         """Test that launchd installation creates plist file in correct location."""
+        from codeweaver.cli import StatusDisplay
         from codeweaver.cli.commands.init import _install_launchd_service
-        from codeweaver.cli.ui import StatusDisplay
 
         display = StatusDisplay()
 
-        with patch("codeweaver.cli.commands.init.subprocess.run") as mock_run:
+        with patch("codeweaver.cli") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
 
             result = _install_launchd_service(
@@ -443,8 +443,8 @@ class TestWindowsServiceInstructions:
 
     def test_windows_instructions_shown(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test that Windows instructions are displayed correctly."""
+        from codeweaver.cli import StatusDisplay
         from codeweaver.cli.commands.init import _show_windows_instructions
-        from codeweaver.cli.ui import StatusDisplay
 
         display = StatusDisplay()
 
@@ -471,8 +471,8 @@ class TestHealthCheckBehavior:
         """Test waiting for daemon to become healthy."""
         import httpx as httpx_module
 
+        from codeweaver.cli import StatusDisplay
         from codeweaver.cli.commands.start import _wait_for_daemon_healthy
-        from codeweaver.cli.ui import StatusDisplay
 
         display = StatusDisplay()
 
@@ -495,8 +495,8 @@ class TestHealthCheckBehavior:
         """Test timeout when daemon doesn't become healthy."""
         import httpx as httpx_module
 
+        from codeweaver.cli import StatusDisplay
         from codeweaver.cli.commands.start import _wait_for_daemon_healthy
-        from codeweaver.cli.ui import StatusDisplay
 
         display = StatusDisplay()
 

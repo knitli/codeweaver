@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import pickle
 import sys
+
 from pathlib import Path
 
 
@@ -25,7 +26,7 @@ def main() -> int:
     if src_path not in sys.path:
         sys.path.insert(0, str(src_path))
 
-    from codeweaver.semantic.node_type_parser import NodeTypeParser
+    from codeweaver.semantic import NodeTypeParser
 
     print("Preprocessing node-types JSON files...")
 
@@ -43,7 +44,8 @@ def main() -> int:
     }
 
     # Write cache file
-    cache_file = repo_root / "src" / "codeweaver" / "data" / "node_types_cache.pkl"
+    cache_file = repo_root / "src" / "codeweaver" / \
+        "semantic" / "data" / "node_types_cache.pkl"
     print(f"Writing cache to {cache_file}...")
 
     with cache_file.open("wb") as f:

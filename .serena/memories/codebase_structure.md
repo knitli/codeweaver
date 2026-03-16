@@ -215,7 +215,7 @@ from pydantic_settings import BaseSettings
 
 # Local imports (absolute from package root)
 from codeweaver.core.types import BasedModel
-from codeweaver.exceptions import CodeWeaverError
+from codeweaver.core import CodeWeaverError
 ```
 
 ### Internal Package Structure

@@ -10,15 +10,20 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, cast
 
+from codeweaver_tokenizers import get_tokenizer
 from pydantic import NonNegativeInt
 
-from codeweaver.tokenizers import get_tokenizer
+from codeweaver.core import dependency_provider
+from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+    from codeweaver.core import CodeChunk
     from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
+
+
+class CohereRerankingCapabilities(RerankingModelCapabilities):
+    """Capabilities for Cohere reranking models."""
 
 
 def cohere_max_input(chunks: Sequence[CodeChunk], query: str) -> tuple[bool, NonNegativeInt]:
@@ -45,24 +50,39 @@ def _get_common_capabilities() -> PartialRerankingCapabilitiesDict:
     }
 
 
-def get_cohere_reranking_capabilities() -> tuple[RerankingModelCapabilities, ...]:
+def _get_v4_capabilities() -> PartialRerankingCapabilitiesDict:
+    """
+    Get the capabilities for Cohere v4 models.
+    """
+    base_caps = _get_common_capabilities()
+    return {**base_caps, "context_window": 32_764}
+
+
+@dependency_provider(CohereRerankingCapabilities, scope="singleton", collection=True)
+def get_cohere_reranking_capabilities() -> tuple[CohereRerankingCapabilities, ...]:
     """Get the capabilities of the Cohere reranking model."""
-    from codeweaver.providers.provider import Provider
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+    from codeweaver.core import Provider
 
     base_capabilities = _get_common_capabilities()
-    capabilities: list[RerankingModelCapabilities] = [
-        RerankingModelCapabilities.model_validate({
+    capabilities: list[CohereRerankingCapabilities] = [
+        CohereRerankingCapabilities.model_validate({
             **base_capabilities,
             "name": model,
             "provider": Provider.COHERE,
             "tokenizer_model": f"Cohere/{model}",
         })
-        for model in ("rerank-v3.5", "rerank-english-v3.0", "rerank-multilingual-v3.0")
+        for model in (
+            "rerank-v3.5",
+            "rerank-english-v3.0",
+            "rerank-multilingual-v3.0",
+            "rerank-v4.0-pro",
+            "rerank-v4.0-fast",
+        )
     ]
+    capabilities.extend([])
     return (
         *capabilities,
-        RerankingModelCapabilities.model_validate({
+        CohereRerankingCapabilities.model_validate({
             **base_capabilities,
             "name": "rerank-v3-5:0",
             "provider": Provider.BEDROCK,
@@ -71,4 +91,4 @@ def get_cohere_reranking_capabilities() -> tuple[RerankingModelCapabilities, ...
     )
 
 
-__all__ = ("get_cohere_reranking_capabilities",)
+__all__ = ("CohereRerankingCapabilities", "cohere_max_input", "get_cohere_reranking_capabilities")

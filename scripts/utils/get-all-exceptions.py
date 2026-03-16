@@ -114,7 +114,7 @@ def scan_source_files_for_exceptions(
 
                 def visit_ExceptHandler(
                     self, node: ast.Raise, module_name: str = module_name
-                ) -> None:  # ty:ignore[invalid-method-override]
+                ) -> None:
                     """Handle except clauses to find exception types."""
                     if node.type:
                         if isinstance(node.type, ast.Name) and node.type.id in builtin_exceptions:
@@ -125,7 +125,7 @@ def scan_source_files_for_exceptions(
                                     builtin_usage.add((module_name, elt.id))
                     self.generic_visit(node)
 
-                def visit_ClassDef(self, node: ast.Raise, module_name: str = module_name) -> None:  # ty:ignore[invalid-method-override]
+                def visit_ClassDef(self, node: ast.Raise, module_name: str = module_name) -> None:
                     """Handle class definitions to find custom exceptions."""
                     # Find custom exception classes
                     for base in node.bases:

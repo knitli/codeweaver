@@ -1,235 +1,130 @@
 ---
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
-
-title: CLI Reference
+title: CLI Reference (Alpha 6)
 description: Complete command-line interface reference for CodeWeaver
 ---
 
 # CodeWeaver CLI Reference
 
-CodeWeaver: Powerful code search and understanding for humans and agents.
+The `cw` command (alias for `codeweaver`) is your primary interface for managing CodeWeaver. It provides tools for initialization, indexing, searching, and diagnostics.
 
 :::note
-This is a simplified CLI reference for the POC. For complete documentation including all subcommands and options, see the full CLI documentation.
+Alpha 6 introduces `cw doctor` for deep diagnostics and `cw init --profile` for rapid setup.
 :::
 
-## Quick Start
+## Core Workflow
 
 ```bash
-# Index a repository
-codeweaver index /path/to/repo
+# 1. Initialize with a profile
+cw init --profile recommended
 
-# Search your code
-codeweaver search "authentication logic"
+# 2. Start the background daemon
+cw start
 
-# Start MCP server
-codeweaver server
+# 3. Search your codebase
+cw search "authentication middleware"
 ```
+
+---
 
 ## Main Commands
 
-### `codeweaver config`
-
-Configure CodeWeaver settings.
-
-**Usage:**
-```bash
-codeweaver config
-```
-
-### `codeweaver search`
-
-Search indexed repositories using semantic search.
+### `cw init`
+Initialize your CodeWeaver configuration.
 
 **Usage:**
 ```bash
-codeweaver search QUERY [OPTIONS]
-```
-
-**Arguments:**
-- `QUERY` - Natural language search query
-
-**Options:**
-- `--repo PATH` - Repository to search (default: current directory)
-- `--limit N` - Maximum number of results (default: 10)
-- `--context-lines N` - Lines of context around matches (default: 3)
-
-**Examples:**
-```bash
-# Basic search
-codeweaver search "user authentication"
-
-# Search specific repository
-codeweaver search "api endpoints" --repo ~/projects/myapp
-
-# Limit results
-codeweaver search "database queries" --limit 5
-```
-
-### `codeweaver server`
-
-Start the CodeWeaver MCP server for AI agent integration.
-
-**Usage:**
-```bash
-codeweaver server [OPTIONS]
+cw init [OPTIONS]
 ```
 
 **Options:**
-- `--host TEXT` - Host to bind to (default: localhost)
-- `--port INT` - Port to listen on (default: 8765)
-- `--repo PATH` - Repository to serve
+- `--profile [recommended|quickstart|testing]` - Choose a premade provider profile.
+- `--force` - Overwrite existing configuration.
 
 **Example:**
 ```bash
-codeweaver server --port 8765
+cw init --profile recommended
 ```
 
-### `codeweaver index`
+---
 
-Index a repository for semantic search.
+### `cw doctor`
+Check system configuration and diagnose issues. This is the first command you should run if something isn't working.
 
 **Usage:**
 ```bash
-codeweaver index PATH [OPTIONS]
+cw doctor
+```
+
+**What it checks:**
+- **Provider Connectivity:** Verifies API keys and cloud service reachability.
+- **Index Health:** Checks for corrupted or outdated search indexes.
+- **DI Container:** Validates that all required services are correctly registered.
+- **Environment:** Checks Python version, project paths, and disk space.
+
+---
+
+### `cw search`
+Search indexed repositories using hybrid (Semantic + AST + Keyword) search.
+
+**Usage:**
+```bash
+cw search QUERY [OPTIONS]
 ```
 
 **Arguments:**
-- `PATH` - Path to repository to index
+- `QUERY` - Your natural language search query.
 
 **Options:**
-- `--force` - Force reindex even if index exists
-- `--incremental` - Only index changed files
+- `--repo PATH` - Repository to search (default: current directory).
+- `--limit N` - Maximum number of results.
+- `--context-lines N` - Lines of context around each match.
 
-**Examples:**
-```bash
-# Index current directory
-codeweaver index .
+---
 
-# Force reindex
-codeweaver index . --force
-
-# Incremental update
-codeweaver index . --incremental
-```
-
-### `codeweaver doctor`
-
-Check system configuration and diagnose issues.
+### `cw start` / `cw stop`
+Manage the CodeWeaver background daemon.
 
 **Usage:**
 ```bash
-codeweaver doctor
+cw start [OPTIONS]
+cw stop
 ```
 
-Verifies:
-- Provider configurations
-- API keys and credentials
-- Index health
-- Dependencies
+**Options:**
+- `--foreground` - Run in the current terminal instead of the background.
+- `--project PATH` - Start services for a specific project.
 
-### `codeweaver list`
+---
 
-List available providers and models.
-
-**Subcommands:**
-- `providers` - List all available providers
-- `embedding` - List embedding providers
-- `vector-store` - List vector store providers
-- `reranking` - List reranking providers
-
-**Examples:**
-```bash
-# List all providers
-codeweaver list providers
-
-# List embedding providers
-codeweaver list embedding
-```
-
-### `codeweaver init`
-
-Initialize CodeWeaver configuration.
-
-**Subcommands:**
-- `config` - Initialize configuration file
-- `mcp` - Initialize MCP server configuration
-
-**Examples:**
-```bash
-# Initialize config
-codeweaver init config
-
-# Initialize MCP server
-codeweaver init mcp
-```
-
-### `codeweaver status`
-
-Show status of indexed repositories.
+### `cw status`
+Show the status of the current project, including indexing progress and active providers.
 
 **Usage:**
 ```bash
-codeweaver status [PATH]
+cw status
 ```
 
-Shows:
-- Index status
-- Number of indexed files
-- Last update time
-- Provider configuration
+---
 
 ## Configuration
 
-CodeWeaver can be configured via:
-1. Configuration file (`~/.codeweaver/config.yaml`)
-2. Environment variables
-3. Command-line options
+CodeWeaver Alpha 6 uses `codeweaver.toml` as its primary configuration format.
 
-### Configuration File
-
-Example configuration:
-
-```yaml
-# ~/.codeweaver/config.yaml
-embedding:
-  provider: openai
-  model: text-embedding-3-small
-
-vector_store:
-  provider: chroma
-  path: ~/.codeweaver/vectors
-
-reranking:
-  provider: cohere
-  model: rerank-english-v3.0
-
-indexing:
-  chunk_size: 512
-  chunk_overlap: 128
-```
+### File Locations (Priority Order)
+1. **Project Root:** `./codeweaver.toml`
+2. **User Config:** `~/.config/codeweaver/config.toml`
+3. **Environment:** `CODEWEAVER_CONFIG_FILE`
 
 ### Environment Variables
+- `CODEWEAVER_PROJECT_PATH` - Override the current project path.
+- `VOYAGE_API_KEY` - API key for Voyage AI.
+- `ANTHROPIC_API_KEY` - API key for the Context Agent.
 
-- `CODEWEAVER_CONFIG` - Path to configuration file
-- `CODEWEAVER_DATA_DIR` - Data directory
-- `OPENAI_API_KEY` - OpenAI API key
-- `COHERE_API_KEY` - Cohere API key
-- `ANTHROPIC_API_KEY` - Anthropic API key
+---
 
 ## Exit Codes
-
-- `0` - Success
-- `1` - General error
-- `2` - Configuration error
-- `3` - Index error
-- `4` - Provider error
-
-## See Also
-
-- [Configuration Guide](/guides/configuration/)
-- [Provider Setup](/guides/providers/)
-- [API Reference](/api/)
+- `0` - Success.
+- `1` - General error.
+- `2` - Configuration/Validation error.
+- `3` - Index/Storage error.
+- `4` - Provider/API error.

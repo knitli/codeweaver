@@ -15,7 +15,7 @@ import pytest
 
 from pydantic.dataclasses import dataclass
 
-from codeweaver.core.types import (
+from codeweaver.core import (
     DATACLASS_CONFIG,
     AnonymityConversion,
     BasedModel,

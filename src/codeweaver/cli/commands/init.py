@@ -17,31 +17,39 @@ import sys
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 import cyclopts
 
 from pydantic import AnyHttpUrl
 from pydantic_core import from_json as from_json
 from pydantic_core import to_json as to_json
-from rich.prompt import Confirm
 
-from codeweaver.cli.ui import CLIErrorHandler, get_display
-from codeweaver.cli.utils import resolve_project_root
-from codeweaver.common.utils.utils import get_user_config_dir
-from codeweaver.exceptions import CodeWeaverError
+from codeweaver.cli.ui import CLIErrorHandler, UserInteractionDep, get_display
+from codeweaver.core import CodeWeaverError, get_project_path, get_user_config_dir
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+from codeweaver.core.dependencies.core_settings import SettingsDep
+from codeweaver.core.di.dependency import INJECTED
+from codeweaver.core.exceptions import ConfigurationError
+from codeweaver.core.utils import TypeIs
+from codeweaver.providers.config.profiles import ProviderProfile
 
 
 if TYPE_CHECKING:
     from codeweaver.cli.ui import StatusDisplay
-    from codeweaver.config.mcp import CodeWeaverMCPConfig, StdioCodeWeaverConfig
+    from codeweaver.server.config import CodeWeaverMCPConfig, StdioCodeWeaverConfig
+
 
 type MCPClient = Literal[
     "claude_code", "claude_desktop", "cursor", "gemini_cli", "vscode", "mcpjson"
 ]
 
 
-def _lazy_import_httpx() -> None:
+def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverSettingsType:
+    return settings
+
+
+def _lateimport_httpx() -> None:
     """Lazy import httpx for type checking compatibility.
 
     This function ensures httpx is imported at runtime when needed,
@@ -106,8 +114,7 @@ def _backup_config(path: Path) -> Path:
 def _create_codeweaver_config(
     project_path: Path,
     *,
-    profile: Literal["recommended", "quickstart", "test"],
-    vector_deployment: Literal["local", "cloud"] = "local",
+    profile: ProviderProfile,
     vector_url: AnyHttpUrl | None = None,
     config_path: Path,
 ) -> Path:
@@ -115,7 +122,7 @@ def _create_codeweaver_config(
 
     Args:
         project_path: Path to project directory
-        profile: Profile name to use ("recommended", "quickstart", "test")
+        profile: Profile to use for configuration
         vector_deployment: Vector store deployment type ("local" or "cloud")
         vector_url: URL for cloud vector deployment (required if vector_deployment="cloud")
         config_path: Custom config file path (defaults to codeweaver.toml in project)
@@ -126,25 +133,49 @@ def _create_codeweaver_config(
     display = _display
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    from codeweaver.config.profiles import get_profile
 
-    deployment_profile = (
-        get_profile("backup" if profile == "test" else profile, vector_deployment, url=vector_url)  # ty: ignore[no-matching-overload]
-        if profile
-        else None
-    )  # ty: ignore[no-matching-overload]
-    from codeweaver.config.settings import get_settings, update_settings
+    # Create settings from profile (don't use DI since container isn't initialized yet)
+    from codeweaver.server.config.settings import CodeWeaverSettings
 
-    settings = get_settings()
-    # Don't pass config_file when creating a new config - the file doesn't exist yet
-    _settings_view = update_settings(
-        **({"project_path": project_path} | (deployment_profile or {}))  # type: ignore
-    )
-    # The reference should reflect the updated settings, but we'll refetch to be sure
-    settings = get_settings()
+    # Use model_validate to ensure all fields are correctly marked as "set"
+    # and not just passed through the constructor which might ignore them.
+    settings = CodeWeaverSettings.model_validate({
+        "project_path": project_path,
+        "project_name": project_path.name,
+        "config_file": config_path,
+        "provider": profile.as_provider_settings(),
+    })
 
-    # Save to TOML file
+    # Save to TOML file using the robust settings method
     settings.save_to_file(config_path)
+
+    # pydantic_settings in test mode excludes init_settings from sources, so fields passed to
+    # model_validate() may be dropped when serialized. Fix: merge missing fields into saved TOML.
+    import tomli
+    import tomli_w
+
+    existing = tomli.loads(config_path.read_text()) if config_path.exists() else {}
+    needs_write = False
+
+    from codeweaver.core.types.sentinel import UNSET
+
+    if settings.provider is UNSET:
+        from codeweaver.core.config.core_settings import _clean_for_toml
+        from codeweaver.providers.config.providers import ProviderSettings
+
+        provider_settings = ProviderSettings.model_validate(profile.as_provider_settings())
+        provider_dump = provider_settings.model_dump(
+            mode="json", exclude_none=True, exclude_computed_fields=True
+        )
+        existing["provider"] = _clean_for_toml(provider_dump)
+        needs_write = True
+
+    if "project_path" not in existing:
+        existing["project_path"] = str(project_path.resolve())
+        needs_write = True
+
+    if needs_write:
+        config_path.write_text(tomli_w.dumps(existing))
 
     display.print_success(f"Created configuration file: {config_path}")
     if profile:
@@ -153,16 +184,17 @@ def _create_codeweaver_config(
     return config_path
 
 
+def _is_config_path(path: Any) -> TypeIs[Path]:
+    return isinstance(path, Path) and path.suffix in {".toml", ".yaml", ".yml", ".json"}
+
+
 @app.command
 def config(
     *,
     project: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     profile: Annotated[
-        Literal["recommended", "quickstart", "test"],
-        cyclopts.Parameter(
-            name=["--profile"],
-            help="Configuration profile to use (recommended, quickstart, or test)",
-        ),
+        Literal["recommended", "recommended-cloud", "quickstart", "testing", "testing-db"],
+        cyclopts.Parameter(name=["--profile"], help="Configuration profile to use"),
     ] = "recommended",
     quickstart: Annotated[
         bool,
@@ -200,46 +232,32 @@ def config(
         ),
     ] = "project",
     force: Annotated[bool, cyclopts.Parameter(name=["--force", "-f"])] = False,
+    interaction: UserInteractionDep = INJECTED,
 ) -> None:
     """Set up CodeWeaver configuration file.
 
     Args:
         project: Path to project directory (defaults to current directory)
-        profile: Configuration profile to use (recommended, quickstart, or backup)
+        profile: Configuration profile to use
         vector_deployment: Vector store deployment type (local or cloud)
         vector_url: URL for cloud vector deployment
         config_path: Custom path for configuration file
         force: Overwrite existing configuration file
+        interaction: User interaction service
     """
     display = _display
     error_handler = CLIErrorHandler(display)
 
     display.print_command_header("init config", "Initialize CodeWeaver configuration file.")
 
+    # Convert string profile to enum
+    profile_enum = ProviderProfile.from_string(profile)
+
     if quickstart:
-        profile = "quickstart"
+        profile_enum = ProviderProfile.QUICKSTART
 
-    # Validate vector_url if cloud deployment
-    project_path = project or resolve_project_root()
-    parsed_vector_url: AnyHttpUrl | None = None
-    if vector_deployment == "cloud" and not vector_url:
-        error_handler.handle_error(
-            CodeWeaverError(
-                "Vector URL is required for cloud vector deployment. "
-                "Please provide a valid --vector-url when using --vector-deployment=cloud."
-            ),
-            "Configuration validation",
-            exit_code=1,
-        )
-
-    if not config_path:
-        if config_level == "local":
-            config_path = project_path / f"codeweaver.local.{config_extension}"
-        elif config_level == "project":
-            config_path = project_path / f"codeweaver.{config_extension}"
-        else:
-            config_path = get_user_config_dir() / f"codeweaver.{config_extension}"
-
+    # Validate project path
+    project_path = project or get_project_path()
     if not project_path.is_dir():
         error_handler.handle_error(
             CodeWeaverError(
@@ -252,33 +270,64 @@ def config(
 
     display.console.print(f"[dim]Project:[/dim] {project_path}\n")
 
-    # Determine final config path
-    final_config_path = config_path or project_path / f"codeweaver.{config_extension}"
-
-    if final_config_path.exists() and not force:
-        if Confirm.ask(
-            f"[yellow]Configuration file already exists at {final_config_path}. Overwrite?[/yellow]",
-            default=False,
-        ):
-            created_path = _create_codeweaver_config(
-                project_path,
-                profile=profile,
-                vector_deployment=vector_deployment,
-                vector_url=parsed_vector_url,
-                config_path=final_config_path,
-            )
-            display.print_success(f"Config created: {created_path}\n")
-        else:
-            display.print_warning("Skipping CodeWeaver config creation.\n")
-    else:
-        created_path = _create_codeweaver_config(
-            project_path,
-            profile=profile,
-            vector_deployment=vector_deployment,
-            vector_url=parsed_vector_url,
-            config_path=final_config_path,
+    # Validate vector_url if cloud deployment
+    if vector_deployment == "cloud" and not vector_url:
+        error_handler.handle_error(
+            CodeWeaverError(
+                "Vector URL is required for cloud vector deployment. "
+                "Please provide a valid --vector-url when using --vector-deployment=cloud."
+            ),
+            "Configuration validation",
+            exit_code=1,
         )
-        display.print_completion(f"Config created: {created_path}\n")
+
+    # Adjust profile for cloud deployment
+    if vector_deployment == "cloud":
+        if profile_enum == ProviderProfile.RECOMMENDED:
+            profile_enum = ProviderProfile.RECOMMENDED_CLOUD
+        elif profile_enum != ProviderProfile.RECOMMENDED_CLOUD:
+            raise ConfigurationError(
+                "Cloud vector deployment requires the RECOMMENDED_CLOUD profile."
+            )
+
+    # Determine config file path
+    if not config_path:
+        match config_level:
+            case "local":
+                config_path = project_path / f"codeweaver.local.{config_extension}"
+            case "project":
+                config_path = project_path / f"codeweaver.{config_extension}"
+            case "user":
+                config_path = get_user_config_dir() / f"codeweaver.{config_extension}"
+
+    if not (_is_config_path(config_path)):
+        error_handler.handle_error(
+            CodeWeaverError(
+                f"Invalid configuration file path: {config_path}. "
+                "Please provide a valid path ending in .toml, .yaml, .yml, or .json."
+            ),
+            "Configuration path validation",
+            exit_code=1,
+        )
+
+    # Handle existing configuration
+    if (
+        config_path
+        and config_path.exists()
+        and not force
+        and not interaction.confirm(
+            f"[yellow]Configuration file already exists at {config_path}. Overwrite?[/yellow]",
+            default=False,
+        )
+    ):
+        display.print_warning("Skipping CodeWeaver config creation.\n")
+        return
+
+    # Create the configuration
+    created_path = _create_codeweaver_config(
+        project_path, profile=profile_enum, vector_url=None, config_path=cast(Path, config_path)
+    )
+    display.print_completion(f"Config created: {created_path}\n")
 
 
 def _get_client_config_path(
@@ -339,7 +388,7 @@ def _get_client_config_path(
 
 def _get_user_config_path(sys, provider: str, file_name: str, os):
     """Get user config path for specific provider based on OS."""
-    from codeweaver.common.utils.utils import get_user_config_dir
+    from codeweaver.core import get_user_config_dir
 
     user_configdir = get_user_config_dir(base_only=True)
     return user_configdir / provider / file_name
@@ -366,7 +415,7 @@ def _create_stdio_config(
     Returns:
         StdioCodeWeaverConfig instance
     """
-    from codeweaver.config.mcp import StdioCodeWeaverConfig
+    from codeweaver.server.config.mcp import StdioCodeWeaverConfig
 
     # Build the command - CodeWeaver doesn't need uv environment
     # Explicitly specify stdio transport to make configuration unambiguous
@@ -409,7 +458,7 @@ def _create_remote_config(
     Returns:
         CodeWeaverMCPConfig instance
     """
-    from codeweaver.config.mcp import CodeWeaverMCPConfig
+    from codeweaver.server.config.mcp import CodeWeaverMCPConfig
 
     # For HTTP transport, we just need the URL
     # No command execution needed - client connects directly to running server
@@ -446,7 +495,7 @@ def _handle_write_output(
     Raises:
         ValueError: If configuration is invalid or client doesn't support the config level
     """
-    from codeweaver.config.mcp import MCPConfig
+    from codeweaver.server.config.mcp import MCPConfig
 
     display = _display
     error_handler = CLIErrorHandler(display)
@@ -689,7 +738,7 @@ def mcp(
     display.print_section("MCP Client Configuration Setup")
 
     # Determine project path
-    project_path = project or resolve_project_root()
+    project_path = project or get_project_path()
     project_path = Path(project_path).resolve()
     display.console.print(f"[dim]Project:[/dim] {project_path}\n")
 
@@ -732,7 +781,7 @@ def init(
     mcp_only: Annotated[bool, cyclopts.Parameter(name=["--mcp-only"])] = False,
     quickstart: Annotated[bool, cyclopts.Parameter(name=["--quickstart", "-q"])] = False,
     profile: Annotated[
-        Literal["recommended", "quickstart", "test"],
+        Literal["recommended", "recommended-cloud", "quickstart", "testing", "testing-db"],
         cyclopts.Parameter(
             name=["--profile"],
             help="Configuration profile to use (recommended, quickstart, or test). Defaults to 'recommended' with --recommended.",
@@ -842,11 +891,14 @@ def init(
         "init", "Create a CodeWeaver config and/or add CodeWeaver to your MCP clients."
     )
 
+    # Convert string profile to enum
+    profile_enum = ProviderProfile.from_string(profile)
+
     if quickstart:
-        profile = "quickstart"
+        profile_enum = ProviderProfile.QUICKSTART
 
     # Determine project path
-    project_path = (project or resolve_project_root()).resolve()
+    project_path = (project or get_project_path()).resolve()
     if not project_path.exists():
         error_handler.handle_error(
             CodeWeaverError(f"Project path does not exist: {project_path}"),
@@ -874,7 +926,7 @@ def init(
 
         config(
             project=project_path,
-            profile=profile,
+            profile=profile_enum.variable,  # ty:ignore[invalid-argument-type]
             quickstart=quickstart,
             vector_deployment=vector_deployment,
             vector_url=vector_url,
@@ -993,7 +1045,8 @@ WantedBy=default.target
 def _escape_xml(text: str) -> str:
     """Escape special characters for XML content."""
     return (
-        text.replace("&", "&amp;")
+        text
+        .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .replace('"', "&quot;")
@@ -1323,7 +1376,7 @@ def service(
     display.print_command_header("init service", "Install CodeWeaver as a system service")
 
     # Determine project path
-    project_path = (project or resolve_project_root()).resolve()
+    project_path = (project or get_project_path()).resolve()
     display.print_info(f"Working directory: {project_path}\n")
 
     # Find the codeweaver executable
@@ -1382,4 +1435,4 @@ if __name__ == "__main__":
     main()
 
 
-__all__ = ("app",)
+__all__ = ()

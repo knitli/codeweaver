@@ -125,7 +125,7 @@ Validates complete index → search workflows:
 @pytest.mark.asyncio
 async def test_my_search_behavior(real_providers, known_test_codebase):
     """Test actual search behavior with real embeddings."""
-    from codeweaver.agent_api.find_code import find_code
+    from codeweaver.agent_api import find_code
 
     # This uses REAL embeddings, REAL vector store, REAL search
     response = await find_code(
@@ -284,13 +284,13 @@ pytest -m "integration and real_providers"
 ### Tests fail with "Model not found"
 ```bash
 # Download models manually
-python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('ibm-granite/granite-embedding-english-r2')"
+python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('ibm-granite/granite-embedding-30m-english')"
 ```
 
 ### Tests fail with dimension mismatch
 - Check embedding model outputs correct dimensions
 - Verify vector store configured for model dimensions
-- This is exactly the kind of bug Tier 2 tests catch!
+- This is exactly the category of bug Tier 2 tests catch!
 
 ### Search doesn't find expected files
 - ✅ **This is a real quality issue** - don't change the test!

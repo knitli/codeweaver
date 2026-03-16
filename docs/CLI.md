@@ -257,7 +257,7 @@ $ codeweaver list providers [ARGS]
 
 **Options**:
 
-* `-k, --kind`: Filter by provider kind  *[choices: data, embedding, sparse-embedding, reranking, vector-store, agent, unset]*  *[default: embedding]*
+* `-k, --category`: Filter by provider category  *[choices: data, embedding, sparse-embedding, reranking, vector-store, agent, unset]*  *[default: embedding]*
 
 
 ## `codeweaver list models`
@@ -281,7 +281,7 @@ $ codeweaver list models PROVIDER-NAME
 
 List all embedding providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind embedding
+Equivalent to: codeweaver list providers --category embedding
 
 **Usage**:
 
@@ -294,7 +294,7 @@ $ codeweaver list embedding
 
 List all embedding providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind embedding
+Equivalent to: codeweaver list providers --category embedding
 
 **Usage**:
 
@@ -307,7 +307,7 @@ $ codeweaver list embed
 
 List all sparse-embedding providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind sparse-embedding
+Equivalent to: codeweaver list providers --category sparse-embedding
 
 **Usage**:
 
@@ -320,7 +320,7 @@ $ codeweaver list sparse-embedding
 
 List all vector-store providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind vector-store
+Equivalent to: codeweaver list providers --category vector-store
 
 **Usage**:
 
@@ -337,7 +337,7 @@ $ codeweaver list vector-store [ARGS]
 
 List all reranking providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind reranking
+Equivalent to: codeweaver list providers --category reranking
 
 **Usage**:
 
@@ -350,7 +350,7 @@ $ codeweaver list reranking
 
 List all reranking providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind reranking
+Equivalent to: codeweaver list providers --category reranking
 
 **Usage**:
 
@@ -363,7 +363,7 @@ $ codeweaver list rerank
 
 List all agent providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind agent
+Equivalent to: codeweaver list providers --category agent
 
 **Usage**:
 
@@ -376,7 +376,7 @@ $ codeweaver list agent
 
 List all data providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind data
+Equivalent to: codeweaver list providers --category data
 
 **Usage**:
 
@@ -420,7 +420,7 @@ $ codeweaver ls providers [ARGS]
 
 **Options**:
 
-* `-k, --kind`: Filter by provider kind  *[choices: data, embedding, sparse-embedding, reranking, vector-store, agent, unset]*  *[default: embedding]*
+* `-k, --category`: Filter by provider category  *[choices: data, embedding, sparse-embedding, reranking, vector-store, agent, unset]*  *[default: embedding]*
 
 
 ## `codeweaver ls models`
@@ -444,7 +444,7 @@ $ codeweaver ls models PROVIDER-NAME
 
 List all embedding providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind embedding
+Equivalent to: codeweaver list providers --category embedding
 
 **Usage**:
 
@@ -457,7 +457,7 @@ $ codeweaver ls embedding
 
 List all embedding providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind embedding
+Equivalent to: codeweaver list providers --category embedding
 
 **Usage**:
 
@@ -470,7 +470,7 @@ $ codeweaver ls embed
 
 List all sparse-embedding providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind sparse-embedding
+Equivalent to: codeweaver list providers --category sparse-embedding
 
 **Usage**:
 
@@ -483,7 +483,7 @@ $ codeweaver ls sparse-embedding
 
 List all vector-store providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind vector-store
+Equivalent to: codeweaver list providers --category vector-store
 
 **Usage**:
 
@@ -500,7 +500,7 @@ $ codeweaver ls vector-store [ARGS]
 
 List all reranking providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind reranking
+Equivalent to: codeweaver list providers --category reranking
 
 **Usage**:
 
@@ -513,7 +513,7 @@ $ codeweaver ls reranking
 
 List all reranking providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind reranking
+Equivalent to: codeweaver list providers --category reranking
 
 **Usage**:
 
@@ -526,7 +526,7 @@ $ codeweaver ls rerank
 
 List all agent providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind agent
+Equivalent to: codeweaver list providers --category agent
 
 **Usage**:
 
@@ -539,7 +539,7 @@ $ codeweaver ls agent
 
 List all data providers (shortcut).
 
-Equivalent to: codeweaver list providers --kind data
+Equivalent to: codeweaver list providers --category data
 
 **Usage**:
 

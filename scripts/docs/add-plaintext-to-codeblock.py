@@ -31,7 +31,7 @@ def add_plaintext_to_empty_language(codeblock: str) -> str:
     )
 
 
-def find_blocks_in_file(file_path: Path) -> list[re.Match | None]:
+def find_blocks_in_file(file_path: Path) -> list[re.Match[str]]:
     """
     Find all code blocks in a file.
     """

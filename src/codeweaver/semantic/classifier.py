@@ -17,25 +17,43 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, NamedTuple, cast
+from typing import TYPE_CHECKING, Annotated, cast
 
 from ast_grep_py import SgNode
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
-from typing_extensions import TypeIs
 
-from codeweaver.common.utils.utils import rpartial
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types.aliases import CategoryName, CategoryNameT, ThingNameT
-from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core import (
+    BasedModel,
+    BaseEnum,
+    CategoryName,
+    CategoryNameT,
+    SemanticSearchLanguage,
+    ThingNameT,
+    TypeIs,
+    generate_field_title,
+    rpartial,
+)
+from codeweaver.core.constants import DEFAULT_SEMANTIC_IDENTIFICATION_CONFIDENCE_THRESHOLD
+from codeweaver.core.di import INJECTED
 from codeweaver.semantic.classifications import ImportanceRank, SemanticClass
+from codeweaver.semantic.dependencies import ThingRegistryDep
 
 
 if TYPE_CHECKING:
     from codeweaver.semantic.ast_grep import AstThing
     from codeweaver.semantic.grammar import CompositeThing, Token
+    from codeweaver.semantic.registry import ThingRegistry
 
 
-CONFIDENCE_THRESHOLD = 0.80
+def _get_registry(registry: ThingRegistryDep = INJECTED) -> ThingRegistry:
+    """Lazily import and return the global ThingRegistry instance."""
+    from codeweaver.core.di.dependency import DependsPlaceholder, _InjectedProxy
+
+    if isinstance(registry, (_InjectedProxy, DependsPlaceholder)):
+        from codeweaver.semantic.ast_grep import AstThing
+
+        return AstThing._thing_registry()
+    return registry
 
 
 def is_token(thing: CompositeThing | Token) -> TypeIs[Token]:
@@ -130,13 +148,13 @@ class EvidenceKind(int, BaseEnum):
             return "No evidence available for classification."
 
         summaries = (
-            f"- {kind.as_title}: {kind.statement} ({kind.value})"
+            f"- {kind.as_title}: {kind.statement} ({kind.variable})"
             for kind in sorted(kinds, reverse=True)
         )
         return "\n".join(summaries)
 
 
-class GrammarClassificationResult(NamedTuple):
+class GrammarClassificationResult(BasedModel):
     """Result of grammar-based classification.
 
     Attributes:
@@ -149,29 +167,42 @@ class GrammarClassificationResult(NamedTuple):
     """
 
     classification: Annotated[
-        SemanticClass, Field(description="Semantic classification assigned to the node")
+        SemanticClass,
+        Field(
+            description="Semantic classification assigned to the node",
+            field_title_generator=generate_field_title,
+        ),
     ]
     rank: Annotated[
         ImportanceRank,
         Field(
             description="Importance rank (1-5), lower is more important",
             default_factory=lambda data: ImportanceRank.from_classification(data["classification"]),
+            field_title_generator=generate_field_title,
         ),
     ]
-    classification_method: ClassificationMethod
-    evidence: Annotated[
-        tuple[EvidenceKind, ...],
-        Field(description="Kinds of evidence used for classification", default_factory=tuple),
-    ]
+    classification_method: ClassificationMethod = Field(
+        description="Method used for classification", field_title_generator=generate_field_title
+    )
+    evidence: tuple[EvidenceKind, ...] = Field(
+        description="Kinds of evidence used for classification",
+        default_factory=tuple,
+        field_title_generator=generate_field_title,
+    )
     adjustment: Annotated[
-        int, Field(description="Manual adjustment to confidence. Any integer.")
+        int,
+        Field(
+            description="Manual adjustment to confidence. Any integer.",
+            field_title_generator=generate_field_title,
+        ),
     ] = 0
 
     alternate_classifications: (
         Annotated[
             dict[SemanticClass, tuple[EvidenceKind, ...]],
             Field(
-                description="Alternate classifications for the node. Only used when there are multiple classifications and none above the confidence threshold."
+                description="Alternate classifications for the node. Only used when there are multiple classifications and none above the confidence threshold.",
+                field_title_generator=generate_field_title,
             ),
         ]
         | None
@@ -180,16 +211,21 @@ class GrammarClassificationResult(NamedTuple):
     assessment_comment: Annotated[
         str | None,
         Field(
-            description="Optional human-readable comment regarding the classification assessment."
+            description="Optional human-readable comment regarding the classification assessment.",
+            field_title_generator=generate_field_title,
         ),
     ] = None
 
     differentiator: Annotated[
         Callable[[AstThing[SgNode]], SemanticClass | None] | None,
         Field(
-            description="Optional function to differentiate between alternate classifications based on AST node context. The function receives an AstThing and returns a SemanticClass or None."
+            description="Optional function to differentiate between alternate classifications based on AST node context. The function receives an AstThing and returns a SemanticClass or None.",
+            field_title_generator=generate_field_title,
         ),
     ] = None
+
+    def _telemetry_keys(self) -> None:
+        return
 
     @computed_field(
         description="Confidence score (0.0-1.0) computed from evidence kinds and adjustment",
@@ -203,7 +239,7 @@ class GrammarClassificationResult(NamedTuple):
     @computed_field(description="Whether the confidence level is above the threshold", repr=True)
     def is_confident(self) -> bool:
         """Whether the confidence level is above the threshold."""
-        return self.confidence >= CONFIDENCE_THRESHOLD
+        return self.confidence >= DEFAULT_SEMANTIC_IDENTIFICATION_CONFIDENCE_THRESHOLD
 
     @computed_field(description="Human-readable summary of the evidence kinds used", repr=False)
     def evidence_summary(self) -> str:
@@ -279,29 +315,42 @@ class GrammarClassificationResult(NamedTuple):
             # we adjust confidence based on the disparity of classification simple_ranks -- wide disparity means less confidence
             # we first compare true ranks, then the classification's simple_rank (a 1 to n for each classification)
             adjustment += cls._adjust_for_disparity(results, max_confidence_result)
-            return max_confidence_result._replace(
-                evidence=evidence,
-                adjustment=adjustment,
-                alternate_classifications={
-                    result.classification: result.evidence
-                    for result in results
-                    if result.classification != max_confidence_result.classification
-                },
+            return max_confidence_result.model_copy(
+                update={
+                    "evidence": evidence,
+                    "adjustment": adjustment,
+                    "alternate_classifications": {
+                        result.classification: result.evidence
+                        for result in results
+                        if result.classification != max_confidence_result.classification
+                    },
+                }
             )
         if len([result for result in results if result != max_confidence_result]) > 1:
             # we adjust confidence based on the disparity of classification simple_ranks -- wide disparity means less confidence
             # we first compare true ranks, then the classification's simple_rank (a 1 to n for each classification)
             adjustment = cls._adjust_for_disparity(results, max_confidence_result)
             results = [result for result in results if result != max_confidence_result]
-            return max_confidence_result._replace(
-                adjustment=adjustment,
-                alternate_classifications={
-                    result.classification: result.evidence
-                    for result in results
-                    if result.classification != max_confidence_result.classification
-                },
+            return max_confidence_result.model_copy(
+                update={
+                    "adjustment": adjustment,
+                    "alternate_classifications": {
+                        result.classification: result.evidence
+                        for result in results
+                        if result.classification != max_confidence_result.classification
+                    },
+                }
             )
         return max_confidence_result
+
+
+def _rebuild_grammar_classification_result() -> None:
+    from codeweaver.semantic.ast_grep import AstThing  # noqa: F401
+
+    GrammarClassificationResult.model_rebuild()
+
+
+_rebuild_grammar_classification_result()
 
 
 class GrammarBasedClassifier:
@@ -339,25 +388,25 @@ class GrammarBasedClassifier:
             evidence=[EvidenceKind.SPECIFIC_THING, EvidenceKind.LANGUAGE, EvidenceKind.HEURISTIC],
             adjustment=100,
             differentiator=None,
-        )  # type: ignore
+        )
 
         if not thing.can_be_anywhere:
             return None
         # NOTE: we know exactly what each of these are from empirical analysis of all can_be_anywhere Things across all languages
         if language == SemanticSearchLanguage.SWIFT:
             if str(thing.name).lower() == "comment":
-                return result_func(SemanticClass.SYNTAX_ANNOTATION)  # type: ignore
+                return result_func(SemanticClass.SYNTAX_ANNOTATION)
             if str(thing.name).lower() == "multiline_comment":
-                return result_func(SemanticClass.DOCUMENTATION_STRUCTURED)  # type: ignore
+                return result_func(SemanticClass.DOCUMENTATION_STRUCTURED)
         if (
             str(thing.name).lower() == "line_continuation"
             and language == SemanticSearchLanguage.PYTHON
         ):
             # Special case: Python line_continuation is SYNTAX_PUNCTUATION
-            return result_func(SemanticClass.SYNTAX_PUNCTUATION)  # type: ignore
+            return result_func(SemanticClass.SYNTAX_PUNCTUATION)
         if str(thing.name).lower() == "text_interpolation":
             # Special case: (PHP) text_interpolation is SYNTAX_IDENTIFIER
-            return result_func(SemanticClass.SYNTAX_IDENTIFIER)  # type: ignore
+            return result_func(SemanticClass.SYNTAX_IDENTIFIER)
         return None
 
     def _handle_comment_cases(
@@ -375,7 +424,7 @@ class GrammarBasedClassifier:
                 ],
                 adjustment=90,
                 differentiator=None,
-            )  # type: ignore
+            )
         if language == SemanticSearchLanguage.RUST and str(thing.name).lower() in {
             "doc_comment",
             "block_comment",
@@ -389,17 +438,13 @@ class GrammarBasedClassifier:
                     EvidenceKind.SIMPLE_NAME_PATTERN,
                 ],
                 adjustment=90,
-                differentiator=lambda thing: (  # type: ignore
+                differentiator=lambda thing: (
                     SemanticClass.DOCUMENTATION_STRUCTURED
-                    if thing.text.strip().startswith(("/**", "///", "//!", "#[doc", "#![doc"))  # type: ignore
+                    if thing.text.strip().startswith(("/**", "///", "//!", "#[doc", "#![doc"))
                     else SemanticClass.SYNTAX_ANNOTATION
-                ),  # type: ignore
+                ),
             )
-        if str(thing.name).lower() in {  # type: ignore
-            "block_comment",
-            "multiline_comment",
-            "comment",
-        }:
+        if str(thing.name).lower() in {"block_comment", "multiline_comment", "comment"}:
             return self._to_classification_result(
                 SemanticClass.DOCUMENTATION_STRUCTURED,
                 method=ClassificationMethod.SPECIFIC_THING,
@@ -410,7 +455,7 @@ class GrammarBasedClassifier:
                 ],
                 adjustment=-30 if str(thing.name) == "comment" else -20,
                 differentiator=None,
-            )  # type: ignore
+            )
         return None
 
     def _classify_from_composite_checks(
@@ -443,9 +488,7 @@ class GrammarBasedClassifier:
         """Classify known exceptions that don't fit other patterns or that have very high confidence based on their specific characteristics."""
         if classification := self._handle_comment_cases(thing, language):
             return classification
-        from codeweaver.semantic.registry import get_registry
-
-        registry = get_registry()
+        registry = _get_registry()
         result_func = rpartial(
             self._to_classification_result,
             method=ClassificationMethod.SPECIFIC_THING,
@@ -455,7 +498,7 @@ class GrammarBasedClassifier:
         if is_token(thing) and (str(thing.name) in registry.composite_things[language]):
             # a rare number of Things are *both* Tokens and CompositeThings in some languages
             return result_func(
-                classification=SemanticClass.from_token_purpose(thing.purpose, thing.name)  # type: ignore
+                classification=SemanticClass.from_token_purpose(thing.purpose, str(thing.name))
             )
         if (
             is_composite_thing(thing)
@@ -463,7 +506,7 @@ class GrammarBasedClassifier:
             and (token := (registry.tokens[language][thing.name]))
         ):
             return result_func(
-                classification=SemanticClass.from_token_purpose(token.purpose, token.name)  # type: ignore
+                classification=SemanticClass.from_token_purpose(token.purpose, str(token.name))
             )
         if is_composite_thing(thing):
             return self._classify_from_composite_checks(thing, language)
@@ -492,21 +535,21 @@ class GrammarBasedClassifier:
         )
         match thing_name:
             case "class" | "module" | "singleton_class":
-                return result_func(classification=SemanticClass.DEFINITION_TYPE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_TYPE)
             case "method" | "singleton_method":
-                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)
             case "if" | "unless" | "case" | "case_match":
-                return result_func(classification=SemanticClass.FLOW_BRANCHING)  # type: ignore
+                return result_func(classification=SemanticClass.FLOW_BRANCHING)
             case "while" | "until" | "for":
-                return result_func(classification=SemanticClass.FLOW_ITERATION)  # type: ignore
+                return result_func(classification=SemanticClass.FLOW_ITERATION)
             case "break" | "next" | "redo" | "retry" | "return" | "yield":
-                return result_func(classification=SemanticClass.FLOW_CONTROL)  # type: ignore
+                return result_func(classification=SemanticClass.FLOW_CONTROL)
             case "unary":
-                return result_func(classification=SemanticClass.OPERATION_OPERATOR)  # type: ignore
+                return result_func(classification=SemanticClass.OPERATION_OPERATOR)
             case "call":
-                return result_func(classification=SemanticClass.OPERATION_INVOCATION)  # type: ignore
+                return result_func(classification=SemanticClass.OPERATION_INVOCATION)
             case "lambda":
-                return result_func(classification=SemanticClass.EXPRESSION_ANONYMOUS)  # type: ignore
+                return result_func(classification=SemanticClass.EXPRESSION_ANONYMOUS)
             case (
                 "simple_numeric"
                 | "character"
@@ -520,11 +563,11 @@ class GrammarBasedClassifier:
                 | "symbol_array"
                 | "hash"
             ):
-                return result_func(classification=SemanticClass.SYNTAX_LITERAL)  # type: ignore
+                return result_func(classification=SemanticClass.SYNTAX_LITERAL)
             case "lhs":
-                return result_func(classification=SemanticClass.SYNTAX_IDENTIFIER)  # type: ignore
+                return result_func(classification=SemanticClass.SYNTAX_IDENTIFIER)
             case "begin" | "subshell" | "parenthesized_statements" | "heredoc_beginning":
-                return result_func(classification=SemanticClass.SYNTAX_PUNCTUATION)  # type: ignore
+                return result_func(classification=SemanticClass.SYNTAX_PUNCTUATION)
             case _:
                 return None
 
@@ -580,31 +623,31 @@ class GrammarBasedClassifier:
                 | "type_item"
                 | "impl_item"
             ):
-                return result_func(classification=SemanticClass.DEFINITION_TYPE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_TYPE)
 
             # Tier 1: Callable definitions
             case "function_item" | "function_signature_item":
-                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)
 
             # Tier 1: Data definitions
             case "const_item" | "static_item" | "let_declaration" | "associated_type":
-                return result_func(classification=SemanticClass.DEFINITION_DATA)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_DATA)
 
             # Tier 2: Module boundaries
             case "use_declaration" | "extern_crate_declaration" | "mod_item" | "foreign_mod_item":
-                return result_func(classification=SemanticClass.BOUNDARY_MODULE)  # type: ignore
+                return result_func(classification=SemanticClass.BOUNDARY_MODULE)
 
             # Syntax/metadata
             case "attribute_item" | "inner_attribute_item":
-                return result_func(classification=SemanticClass.SYNTAX_ANNOTATION)  # type: ignore
+                return result_func(classification=SemanticClass.SYNTAX_ANNOTATION)
 
             # Macros - treat as callable definitions
             case "macro_invocation" | "macro_definition":
-                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)
 
             # Empty statement
             case "empty_statement":
-                return result_func(classification=SemanticClass.SYNTAX_PUNCTUATION)  # type: ignore
+                return result_func(classification=SemanticClass.SYNTAX_PUNCTUATION)
             case _:
                 return None
 
@@ -633,20 +676,20 @@ class GrammarBasedClassifier:
         match thing_name:
             # Tier 1: Callable definitions
             case "function_declaration" | "function_definition" | "given_definition":
-                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)
             # Tier 1: Type definitions
             case "class_definition" | "trait_definition" | "enum_definition" | "object_definition":
-                return result_func(classification=SemanticClass.DEFINITION_TYPE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_TYPE)
             case "type_definition":
-                return result_func(classification=SemanticClass.DEFINITION_TYPE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_TYPE)
             # Tier 1: Data definitions
             case "var_definition" | "val_definition" | "var_declaration" | "val_declaration":
-                return result_func(classification=SemanticClass.DEFINITION_DATA)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_DATA)
             # Tier 2: Module boundaries
             case "import_declaration" | "export_declaration" | "package_clause" | "package_object":
-                return result_func(classification=SemanticClass.BOUNDARY_MODULE)  # type: ignore
+                return result_func(classification=SemanticClass.BOUNDARY_MODULE)
             case "extension_definition":
-                return result_func(classification=SemanticClass.DEFINITION_TYPE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_TYPE)
             case _:
                 return None
 
@@ -667,18 +710,22 @@ class GrammarBasedClassifier:
         """
         thing_name = str(thing.name)
         return {
-            SemanticSearchLanguage.RUBY: lambda: self._classify_ruby_primary(thing_name)
-            # ty seems to think this is not ok -- it's explicitly defined on `Thing` as `__contains__`
-            if CategoryName("primary") in thing  # ty: ignore[unsupported-operator]
-            else None,
-            SemanticSearchLanguage.RUST: lambda: self._classify_rust_declaration_statement(
-                thing_name
-            )
-            if CategoryName("declaration_statement") in thing  # ty: ignore[unsupported-operator]
-            else None,
-            SemanticSearchLanguage.SCALA: lambda: self._classify_scala_definition(thing_name)
-            if CategoryName("definition") in thing  # ty: ignore[unsupported-operator]
-            else None,
+            SemanticSearchLanguage.RUBY: lambda: (
+                self._classify_ruby_primary(thing_name)
+                # ty seems to think this is not ok -- it's explicitly defined on `Thing` as `__contains__`
+                if CategoryName("primary") in thing
+                else None
+            ),
+            SemanticSearchLanguage.RUST: lambda: (
+                self._classify_rust_declaration_statement(thing_name)
+                if CategoryName("declaration_statement") in thing
+                else None
+            ),
+            SemanticSearchLanguage.SCALA: lambda: (
+                self._classify_scala_definition(thing_name)
+                if CategoryName("definition") in thing
+                else None
+            ),
         }.get(language, lambda: None)()
 
     def _classify_by_cross_language_lookup(
@@ -701,9 +748,7 @@ class GrammarBasedClassifier:
         Returns:
             Classification result with reduced confidence, or None if no match found
         """
-        from codeweaver.semantic.registry import get_registry
-
-        registry = get_registry()
+        registry = _get_registry()
 
         thing_name = str(thing.name)
         if (
@@ -746,9 +791,11 @@ class GrammarBasedClassifier:
                     adjustment=-5,  # we have multiple agreeing matches, so less reduction in confidence
                 )
             if combined_results := GrammarClassificationResult.from_results(results):
-                return combined_results._replace(
-                    classification_method=ClassificationMethod.THING_INFERENCE,
-                    adjustment=combined_results.adjustment - 10,  # reduce confidence
+                return combined_results.model_copy(
+                    update={
+                        "classification_method": ClassificationMethod.THING_INFERENCE,
+                        "adjustment": combined_results.adjustment - 10,  # reduce confidence
+                    }
                 )
         return None
 
@@ -813,7 +860,11 @@ class GrammarBasedClassifier:
                     continue
                 # if we have multiple classifications, we need to disambiguate
                 # fast path: if we have a classification above the confidence threshold, and it's the first one, return it immediately
-                if classification.confidence >= CONFIDENCE_THRESHOLD and not results:
+                if (
+                    classification.confidence
+                    >= DEFAULT_SEMANTIC_IDENTIFICATION_CONFIDENCE_THRESHOLD
+                    and not results
+                ):
                     return classification
                 # If we have multiple classifications, we need to disambiguate
                 # We collect all classifications and then choose the best one at the end
@@ -992,7 +1043,7 @@ class GrammarBasedClassifier:
                 )
                 for classification in alternates
                 if classification is not None
-            ]  # type: ignore
+            ]
             return tuple(results) if results else None
         return None
 
@@ -1068,3 +1119,17 @@ class GrammarBasedClassifier:
             evidence=(EvidenceKind.ROLES, EvidenceKind.CONNECTIONS),
             adjustment=10,
         )
+
+    def _telemetry_keys(self) -> None:
+        """Return telemetry keys for this classifier."""
+        return
+
+
+__all__ = (
+    "ClassificationMethod",
+    "EvidenceKind",
+    "GrammarBasedClassifier",
+    "GrammarClassificationResult",
+    "is_composite_thing",
+    "is_token",
+)

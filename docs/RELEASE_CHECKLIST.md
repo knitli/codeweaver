@@ -48,7 +48,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
   
   # Verify version
   uv build
-  ls -la dist/  # Should show: codeweaver_mcp-0.1.0a1-py3-none-any.whl
+  ls -la dist/  # Should show: codeweaver.server.mcp-0.1.0a1-py3-none-any.whl
   ```
 
 - [ ] **Push Release**

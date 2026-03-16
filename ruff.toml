@@ -158,6 +158,9 @@ exclude = [
 convention = "google"
 
 [lint.per-file-ignores]
+"**/**/__init__.py" = [
+  "E402",  # module level import not at top of file
+]
 # Ignore specific rules for certain files
 "**/validation/**/*.py" = [
   "S110",  # try-except-pass
@@ -246,7 +249,7 @@ convention = "google"
 "src/codeweaver/engine/failover.py" = [
   "C901",  # too complex - failover logic has many edge cases
 ]
-"src/codeweaver/engine/indexer/indexer.py" = [
+"src/codeweaver/engine/services/indexing_service.py" = [
   "C901",  # too complex - indexing orchestration is inherently complex
 ]
 "src/codeweaver/engine/resource_estimation.py" = [
@@ -264,6 +267,27 @@ convention = "google"
 ]
 "src/codeweaver/providers/vector_stores/inmemory.py" = [
   "C901",  # too complex - vector store initialization has many conditions
+]
+# Provider config validation has complex asymmetric compatibility checking
+"src/codeweaver/providers/config/categories/embedding.py" = [
+  "C901",  # too complex - asymmetric validation has inherent complexity
+  "G201",  # logger.exception preferred - existing logging style
+  "SIM102",  # nested if - validates multiple independent conditions
+  "TRY300",  # else block - return-in-try pattern intentional
+  "TRY301",  # abstract raise - validation raises are intentional inline
+  "TRY401",  # redundant exception in logging - existing style
+]
+"tools/tests/**/*.py" = [
+  "ANN201",  # missing type annotation for self in method
+  "ANN002",
+  "S101",
+  "S108"
+]
+"tools/**/tests/**/*.py" = [
+  "ANN201",  # missing type annotation for self in method
+  "ANN002",
+  "S101",
+  "S108"
 ]
 
 [lint.isort]

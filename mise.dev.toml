@@ -2,6 +2,9 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+#:tombi schema.strict = false
+
+[prepare.uv]
 
 [settings.python]
 
@@ -11,10 +14,14 @@ pkl = "latest"
 usage = "latest"
 uv = "latest"
 # Quality & validation tools
-"pipx:reuse" = "latest"  # License validation
 "aqua:tombi-toml/tombi" = "latest"
 "ubi:astral-sh/ty" = "latest"
 ruff = "latest"  # Python linting/formatting
+"pipx:ipython" = "latest"
+
+[tools."pipx:reuse"]
+version = "latest"
+python = "3.13"
 
 [env]
 _.python.venv = { path = ".venv" }

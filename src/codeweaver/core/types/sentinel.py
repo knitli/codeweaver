@@ -21,13 +21,13 @@ from pydantic_core import core_schema
 from pydantic_core._pydantic_core import PydanticOmit
 
 from codeweaver.core.types.aliases import LiteralStringT, SentinelName, SentinelNameT
-from codeweaver.core.types.models import BasedModel, clean_sentinel_from_schema
+from codeweaver.core.types.models import BasedModel
 
 
 class DontGenerateJsonSchema(GenerateJsonSchema):
     """GenerateJsonSchema implementation that disables JSON Schema generation."""
 
-    def generate(self, _schema: core_schema.CoreSchema, _error_info: str) -> JsonSchemaValue:  # ty:ignore[invalid-method-override]
+    def generate(self, _schema: core_schema.CoreSchema, _error_info: str) -> JsonSchemaValue:
         """Disable JSON Schema generation by raising an error."""
         raise PydanticOmit
 
@@ -65,9 +65,9 @@ class Sentinel(BasedModel):
         from pydantic_core import core_schema as cs
 
         # Define serialization function
-        def serialize_sentinel(value: Sentinel) -> str:
-            """Serialize Sentinel to string."""
-            return str(value.name)
+        def serialize_sentinel(value: Sentinel) -> None:
+            """Serialize Sentinel to None."""
+            return
 
         assert source_type is cls, "Sentinel can only validate its own instances."  # noqa: S101
         # Use is_instance schema with custom serialization
@@ -77,7 +77,7 @@ class Sentinel(BasedModel):
             cls,
             cls_repr=repr(cls),
             serialization=cs.plain_serializer_function_ser_schema(
-                serialize_sentinel, return_schema=cs.str_schema(), when_used="json"
+                serialize_sentinel, return_schema=cs.none_schema(), when_used="always"
             ),
         )
         # spellchecker:on
@@ -102,7 +102,7 @@ class Sentinel(BasedModel):
         # Include the class's module and fully qualified name in the
         # registry key to support sub-classing.
         registry_key = SentinelName(
-            _sys.intern(f"{cls.__module__}-{cls.__qualname__}-{module_name}-{name}")  # type: ignore
+            _sys.intern(f"{cls.__module__}-{cls.__qualname__}-{module_name}-{name}")
         )
         existing: Sentinel | None = _registry.get(registry_key)
         if existing is not None:
@@ -192,4 +192,19 @@ class Unset(Sentinel):
 UNSET: Unset = Unset(name="Unset", module_name=Sentinel._get_module_name_generator()())  # type: ignore
 
 
-__all__ = ("UNSET", "Sentinel", "SentinelName", "Unset", "clean_sentinel_from_schema")
+class Missing(Sentinel):
+    """Sentinel for missing values."""
+
+
+MISSING: Missing = Missing(name=SentinelName("MISSING"), module_name=__name__)
+
+
+__all__ = (
+    "MISSING",
+    "UNSET",
+    "DontGenerateJsonSchema",
+    "Missing",
+    "Sentinel",
+    "SentinelName",
+    "Unset",
+)

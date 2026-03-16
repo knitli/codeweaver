@@ -13,23 +13,16 @@ from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from enum import Enum, auto, unique
 from functools import cached_property
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
+from typing import TYPE_CHECKING, Any, Self, cast, override
 
 import textcase
 
-from aenum import extend_enum  # type: ignore
-from pydantic import Field, computed_field
-from pydantic.dataclasses import dataclass
-
-from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
+from pydantic import computed_field
 
 
 if TYPE_CHECKING:
     from codeweaver.core.types.aliases import FilteredKeyT
-
-
-type EnumExtend = Callable[[Enum, str], Enum]
-extend_enum: EnumExtend = extend_enum
+    from codeweaver.core.types.dataclasses import BaseEnumData
 
 
 # ================================================
@@ -37,37 +30,74 @@ extend_enum: EnumExtend = extend_enum
 # ================================================
 
 
-@dataclass(config=DATACLASS_CONFIG, order=True, frozen=True)
-class BaseEnumData(DataclassSerializationMixin):
-    """A dataclass to hold enum member data.
-
-    `BaseEnumData` provides a standard structure for enum member data, including name, value, aliases, and description. Subclasses can extend this dataclass to include additional fields as needed.
-    """
-
-    aliases: Annotated[
-        tuple[str, ...],
-        Field(description="The aliases for the enum member.", default_factory=tuple, repr=False),
-    ]
-    _description: (
-        Annotated[str | None, Field(description="The description of the enum member.")] | None
-    ) = None
-
-    # These are just generic fields, define more in subclasses as needed.
-
-    def __init__(
-        self, aliases: Sequence[str] | None = None, description: str | None = None, **kwargs: Any
-    ) -> None:
-        """Initialize the BaseEnumData dataclass."""
-        object.__setattr__(self, "aliases", tuple(aliases) if aliases is not None else ())
-        object.__setattr__(self, "_description", description)
-        for key, val in kwargs.items():
-            object.__setattr__(self, key, val)
-        super().__init__()
-
-
 @unique
 class BaseDataclassEnum(Enum):
-    """A base enum class for enums with dataclass members. Does not come with its 'type' -- you must define that with `BaseEnumData` and subclass your implementation, like: `class MyDataclassEnum(MyCustomBaseEnumDataDataclass, BaseDataclassEnum): ...`."""
+    """A base enum class for enums with dataclass members. Does not come with its 'type' -- you must define that with `codeweaver.core.types.dataclasses.BaseEnumData` and subclass your implementation.
+
+    ## Usage
+
+    Building a dataclass enum is a bit more involved than a standard enum. Steps:
+    1. Create a dataclass. It should inherit from `codeweaver.core.types.dataclasses.BaseEnumData`.
+        - Note that `BaseEnumData` already includes `aliases`, and `description` fields, so you don't need to redefine those unless you want to customize them. `_name` and `_value` are required by `Enum` members, **you cannot use those names or their non-sunder versions (i.e. 'name')**. `_name` will be the name of the Enum member you assign in the class definition, and `_value` *is your dataclass instance*.
+        - It is already a dataclass and does not need a `@dataclass` decorator (which will break it).
+        - Suggestion: I find that it's easiest to define a dataclass-within-a-dataclass, where there is only a single top-level field that is either a typed dict, dataclass or named tuple. It makes constructing the dataclass enum members easier to read.
+    2. Create your enum class, inheriting from `BaseDataclassEnum`.
+    3. Define your enum members, assigning each to an instance of your dataclass.
+    4. Use it.
+
+    ## Example
+
+    ```python
+    from codeweaver.core import BaseEnumData, BaseDataclassEnum
+
+    class ColorData(BaseEnumData):
+        hex_code: str
+        rgb: tuple[int, int, int]
+
+        # Because we are making a serializable dataclass with pydantic,
+        # we *must* define __init__ and set values before calling super().__init__()
+        def __init__(self, hex_code: str, rgb: tuple[int, int, int], *args: Any):
+            # use `object.__setattr__` to avoid pydantic/dataclass immutability issues
+            # it's a hack, but it works. We're not abusing it, just working around limitations.
+            object.__setattr__(self, "hex_code", hex_code)
+            object.__setattr__(self, "rgb", rgb)
+            # now call and validate
+            super().__init__(*args)
+
+    class Color(ColorData, BaseDataclassEnum):
+        # Important: aliases and description are optional *positional* args after the required fields.
+        RED = ColorData(hex_code="#FF0000", rgb=(255, 0, 0), ("rojo", "rouge"), "A bright red color.")
+        GREEN = ColorData(hex_code="#00FF00", rgb=(0, 255, 0))
+        BLUE = ColorData(hex_code="#0000FF", rgb=(0, 0, 255))
+
+        # define methods/properties if you want
+        @property
+        def brightness(self) -> float:
+            r, g, b = self.value.rgb
+            return (r + g + b) / (3 * 255)
+
+    print(Color.RED.value.hex_code)  # Output: #FF0000
+    print(Color.GREEN.variable)      # Output: green
+    print(Color.BLUE.as_title)       # Output: Blue
+    ```
+    """
+
+    def __init__(self, value: BaseDataclassEnum):
+        """Initialize the enum member with a dataclass instance as its value. The dataclass instance should contain all the relevant data for that member, including any aliases and description."""
+        # Ensure that the value is an instance of BaseEnumData
+        if not isinstance(value, BaseEnumData):
+            raise TypeError(
+                f"Value for {self.__class__.__name__} must be an instance of BaseEnumData"
+            )
+        for key in type(value).__annotations__:
+            val = getattr(value, key)
+            object.__setattr__(self, key, val)
+
+    def __new__(cls, value: BaseEnumData) -> Self:
+        """Create a new enum member with the dataclass instance as its value."""
+        obj = object.__new__(cls)
+        object.__setattr__(obj, "_value_", value)
+        return obj
 
     @staticmethod
     def _multiply_variations(s: str) -> set[str]:
@@ -90,7 +120,7 @@ class BaseDataclassEnum(Enum):
         raise NotImplementedError("Subclasses must implement _telemetry_keys method.")
 
     @classmethod
-    def aliases(cls) -> MappingProxyType[str, Enum]:
+    def get_aliases(cls) -> MappingProxyType[str, Enum]:
         """Return a mapping of aliases to enum members."""
         values = {
             alias: member
@@ -98,8 +128,7 @@ class BaseDataclassEnum(Enum):
             for alias in {
                 alias
                 for name in (
-                    member.value._name,
-                    member.value._value,
+                    member.name,
                     *(
                         member.value.aliases
                         if hasattr(member.value, "aliases") and member.value.aliases is not None
@@ -116,7 +145,7 @@ class BaseDataclassEnum(Enum):
         """Convert a string to the corresponding enum member."""
         if value in cls.__members__:
             return cls.__members__[value]
-        if (aliases := cls.aliases()) and (found_member := aliases.get(value)):
+        if (aliases := cls.get_aliases()) and (found_member := aliases.get(value)):
             assert isinstance(found_member, cls)  # noqa: S101
             return found_member
         raise ValueError(f"{value} is not a valid {cls.__qualname__} member")
@@ -150,7 +179,7 @@ class BaseDataclassEnum(Enum):
     @property
     def description(self) -> str | None:
         """Return the description of the enum member."""
-        return self.value._description if hasattr(self.value, "_description") else None
+        return self.value.description if hasattr(self.value, "description") else None
 
     @computed_field
     @property
@@ -171,16 +200,23 @@ class BaseDataclassEnum(Enum):
     @classmethod
     def add_member(cls, name: str, value: BaseEnumData) -> Self:
         """Dynamically add a new member to the enum."""
-        # The type stub signature is (cls, name, *args, **kwargs), but the function applies a tuple to single args (value -> (value,)). Bottom line: it works fine. This is much more clear.
-        extend_enum(cls, textcase.upper(name), value)  # ty: ignore[too-many-positional-arguments]
+        from codeweaver.core.types.utils import add_enum_member
+
+        add_enum_member(cls, name, value)
         return cls(value)
+
+    def add_alias(self, alias_name: str) -> None:
+        """Add an alias to the enum member."""
+        from codeweaver.core.types.utils import add_enum_alias
+
+        add_enum_alias(self, alias_name)
 
 
 @unique
 class BaseEnum(Enum):
     """An enum class that provides common functionality for all enums in the CodeWeaver project. Enum members must be unique and either all strings or all integers.
 
-    `aenum.extend_enum` allows us to dynamically add members, such as for plugin systems.
+    `add_enum_member` allows us to dynamically add members, such as for plugin systems.
 
     BaseEnum provides convenience methods for converting between strings and enum members, checking membership, and retrieving members and members' values, and adding new members dynamically.
     """
@@ -225,7 +261,7 @@ class BaseEnum(Enum):
                 if isinstance(alias, str):
                     names.add(alias)
                 elif isinstance(alias, list | tuple):
-                    names |= set(alias)  # type: ignore
+                    names |= set(alias)
             names |= {n for name in names.copy() for n in self._multiply_variations(name)}
             return tuple(sorted(names))
         return (self.value, self.name, self.variable, self.as_title)
@@ -333,17 +369,21 @@ class BaseEnum(Enum):
     @classmethod
     def _value_type(cls) -> type[int | str]:
         """Return the type of the enum values."""
-        if all(isinstance(member.value, str) for member in cls.__members__.values() if member):
+        # Use simple heuristic: check the first member's value type
+        # All members must have the same type by convention in this project.
+        if not cls.__members__:
             return str
-        if all(
-            isinstance(member.value, int)
-            for member in cls.__members__.values()
-            if member and member.value
-        ):
-            return int
-        raise TypeError(
-            f"All members of {cls.__qualname__} must have the same value type and must be either str or int."
-        )
+        first_member = next(iter(cls.__members__.values()))
+        # Handle cases where member might be None during initialization
+        if first_member is None:
+            return str
+        # Use object.__getattribute__ to avoid triggering property recursion
+        try:
+            val = object.__getattribute__(first_member, "_value_")
+        except AttributeError:
+            val = first_member.value
+
+        return type(val) if isinstance(val, int | str) else str
 
     def __lt__(self, other: Self) -> bool:
         """Less than comparison for enum members."""
@@ -429,11 +469,17 @@ class BaseEnum(Enum):
     def add_member(cls, name: str, value: str | int) -> Self:
         """Dynamically add a new member to the enum."""
         if isinstance(value, str):
-            name = cls._encode_name(name).upper()
-            value = name.lower()
-        # the signature here is (cls, name, *args, **kwargs), but the function applies a tuple to single args (value -> (value,)). Bottom line: it works fine. This is much more clear.
-        extend_enum(cls, name, value)  # ty: ignore[too-many-positional-arguments]
+            name = name.upper().replace(" ", "_").replace("-", "_")
+        from codeweaver.core.types.utils import add_enum_member
+
+        add_enum_member(cls, name, value)
         return cls(value)
+
+    def add_alias(self, alias_name: str) -> None:
+        """Add an alias to the enum member."""
+        from codeweaver.core.types.utils import add_enum_alias
+
+        add_enum_alias(self, alias_name)
 
     def serialize_for_cli(self) -> str:
         """Serialize the enum member for CLI display."""
@@ -481,10 +527,12 @@ class AnonymityConversion(BaseEnum):
         functions: MappingProxyType[AnonymityConversion, FilteredCallable] = MappingProxyType({
             AnonymityConversion.BOOLEAN: lambda v: bool(v),
             AnonymityConversion.COUNT: lambda v: len(v) if isinstance(v, list) else 1,
-            AnonymityConversion.DISTRIBUTION: lambda v: {item: v.count(item) for item in set(v)}  # type: ignore
-            if (isinstance(v, Sequence) and not isinstance(v, str))
-            else {v: 1},  # type: ignore
-            AnonymityConversion.AGGREGATE: lambda v: sum(v) if isinstance(v, list) else v,  # type: ignore
+            AnonymityConversion.DISTRIBUTION: lambda v: (
+                {item: v.count(item) for item in set(v)}
+                if (isinstance(v, Sequence) and not isinstance(v, str))
+                else {v: 1}
+            ),
+            AnonymityConversion.AGGREGATE: lambda v: sum(v) if isinstance(v, list) else v,
             AnonymityConversion.HASH: lambda v: _hash_it(v),
             AnonymityConversion.TEXT_COUNT: lambda v: len(v) if isinstance(v, str) else 0,
             AnonymityConversion.FORBIDDEN: lambda v: None,  # Accept value but return None
@@ -492,4 +540,10 @@ class AnonymityConversion(BaseEnum):
         return functions.get(self, lambda v: v)(values)
 
 
-__all__ = ("AnonymityConversion", "BaseDataclassEnum", "BaseEnum", "BaseEnumData")
+__all__ = (
+    "AnonymityConversion",
+    "BaseDataclassEnum",
+    "BaseEnum",
+    "FilteredCallable",
+    "FilteredReturn",
+)

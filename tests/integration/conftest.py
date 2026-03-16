@@ -1,4 +1,4 @@
-# sourcery skip: docstrings-for-classes
+# sourcery skip: docstrings-for-classes, require-parameter-annotation, require-return-annotation
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -9,6 +9,8 @@
 from __future__ import annotations
 
 import contextlib
+import logging
+import os
 
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
@@ -17,44 +19,123 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from codeweaver.common.registry.provider import ProviderRegistry
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+from codeweaver.core.utils import has_package
+from codeweaver.providers import (
+    FastEmbedEmbeddingProvider,
+    MemoryVectorStoreProvider,
+    MemoryVectorStoreProviderSettings,
+)
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
-    from codeweaver.providers.embedding.providers.sentence_transformers import (
+    from codeweaver.core import CodeChunk, DictView
+    from codeweaver.providers import (
+        EmbeddingModelCapabilities,
+        FastEmbedEmbeddingProvider,
+        FastEmbedRerankingProvider,
+        FastEmbedSparseProvider,
+        RerankingModelCapabilities,
         SentenceTransformersEmbeddingProvider,
-        SentenceTransformersSparseProvider,
-    )
-    from codeweaver.providers.reranking.providers.sentence_transformers import (
         SentenceTransformersRerankingProvider,
+        SentenceTransformersSparseProvider,
+        SparseEmbeddingModelCapabilities,
     )
+    from codeweaver.server import (
+        CodeWeaverSettingsDict,
+        EmbeddingProviderSettings,
+        RerankingProviderSettings,
+        SparseEmbeddingProviderSettings,
+    )
+
+logger = logging.getLogger(__name__)
 
 # ===========================================================================
 # CLI Mock Fixtures
 # ===========================================================================
 
+os.environ["CODEWEAVER_TEST_MODE"] = "true"
+
+# Disable SSL verification warnings for tests (WSL time sync issues cause false positives)
+import warnings
+
+
+with contextlib.suppress(ImportError):
+    from urllib3.exceptions import SystemTimeWarning
+
+    warnings.filterwarnings("ignore", category=SystemTimeWarning)
+
+# Also suppress general SSL and verification warnings that can be triggered by time issues
+warnings.filterwarnings("ignore", message=".*System time is way off.*")
+warnings.filterwarnings("ignore", message=".*SSL verification errors.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
+
+
+def _set_settings() -> DictView[CodeWeaverSettingsDict]:
+    """Get the global settings for tests.
+
+    With CODEWEAVER_TEST_MODE="true", CodeWeaverSettings automatically loads
+    codeweaver.test.toml which uses lightweight models:
+    - embedding: minishlab/potion-base-8M (256-dim, fast)
+    - sparse: qdrant/bm25 (fast BM25 tokenization)
+    - reranking: cross-encoder/ms-marco-TinyBERT-L2-v2 (tiny, fast)
+    - vector_store: memory (in-memory, no Docker needed)
+
+    No manual loading needed - the config system handles it automatically.
+    """
+    from codeweaver.core.config.loader import get_settings
+
+    # Just return the settings map - config system already loaded codeweaver.test.toml
+    # because CODEWEAVER_TEST_MODE="true" (set at top of this file)
+    return get_settings().view()  # ty:ignore[invalid-return-type]
+
+
+_settings: DictView[CodeWeaverSettingsDict] = _set_settings()
+
+HAS_SENTENCE_TRANSFORMERS = has_package("sentence_transformers") is not None
+HAS_FASTEMBED = has_package("fastembed") is not None or has_package("fastembed_gpu") is not None
+
+
+def _get_configs(
+    *, sparse: bool = False, rerank: bool = False
+) -> EmbeddingProviderSettings | SparseEmbeddingProviderSettings | RerankingProviderSettings:
+    """Get provider settings for testing based on available libraries.
+
+    Uses the TESTING profile (same as BACKUP) which provides lightweight local models
+    for development and testing.
+
+    Args:
+        sparse: If True, return sparse embedding settings
+        rerank: If True, return reranking settings
+
+    Returns:
+        Provider settings for the requested provider type
+    """
+    from codeweaver.providers.config.profiles import ProviderProfile
+
+    # Get the testing profile configuration
+    profile = ProviderProfile.TESTING.value
+
+    # Extract the appropriate settings based on parameters
+    if rerank:
+        # Reranking settings are stored as a tuple, get the first element
+        return profile.reranking[0]
+    return profile.sparse_embedding if sparse else profile.embedding
+
 
 @pytest.fixture
-def mock_confirm(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
-    """Mock rich.prompt.Confirm for CLI tests.
+def mock_confirm(clean_container) -> MagicMock:
+    """Mock UserInteraction for CLI tests.
 
-    Returns a mock Confirm object that automatically returns True for all confirmations.
-    Tests can override by setting mock_confirm.ask.return_value to False.
-
-    Patches module-level imports of Confirm to avoid stdin access issues during testing
-    when pytest captures output. Only patches locations where Confirm is imported at
-    module level, not inside functions.
+    Returns a mock Interaction object that automatically returns True for all confirmations.
+    Tests can override by setting mock_confirm.confirm.return_value to False.
     """
-    mock = MagicMock()
-    mock.ask.return_value = True
+    from codeweaver.cli.ui import UserInteraction
 
-    # Patch the module-level import in init.py (imported at line 27)
-    monkeypatch.setattr("codeweaver.cli.commands.init.Confirm", mock)
-    # Also patch the base location to catch any other imports
-    monkeypatch.setattr("rich.prompt.Confirm", mock)
+    mock = MagicMock()
+    mock.confirm.return_value = True
+
+    # Override in DI container
+    clean_container.override(UserInteraction, mock)
 
     return mock
 
@@ -81,26 +162,49 @@ def mock_embedding_provider() -> AsyncMock:
     return mock_provider
 
 
-@pytest.fixture
-def actual_dense_embedding_provider() -> SentenceTransformersEmbeddingProvider:
-    """Provide an actual dense embedding provider using SentenceTransformers."""
-    from sentence_transformers import SentenceTransformer
-
-    from codeweaver.providers.embedding.capabilities.ibm_granite import (
-        get_ibm_granite_embedding_capabilities,
+def _get_caps() -> tuple[
+    EmbeddingModelCapabilities | None,
+    SparseEmbeddingModelCapabilities | None,
+    RerankingModelCapabilities | None,
+]:
+    from codeweaver.providers.embedding.capabilities.resolver import (
+        EmbeddingCapabilityResolver,
+        SparseEmbeddingCapabilityResolver,
     )
+    from codeweaver.providers.reranking.capabilities.resolver import RerankingCapabilityResolver
+
+    settings = (_get_configs(), _get_configs(sparse=True), _get_configs(rerank=True))
+
+    embed_resolver = EmbeddingCapabilityResolver()
+    sparse_resolver = SparseEmbeddingCapabilityResolver()
+    rerank_resolver = RerankingCapabilityResolver()
+
+    return (
+        embed_resolver.resolve(settings[0].model_name),
+        sparse_resolver.resolve(settings[1].model_name),
+        rerank_resolver.resolve(settings[2].model_name),
+    )
+
+
+@pytest.fixture
+async def actual_dense_embedding_provider() -> (
+    SentenceTransformersEmbeddingProvider | FastEmbedEmbeddingProvider
+):
+    """Provide an actual dense embedding provider using SentenceTransformers."""
+    caps, _, _ = _get_caps()
+    config = _get_configs()
+    # Manually instantiate for tests instead of using registry
     from codeweaver.providers.embedding.providers.sentence_transformers import (
         SentenceTransformersEmbeddingProvider,
     )
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry
 
-    # nice lightweight model
-    caps = next(
-        cap
-        for cap in get_ibm_granite_embedding_capabilities()
-        if cap.name == "ibm-granite/granite-embedding-english-r2"
-    )
     return SentenceTransformersEmbeddingProvider(
-        capabilities=caps, client=SentenceTransformer(caps.name)
+        client=None,  # Not needed for ST provider usually or handles internally
+        registry=EmbeddingRegistry(),
+        caps=caps,
+        config=config,
+        cache_manager=None,
     )
 
 
@@ -122,39 +226,35 @@ def mock_sparse_provider() -> AsyncMock:
 
 
 @pytest.fixture
-def actual_sparse_embedding_provider() -> SentenceTransformersSparseProvider:
+async def actual_sparse_embedding_provider() -> (
+    SentenceTransformersSparseProvider | FastEmbedSparseProvider
+):
     """Provide an actual sparse embedding provider using SentenceTransformers."""
-    # Check if SparseEncoder is available in sentence_transformers
-    try:
-        from sentence_transformers import SparseEncoder
-    except ImportError:
-        pytest.skip(
-            "SparseEncoder not available in sentence_transformers. "
-            "This feature may require a different version of sentence-transformers."
-        )
+    _, caps, _ = _get_caps()
+    config = _get_configs(sparse=True)
 
-    from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
     from codeweaver.providers.embedding.providers.sentence_transformers import (
-        SentenceTransformersSparseProvider,
+        SentenceTransformersSparseEmbeddingProvider,
     )
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry
 
-    cap = next(
-        cap
-        for cap in get_sparse_caps()
-        if cap.name == "opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini"
+    return SentenceTransformersSparseEmbeddingProvider(
+        client=None, registry=EmbeddingRegistry(), caps=caps, config=config
     )
-    return SentenceTransformersSparseProvider(capabilities=cap, client=SparseEncoder(cap.name))
 
 
 @pytest.fixture
 def mock_vector_store() -> AsyncMock:
     """Provide a mock vector store that returns search results."""
-    from codeweaver.agent_api.find_code.results import SearchResult
-    from codeweaver.common.utils.utils import uuid7
-    from codeweaver.core.chunks import CodeChunk
-    from codeweaver.core.language import SemanticSearchLanguage
-    from codeweaver.core.metadata import ChunkKind, ExtKind
-    from codeweaver.core.spans import Span
+    from codeweaver.core import (
+        ChunkKind,
+        CodeChunk,
+        ExtCategory,
+        SearchResult,
+        SemanticSearchLanguage,
+        Span,
+        uuid7,
+    )
 
     mock_store = AsyncMock()
 
@@ -163,12 +263,12 @@ def mock_vector_store() -> AsyncMock:
         chunk_id = uuid7()
         return CodeChunk(
             chunk_id=chunk_id,
-            ext_kind=ExtKind.from_language(SemanticSearchLanguage.PYTHON, ChunkKind.CODE),
+            ext_category=ExtCategory.from_language(SemanticSearchLanguage.PYTHON, ChunkKind.CODE),
             chunk_name=name,
             file_path=file_path,
             language=SemanticSearchLanguage.PYTHON,
             content=content,
-            line_range=Span(start=1, end=10, _source_id=chunk_id),
+            line_range=Span(start=1, end=10, source_id=chunk_id),
         )
 
     # Create mock search results
@@ -199,6 +299,170 @@ def mock_vector_store() -> AsyncMock:
     return mock_store
 
 
+_shared_memory_vector_store: MemoryVectorStoreProvider | None = None
+
+
+@pytest.fixture
+async def actual_vector_store() -> MemoryVectorStoreProvider:
+    """Provide an actual in-memory vector store provider.
+
+    Uses a singleton instance and a FIXED collection name to ensure that
+    different components (e.g., Indexer and Search) share the same in-memory data.
+    """
+    from codeweaver.core import get_container
+    from codeweaver.providers import MemoryVectorStoreProvider, VectorStoreProvider
+
+    global _shared_memory_vector_store
+    if _shared_memory_vector_store is None:
+        # Get embedding capabilities to construct EmbeddingCapabilityGroup
+        from codeweaver.providers.types import ConfiguredCapability, EmbeddingCapabilityGroup
+
+        dense_caps, sparse_caps, _ = _get_caps()
+        dense_config = _get_configs()
+        sparse_config = _get_configs(sparse=True)
+
+        # Create ConfiguredCapability objects
+        capabilities = [
+            ConfiguredCapability(capability=dense_caps, config=dense_config),
+            ConfiguredCapability(capability=sparse_caps, config=sparse_config),
+        ]
+
+        # Create EmbeddingCapabilityGroup
+        caps = EmbeddingCapabilityGroup.from_capabilities(capabilities)
+
+        # Create in-memory Qdrant client explicitly
+        from qdrant_client import AsyncQdrantClient
+
+        client = AsyncQdrantClient(location=":memory:")
+
+        # Create collection config with test collection name
+        from codeweaver.providers import CollectionConfig
+
+        collection = CollectionConfig(collection_name="codeweaver-test-collection")
+        config = MemoryVectorStoreProviderSettings(collection=collection)
+
+        # Create provider with explicit in-memory client
+        _shared_memory_vector_store = MemoryVectorStoreProvider(
+            client=client, config=config, caps=caps
+        )
+
+        # Initialize the provider (this sets up internal state)
+        await _shared_memory_vector_store._initialize()
+
+    # Override in DI container
+    get_container().override(VectorStoreProvider, _shared_memory_vector_store)
+
+    import sys
+
+    logger.debug(
+        "actual_vector_store returning instance %d with collection %s",
+        id(_shared_memory_vector_store),
+        getattr(_shared_memory_vector_store, "_collection", "N/A"),
+    )
+    sys.stdout.flush()
+    return _shared_memory_vector_store
+
+
+async def _reset_vector_store_collection(store: MemoryVectorStoreProvider) -> None:
+    """Delete and recreate the shared vector store collection to ensure a clean state."""
+    if store and store.client and store.collection_name:
+        with contextlib.suppress(Exception):
+            await store.client.delete_collection(store.collection_name)
+        if hasattr(store, "_known_collections"):
+            store._known_collections.clear()
+        with contextlib.suppress(Exception):
+            await store._ensure_collection(store.collection_name)
+
+
+def _reset_embedding_caches() -> None:
+    """Reset embedding registry and cache manager state between tests.
+
+    Clears the global EmbeddingRegistry singleton and removes embedding-related
+    DI singletons (EmbeddingRegistry, EmbeddingCacheManager, EmbeddingProvider,
+    SparseEmbeddingProvider, IndexingService) so the next test starts with fresh
+    instances. Without this, the hash-based deduplication in EmbeddingCacheManager
+    carries over between tests: re-indexed chunks with new UUIDs but same content
+    are "deduplicated away" with no embeddings registered, causing upsert to fail.
+
+    Key subtlety: EmbeddingRegistry.__init__ calls container.register() to register
+    itself as a lambda factory. Over multiple tests, stale lambdas accumulate in
+    _factories[EmbeddingRegistry] and _get_factory() returns the last one (the stale
+    old instance). We must prune these lambda factories so _get_main_registry() is
+    the sole factory, ensuring that each resolution calls get_embedding_registry()
+    which returns the freshly-reset _main_registry.
+    """
+    import contextlib
+
+    from codeweaver.core import get_container
+    from codeweaver.providers.embedding.registry import reset_embedding_registry
+
+    # Reset the module-level global registry so next call creates a fresh instance
+    reset_embedding_registry()
+
+    container = get_container()
+
+    with contextlib.suppress(Exception):
+        from codeweaver.providers.embedding.registry import EmbeddingRegistry
+
+        # Remove the singleton so the next resolve calls the factory (not cache)
+        container._singletons.pop(EmbeddingRegistry, None)
+
+        # Prune stale lambda factories registered by EmbeddingRegistry.__init__.
+        # Keep only named factories (like _get_main_registry from @dependency_provider).
+        # The lambda entries point to old registry instances and shadow the proper factory.
+        if EmbeddingRegistry in container._factories:
+            container._factories[EmbeddingRegistry] = [
+                (f, tags)
+                for f, tags in container._factories[EmbeddingRegistry]
+                if getattr(f, "__name__", None) != "<lambda>"
+            ]
+
+    with contextlib.suppress(Exception):
+        from codeweaver.providers.embedding.cache_manager import EmbeddingCacheManager
+
+        container._singletons.pop(EmbeddingCacheManager, None)
+
+    # Remove embedding provider singletons (they hold a reference to cache_manager).
+    with contextlib.suppress(Exception):
+        from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider
+
+        container._singletons.pop(EmbeddingProvider, None)
+        container._singletons.pop(SparseEmbeddingProvider, None)
+
+    # Remove IndexingService singleton (it holds references to embedding providers).
+    with contextlib.suppress(Exception):
+        from codeweaver.engine import IndexingService
+
+        container._singletons.pop(IndexingService, None)
+
+    # Also clear tagged singletons that may hold embedding provider instances.
+    with contextlib.suppress(Exception):
+        keys_to_remove = [
+            k
+            for k in container._tagged_singletons
+            if any(tag in k[1] for tag in ("embedding", "sparse_embedding"))
+        ]
+        for k in keys_to_remove:
+            container._tagged_singletons.pop(k, None)
+
+
+@pytest.fixture(autouse=True)
+async def cleanup_shared_vector_store(
+    actual_vector_store: MemoryVectorStoreProvider,
+) -> AsyncGenerator[None, None]:
+    """Automatically clean up the shared vector store before and after each test."""
+    # Clean embedding caches before test to prevent deduplication poisoning from
+    # previous tests (EmbeddingCacheManager._hash_stores persists across tests
+    # as a DI singleton, causing re-indexed chunks to be skipped without embedding).
+    _reset_embedding_caches()
+    # Clean vector store before test to ensure no stale data from previous runs
+    await _reset_vector_store_collection(actual_vector_store)
+    yield
+    # Clean after test to start fresh for the next test
+    await _reset_vector_store_collection(actual_vector_store)
+    _reset_embedding_caches()
+
+
 @pytest.fixture
 def mock_reranking_provider() -> AsyncMock:
     """Provide a mock reranking provider."""
@@ -227,114 +491,52 @@ def mock_reranking_provider() -> AsyncMock:
 
 
 @pytest.fixture
-def actual_reranking_provider() -> SentenceTransformersRerankingProvider:
+async def actual_reranking_provider() -> (
+    SentenceTransformersRerankingProvider | FastEmbedRerankingProvider
+):
     """Provide an actual reranking provider using SentenceTransformers."""
-    from sentence_transformers import CrossEncoder
+    _, _, caps = _get_caps()
+    config = _get_configs(rerank=True)
 
-    from codeweaver.providers.reranking.capabilities.ms_marco import (
-        get_marco_reranking_capabilities,
-    )
+    from codeweaver.core.types import Provider
     from codeweaver.providers.reranking.providers.sentence_transformers import (
         SentenceTransformersRerankingProvider,
     )
 
-    # Use the correct cross-encoder model name
-    # The Xenova models don't exist - need to use cross-encoder namespace
-    model_name = "cross-encoder/ms-marco-MiniLM-L6-v2"
-
-    # Find or create the capability for this model
-    caps = next(
-        (
-            cap
-            for cap in get_marco_reranking_capabilities()
-            if "L6-v2" in cap.name or "L-6-v2" in cap.name
-        ),
-        None,
+    return SentenceTransformersRerankingProvider(
+        client=None, config=config, caps=caps, _provider=Provider.SENTENCE_TRANSFORMERS
     )
-
-    if caps is None:
-        # Create a basic capability if not found
-        from codeweaver.providers.provider import Provider
-        from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-
-        caps = RerankingModelCapabilities(
-            name=model_name,
-            max_input=512,
-            context_window=512,
-            tokenizer="tokenizers",
-            tokenizer_model=model_name,
-            supports_custom_prompt=False,
-            provider=Provider.SENTENCE_TRANSFORMERS,
-        )
-
-    return SentenceTransformersRerankingProvider(caps=caps, client=CrossEncoder(model_name))
 
 
 # ===========================================================================
 # Provider Registry Configuration Fixtures
 # ===========================================================================
 
+# Removed Mock Registry Fixtures (mock_provider_registry, configured_providers)
+# as they are no longer needed with DI overrides.
+
 
 @pytest.fixture
-def mock_provider_registry(
+def configured_providers(
     mock_embedding_provider: MagicMock,
     mock_sparse_provider: MagicMock,
     mock_vector_store: MagicMock,
     mock_reranking_provider: MagicMock,
-) -> MagicMock:
-    """Configure mock provider registry with all providers."""
-    from enum import Enum
+) -> Generator[None, None, None]:
+    """Fixture that overrides providers in the DI container."""
+    from codeweaver.core import get_container
+    from codeweaver.providers import (
+        EmbeddingProvider,
+        RerankingProvider,
+        SparseEmbeddingProvider,
+        VectorStoreProvider,
+    )
 
-    class MockProviderEnum(Enum):
-        VOYAGE = "voyage"
-        FASTEMBED = "fastembed"
-        QDRANT = "qdrant"
-
-    mock_registry = MagicMock()
-
-    # Configure get_provider_enum_for to return mock provider enums
-    def get_provider_enum_for(kind: str) -> MockProviderEnum | None:
-        if kind == "embedding":
-            return MockProviderEnum.VOYAGE
-        if kind == "sparse_embedding":
-            return MockProviderEnum.FASTEMBED
-        if kind == "vector_store":
-            return MockProviderEnum.QDRANT
-        return MockProviderEnum.VOYAGE if kind == "reranking" else None
-
-    mock_registry.get_provider_enum_for = MagicMock(side_effect=get_provider_enum_for)
-
-    # Configure get_provider_instance to return mock providers
-    def get_provider_instance(
-        enum_value: MockProviderEnum, kind: str, singleton: bool = True
-    ) -> AsyncMock | None:
-        if kind == "embedding":
-            return mock_embedding_provider
-        if kind == "sparse_embedding":
-            return mock_sparse_provider
-        if kind == "vector_store":
-            return mock_vector_store
-        return mock_reranking_provider if kind == "reranking" else None
-
-    mock_registry.get_provider_instance = MagicMock(side_effect=get_provider_instance)
-
-    return mock_registry
-
-
-@pytest.fixture
-def configured_providers(mock_provider_registry: MagicMock) -> Generator[MagicMock, None, None]:
-    """Fixture that patches the provider registry with mock providers.
-
-    This fixture automatically configures the provider registry for tests
-    that need embedding, vector store, and reranking providers.
-
-    Usage:
-        @pytest.mark.asyncio
-        async def test_something(configured_providers):
-            # find_code and other functions will use mock providers
-            response = await find_code("test query")
-    """
-    # Patch both the provider registry and time.time to ensure monotonic timing
+    container = get_container()
+    container.override(EmbeddingProvider, mock_embedding_provider)
+    container.override(SparseEmbeddingProvider, mock_sparse_provider)
+    container.override(VectorStoreProvider, mock_vector_store)
+    container.override(RerankingProvider, mock_reranking_provider)
 
     call_count = [0]  # Use list for mutable counter
 
@@ -343,13 +545,9 @@ def configured_providers(mock_provider_registry: MagicMock) -> Generator[MagicMo
         # Return monotonically increasing time values (start from a baseline)
         return 1000000.0 + call_count[0] * 0.001
 
-    with (
-        patch(
-            "codeweaver.common.registry.get_provider_registry", return_value=mock_provider_registry
-        ),
-        patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
-    ):
-        yield mock_provider_registry
+    with patch("time.time", side_effect=mock_time):
+        yield
+        container.clear_overrides()
 
 
 # ===========================================================================
@@ -358,9 +556,43 @@ def configured_providers(mock_provider_registry: MagicMock) -> Generator[MagicMo
 
 
 @pytest.fixture
+def reset_settings() -> Generator[None, None, None]:
+    """Reset DI container settings to defaults.
+
+    This fixture provides a clean settings state by resetting the DI container.
+    It's useful for tests that need to ensure settings isolation between test runs.
+
+    Usage:
+        def test_something(reset_settings):
+            # Test runs with fresh settings from codeweaver.test.toml
+            ...
+
+    The fixture:
+    1. Clears DI container overrides before test
+    2. Resets container to force new settings creation
+    3. Yields control to test
+    4. Clears overrides again after test
+    """
+    from codeweaver.core.di import get_container, reset_container_state
+
+    # Clear any existing overrides
+    container = get_container()
+    container.clear_overrides()
+
+    # Reset container to force new settings on next resolution
+    reset_container_state()
+
+    yield
+
+    # Cleanup: clear overrides after test
+    container = get_container()
+    container.clear_overrides()
+
+
+@pytest.fixture
 def mock_settings_with_providers() -> MagicMock:
     """Provide mock settings with provider configuration."""
-    from codeweaver.config.settings import CodeWeaverSettings as Settings
+    from codeweaver.server import CodeWeaverSettings as Settings
 
     mock_settings = MagicMock(spec=Settings)
     mock_settings.providers = {
@@ -379,76 +611,34 @@ def mock_settings_with_providers() -> MagicMock:
 
 @pytest.fixture
 def real_embedding_provider(
-    actual_dense_embedding_provider: SentenceTransformersEmbeddingProvider,
-) -> SentenceTransformersEmbeddingProvider:
-    """Provide a REAL embedding provider for behavior validation.
-
-    Uses the existing actual_dense_embedding_provider fixture which is already
-    working and tested. This avoids duplicating provider initialization logic.
-
-    Model: IBM Granite English R2 - lightweight, fast, good quality
-    No API key required - runs entirely locally.
-
-    Use this fixture for tests marked with @pytest.mark.real_providers.
-
-    Note: This fixture found a production bug! The SentenceTransformersEmbeddingProvider
-    has a Pydantic initialization issue where it sets instance attributes before
-    calling super().__init__(). The actual_dense_embedding_provider works around this.
-    """
+    actual_dense_embedding_provider: SentenceTransformersEmbeddingProvider
+    | FastEmbedEmbeddingProvider,
+) -> SentenceTransformersEmbeddingProvider | FastEmbedEmbeddingProvider:
+    """Provide a REAL embedding provider for behavior validation."""
     return actual_dense_embedding_provider
 
 
 @pytest.fixture
-def real_sparse_provider(mock_sparse_provider: MagicMock) -> SentenceTransformersSparseProvider:
-    """Provide a sparse embedding provider - real if available, mock otherwise.
-
-    **SparseEncoder Availability:**
-    SparseEncoder is not available in current sentence-transformers version.
-    Falls back to mock provider to allow tests to run without sparse encoding.
-
-    This is expected for Alpha 1 release - sparse encoding is optional.
-    Tests will use dense embeddings only when sparse is unavailable.
-
-    Model (when available): OpenSearch neural sparse encoding
-    Fallback: Mock provider with sparse format compatibility
-    """
+def real_sparse_provider(
+    actual_sparse_embedding_provider: SentenceTransformersSparseProvider | FastEmbedSparseProvider,
+) -> SentenceTransformersSparseProvider | FastEmbedSparseProvider:
+    """Provide a sparse embedding provider - real if available, mock otherwise."""
     # Check if SparseEncoder is available
-    try:
-        from sentence_transformers import SparseEncoder
-
-        from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
-        from codeweaver.providers.embedding.providers.sentence_transformers import (
-            SentenceTransformersSparseProvider,
-        )
-
-        cap = next(
-            cap
-            for cap in get_sparse_caps()
-            if cap.name == "opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini"
-        )
-        return SentenceTransformersSparseProvider(capabilities=cap, client=SparseEncoder(cap.name))
-    except ImportError:
-        # SparseEncoder not available - use mock provider
-        # This allows tests to run without sparse encoding
-        return mock_sparse_provider
+    return actual_sparse_embedding_provider
 
 
 @pytest.fixture
 def real_reranking_provider(
     actual_reranking_provider: SentenceTransformersRerankingProvider,
 ) -> SentenceTransformersRerankingProvider:
-    """Provide a REAL reranking provider for relevance scoring validation.
-
-    Uses the existing actual_reranking_provider fixture.
-
-    Model: MS MARCO MiniLM - lightweight cross-encoder for reranking
-    No API key required - runs entirely locally.
-    """
+    """Provide a REAL reranking provider for relevance scoring validation."""
     return actual_reranking_provider
 
 
 @pytest.fixture
-async def real_vector_store(tmp_path: Path) -> AsyncGenerator[MemoryVectorStoreProvider]:
+async def real_vector_store(
+    known_test_codebase: Path, actual_vector_store: MemoryVectorStoreProvider
+) -> AsyncGenerator[MemoryVectorStoreProvider]:
     """Provide a REAL Qdrant vector store in memory mode for behavior validation.
 
     Creates an actual in-memory Qdrant instance that:
@@ -463,29 +653,24 @@ async def real_vector_store(tmp_path: Path) -> AsyncGenerator[MemoryVectorStoreP
 
     Perfect for CI - no Docker required, just in-memory mode.
     """
-    from qdrant_client import AsyncQdrantClient
+    instance: MemoryVectorStoreProvider = actual_vector_store
 
-    from codeweaver.config.providers import MemoryConfig
+    # FORCE fixed collection name for test alignment
+    collection_name = "codeweaver-test-collection"
 
-    # Create in-memory Qdrant client
-    client = AsyncQdrantClient(location=":memory:")
+    # Explicitly set collection name in config to override any global settings
+    if not instance.config:
+        instance.config = {}
+    instance.config["collection_name"] = collection_name
+    instance._collection = collection_name
 
-    # Create config for the vector store
-    config = MemoryConfig(
-        persist_path=tmp_path / "vector_store", collection_name="test_real_collection"
-    )
-
-    # Create the vector store provider
-    provider = MemoryVectorStoreProvider(_provider=Provider.MEMORY, client=client, config=config)
-
-    # Initialize (creates collection if needed)
-    await provider._initialize()
-
-    yield provider
+    # Already initialized by actual_vector_store fixture
+    yield instance
 
     # Cleanup: Delete collection after test
-    with contextlib.suppress(Exception):
-        await client.delete_collection(config.collection_name)
+    if instance._client:
+        with contextlib.suppress(Exception):
+            await instance._client.delete_collection(collection_name)
 
 
 @pytest.fixture
@@ -818,118 +1003,41 @@ def real_provider_registry(
     real_sparse_provider: SentenceTransformersSparseProvider,
     real_vector_store: MemoryVectorStoreProvider,
     real_reranking_provider: SentenceTransformersRerankingProvider,
-) -> MagicMock:
-    """Configure provider registry with REAL providers for behavior validation.
-
-    This fixture creates a complete provider ecosystem using actual implementations:
-    - Real embedding generation (SentenceTransformers)
-    - Real or mock sparse embeddings (depending on SparseEncoder availability)
-    - Real vector storage (Qdrant in-memory)
-    - Real reranking (MS MARCO)
-
-    Tests using this fixture validate actual search behavior, not just structure.
-
-    Use for tests marked with @pytest.mark.real_providers.
-
-    **Note on Sparse Encoding:**
-    If SparseEncoder is unavailable, uses mock sparse provider. This is expected
-    for Alpha 1 and allows dense-only search validation.
-    """
-    from enum import Enum
-    from unittest.mock import MagicMock
-
-    class RealProviderEnum(Enum):
-        SENTENCE_TRANSFORMERS = "sentence_transformers"
-        OPENSEARCH = "opensearch"
-        QDRANT_MEMORY = "qdrant_memory"
-        MS_MARCO = "ms_marco"
-
-    mock_registry = MagicMock()
-
-    # Configure get_provider_enum_for to return real provider enums
-    def get_provider_enum_for(kind: str) -> RealProviderEnum | None:
-        if kind == "embedding":
-            return RealProviderEnum.SENTENCE_TRANSFORMERS
-        if kind == "sparse_embedding":
-            return RealProviderEnum.OPENSEARCH
-        if kind == "vector_store":
-            return RealProviderEnum.QDRANT_MEMORY
-        return RealProviderEnum.MS_MARCO if kind == "reranking" else None
-
-    mock_registry.get_provider_enum_for = MagicMock(side_effect=get_provider_enum_for)
-
-    # Configure get_provider_instance to return real providers
-    def get_provider_instance(
-        enum_value: RealProviderEnum, kind: str, singleton: bool = True
-    ) -> Any | MagicMock:
-        if kind == "embedding":
-            return real_embedding_provider
-        if kind == "sparse_embedding":
-            return real_sparse_provider
-        if kind == "vector_store":
-            return real_vector_store
-        return real_reranking_provider if kind == "reranking" else None
-
-    mock_registry.get_provider_instance = MagicMock(side_effect=get_provider_instance)
-
-    return mock_registry
+) -> None:
+    """NO OP - Use real_providers fixture instead."""
+    # This fixture is deprecated/removed in favor of real_providers setup
+    return
 
 
 @pytest.fixture
-def real_providers(real_provider_registry: MagicMock) -> Generator[ProviderRegistry, None, None]:
-    """Fixture that patches the provider registry with REAL providers.
+def real_providers(
+    real_embedding_provider, real_sparse_provider, real_vector_store, real_reranking_provider
+) -> Generator[None, None, None]:
+    """Fixture that overrides providers in DI container with REAL providers."""
 
-    This is the main fixture for Tier 2 tests. It provides actual provider
-    implementations that generate real embeddings, store real vectors, and
-    perform real search operations.
+    from codeweaver.core import get_container
+    from codeweaver.providers import (
+        EmbeddingProvider,
+        RerankingProvider,
+        SparseEmbeddingProvider,
+        VectorStoreProvider,
+    )
 
-    **When to use this vs configured_providers:**
+    container = get_container()
+    container.override(EmbeddingProvider, real_embedding_provider)
+    container.override(SparseEmbeddingProvider, real_sparse_provider)
+    container.override(VectorStoreProvider, real_vector_store)
+    container.override(RerankingProvider, real_reranking_provider)
 
-    - Use `configured_providers` (Tier 1) for:
-      * Structure validation tests
-      * Error path testing
-      * Fast feedback loops
-      * Response format verification
-
-    - Use `real_providers` (Tier 2) for:
-      * Search quality validation
-      * End-to-end pipeline testing
-      * Performance benchmarking
-      * Behavior validation
-
-    **Example usage:**
-
-    ```python
-    @pytest.mark.integration
-    @pytest.mark.real_providers
-    async def test_search_finds_auth_code(real_providers, known_test_codebase):
-        # This test validates actual search behavior
-        response = await find_code("authentication logic")
-
-        # Should actually find auth.py in top results
-        assert any("auth.py" in r.file_path for r in response.results[:3])
-    ```
-
-    **Performance note:** These tests are slower (~2-10s each) because they:
-    - Generate real embeddings (CPU/GPU intensive)
-    - Perform real vector similarity search
-    - Run actual reranking models
-
-    Mark tests with @pytest.mark.slow if they take >5s.
-    """
     call_count = [0]
 
     def mock_time() -> float:
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
 
-    with (
-        patch(
-            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
-        ),
-        patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
-    ):
-        yield real_provider_registry
+    with patch("time.time", side_effect=mock_time):
+        yield
+        container.clear_overrides()
 
 
 # ===========================================================================
@@ -938,51 +1046,203 @@ def real_providers(real_provider_registry: MagicMock) -> Generator[ProviderRegis
 
 
 @pytest.fixture
-def initialized_cw_state(tmp_path: Path) -> Generator[Any, None, None]:
-    """Initialize CodeWeaverState for integration tests that call find_code_tool.
+async def initialized_cw_state(
+    tmp_path: Path, actual_vector_store, clean_container
+) -> AsyncGenerator[Any, None]:
+    """Initialize CodeWeaverState for integration tests using DI.
 
-    This fixture ensures CodeWeaverState is properly initialized before tests that
-    call find_code_tool, which requires CodeWeaverState.get_state() to succeed.
-
-    The fixture creates a minimal CodeWeaverState with:
-    - Settings initialized
-    - Registries initialized (provider, services, model)
-    - Statistics tracking
-    - No failover manager (optional for basic tests)
-
-    Usage:
-        @pytest.mark.asyncio
-        async def test_something(initialized_cw_state):
-            # find_code_tool will work now
-            response = await find_code_tool("test query", ...)
+    This fixture ensures CodeWeaverState is properly initialized via the DI
+    container, allowing for consistent dependency resolution and overrides.
     """
-    from codeweaver.common.registry import (
-        get_model_registry,
-        get_provider_registry,
-        get_services_registry,
-    )
-    from codeweaver.common.statistics import get_session_statistics
-    from codeweaver.common.telemetry.client import PostHogClient
-    from codeweaver.config.settings import get_settings
-    from codeweaver.server.server import CodeWeaverState
+    # Ensure all dependencies are loaded
+    import codeweaver.core.dependencies
+    import codeweaver.server.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
 
-    # Initialize settings
-    settings = get_settings()
-    yield CodeWeaverState(
-        initialized=True,
-        settings=settings,
-        project_path=tmp_path,
-        config_path=None,
-        provider_registry=get_provider_registry(),
-        services_registry=get_services_registry(),
-        model_registry=get_model_registry(),
-        statistics=get_session_statistics(),
-        middleware_stack=(),
-        indexer=None,
-        health_service=None,
-        failover_manager=None,
-        telemetry=PostHogClient.from_settings(),
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+    from codeweaver.providers import VectorStoreProvider
+    from codeweaver.providers.dependencies.providers import (
+        PrimaryVectorStoreProviderDep,
+        VectorStoreProvidersDep,
     )
+    from codeweaver.server import CodeWeaverState
+
+    # Don't reset container here - clean_container fixture already handles it
+    # Force provider loading if not already done
+    clean_container._load_providers()
+
+    project_name = f"test_workflow_{tmp_path.name}"
+
+    # Override settings to use in-memory Qdrant and set project_path before DI
+    # resolves CodeWeaverState. Without this, bootstrap_settings() constructs
+    # ProviderProfile.TESTING which uses path=backup-None (disk-based Qdrant),
+    # causing "already accessed" RuntimeError when multiple tests run in parallel,
+    # and "Unset.resolve()" AttributeError when project_path is still UNSET.
+    async def get_test_settings() -> CodeWeaverSettingsType:
+        from codeweaver.core.config.loader import get_settings_async
+        from codeweaver.core.types.sentinel import UNSET
+        from codeweaver.providers.config.categories.vector_store import (
+            MemoryVectorStoreProviderSettings,
+        )
+        from codeweaver.providers.config.clients.vector_store import QdrantClientOptions
+        from codeweaver.providers.config.profiles import ProviderProfile
+        from codeweaver.providers.config.providers import ProviderSettings
+
+        settings = await get_settings_async()
+        settings.project_path = tmp_path
+        settings.project_name = project_name
+        if settings.provider is UNSET:
+            profile_settings = ProviderProfile.TESTING.as_provider_settings()
+            # Replace disk-based Qdrant (backup-None) with in-memory to avoid
+            # lock conflicts across parallel tests.
+            profile_settings["vector_store"] = (
+                MemoryVectorStoreProviderSettings(
+                    project_name=project_name,
+                    client_options=QdrantClientOptions(location=":memory:"),
+                ),
+            )
+            settings.provider = ProviderSettings.model_construct(**profile_settings)
+        return settings
+
+    clean_container.override(CodeWeaverSettingsType, get_test_settings)
+
+    # Also override vector store providers to use the shared actual_vector_store.
+    clean_container.override(VectorStoreProvider, actual_vector_store)
+    clean_container.override(VectorStoreProvidersDep, (actual_vector_store,))
+    clean_container.override(PrimaryVectorStoreProviderDep, actual_vector_store)
+
+    # Resolve and cache settings in _singletons so _global_settings() can find
+    # them synchronously (container[T] only checks _singletons, not overrides),
+    # preventing _get_canonical_project_path from falling through to loop.to_thread.
+    test_settings = await clean_container.resolve(CodeWeaverSettingsType)
+    clean_container._singletons[CodeWeaverSettingsType] = test_settings
+
+    # Resolve state via container (this will trigger resolution of all deps including settings)
+    state = await clean_container.resolve(CodeWeaverState)
+
+    # Ensure state uses the correct project path (may have been set via settings already)
+    if state.settings:
+        state.settings.project_path = tmp_path
+        state.settings.project_name = project_name
+    state.project_path = tmp_path
+
+    # CRITICAL: Set the global state so get_state() works during tests
+    from codeweaver.server import server
+
+    server._state = state
+
+    yield state
+
+    # Cleanup: Reset global state and clear overrides
+    from codeweaver.server import server
+
+    server._state = None
+    clean_container.clear_overrides()
+
+
+@pytest.fixture
+async def indexed_test_project(known_test_codebase, clean_container, actual_vector_store):
+    """Create pre-indexed test project with configured settings.
+
+    This fixture:
+    1. Configures CodeWeaverSettings with project path
+    2. Resolves and initializes the IndexingService via DI
+    3. Indexes the test codebase
+    4. Ensures global state is correctly initialized
+    5. Yields the project path for tests
+    """
+    import codeweaver.core.dependencies
+    import codeweaver.engine.dependencies
+    import codeweaver.server.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
+
+    from codeweaver.core.config.loader import get_settings_async
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+    from codeweaver.engine import IndexingService
+    from codeweaver.server import CodeWeaverState
+
+    # Ensure known_test_codebase is absolute
+    project_path = known_test_codebase.resolve()
+
+    # Define a factory that returns settings with the test project path
+    async def get_test_settings() -> CodeWeaverSettingsType:
+        from codeweaver.core.types.sentinel import UNSET
+        from codeweaver.providers.config.categories.vector_store import (
+            MemoryVectorStoreProviderSettings,
+        )
+        from codeweaver.providers.config.profiles import ProviderProfile
+        from codeweaver.providers.config.providers import ProviderSettings
+
+        # codeweaver.test.toml is already loaded via CODEWEAVER_TEST_MODE="true"
+        settings = await get_settings_async()
+        settings.project_path = project_path
+        settings.project_name = f"test_real_{project_path.name}"
+        # get_settings_async() uses CodeWeaverSettings(**kwargs) which never calls
+        # _initialize(), leaving provider=UNSET. Set it explicitly so downstream
+        # DI factories (_get_provider_settings) don't fail.
+        if settings.provider is UNSET:
+            profile_settings = ProviderProfile.TESTING.as_provider_settings()
+            # Replace disk-based Qdrant with in-memory to avoid cross-test lock conflicts.
+            # The TESTING profile uses path=backup-None which causes RuntimeError when
+            # multiple tests compete for the same Qdrant storage folder.
+            from codeweaver.providers.config.clients.vector_store import QdrantClientOptions
+
+            profile_settings["vector_store"] = (
+                MemoryVectorStoreProviderSettings(
+                    project_name=f"test_real_{project_path.name}",
+                    client_options=QdrantClientOptions(location=":memory:"),
+                ),
+            )
+            settings.provider = ProviderSettings.model_construct(**profile_settings)
+        # get_settings() returns BaseCodeWeaverSettings, but in test mode it's actually CodeWeaverSettings
+        return settings
+
+    # Apply overrides to container
+    clean_container.override(CodeWeaverSettingsType, get_test_settings)
+
+    # Override vector store providers to use the shared actual_vector_store.
+    # Without this, _create_vector_store_providers() creates a new in-memory
+    # Qdrant instance from settings (separate from actual_vector_store), so
+    # indexed data is invisible to the search path which uses actual_vector_store.
+    from codeweaver.providers import VectorStoreProvider
+    from codeweaver.providers.dependencies.providers import (
+        PrimaryVectorStoreProviderDep,
+        VectorStoreProvidersDep,
+    )
+
+    clean_container.override(VectorStoreProvider, actual_vector_store)
+    clean_container.override(VectorStoreProvidersDep, (actual_vector_store,))
+    clean_container.override(PrimaryVectorStoreProviderDep, actual_vector_store)
+
+    # Resolve settings and store in _singletons for sync access via _global_settings()
+    # (container[T] only checks _singletons, not overrides)
+    test_settings = await clean_container.resolve(CodeWeaverSettingsType)
+    clean_container._singletons[CodeWeaverSettingsType] = test_settings
+
+    # Resolve state via container to ensure it's initialized with correct settings
+    state = await clean_container.resolve(CodeWeaverState)
+
+    # CRITICAL: Set the global state so get_state() works during tests
+    from codeweaver.server import server
+
+    server._state = state
+
+    # Patch time for deterministic behavior if needed
+    call_count = [0]
+
+    def mock_time() -> float:
+        call_count[0] += 1
+        return 1000000.0 + call_count[0] * 0.001
+
+    with patch("time.time", side_effect=mock_time):
+        # Resolve indexer from container
+        indexer = await clean_container.resolve(IndexingService)
+
+        # Ensure it's using the correct project path
+        indexer._project_path = project_path
+
+        await indexer.index_project(force_reindex=True)
+
+        yield project_path
+
     # Cleanup: Reset global state
     from codeweaver.server import server
 

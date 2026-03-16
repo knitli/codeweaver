@@ -26,13 +26,14 @@ from rich.table import Table
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from codeweaver.engine.chunker.delimiters.custom import get_custom_patterns
-from codeweaver.engine.chunker.delimiters.families import LanguageFamily, get_family_patterns
-from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
-from codeweaver.engine.chunker.delimiters.patterns import (
+from codeweaver.engine import (
     DelimiterDict,
+    DelimiterKind,
     DelimiterPattern,
+    LanguageFamily,
     expand_pattern,
+    get_custom_patterns,
+    get_family_patterns,
 )
 
 

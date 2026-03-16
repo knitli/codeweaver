@@ -23,8 +23,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from codeweaver.cli.commands.config import app as config_app
-from codeweaver.cli.commands.init import app as init_app  # For setup in integration tests
+from codeweaver.cli import app as config_app
+from codeweaver.cli import app as init_app  # For setup in integration tests
 
 
 @pytest.fixture
@@ -39,6 +39,7 @@ def temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 @pytest.mark.unit
 @pytest.mark.config
+@pytest.mark.mock_only
 class TestConfigShow:
     """Tests for config show command - the main functionality of `config` command."""
 
@@ -48,7 +49,7 @@ class TestConfigShow:
         """Test config show displays current configuration."""
         # Create config first
         with pytest.raises(SystemExit) as init_exc:
-            init_app(["config", "--quickstart", "--project", str(temp_project)])
+            init_app(["init", "config", "--quickstart", "--project", str(temp_project)])
 
         assert init_exc.value.code == 0
 
@@ -86,21 +87,21 @@ class TestConfigShow:
 
 @pytest.mark.unit
 @pytest.mark.config
+@pytest.mark.mock_only
 class TestConfigValidation:
     """Tests for config validation."""
 
-    @pytest.mark.skip(reason="Provider validation not yet implemented in settings")
     def test_invalid_provider_rejected(self, temp_project: Path) -> None:
-        """Test invalid provider names are rejected."""
-        config_path = temp_project / "codeweaver.toml"
-        config_content = """
-[embedding]
-provider = "invalid_provider_xyz"
-"""
-        config_path.write_text(config_content)
+        """Test invalid provider names are rejected at the ProviderSettings validation level.
 
-        from codeweaver.config.settings import CodeWeaverSettings
-        from codeweaver.exceptions import CodeWeaverError
+        Note: CodeWeaverSettings in test mode excludes config file sources (to prevent
+        test pollution), so provider validation is tested directly via ProviderSettings.
+        """
+        from pydantic import ValidationError
 
-        with pytest.raises((CodeWeaverError, ValueError)):
-            CodeWeaverSettings(config_file=config_path)
+        from codeweaver.providers.config.providers import ProviderSettings
+
+        with pytest.raises((ValidationError, ValueError)):
+            ProviderSettings.model_validate({
+                "embedding": [{"provider": "invalid_provider_xyz", "model_name": "test-model"}]
+            })

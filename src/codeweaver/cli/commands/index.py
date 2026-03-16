@@ -10,28 +10,36 @@ from __future__ import annotations
 import sys
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 import cyclopts
 
 from cyclopts import App
 from pydantic import FilePath
 
+from codeweaver.cli.dependencies import setup_cli_di
 from codeweaver.cli.ui import CLIErrorHandler, IndexingProgress, StatusDisplay, get_display
-from codeweaver.common.utils.git import get_project_path
-from codeweaver.common.utils.utils import get_user_config_dir
-from codeweaver.config.types import CodeWeaverSettingsDict
-from codeweaver.core.types.dictview import DictView
-from codeweaver.exceptions import CodeWeaverError
+from codeweaver.core import CodeWeaverError, SettingsMapDep
+from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.constants import ONE_MINUTE
+from codeweaver.core.di.dependency import INJECTED
+from codeweaver.core.types import UNSET, DictView
+from codeweaver.engine import CheckpointManager, FileManifestManager
+from codeweaver.engine.services.indexing_service import IndexingService
+from codeweaver.providers import VectorStoreProvider
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.settings import CodeWeaverSettings
-    from codeweaver.engine.indexer.checkpoint import CheckpointManager
+    from codeweaver.engine.config.root_settings import CodeWeaverEngineSettings
 
 _display: StatusDisplay = get_display()
 
 app = App("index", help="Index codebase for semantic search.", console=_display.console)
+
+
+def _settings_map(settings: SettingsMapDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
+    """Get the settings map."""
+    return settings
 
 
 async def _check_server_health() -> bool:
@@ -51,54 +59,8 @@ async def _check_server_health() -> bool:
         return response.status_code == 200
 
 
-def _trigger_server_reindex(*, force: bool) -> bool:
-    """Trigger re-index on running server.
-
-    Args:
-        force: If True, force full re-index
-
-    Returns:
-        True if re-index was successfully triggered
-    """
-    # For v0.1, we don't have an admin endpoint yet
-    # The server auto-indexes on startup, so just inform user
-    return False
-
-
-def _load_and_configure_settings(
-    config_file: FilePath | None, project_path: Path | None
-) -> tuple[CodeWeaverSettings, Path]:
-    """Load settings and determine project path.
-
-    Args:
-        config_file: Optional path to configuration file
-        project_path: Optional path to project root
-
-    Returns:
-        Tuple of (CodeWeaverSettings, resolved project path)
-    """
-    from codeweaver.config.settings import get_settings, update_settings
-
-    settings = get_settings(config_file=config_file)
-
-    if project_path:
-        settings = update_settings(
-            **CodeWeaverSettingsDict(**(settings.model_dump() | {"project_path": project_path}))  # type: ignore
-        )
-
-    new_settings = get_settings()
-
-    resolved_path = (
-        project_path or new_settings.project_path
-        if isinstance(new_settings.project_path, Path)
-        else get_project_path()
-    )
-
-    return new_settings, resolved_path
-
-
-def _derive_collection_name(
-    settings: CodeWeaverSettings, project_path: Path, checkpoint_mgr: CheckpointManager
+async def _derive_collection_name(
+    settings: CodeWeaverEngineSettings, project_path: Path, checkpoint_mgr: CheckpointManager
 ) -> str:
     """Derive collection name from settings or checkpoint.
 
@@ -110,8 +72,8 @@ def _derive_collection_name(
     Returns:
         Derived collection name string
     """
-    from codeweaver.common.utils.utils import generate_collection_name
-    from codeweaver.config.providers import ProviderSettings
+    from codeweaver.core import generate_collection_name
+    from codeweaver.providers import ProviderSettings
 
     # Default collection name
     collection_name = generate_collection_name()
@@ -125,16 +87,18 @@ def _derive_collection_name(
         (provider_settings := settings.provider)
         and isinstance(provider_settings, ProviderSettings)
         and (vector_settings := provider_settings.vector_store)
-        and vector_settings is not None
-        and (vector_provider_config := vector_settings.get("provider_settings"))
+        and vector_settings is not UNSET
     ):
-        collection_name = vector_provider_config.get("collection_name", collection_name)
-
+        return (
+            vector_settings[0].collection.collection_name
+            if isinstance(vector_settings, tuple) and len(vector_settings) > 0
+            else vector_settings.collection.collection_name  # ty:ignore[unresolved-attribute, invalid-return-type]
+        )
     return collection_name
 
 
 async def _perform_clear_operation(
-    settings: CodeWeaverSettings, project_path: Path, *, yes: bool, display: StatusDisplay
+    settings: CodeWeaverEngineSettings, project_path: Path, *, yes: bool, display: StatusDisplay
 ) -> None:
     """Clear vector store and checkpoints.
 
@@ -147,10 +111,7 @@ async def _perform_clear_operation(
     Raises:
         CodeWeaverError: If operation fails
     """
-    from codeweaver.common.registry.provider import get_provider_registry
-    from codeweaver.config.indexer import IndexerSettings
-    from codeweaver.engine.indexer.checkpoint import CheckpointManager
-    from codeweaver.engine.indexer.manifest import FileManifestManager
+    from codeweaver.core import get_container
 
     if not yes:
         display.print_warning("⚠ Warning: Destructive Operation")
@@ -170,52 +131,17 @@ async def _perform_clear_operation(
 
     display.print_info("Clearing vector store and checkpoints...")
 
-    # Setup paths and managers
-    indexes_dir = (
-        settings.indexer.cache_dir
-        if isinstance(settings.indexer, IndexerSettings)
-        else get_user_config_dir() / ".indexes"
-    )
+    container = get_container()
 
-    checkpoint_mgr = CheckpointManager(
-        project_path=project_path, checkpoint_dir=indexes_dir / "checkpoints"
-    )
-    manifest = FileManifestManager(
-        project_path=project_path, manifest_dir=indexes_dir / "manifests"
-    )
+    # Resolve managers
+    checkpoint_mgr = await container.resolve(CheckpointManager)
+    manifest = await container.resolve(FileManifestManager)
+
+    # Resolve vector store
+    store = await container.resolve(VectorStoreProvider)
 
     # Derive collection name
-    collection_name = _derive_collection_name(settings, project_path, checkpoint_mgr)
-
-    # Clear vector store
-    from codeweaver.config.providers import ProviderSettings
-    from codeweaver.core.types import Unset
-
-    registry = get_provider_registry()
-    provider = registry.get_provider_enum_for("vector_store")
-
-    # Extract provider settings from config
-    provider_config: dict[str, object] = {}
-    if (
-        (provider_settings := settings.provider)
-        and isinstance(provider_settings, ProviderSettings)
-        and (
-            vector_settings := provider_settings.vector_store[0]
-            if isinstance(provider_settings.vector_store, tuple)
-            else provider_settings.vector_store
-        )
-        and vector_settings is not Unset
-        and (vector_provider_config := vector_settings.get("provider_settings"))
-    ):
-        # Copy provider_settings (url, collection_name, etc.)
-        provider_config = dict(vector_provider_config)  # ty:ignore[no-matching-overload]
-        # Add api_key from parent level if present
-        if api_key := vector_settings.get("api_key"):
-            provider_config["api_key"] = (
-                api_key if isinstance(api_key, str) else api_key.get_secret_value()
-            )
-
-    store = registry.create_provider(provider, "vector_store", config=provider_config)  # type: ignore
+    collection_name = await _derive_collection_name(settings, project_path, checkpoint_mgr)
 
     await store._initialize()
     await_result = await store.delete_collection(collection_name)
@@ -226,20 +152,13 @@ async def _perform_clear_operation(
         display.print_info(f"Vector store collection '{collection_name}' did not exist")
 
     # Clear checkpoints and manifests
-    checkpoint_mgr.delete()
+    await checkpoint_mgr.delete()
     display.print_success("Checkpoints cleared")
-    manifest.delete()
+    await manifest.delete()
     display.print_success("File manifest cleared")
 
     display.print_success("Clear operation complete")
     display.console.print()
-    backups_dir = indexes_dir.parent / ".vectors" / "backups"
-    if backups_dir.exists() and (files := list(backups_dir.iterdir())):
-        for file in files:
-            file.unlink()
-        display.print_success(
-            f"Deleted {len(files)} files for the failsafe vector store from '{backups_dir}'"
-        )
 
 
 async def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> bool:
@@ -265,9 +184,7 @@ async def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> 
 
 
 def _get_url():
-    from codeweaver.config.settings import get_settings_map
-
-    settings_map = get_settings_map()
+    settings_map = _settings_map()
     host = settings_map.get("management_host", "localhost")
     port = settings_map.get("management_port", 9329)
     return f"http://{host}:{port}"
@@ -302,10 +219,7 @@ def _check_and_print_server_status(display: StatusDisplay):
 
 
 async def _run_standalone_indexing(
-    settings: CodeWeaverSettings | DictView[CodeWeaverSettingsDict],
-    *,
-    force_reindex: bool,
-    display: StatusDisplay,
+    settings: CodeWeaverEngineSettings, *, force_reindex: bool, display: StatusDisplay
 ) -> None:
     """Run standalone indexing operation.
 
@@ -317,17 +231,20 @@ async def _run_standalone_indexing(
     Raises:
         CodeWeaverError: If indexing fails
     """
-    from typing import Any
-
-    from codeweaver.engine.indexer import Indexer
+    from codeweaver.core import get_container
 
     display.print_info("Initializing indexer...")
-    indexer = await Indexer.from_settings_async(
-        settings=settings if isinstance(settings, DictView) else DictView(settings.model_dump())
-    )
+
+    container = get_container()
+    indexing_service = await container.resolve(IndexingService)
 
     # Check if sparse embeddings are configured
-    has_sparse = indexer._sparse_provider is not None
+    # We can check the service's private attribute if accessible or check settings
+    # For now, let's assume if the service was created, it has what it needs.
+    # The progress tracker needs to know if sparse is enabled.
+    # We can inspect the service or check config.
+    # Accessing private attribute _sparse_provider for UI hint logic is acceptable here.
+    has_sparse = getattr(indexing_service, "_sparse_provider", None) is not None
 
     # Create progress tracker with batch support
     progress_tracker = IndexingProgress(console=display.console, has_sparse=has_sparse)
@@ -373,13 +290,13 @@ async def _run_standalone_indexing(
     display.print_success("Starting indexing process...")
 
     with progress_tracker:
-        _ = await indexer.prime_index(
+        _ = await indexing_service.index_project(
             force_reindex=force_reindex, progress_callback=progress_callback
         )
         progress_tracker.complete()
 
     # Display final summary
-    stats = indexer.stats
+    stats = indexing_service.stats
     display.console.print()
     display.print_success("Indexing Complete!")
     display.console.print()
@@ -394,12 +311,12 @@ async def _run_standalone_indexing(
     elapsed = stats.elapsed_time()
     if elapsed >= 3600:
         hours = int(elapsed // 3600)
-        minutes = int((elapsed % 3600) // 60)
-        seconds = int(elapsed % 60)
+        minutes = int((elapsed % 3600) // ONE_MINUTE)
+        seconds = int(elapsed % ONE_MINUTE)
         human_time = f"{hours}h {minutes}m {seconds}s"
-    elif elapsed >= 60:
-        minutes = int(elapsed // 60)
-        seconds = int(elapsed % 60)
+    elif elapsed >= ONE_MINUTE:
+        minutes = int(elapsed // ONE_MINUTE)
+        seconds = int(elapsed % ONE_MINUTE)
         human_time = f"{minutes}m {seconds}s"
     else:
         human_time = f"{elapsed:.1f}s"
@@ -465,7 +382,7 @@ async def index(
     """
     display = _display or get_display()
     error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
-    from codeweaver.common.utils import is_wsl_vscode
+    from codeweaver.core import is_wsl_vscode
 
     if is_wsl_vscode():
         display.print_warning(
@@ -474,11 +391,19 @@ async def index(
         display.print_info("If you have already indexed your codebase, you'll probably be OK.")
 
     try:
+        # Setup DI Container
+        container = setup_cli_di(config_file, project_path, verbose=verbose)
+
+        # We need to retrieve settings from the container now
+        from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+
+        settings = await container.resolve(CodeWeaverSettingsType)
+
         # Handle --clear flag
         if clear:
-            display.print_info("Loading configuration...")
-            settings, resolved_path = _load_and_configure_settings(config_file, project_path)
-            await _perform_clear_operation(settings, resolved_path, yes=yes, display=display)
+            await _perform_clear_operation(
+                settings, Path(str(settings.project_path)), yes=yes, display=display
+            )
             force_reindex = True  # Continue to reindex after clearing
 
         # Check server status and decide whether to proceed
@@ -486,8 +411,6 @@ async def index(
             return  # Server is running, exit early
 
         # Standalone indexing
-        display.print_info("Loading configuration...")
-        settings, _ = _load_and_configure_settings(config_file, project_path)
         await _run_standalone_indexing(settings, force_reindex=force_reindex, display=display)
 
     except CodeWeaverError as e:
@@ -516,4 +439,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-__all__ = ("app", "index")
+__all__ = ()
