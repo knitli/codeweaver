@@ -59,7 +59,6 @@ def test_from_path_with_directory_resolves_git_branch(temp_project: Path) -> Non
     test_dir.mkdir()
 
     with patch("codeweaver.core.discovery.get_git_branch", return_value="custom-branch") as mock_git:
-        # ExtCategory.from_file returns None for directories, so we must patch it to test this specific path
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.core.metadata import ChunkKind
         mock_ext = ExtCategory(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE)
