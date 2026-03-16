@@ -10,8 +10,10 @@ from __future__ import annotations
 import datetime
 import sys
 
+from collections.abc import Callable
 from typing import Literal, cast, overload
 
+from lateimport import LateImport, lateimport
 from pydantic import UUID7
 
 from codeweaver.core.constants import ONE_MILLISECOND_IN_MICROSECONDS
@@ -19,27 +21,17 @@ from codeweaver.core.types.aliases import BlakeHashKey, BlakeKey
 
 
 if sys.version_info < (3, 14):
-    try:
-        from uuid_extensions import uuid7 as uuid7_gen
-    except ImportError:
-        def uuid7_gen(*args, **kwargs) -> UUID7:
-            from pydantic import UUID7
-            from uuid import uuid4
-            return cast(UUID7, uuid4())
+    uuid7_gen_func: LateImport[Callable[..., UUID7]] = lateimport("uuid_extensions", "uuid7")
 else:
-    try:
-        from uuid import uuid7 as uuid7_gen
-    except ImportError:
-        def uuid7_gen(*args, **kwargs) -> UUID7:
-            from pydantic import UUID7
-            from uuid import uuid4
-            return cast(UUID7, uuid4())
+    uuid7_gen_func: LateImport[Callable[..., UUID7]] = lateimport("uuid", "uuid7")
+
+
+uuid7_gen: Callable[..., UUID7] = uuid7_gen_func._resolve()
 
 
 def uuid7() -> UUID7:
     """Generate a new UUID7."""
-    from pydantic import UUID7
-
+    global uuid7_gen
     return cast(UUID7, uuid7_gen())
 
 
@@ -61,11 +53,19 @@ def uuid7_as_timestamp(
 
             return uuid_to_datetime(uuid) if as_datetime else time_ns(uuid)
         except ImportError:
-            return datetime.datetime.now(datetime.UTC) if as_datetime else int(datetime.datetime.now(datetime.UTC).timestamp() * 1e9)
+            return (
+                datetime.datetime.now(datetime.UTC)
+                if as_datetime
+                else int(datetime.datetime.now(datetime.UTC).timestamp() * 1e9)
+            )
     try:
         from uuid import uuid7
     except ImportError:
-        return datetime.datetime.now(datetime.UTC) if as_datetime else int(datetime.datetime.now(datetime.UTC).timestamp() * 1e9)
+        return (
+            datetime.datetime.now(datetime.UTC)
+            if as_datetime
+            else int(datetime.datetime.now(datetime.UTC).timestamp() * 1e9)
+        )
 
     uuid = uuid7(uuid) if isinstance(uuid, str | int) else uuid
     return (
