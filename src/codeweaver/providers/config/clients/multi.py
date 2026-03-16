@@ -43,21 +43,21 @@ from codeweaver.providers.config.clients.utils import (
 )
 
 
-if has_package("google") is not None:
+if has_package("google"):
     from google.auth.credentials import Credentials as GoogleCredentials
 else:
     GoogleCredentials = Any
 
-if has_package("fastembed") is not None or has_package("fastembed_gpu") is not None:
+if has_package("fastembed") or has_package("fastembed_gpu"):
     from fastembed.common.types import OnnxProvider
 else:
     OnnxProvider = object
 
-if has_package("torch") is not None:
+if has_package("torch"):
     from torch.nn import Module
 else:
     Module = object
-if has_package("sentence_transformers") is not None:
+if has_package("sentence_transformers"):
     # SentenceTransformerModelCardData contains these forward references:
     # - eval_results_dict: dict[SentenceEvaluator, dict[str, Any]] | None
     # - model: SentenceTransformer | None
@@ -512,7 +512,7 @@ class VoyageClientOptions(ClientOptions):
 # Rebuild Pydantic models to resolve forward references after all imports complete
 # This is necessary because SentenceTransformerModelCardData contains SentenceEvaluator references
 if (
-    has_package("sentence_transformers") is not None
+    has_package("sentence_transformers")
     and not SentenceTransformersClientOptions.__pydantic_complete__
 ):
     # we can rebuild lazily later if this fails
