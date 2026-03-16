@@ -49,7 +49,10 @@ else:
     GoogleCredentials = Any
 
 if has_package("fastembed") is not None or has_package("fastembed_gpu") is not None:
-    from fastembed.common.types import OnnxProvider
+    try:
+        from fastembed.common.types import OnnxProvider
+    except ImportError:
+        OnnxProvider = object
 else:
     OnnxProvider = object
 
