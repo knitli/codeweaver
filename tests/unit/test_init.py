@@ -1,7 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 import importlib.metadata
 import shutil
 import subprocess
 import sys
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -25,8 +30,10 @@ def mock_no_version_file(monkeypatch):
     # We must also clear the internal import mechanisms tracking caching!
     # A cleaner approach is simply to re-import get_version explicitly so it bounds to the current env
     import importlib
+
     importlib.reload(codeweaver)
     return codeweaver.get_version
+
 
 @pytest.fixture
 def mock_no_metadata(monkeypatch, mock_no_version_file):
@@ -37,8 +44,10 @@ def mock_no_metadata(monkeypatch, mock_no_version_file):
         if pkg_name == "code-weaver":
             raise importlib.metadata.PackageNotFoundError("code-weaver")
         return _original_version(pkg_name)
+
     monkeypatch.setattr(importlib.metadata, "version", mock_version)
     return mock_no_version_file
+
 
 def test_get_version_from_version_file(monkeypatch, mock_no_version_file):
     """Test getting version from codeweaver._version.__version__."""
@@ -48,9 +57,11 @@ def test_get_version_from_version_file(monkeypatch, mock_no_version_file):
 
     # Need to reload codeweaver because we just changed sys.modules
     import importlib
+
     importlib.reload(codeweaver)
 
     assert codeweaver.get_version() == "1.2.3-file"
+
 
 def test_get_version_from_importlib_metadata(monkeypatch, mock_no_version_file):
     """Test getting version from importlib.metadata."""
@@ -65,6 +76,7 @@ def test_get_version_from_importlib_metadata(monkeypatch, mock_no_version_file):
     monkeypatch.setattr(importlib.metadata, "version", mock_version)
 
     assert get_version() == "1.2.3-metadata"
+
 
 def test_get_version_from_git_success(monkeypatch, mock_no_metadata):
     """Test getting version from git describe."""
@@ -82,6 +94,7 @@ def test_get_version_from_git_success(monkeypatch, mock_no_metadata):
 
     assert get_version() == "1.2.3-git"
 
+
 def test_get_version_from_git_failure(monkeypatch, mock_no_metadata):
     """Test git describe fails and returns 0.0.0."""
     get_version = mock_no_metadata
@@ -97,6 +110,7 @@ def test_get_version_from_git_failure(monkeypatch, mock_no_metadata):
 
     assert get_version() == "0.0.0"
 
+
 def test_get_version_no_git(monkeypatch, mock_no_metadata):
     """Test git is not installed, returns 0.0.0."""
     get_version = mock_no_metadata
@@ -104,11 +118,14 @@ def test_get_version_no_git(monkeypatch, mock_no_metadata):
 
     assert get_version() == "0.0.0"
 
+
 def test_get_version_exception(monkeypatch, mock_no_metadata):
     """Test general exception in git block returns 0.0.0."""
     get_version = mock_no_metadata
+
     def mock_which(cmd):
         raise RuntimeError("Something went wrong")
+
     monkeypatch.setattr(shutil, "which", mock_which)
 
     assert get_version() == "0.0.0"
