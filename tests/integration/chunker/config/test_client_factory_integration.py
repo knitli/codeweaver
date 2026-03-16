@@ -247,6 +247,7 @@ class TestVectorStoreProviderWithClientFactory:
 
         mock_provider_class = Mock(return_value=Mock())
         mock_provider_lazy = Mock()
+        mock_provider_lazy.__name__ = "MockQdrantProvider"
         mock_provider_lazy._resolve.return_value = mock_provider_class
         mock_provider_lazy.return_value = Mock()  # Fix: mock_provider_lazy is what gets called
 
@@ -289,7 +290,9 @@ class TestVectorStoreProviderWithClientFactory:
 
         mock_provider_class = Mock(return_value=Mock())
         mock_provider_lazy = Mock()
+        mock_provider_lazy.__name__ = "MockQdrantProvider"
         mock_provider_lazy._resolve.return_value = mock_provider_class
+        mock_provider_lazy.return_value = Mock()  # Fix: mock_provider_lazy is called at line 959
 
         mock_client_map = {
             Provider.QDRANT: (
