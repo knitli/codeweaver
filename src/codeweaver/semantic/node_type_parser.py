@@ -543,9 +543,10 @@ class NodeTypeParser:
     }
 
     _cache_loaded: ClassVar[bool] = False
-    # TypeAdapter is built lazily on first use; typed as Any to avoid mismatch with the
-    # locally-defined TypedDict used for construction (which cannot be module-level due to
-    # circular-import constraints on the grammar types).
+    # TypeAdapter is built lazily on first use via _ensure_cache_adapter(); typed as Any because
+    # it wraps locally-defined TypedDicts that cannot live at module scope — grammar types
+    # (Category, Token, etc.) are needed in their annotations but importing grammar at module
+    # level would create a circular import (grammar.py imports NodeTypeParser inside a function).
     _cache_adapter: ClassVar[TypeAdapter[Any] | None] = None
 
     def __init__(
@@ -598,11 +599,9 @@ class NodeTypeParser:
                 return False
 
             self._ensure_cache_adapter()
-            adapter = type(self)._cache_adapter
-            if adapter is None:  # should not happen after _ensure_cache_adapter
-                return False
-
-            cache_data = adapter.validate_json(cache_resource.read_bytes())
+            cache_data = type(self)._cache_adapter.validate_json(  # type: ignore[union-attr]
+                cache_resource.read_bytes()
+            )
             type(self)._registration_cache = self._reconstruct_cache(
                 cache_data["registration_cache"]
             )
@@ -625,14 +624,22 @@ class NodeTypeParser:
     def _ensure_cache_adapter(self) -> None:
         """Build and cache the TypeAdapter for JSON cache loading (once per class lifetime).
 
-        Grammar types are imported at runtime here to avoid circular import issues at
-        module load time. connections are kept as raw dicts in the TypedDict and
-        reconstructed per-item because the DirectConnection | PositionalConnections union
-        has no discriminator field and cannot be resolved by TypeAdapter directly.
+        Grammar types (Category, Token, etc.) are imported at runtime to avoid a circular
+        import: grammar.py imports NodeTypeParser inside a function, so importing grammar at
+        module level here would form a cycle at startup.
+
+        Connections are kept as raw ``list[dict]`` in the validation TypedDict and
+        reconstructed per-item in ``_reconstruct_cache`` because the
+        ``DirectConnection | PositionalConnections`` union has no discriminator field, and
+        ``Connection.__init__`` raises ``KeyError`` when TypeAdapter tries ``DirectConnection``
+        on a ``PositionalConnections`` payload.
         """
         if type(self)._cache_adapter is not None:
             return
 
+
+        # ruff cannot see them as "used" because `from __future__ import annotations` makes
+        # all annotations lazy strings that are resolved at TypeAdapter construction time.
         from codeweaver.semantic.grammar import Category, CompositeThing, Token  # noqa: F401
 
         class _RC(TypedDict):
