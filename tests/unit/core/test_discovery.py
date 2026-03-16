@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+"""Tests for DiscoveredFile.from_path condition, which is the primary instantiation route for DiscoveredFile."""
 import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
