@@ -213,7 +213,6 @@
       ]
     }
   },
-  "models": {},
   "models": {
     "Alibaba-NLP/gte-modernbert-base": {
       "adapted_from": null,
@@ -3925,6 +3924,4 @@
       "opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini"
     ]
   }
-{
-    "models": {}
-  }
+}

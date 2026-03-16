@@ -17,16 +17,6 @@ import pytest
 from codeweaver.core import Provider, ProviderCategory
 
 
-def make_lazy_provider_mock(name: str, resolved_class: Mock, instance: Mock | None = None) -> Mock:
-    """Helper to create and configure a lazy provider mock."""
-    lazy_mock = Mock()
-    lazy_mock.__name__ = name
-    lazy_mock._resolve.return_value = resolved_class
-    # mock_provider_lazy is invoked like the provider class
-    lazy_mock.return_value = instance if instance is not None else Mock()
-    return lazy_mock
-
-
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.skip(reason="ProviderRegistry removed - functionality tested through DI container"),
@@ -85,8 +75,13 @@ class TestProviderInstantiationWithClientFactory:
 
         mock_provider_class = Mock()
         mock_provider_instance = Mock()
-        mock_provider_lazy = make_lazy_provider_mock(
-            "MockVoyageProvider", mock_provider_class, mock_provider_instance
+        mock_provider_lazy = Mock()
+        mock_provider_lazy.__name__ = (
+            "MockVoyageProvider"  # Fix: Add __name__ to lazy mock (not resolved class)
+        )
+        mock_provider_lazy._resolve.return_value = mock_provider_class
+        mock_provider_lazy.return_value = (
+            mock_provider_instance  # Fix: mock_provider_lazy is called at line 959
         )
         mock_provider_class.return_value = mock_provider_instance
 
@@ -129,7 +124,12 @@ class TestProviderInstantiationWithClientFactory:
         mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock()
-        mock_provider_lazy = make_lazy_provider_mock("MockVoyageProvider", mock_provider_class)
+        mock_provider_lazy = Mock()
+        mock_provider_lazy.__name__ = (
+            "MockVoyageProvider"  # Fix: Add __name__ to lazy mock (not resolved class)
+        )
+        mock_provider_lazy._resolve.return_value = mock_provider_class
+        mock_provider_lazy.return_value = Mock()  # Fix: mock_provider_lazy is called at line 959
 
         mock_client_map = {
             Provider.VOYAGE: (
@@ -168,7 +168,12 @@ class TestProviderInstantiationWithClientFactory:
         mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock(return_value=Mock())
-        mock_provider_lazy = make_lazy_provider_mock("MockVoyageProvider", mock_provider_class)
+        mock_provider_lazy = Mock()
+        mock_provider_lazy.__name__ = (
+            "MockVoyageProvider"  # Fix: Add __name__ to lazy mock (not resolved class)
+        )
+        mock_provider_lazy._resolve.return_value = mock_provider_class
+        mock_provider_lazy.return_value = Mock()  # Fix: mock_provider_lazy is called at line 959
 
         mock_client_map = {
             Provider.VOYAGE: (
@@ -241,7 +246,9 @@ class TestVectorStoreProviderWithClientFactory:
         mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock(return_value=Mock())
-        mock_provider_lazy = make_lazy_provider_mock("MockQdrantProvider", mock_provider_class)
+        mock_provider_lazy = Mock()
+        mock_provider_lazy._resolve.return_value = mock_provider_class
+        mock_provider_lazy.return_value = Mock()  # Fix: mock_provider_lazy is what gets called
 
         mock_client_map = {
             Provider.QDRANT: (
@@ -281,7 +288,8 @@ class TestVectorStoreProviderWithClientFactory:
         mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock(return_value=Mock())
-        mock_provider_lazy = make_lazy_provider_mock("MockQdrantProvider", mock_provider_class)
+        mock_provider_lazy = Mock()
+        mock_provider_lazy._resolve.return_value = mock_provider_class
 
         mock_client_map = {
             Provider.QDRANT: (
@@ -375,7 +383,12 @@ class TestProviderCategoryStringHandling:
         mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock(return_value=Mock())
-        mock_provider_lazy = make_lazy_provider_mock("MockVoyageProvider", mock_provider_class)
+        mock_provider_lazy = Mock()
+        mock_provider_lazy.__name__ = (
+            "MockVoyageProvider"  # Fix: Add __name__ to lazy mock (not resolved class)
+        )
+        mock_provider_lazy._resolve.return_value = mock_provider_class
+        mock_provider_lazy.return_value = Mock()  # Fix: mock_provider_lazy is called at line 959
 
         mock_client_map = {
             Provider.VOYAGE: (

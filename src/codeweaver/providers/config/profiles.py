@@ -268,9 +268,7 @@ def _recommended_default(
         ),
         data=(TavilyProviderSettings(provider=Provider.TAVILY),)
         if Provider.TAVILY.has_env_auth and has_package("tavily")
-        else (DuckDuckGoProviderSettings(provider=Provider.DUCKDUCKGO),)
-        if has_package("ddgs")
-        else (),
+        else (DuckDuckGoProviderSettings(provider=Provider.DUCKDUCKGO),),
         vector_store=(
             QdrantVectorStoreProviderSettings(
                 provider=Provider.QDRANT,
