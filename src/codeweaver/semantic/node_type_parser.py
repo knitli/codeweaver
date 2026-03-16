@@ -599,9 +599,9 @@ class NodeTypeParser:
                 return False
 
             self._ensure_cache_adapter()
-            cache_data = type(self)._cache_adapter.validate_json(  # type: ignore[union-attr]
-                cache_resource.read_bytes()
-            )
+            adapter = type(self)._cache_adapter
+            assert adapter is not None
+            cache_data = adapter.validate_json(cache_resource.read_bytes())
             type(self)._registration_cache = self._reconstruct_cache(
                 cache_data["registration_cache"]
             )
