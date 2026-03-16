@@ -1,12 +1,7 @@
-# SPDX-FileCopyrightText: 2024-present The codeweaver authors
-# SPDX-License-Identifier: MIT
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 from codeweaver.core.discovery import DiscoveredFile
-
-pytestmark = [pytest.mark.unit]
 
 
 def test_absolute_path_filenotfound() -> None:
@@ -14,10 +9,10 @@ def test_absolute_path_filenotfound() -> None:
     # Setup our discovered file
     file = DiscoveredFile(
         path=Path("some/file.py"),
-        project_path=None,
+        project_path=None
     )
 
     # We want to mock get_project_path to raise FileNotFoundError
-    with patch("codeweaver.core.discovery.get_project_path", side_effect=FileNotFoundError):
+    with patch("codeweaver.core.utils.get_project_path", side_effect=FileNotFoundError):
         # We expect absolute_path to fall back to returning self.path
         assert file.absolute_path == Path("some/file.py")
