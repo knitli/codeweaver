@@ -24,12 +24,9 @@ from codeweaver.providers.embedding.providers.base import (
 
 
 try:
-    try:
-        from voyageai.client_async import AsyncClient
-        from voyageai.object.contextualized_embeddings import ContextualizedEmbeddingsObject
-        from voyageai.object.embeddings import EmbeddingsObject
-    except Exception:
-        AsyncClient, ContextualizedEmbeddingsObject, EmbeddingsObject = object, object, object
+    from voyageai.client_async import AsyncClient
+    from voyageai.object.contextualized_embeddings import ContextualizedEmbeddingsObject
+    from voyageai.object.embeddings import EmbeddingsObject
 except ImportError as _import_error:
     raise ConfigurationError(
         'Please install the `voyageai` package to use the Voyage provider, you can use the `voyage` optional group -- `pip install "code-weaver\\[voyage]"`'

@@ -1,0 +1,14 @@
+--- src/codeweaver/providers/reranking/providers/voyage.py
++++ src/codeweaver/providers/reranking/providers/voyage.py
+@@ -27,8 +27,11 @@
+         import voyageai  # noqa: F401
+     except ImportError:
+         logger.error("Failed to import voyageai", exc_info=True)
+         raise ConfigurationError(
+             r"Voyage AI is not installed. Please install it with `pip install code-weaver\[voyage]`."
+         )
+-    from voyageai.client_async import AsyncClient
++    try:
++        from voyageai.client_async import AsyncClient
++    except Exception:
++        AsyncClient = object

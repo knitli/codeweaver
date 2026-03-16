@@ -1,0 +1,18 @@
+--- src/codeweaver/providers/reranking/providers/voyage.py
++++ src/codeweaver/providers/reranking/providers/voyage.py
+@@ -28,8 +28,11 @@
+ logger = logging.getLogger(__name__)
+
+ try:
+-    from voyageai.client_async import AsyncClient
+-    from voyageai.object.reranking import RerankingObject
+-    from voyageai.object.reranking import RerankingResult as VoyageRerankingResult
++    try:
++        from voyageai.client_async import AsyncClient
++        from voyageai.object.reranking import RerankingObject
++        from voyageai.object.reranking import RerankingResult as VoyageRerankingResult
++    except Exception:
++        AsyncClient, RerankingObject, VoyageRerankingResult = object, object, object
+
+ except ImportError as e:
+     from codeweaver.core import ConfigurationError
