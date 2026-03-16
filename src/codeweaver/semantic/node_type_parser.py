@@ -246,7 +246,6 @@ For developers familiar with tree-sitter terminology:
 from __future__ import annotations
 
 import logging
-import pickle
 
 from collections.abc import Callable, Sequence
 from importlib.resources import files
@@ -254,7 +253,7 @@ from itertools import groupby
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, overload
 
-from pydantic import DirectoryPath, Field
+from pydantic import DirectoryPath, Field, TypeAdapter, ValidationError
 from pydantic_core import from_json
 
 from codeweaver.core import INJECTED, CategoryNameT, RootedRoot, SemanticSearchLanguage, ThingName
@@ -347,7 +346,7 @@ logger = logging.getLogger()
 #
 # * Static at runtime
 #
-# In practice, CodeWeaver generates this data at build time and saves it as a pickle cache (python object) in `codeweaver.semantic.data`. This avoids the need for runtime parsing and speeds up startup.
+# In practice, CodeWeaver generates this data at build time and saves it as a JSON cache in `codeweaver.semantic.data`. This avoids the need for runtime parsing and speeds up startup.
 # We keep this capability within the code, vice in build generation, because we plan to use it dynamically in the future for new languages at runtime.
 # ===========================================================================
 
@@ -544,6 +543,11 @@ class NodeTypeParser:
     }
 
     _cache_loaded: ClassVar[bool] = False
+    # TypeAdapter is built lazily on first use via _ensure_cache_adapter(); typed as Any because
+    # it wraps locally-defined TypedDicts that cannot live at module scope — grammar types
+    # (Category, Token, etc.) are needed in their annotations but importing grammar at module
+    # level would create a circular import (grammar.py imports NodeTypeParser inside a function).
+    _cache_adapter: ClassVar[TypeAdapter[Any] | None] = None
 
     def __init__(
         self, languages: Sequence[SemanticSearchLanguage] | None = None, *, use_cache: bool = True
@@ -584,48 +588,28 @@ class NodeTypeParser:
     def _load_from_cache(self) -> bool:
         """Try to load pre-processed node types from cache.
 
-        Security: While pickle.loads() can execute arbitrary code, this cache is:
-        1. Generated during our build process
-        2. Shipped as part of the package (same trust level as our code)
-        3. Validated for structure and version compatibility
-
         Returns:
             True if cache was loaded successfully, False otherwise.
         """
         try:
             # Try to load cache from package resources
-            cache_resource = files("codeweaver.semantic.data") / "node_types_cache.pkl"
+            cache_resource = files("codeweaver.semantic.data") / "node_types_cache.json"
             if not cache_resource.is_file():
                 logger.debug("Node types cache not found, will parse from JSON files")
                 return False
-            # this is safe because we control it and check HMAC for validity
-            cache_data = pickle.loads(cache_resource.read_bytes())  # noqa: S301
 
-            # Validate cache structure
-            if not isinstance(cache_data, dict) or "registration_cache" not in cache_data:
-                logger.warning(
-                    "Invalid cache structure: missing 'registration_cache' key, will parse from JSON"
-                )
-                return False
+            self._ensure_cache_adapter()
+            adapter = type(self)._cache_adapter
+            assert adapter is not None
+            cache_data = adapter.validate_json(cache_resource.read_bytes())
+            type(self)._registration_cache = self._reconstruct_cache(
+                cache_data["registration_cache"]
+            )
+            self._clear_stale_cached_properties()
 
-            # Validate cache data type
-            if not isinstance(cache_data["registration_cache"], dict):
-                logger.warning("Invalid cache data type, will parse from JSON")
-                return False
-
-            type(self)._registration_cache = cache_data["registration_cache"]
-            # Clear any stale cached_property values from pickled instances.
-            # classification_result may have been computed and cached during cache generation
-            # before GrammarClassificationResult was fully initialized, leaving broken empty
-            # instances. Clearing it ensures fresh computation on next access.
-            for lang_cache in type(self)._registration_cache.values():
-                for obj in (*lang_cache.get("tokens", []), *lang_cache.get("composites", [])):
-                    obj.__dict__.pop("classification_result", None)
-            type(self)._cache_loaded = True
-            logger.debug("Loaded node types from cache")
-
-        except (pickle.UnpicklingError, AttributeError, KeyError) as e:
-            # Specific pickle/data structure errors
+        except (ValidationError, AttributeError, ImportError) as e:
+            # Pydantic ValidationError covers JSON decode and structural issues; catch
+            # ImportError in case optional grammar modules are unavailable.
             logger.warning("Cache corrupted or incompatible: %s, will parse from JSON", e)
             return False
         except OSError as e:
@@ -633,7 +617,72 @@ class NodeTypeParser:
             logger.warning("Failed to read cache file: %s, will parse from JSON", e)
             return False
         else:
+            type(self)._cache_loaded = True
+            logger.debug("Loaded node types from cache")
             return True
+
+    def _ensure_cache_adapter(self) -> None:
+        """Build and cache the TypeAdapter for JSON cache loading (once per class lifetime).
+
+        Grammar types (Category, Token, etc.) are imported at runtime to avoid a circular
+        import: grammar.py imports NodeTypeParser inside a function, so importing grammar at
+        module level here would form a cycle at startup.
+
+        Connections are kept as raw ``list[dict]`` in the validation TypedDict and
+        reconstructed per-item in ``_reconstruct_cache`` because the
+        ``DirectConnection | PositionalConnections`` union has no discriminator field, and
+        ``Connection.__init__`` raises ``KeyError`` when TypeAdapter tries ``DirectConnection``
+        on a ``PositionalConnections`` payload.
+        """
+        if type(self)._cache_adapter is not None:
+            return
+
+        # ruff cannot see them as "used" because `from __future__ import annotations` makes
+        # all annotations lazy strings that are resolved at TypeAdapter construction time.
+        from codeweaver.semantic.grammar import Category, CompositeThing, Token  # noqa: F401
+
+        class _RC(TypedDict):
+            categories: list[Category]
+            tokens: list[Token]
+            composites: list[CompositeThing]
+            connections: list[dict]
+
+        class _CP(TypedDict):
+            registration_cache: dict[SemanticSearchLanguage, _RC]
+
+        type(self)._cache_adapter = TypeAdapter(_CP)
+
+    def _reconstruct_cache(
+        self, raw: dict[Any, Any]
+    ) -> dict[SemanticSearchLanguage, _ThingCacheDict]:
+        """Reconstruct typed connection objects from raw dicts in the loaded cache.
+
+        DirectConnection has a 'role' field; PositionalConnections does not.
+        """
+        from codeweaver.semantic.grammar import DirectConnection, PositionalConnections
+
+        result: dict[SemanticSearchLanguage, _ThingCacheDict] = {}
+        for lang, rc in raw.items():
+            connections = [
+                DirectConnection.model_validate(c)
+                if isinstance(c, dict) and "role" in c
+                else PositionalConnections.model_validate(c)
+                for c in rc["connections"]
+            ]
+            result[lang] = cast(_ThingCacheDict, {**rc, "connections": connections})
+        return result
+
+    def _clear_stale_cached_properties(self) -> None:
+        """Clear stale cached_property values from loaded cache instances.
+
+        classification_result may have been computed and cached during cache generation
+        before GrammarClassificationResult was fully initialized. Clearing it ensures
+        fresh computation on next access.
+        """
+        for lang_cache in type(self)._registration_cache.values():
+            for obj in (*lang_cache.get("tokens", []), *lang_cache.get("composites", [])):
+                if hasattr(obj, "__dict__"):
+                    obj.__dict__.pop("classification_result", None)
 
     @property
     def nodes(self) -> list[NodeArray]:
