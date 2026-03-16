@@ -229,11 +229,19 @@ test-results.xml
 mise.local.toml
 mise.local.env
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
 <<<<<<< Updated upstream
+>>>>>>> 7cb5efe (chore: align branch with upstream and resolve provider initialization)
 .exportify/
 !.exportify/config.toml
 =======
 .gemini/
 gha-creds-*.json
 .hypothesis/
+<<<<<<< HEAD
+>>>>>>> b6cc77c (🧪 [Testing Improvement] Add tests for conditional branches in run)
+=======
 >>>>>>> Stashed changes
+>>>>>>> 7cb5efe (chore: align branch with upstream and resolve provider initialization)
