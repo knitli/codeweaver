@@ -659,10 +659,6 @@ class Container[T]:
             globalns["Annotated"] = Annotated
 
         try:
-            # Handle Python 3.13 changes for type(None) inspection
-            # inspect.signature(type(None)) raises ValueError in 3.13+
-            if obj is type(None):
-                return inspect.Signature(), {}
             signature = inspect.signature(obj)
         except (ValueError, TypeError) as e:
             raise DependencyInjectionError(f"Cannot get signature for {obj}") from e
