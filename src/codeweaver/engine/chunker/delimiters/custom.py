@@ -357,12 +357,14 @@ RST_COMMENT_PATTERN = DelimiterPattern(
     nestable=False,
 )
 
+HTML_BLOCK_TAGS = frozenset({"html", "body", "main", "section", "article"})
+
 HTML_TAGS_PATTERNS = [
     DelimiterPattern(
         starts=[f"<{tag}"],
         ends=[f"</{tag}>"],
         kind=DelimiterKind.BLOCK
-        if tag in {"html", "body", "main", "section", "article"}
+        if tag in HTML_BLOCK_TAGS
         else DelimiterKind.PARAGRAPH,
         inclusive=True,
         take_whole_lines=True,
