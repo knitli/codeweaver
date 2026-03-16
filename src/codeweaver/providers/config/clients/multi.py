@@ -49,14 +49,20 @@ else:
     GoogleCredentials = Any
 
 if has_package("fastembed") is not None or has_package("fastembed_gpu") is not None:
-    from fastembed.common.types import OnnxProvider
+    try:
+        from fastembed.common.types import OnnxProvider
+    except ImportError:
+        OnnxProvider = Any  # type: ignore[assignment, misc]
 else:
-    OnnxProvider = object
+    OnnxProvider = Any  # type: ignore[assignment, misc]
 
 if has_package("torch") is not None:
-    from torch.nn import Module
+    try:
+        from torch.nn import Module
+    except ImportError:
+        Module = Any  # type: ignore[assignment, misc]
 else:
-    Module = object
+    Module = Any  # type: ignore[assignment, misc]
 if has_package("sentence_transformers") is not None:
     # SentenceTransformerModelCardData contains these forward references:
     # - eval_results_dict: dict[SentenceEvaluator, dict[str, Any]] | None
