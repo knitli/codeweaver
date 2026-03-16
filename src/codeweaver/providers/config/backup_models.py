@@ -45,7 +45,7 @@ def _check_sentence_transformers_available() -> bool:
     Returns:
         True if sentence-transformers is available, False otherwise
     """
-    return has_package("sentence_transformers") is not None
+    return has_package("sentence_transformers")
 
 
 def _check_fastembed_available() -> bool:
@@ -54,7 +54,7 @@ def _check_fastembed_available() -> bool:
     Returns:
         True if fastembed is available, False otherwise
     """
-    return has_package("fastembed") is not None and has_package("fastembed_gpu") is not None
+    return has_package("fastembed") or has_package("fastembed_gpu")
 
 
 async def get_backup_embedding_config(
