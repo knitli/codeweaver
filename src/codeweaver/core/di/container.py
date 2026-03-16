@@ -545,9 +545,6 @@ class Container[T]:
         Raises:
             CircularDependencyError: If a circular dependency is detected.
         """
-        if interface is type(None):
-            return None  # type: ignore[return-value]
-
         from codeweaver.core.exceptions import CircularDependencyError
 
         if _resolution_stack is None:
@@ -565,6 +562,8 @@ class Container[T]:
         if self._is_union_type(interface):
             instance = await self._resolve_union_interface(interface, cache_key, _resolution_stack)
             return cast(T, instance)
+        elif interface is type(None):
+            return cast(T, None)
 
         # 1. Check overrides first
         # We check overrides before tags and singletons because overrides

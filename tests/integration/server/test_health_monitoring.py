@@ -34,6 +34,7 @@ import pytest
 
 from codeweaver.core import FailoverStats, Identifier, SessionStatistics
 from codeweaver.engine import IndexingService, IndexingStats
+from codeweaver.providers import CircuitBreakerState
 from codeweaver.server import (
     HealthResponse,
     HealthService,
@@ -108,7 +109,7 @@ def mock_providers(mocker) -> dict:
     embedding_instance.model_name = "voyage-code-3"
     embedding_instance.__class__.__name__ = "VoyageEmbeddingProvider"
     embedding_instance.circuit_breaker_state = mocker.MagicMock()
-    embedding_instance.circuit_breaker_state.variable = "closed"
+    embedding_instance.circuit_breaker_state.variable = CircuitBreakerState.CLOSED.variable
 
     # Mock sparse embedding provider
     sparse_instance = mocker.MagicMock()
@@ -119,7 +120,7 @@ def mock_providers(mocker) -> dict:
     reranking_instance.model_name = "voyage-rerank-2.5"
     reranking_instance.__class__.__name__ = "VoyageRerankingProvider"
     reranking_instance.circuit_breaker_state = mocker.MagicMock()
-    reranking_instance.circuit_breaker_state.variable = "closed"
+    reranking_instance.circuit_breaker_state.variable = CircuitBreakerState.CLOSED.variable
 
     return {
         "embedding": (embedding_instance,),
@@ -325,8 +326,7 @@ async def test_health_status_degraded(health_service: HealthService, mocker):
     """
     # Mock embedding provider as down (circuit breaker open)
     embedding_instance = health_service._providers["embedding"][0]
-    # FIX: Use .variable instead of .value to match BaseEnum interface
-    embedding_instance.circuit_breaker_state.variable = "open"
+    embedding_instance.circuit_breaker_state.variable = CircuitBreakerState.OPEN.variable
 
     response = await health_service.get_health_response()
 
@@ -429,16 +429,14 @@ async def test_health_circuit_breaker_exposure(health_service: HealthService, mo
 
     # Test half_open state
     embedding_instance = health_service._providers["embedding"][0]
-    # FIX: Use .variable instead of .value to match BaseEnum interface
-    embedding_instance.circuit_breaker_state.variable = "half_open"
+    embedding_instance.circuit_breaker_state.variable = CircuitBreakerState.HALF_OPEN.variable
 
     response2 = await health_service.get_health_response()
     assert response2.services.embedding_provider.circuit_breaker_state == "half_open"
     assert response2.services.embedding_provider.status == "up"
 
     # Test open state (service down)
-    # FIX: Use .variable instead of .value to match BaseEnum interface
-    embedding_instance.circuit_breaker_state.variable = "open"
+    embedding_instance.circuit_breaker_state.variable = CircuitBreakerState.OPEN.variable
 
     response3 = await health_service.get_health_response()
     assert response3.services.embedding_provider.circuit_breaker_state == "open"
