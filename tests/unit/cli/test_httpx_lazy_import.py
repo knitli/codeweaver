@@ -27,6 +27,10 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.unit
+@pytest.mark.async_test
+@pytest.mark.external_api
+@pytest.mark.mock_only
+@pytest.mark.qdrant
 class TestHttpxLateImport:
     """Tests for lazy import of httpx in CLI commands.
 

@@ -61,6 +61,7 @@ class MockOverrideModel(BasedModel):
         return {"special_value": "REDACTED", "extra_field": "injected"}
 
 
+@pytest.mark.unit
 class TestTelemetryPrivacy:
     """Test suite for telemetry privacy serialization."""
 

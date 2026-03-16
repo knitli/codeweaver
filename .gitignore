@@ -229,5 +229,5 @@ test-results.xml
 mise.local.toml
 mise.local.env
 
-.gemini/
-gha-creds-*.json
+.exportify/
+!.exportify/config.toml
