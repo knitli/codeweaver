@@ -29,6 +29,7 @@ from codeweaver.providers.env_registry.models import ProviderEnvConfig
 from codeweaver.providers.env_registry.registry import ProviderEnvRegistry
 
 
+@pytest.mark.integration
 class TestOpenAIProvider:
     """Test OPENAI base provider configuration."""
 
@@ -85,6 +86,7 @@ class TestOpenAIProvider:
         assert OPENAI.inherits_from is None
 
 
+@pytest.mark.integration
 class TestDeepSeekProvider:
     """Test DEEPSEEK provider configuration."""
 
@@ -111,6 +113,7 @@ class TestDeepSeekProvider:
         assert "DeepSeek" in DEEPSEEK.note
 
 
+@pytest.mark.integration
 class TestFireworksProvider:
     """Test FIREWORKS provider configuration."""
 
@@ -137,6 +140,7 @@ class TestFireworksProvider:
         assert FIREWORKS.inherits_from == "openai"
 
 
+@pytest.mark.integration
 class TestTogetherProvider:
     """Test TOGETHER provider configuration."""
 
@@ -162,6 +166,7 @@ class TestTogetherProvider:
         assert "Together" in TOGETHER.note
 
 
+@pytest.mark.integration
 class TestCerebrasProvider:
     """Test CEREBRAS provider configuration."""
 
@@ -187,6 +192,7 @@ class TestCerebrasProvider:
         assert CEREBRAS.inherits_from == "openai"
 
 
+@pytest.mark.integration
 class TestMoonshotProvider:
     """Test MOONSHOT provider configuration."""
 
@@ -207,6 +213,7 @@ class TestMoonshotProvider:
         assert MOONSHOT.inherits_from == "openai"
 
 
+@pytest.mark.integration
 class TestMorphProvider:
     """Test MORPH provider configuration."""
 
@@ -233,6 +240,7 @@ class TestMorphProvider:
         assert MORPH.inherits_from == "openai"
 
 
+@pytest.mark.integration
 class TestNebiusProvider:
     """Test NEBIUS provider configuration."""
 
@@ -258,6 +266,7 @@ class TestNebiusProvider:
         assert NEBIUS.inherits_from == "openai"
 
 
+@pytest.mark.integration
 class TestOpenRouterProvider:
     """Test OPENROUTER provider configuration."""
 
@@ -278,6 +287,7 @@ class TestOpenRouterProvider:
         assert OPENROUTER.inherits_from == "openai"
 
 
+@pytest.mark.integration
 class TestOVHCloudProvider:
     """Test OVHCLOUD provider configuration."""
 
@@ -303,6 +313,7 @@ class TestOVHCloudProvider:
         assert OVHCLOUD.inherits_from == "openai"
 
 
+@pytest.mark.integration
 class TestSambaNovaProvider:
     """Test SAMBANOVA provider configuration."""
 
@@ -328,6 +339,7 @@ class TestSambaNovaProvider:
         assert SAMBANOVA.inherits_from == "openai"
 
 
+@pytest.mark.integration
 class TestGroqProvider:
     """Test GROQ provider configuration."""
 
@@ -357,6 +369,7 @@ class TestGroqProvider:
         assert GROQ.inherits_from == "openai"
 
 
+@pytest.mark.integration
 class TestRegistryAutoDiscovery:
     """Test registry auto-discovery of provider definitions."""
 
@@ -410,6 +423,7 @@ class TestRegistryAutoDiscovery:
             assert provider in all_providers, f"Provider {provider} not found in registry"
 
 
+@pytest.mark.integration
 class TestInheritanceResolution:
     """Test inheritance resolution in registry."""
 
@@ -449,6 +463,7 @@ class TestInheritanceResolution:
         assert "TOGETHER_API_KEY" in api_key_envs
 
 
+@pytest.mark.integration
 class TestBoilerplateReduction:
     """Test that builder pattern reduces boilerplate vs manual definition."""
 
@@ -487,6 +502,7 @@ class TestBoilerplateReduction:
         assert "groq" in GROQ.clients
 
 
+@pytest.mark.integration
 class TestPhase3Summary:
     """Test Phase 3 implementation summary and metrics."""
 

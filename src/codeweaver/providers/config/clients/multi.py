@@ -240,7 +240,10 @@ class FastEmbedClientOptions(ClientOptions):
     model_name: str
     cache_dir: str | None = None
     threads: int | None = None
-    providers: Sequence[OnnxProvider] | None = None
+    onnx_providers: Annotated[
+        Sequence[OnnxProvider] | None,
+        Field(alias="providers", serialization_alias="providers"),
+    ] = None
     cuda: bool | None = None
     device_ids: list[int] | None = None
     lazy_load: bool = True
@@ -251,10 +254,10 @@ class FastEmbedClientOptions(ClientOptions):
         from codeweaver.core import effective_cpu_count
 
         cpu_count = effective_cpu_count()
-        object.__setattr__(self, "threads", self.threads or cpu_count)
+        updates: dict[str, Any] = {"threads": self.threads or cpu_count}
         if self.cuda is False:
-            object.__setattr__(self, "device_ids", [])
-            return self
+            updates["device_ids"] = []
+            return self.model_copy(update=updates)
         from codeweaver.providers.optimize import decide_fastembed_runtime
 
         decision = decide_fastembed_runtime(
@@ -269,11 +272,11 @@ class FastEmbedClientOptions(ClientOptions):
         else:
             cuda = False
             device_ids = []
-        object.__setattr__(self, "cuda", cuda)
-        object.__setattr__(self, "device_ids", device_ids)
-        if cuda and (not self.providers or ONNX_CUDA_PROVIDER not in self.providers):
-            object.__setattr__(self, "providers", [ONNX_CUDA_PROVIDER, *(self.providers or [])])
-        return self
+        updates["cuda"] = cuda
+        updates["device_ids"] = device_ids
+        if cuda and (not self.onnx_providers or ONNX_CUDA_PROVIDER not in self.onnx_providers):
+            updates["onnx_providers"] = [ONNX_CUDA_PROVIDER, *(self.onnx_providers or [])]
+        return self.model_copy(update=updates)
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         return {FilteredKey("cache_dir"): AnonymityConversion.HASH}
