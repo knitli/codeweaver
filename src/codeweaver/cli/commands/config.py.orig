@@ -108,11 +108,11 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
     table.add_row(
         "Background Indexing",
         "❌"
-        if settings.get("indexer") and settings["indexer"].get("only_index_on_command")
-        and not isinstance(settings.get("indexer", {}).get("only_index_on_command"), Unset)
+        if settings["indexer"].get("only_index_on_command")
+        and not isinstance(settings["indexer"].get("only_index_on_command"), Unset)
         else "✅",
     )
-    table.add_row("Telemetry", "❌" if settings.get("telemetry") and settings["telemetry"].get("disable_telemetry") else "✅")
+    table.add_row("Telemetry", "❌" if settings["telemetry"].get("disable_telemetry") else "✅")
 
     display.print_table(table)
 

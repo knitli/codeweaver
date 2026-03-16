@@ -1,0 +1,11 @@
+--- src/codeweaver/cli/commands/config.py
++++ src/codeweaver/cli/commands/config.py
+@@ -103,7 +103,7 @@
+     table.add_row("Project Path", str(settings["project_path"]))
+     table.add_row("Project Name", settings["project_name"] or "auto-detected")
+     table.add_row("Token Limit", str(settings["token_limit"]))
+-    table.add_row("Max File Size", f"{settings['max_file_size']:,} bytes")
++    table.add_row("Max File Size", f"{settings.get('max_file_size', 0):,} bytes")
+     table.add_row("Max Results", str(settings["max_results"]))
+
+     # Feature flags

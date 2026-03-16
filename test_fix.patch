@@ -1,0 +1,12 @@
+--- src/codeweaver/providers/config/clients/multi.py
++++ src/codeweaver/providers/config/clients/multi.py
+@@ -50,6 +50,9 @@
+
+ if has_package("fastembed") is not None or has_package("fastembed_gpu") is not None:
+-    from fastembed.common.types import OnnxProvider
++    try:
++        from fastembed.common.types import OnnxProvider
++    except ImportError:
++        OnnxProvider = Any
+ else:
+     OnnxProvider = Any
