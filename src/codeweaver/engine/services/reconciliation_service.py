@@ -267,7 +267,7 @@ class VectorReconciliationService:
 
         return stats
 
-    async def _repair_batch(
+    async def _repair_batch(  # noqa: C901
         self, collection_name: str, point_ids: list[str], backup_provider: EmbeddingProvider
     ) -> RepairStats:
         """Repair a batch of points.
@@ -341,20 +341,36 @@ class VectorReconciliationService:
                 return batch_stats
 
             # Update points with backup vectors
-            for idx, embedding in enumerate(backup_embeddings):
-                point_id = point_map[idx]
+            points_to_update = [
+                {"id": point_map[idx], "vector": {self.backup_vector_name: embedding}}
+                for idx, embedding in enumerate(backup_embeddings)
+            ]
+
+            if points_to_update:
                 try:
+                    # Attempt batched update first
                     await self.vector_store.client.update_vectors(
                         collection_name=collection_name,
-                        points=[{"id": point_id, "vector": {self.backup_vector_name: embedding}}],
+                        points=points_to_update,
                     )
-                    batch_stats["repaired"] += 1
+                    batch_stats["repaired"] += len(points_to_update)
 
-                except Exception as e:
-                    error_msg = f"Failed to update point {point_id}: {e}"
-                    logger.warning(error_msg)
-                    batch_stats["failed"] += 1
-                    batch_stats["errors"].append(error_msg)
+                except Exception as batch_e:
+                    logger.warning("Batched update failed, falling back to individual updates: %s", batch_e)
+                    # Fallback to individual updates if batch fails
+                    for point in points_to_update:
+                        point_id = point["id"]
+                        try:
+                            await self.vector_store.client.update_vectors(
+                                collection_name=collection_name,
+                                points=[point],
+                            )
+                            batch_stats["repaired"] += 1
+                        except Exception as e:
+                            error_msg = f"Failed to update point {point_id}: {e}"
+                            logger.warning(error_msg)
+                            batch_stats["failed"] += 1
+                            batch_stats["errors"].append(error_msg)
 
         except Exception as e:
             error_msg = f"Batch repair failed: {e}"
