@@ -54,7 +54,7 @@ if has_package("fastembed") or has_package("fastembed_gpu"):
     except ImportError:
         OnnxProvider = Any  # type: ignore[assignment, misc]
 else:
-    OnnxProvider = Any  # type: ignore[assignment, misc]
+    OnnxProvider = Any
 
 if has_package("torch"):
     try:
@@ -62,7 +62,7 @@ if has_package("torch"):
     except ImportError:
         Module = Any  # type: ignore[assignment, misc]
 else:
-    Module = Any  # type: ignore[assignment, misc]
+    Module = Any
 if has_package("sentence_transformers"):
     # SentenceTransformerModelCardData contains these forward references:
     # - eval_results_dict: dict[SentenceEvaluator, dict[str, Any]] | None

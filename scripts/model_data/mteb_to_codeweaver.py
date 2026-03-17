@@ -372,13 +372,13 @@ type ModelMaker = Literal[
     "Snowflake",
 ]
 type HFModelProviders = Literal[
-    Provider.FASTEMBED,
-    Provider.HUGGINGFACE_INFERENCE,
-    Provider.FIREWORKS,
-    Provider.GROQ,
-    Provider.OLLAMA,
-    Provider.SENTENCE_TRANSFORMERS,
-    Provider.TOGETHER,
+    Provider.FASTEMBED,  # ty: ignore[invalid-type-form]
+    Provider.HUGGINGFACE_INFERENCE,  # ty: ignore[invalid-type-form]
+    Provider.FIREWORKS,  # ty: ignore[invalid-type-form]
+    Provider.GROQ,  # ty: ignore[invalid-type-form]
+    Provider.OLLAMA,  # ty: ignore[invalid-type-form]
+    Provider.SENTENCE_TRANSFORMERS,  # ty: ignore[invalid-type-form]
+    Provider.TOGETHER,  # ty: ignore[invalid-type-form]
 ]
 
 
