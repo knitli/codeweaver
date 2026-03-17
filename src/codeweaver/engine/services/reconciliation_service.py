@@ -356,7 +356,13 @@ class VectorReconciliationService:
                     batch_stats["repaired"] += len(points_to_update)
 
                 except Exception as batch_e:
-                    logger.warning("Batched update failed, falling back to individual updates: %s", batch_e)
+                    logger.warning(
+                        "Batched update failed for collection '%s' with batch size %d, "
+                        "falling back to individual updates: %s",
+                        collection_name,
+                        len(points_to_update),
+                        batch_e,
+                    )
                     # Fallback to individual updates if batch fails
                     for point in points_to_update:
                         point_id = point["id"]
