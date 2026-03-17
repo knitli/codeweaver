@@ -536,12 +536,19 @@ class IndexingService:
 
     async def _cleanup_deleted_files(self) -> None:
         """Remove deleted files from vector store and manifest."""
-        if self._vector_store and self._deleted_files:
-            await self._vector_store.delete_by_files(self._deleted_files)
-
+        # Normalize deleted file paths to be relative to the project root, as expected by
+        # VectorStoreProvider.delete_by_files and the file manifest.
+        rel_paths: list[str] = []
         for path in self._deleted_files:
             rel_path = set_relative_path(path, base_path=self._project_path)
-            if rel_path and self._file_manifest:
+            if rel_path:
+                rel_paths.append(rel_path)
+
+        if self._vector_store and rel_paths:
+            await self._vector_store.delete_by_files(rel_paths)
+
+        for rel_path in rel_paths:
+            if self._file_manifest:
                 async with self._manifest_lock:
                     self._file_manifest.remove_file(rel_path)
 
