@@ -20,17 +20,12 @@ Uses real Voyage-4 family models for integration validation.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 
 import pytest
 
 from codeweaver.core import ConfigurationError, ModelSwitchError, Provider
 from codeweaver.providers import CollectionMetadata
 from codeweaver.providers.embedding.capabilities.voyage import VOYAGE_4_FAMILY
-
-
-if TYPE_CHECKING:
-    pass
 
 
 pytestmark = [pytest.mark.contract, pytest.mark.vector_store]

@@ -6,7 +6,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from codeweaver.core import Provider, dependency_provider
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
@@ -14,10 +14,6 @@ from codeweaver.providers.embedding.capabilities.types import (
     EmbeddingCapabilitiesDict,
     PartialCapabilities,
 )
-
-
-if TYPE_CHECKING:
-    pass
 
 
 type QwenProvider = Literal[Provider.SENTENCE_TRANSFORMERS]

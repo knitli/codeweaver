@@ -27,10 +27,6 @@ from codeweaver.providers.data.utils import (
 from codeweaver.server.mcp.types import ToolRegistrationDict
 
 
-if TYPE_CHECKING:
-    pass
-
-
 if TYPE_CHECKING and has_package("ddgs"):
     from ddgs import DDGS
 else:
