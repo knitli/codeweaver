@@ -19,9 +19,21 @@ from codeweaver.core.types.aliases import BlakeHashKey, BlakeKey
 
 
 if sys.version_info < (3, 14):
-    from uuid_extensions import uuid7 as uuid7_gen
+    try:
+        from uuid_extensions import uuid7 as uuid7_gen
+    except ImportError:
+        def uuid7_gen(*args, **kwargs) -> UUID7:
+            from pydantic import UUID7
+            from uuid import uuid4
+            return cast(UUID7, uuid4())
 else:
-    from uuid import uuid7 as uuid7_gen
+    try:
+        from uuid import uuid7 as uuid7_gen
+    except ImportError:
+        def uuid7_gen(*args, **kwargs) -> UUID7:
+            from pydantic import UUID7
+            from uuid import uuid4
+            return cast(UUID7, uuid4())
 
 
 def uuid7() -> UUID7:
@@ -44,10 +56,16 @@ def uuid7_as_timestamp(
 ) -> int | datetime.datetime | None:
     """Utility to extract the timestamp from a UUID7, optionally as a datetime."""
     if sys.version_info < (3, 14):
-        from uuid_extensions import time_ns, uuid_to_datetime
+        try:
+            from uuid_extensions import time_ns, uuid_to_datetime
 
-        return uuid_to_datetime(uuid) if as_datetime else time_ns(uuid)
-    from uuid import uuid7
+            return uuid_to_datetime(uuid) if as_datetime else time_ns(uuid)
+        except ImportError:
+            return datetime.datetime.now(datetime.UTC) if as_datetime else int(datetime.datetime.now(datetime.UTC).timestamp() * 1e9)
+    try:
+        from uuid import uuid7
+    except ImportError:
+        return datetime.datetime.now(datetime.UTC) if as_datetime else int(datetime.datetime.now(datetime.UTC).timestamp() * 1e9)
 
     uuid = uuid7(uuid) if isinstance(uuid, str | int) else uuid
     return (

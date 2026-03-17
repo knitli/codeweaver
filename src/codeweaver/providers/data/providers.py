@@ -34,7 +34,7 @@ def get_data_provider(
     """Get available tools."""
     if isinstance(provider, str):
         provider: Provider = Provider.from_string(provider)
-    if provider == Provider.DUCKDUCKGO and has_package("ddgs"):
+    if provider == Provider.DUCKDUCKGO and has_package("duckduckgo-search"):
         return duckduckgo_search_tool
     if provider == Provider.TAVILY and has_required_auth and has_package("tavily"):
         return tavily_search_tool

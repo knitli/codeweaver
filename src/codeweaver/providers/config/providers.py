@@ -139,7 +139,7 @@ def _create_default_data_provider_settings() -> tuple[DataProviderSettingsType, 
     if has_package("tavily") and Provider.TAVILY.has_env_auth:
         return (TavilyProviderSettings(provider=Provider.TAVILY),)
     return (
-        (DuckDuckGoProviderSettings(provider=Provider.DUCKDUCKGO),) if has_package("ddgs") else ()
+        (DuckDuckGoProviderSettings(provider=Provider.DUCKDUCKGO),) if has_package("duckduckgo-search") else ()
     )
 
 

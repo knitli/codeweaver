@@ -87,7 +87,9 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
                 ],
             ) from e
         else:
-            return response.tolist()
+            if hasattr(response, "tolist"):
+                return response.tolist()
+            return list(response)
 
 
 __all__ = ("FastEmbedRerankingProvider",)
