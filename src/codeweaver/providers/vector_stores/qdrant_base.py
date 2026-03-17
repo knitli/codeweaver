@@ -999,9 +999,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             raise ProviderError("No collection configured")
         await self._ensure_collection(collection_name)
         point_ids = [id_.hex for id_ in ids]
-        for i in range(0, len(point_ids), 1000):
-            batch = point_ids[i : i + 1000]
-            await self.client.delete(collection_name=collection_name, points_selector=batch)
+        await self.client.delete(collection_name=collection_name, points_selector=point_ids)
         await self.handle_persistence()
 
     async def delete_by_name(self, names: list[str]) -> None:
