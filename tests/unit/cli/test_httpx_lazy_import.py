@@ -16,17 +16,16 @@ from __future__ import annotations
 
 import sys
 
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 
-if TYPE_CHECKING:
-    pass
-
-
 @pytest.mark.unit
+@pytest.mark.async_test
+@pytest.mark.external_api
+@pytest.mark.mock_only
+@pytest.mark.qdrant
 class TestHttpxLateImport:
     """Tests for lazy import of httpx in CLI commands.
 

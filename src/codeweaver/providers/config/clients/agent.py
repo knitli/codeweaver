@@ -39,7 +39,7 @@ from codeweaver.providers.config.clients.utils import (
 )
 
 
-if TYPE_CHECKING and has_package("google") is not None:
+if TYPE_CHECKING and has_package("google"):
     from google.auth.credentials import Credentials as GoogleCredentials
 else:
     GoogleCredentials = Any
@@ -320,7 +320,7 @@ class PydanticGatewayClientOptions(ClientOptions):
     http_client: httpx.Client | None = None
 
     @override
-    def as_settings(self) -> tuple[str, dict[str, Any]]:  # ty:ignore[invalid-method-override]
+    def as_settings(self) -> tuple[str, dict[str, Any]]:
         """Return the client options as a dictionary suitable for passing as settings to the client constructor."""
         settings = self.model_dump(exclude={"_core_provider", "_providers", "tag"})
         upstream_provider = settings.pop("upstream_provider")

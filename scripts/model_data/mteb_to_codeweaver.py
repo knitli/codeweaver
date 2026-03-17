@@ -47,10 +47,10 @@ from typing_extensions import TypeIs
 
 
 # make sure codeweaver is importable
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from codeweaver.core import Provider
-from codeweaver.providers import PartialCapabilities
+from codeweaver.core.types.provider import Provider
+from codeweaver.providers.embedding.capabilities import PartialCapabilities
 
 
 # TODO: Finish refactor to use these inline constants and eliminate the hf-models.json
@@ -97,6 +97,13 @@ OLLAMA_ALIASES = {
 """Most secondary providers use the Hugging Face names directly, but Ollama does things differently, so we have to map them here. Keys are HF names and values are Ollama names.
 
 Note: FastEmbed also has some aliases, but we handle those dynamically below.
+"""
+
+KNOWN_ALIASES: dict[str, dict[ModelName, ModelName]] = {"ollama": OLLAMA_ALIASES}
+"""A mapping of provider names to their HF name → provider alias mappings.
+
+Keys are provider name strings (e.g. "ollama") and values are dicts mapping HF model names
+to the provider-specific alias. FastEmbed aliases are handled dynamically via get_fastembed_aliases().
 """
 
 KNOWN_SPARSE_MODELS = {
@@ -382,13 +389,7 @@ type AliasMap = dict[
 
 type DataMap = dict[ModelName, SimplifiedModelMeta]
 
-type ModelMap = dict[
-    ModelMaker,
-    dict[
-        ModelName,
-        tuple[Annotated[HFModelProviders, BeforeValidator(lambda v: Provider.from_string(v))], ...],
-    ],
-]
+type ModelMap = dict[ModelMaker, dict[ModelName, tuple[HFModelProviders, ...]]]
 """A mapping of model makers to their models and the providers that support each model."""
 
 
@@ -520,29 +521,24 @@ class RootJson(BaseModel):
         return cls.model_validate_json(cls._json_path.read_text())
 
 
-"""
+if JSON_CACHE.exists():
     _ROOT = RootJson.load()
     DATA = _ROOT.models
     MODEL_MAP_DATA = _ROOT.model_map
     ALIAS_MAP_DATA = _ROOT.aliases
-    SPARSE_MODELS = _ROOT.sparse_models
-
     FLATTENED_ALIASES = _ROOT.flattened_aliases
 else:
+    _ROOT = RootJson(models={})
     DATA = {}
     MODEL_MAP_DATA = {}
     ALIAS_MAP_DATA = {}
-    SPARSE_MODELS = {}
     FLATTENED_ALIASES = {}
-"""
 
 
 def mteb_to_capabilities(model: SimplifiedModelMeta) -> PartialCapabilities:
     """
     Convert an MTEB model metadata dictionary to a PartialCapabilities object.
     """
-    loader = getattr(model, "loader", {})
-    loader = loader if isinstance(loader, dict) else {}
     caps = {
         "name": model["name"],
         "default_dimension": model.get("embed_dim"),

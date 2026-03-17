@@ -121,7 +121,7 @@ if TYPE_CHECKING:
     from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
     from codeweaver.semantic.registry import ThingRegistry
 
-    if has_package("codeweaver.engine") is not None:
+    if has_package("codeweaver.engine"):
         from codeweaver.engine.chunker.registry import SourceIdRegistry
         from codeweaver.engine.dependencies import SourceIdRegistryDep
     else:

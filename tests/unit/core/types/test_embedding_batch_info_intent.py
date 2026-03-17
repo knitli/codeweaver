@@ -6,7 +6,7 @@
 
 import pytest
 
-from uuid_extensions import uuid7
+from codeweaver.core.utils.generation import uuid7
 
 from codeweaver.core.types import CodeWeaverSparseEmbedding, EmbeddingBatchInfo, EmbeddingKind
 
