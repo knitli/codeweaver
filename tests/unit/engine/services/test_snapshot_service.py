@@ -16,14 +16,9 @@ from __future__ import annotations
 
 from datetime import UTC
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
-
-
-if TYPE_CHECKING:
-    pass
 
 
 @pytest.fixture

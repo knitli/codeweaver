@@ -6,7 +6,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from codeweaver.core import Provider, dependency_provider
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
@@ -16,9 +16,6 @@ from codeweaver.providers.embedding.capabilities.types import (
 )
 from codeweaver.providers.embedding.capabilities.voyage import VOYAGE_4_FAMILY
 
-
-if TYPE_CHECKING:
-    pass
 
 type SentenceTransformersProvider = Literal[
     Provider.FASTEMBED, Provider.HUGGINGFACE_INFERENCE, Provider.SENTENCE_TRANSFORMERS

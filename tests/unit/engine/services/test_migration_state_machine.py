@@ -26,7 +26,6 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
@@ -34,10 +33,6 @@ import pytest
 from pydantic import UUID7
 
 from codeweaver.core import uuid7
-
-
-if TYPE_CHECKING:
-    pass
 
 
 # ===========================================================================

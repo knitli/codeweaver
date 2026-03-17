@@ -600,8 +600,7 @@ class NodeTypeParser:
 
             self._ensure_cache_adapter()
             adapter = type(self)._cache_adapter
-            if adapter is None:
-                return False
+            assert adapter is not None
             cache_data = adapter.validate_json(cache_resource.read_bytes())
             type(self)._registration_cache = self._reconstruct_cache(
                 cache_data["registration_cache"]
