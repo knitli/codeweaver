@@ -1,4 +1,3 @@
-
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -11,17 +10,24 @@ annotations, preventing arbitrary code execution while supporting
 complex Python type hints including generics, unions, and Annotated types.
 """
 
-from typing import Annotated, List, Optional, Union, get_args
+from __future__ import annotations
+
+from typing import Annotated, Optional, Union, get_args
 
 import pytest
 
 from codeweaver.core.di.container import Container
 from codeweaver.core.di.dependency import Depends
 
-def test_safe_type_resolution():
+
+pytestmark = [pytest.mark.unit]
+
+
+def test_safe_type_resolution() -> None:
+    """Verify that valid type strings resolve to the correct type objects."""
     container = Container()
     globalns = {
-        "List": List,
+        "List": list,
         "Optional": Optional,
         "Union": Union,
         "Annotated": Annotated,
@@ -32,8 +38,8 @@ def test_safe_type_resolution():
 
     # Valid type strings
     assert container._resolve_string_type("int", globalns) is int
-    assert container._resolve_string_type("List[int]", globalns) == List[int]
-    assert container._resolve_string_type("Optional[str]", globalns) == Optional[str]
+    assert container._resolve_string_type("List[int]", globalns) == list[int]
+    assert container._resolve_string_type("Optional[str]", globalns) == (str | None)
     assert container._resolve_string_type("int | str", globalns) == (int | str)
 
     # Annotated with Depends
@@ -43,13 +49,17 @@ def test_safe_type_resolution():
     # get_origin(Annotated[int, ...]) should be Annotated, but some environments
     # might unwrap it or return a different origin. We check for __metadata__
     # which is specific to Annotated types.
-    assert hasattr(resolved_annotated, "__metadata__"), f"Expected Annotated type, got {type(resolved_annotated)}"
+    assert hasattr(resolved_annotated, "__metadata__"), (
+        f"Expected Annotated type, got {type(resolved_annotated)}"
+    )
     assert get_args(resolved_annotated)[0] is int
     assert any(isinstance(m, Depends) for m in resolved_annotated.__metadata__)
 
-def test_malicious_type_resolution():
+
+def test_malicious_type_resolution() -> None:
+    """Verify that malicious type strings are blocked and return None."""
     container = Container()
-    globalns = {"__name__": "__main__"}
+    globalns: dict[str, object] = {"__name__": "__main__"}
 
     # Malicious strings that should be blocked
     malicious_strings = [
@@ -64,7 +74,9 @@ def test_malicious_type_resolution():
         result = container._resolve_string_type(s, globalns)
         assert result is None, f"String '{s}' should have been blocked"
 
-def test_dunder_blocking():
+
+def test_dunder_blocking() -> None:
+    """Verify that dunder names and attributes are blocked and return None."""
     container = Container()
     globalns = {"int": int}
 
@@ -74,8 +86,17 @@ def test_dunder_blocking():
     # Dunder attribute blocking
     assert container._resolve_string_type("int.__name__", globalns) is None
 
-def test_safe_builtins_resolution():
+
+def test_safe_builtins_resolution() -> None:
+    """Verify that basic builtin types resolve correctly without explicit globals."""
     container = Container()
     # No globals provided for basic types
     assert container._resolve_string_type("int", {"__name__": "foo"}) is int
     assert container._resolve_string_type("list[str]", {"__name__": "foo"}) == list[str]
+
+
+def test_type_builtin_not_exploitable() -> None:
+    """Verify that type() cannot be invoked to create new classes during resolution."""
+    container = Container()
+    # type() is excluded from safe_builtins, so dynamic class creation is blocked
+    assert container._resolve_string_type("type('X', (object,), {})", {}) is None

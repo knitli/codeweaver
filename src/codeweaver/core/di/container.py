@@ -84,18 +84,20 @@ class Container[T]:
         self._request_cache: dict[Any, Any] = {}  # Keys can be types or callables
         self._providers_loaded: bool = False  # Track if auto-discovery has run
 
-    def _safe_eval_type(self, type_str: str, globalns: dict[str, Any]) -> Any:
+    def _safe_eval_type(self, type_str: str, globalns: dict[str, Any]) -> Any | None:
         """Safely evaluate a type string using AST validation.
+
+        Parses the type string into an AST, validates that it contains only safe
+        constructs (names, attributes, subscripts, unions, calls), and evaluates
+        it in a restricted environment with a minimal set of builtins.
 
         Args:
             type_str: The string representation of a type.
             globalns: The global namespace for evaluation.
 
         Returns:
-            The evaluated type object.
-
-        Raises:
-            ValueError: If the type string contains forbidden constructs.
+            The evaluated type object, or None if the type string is invalid or
+            contains forbidden constructs.
         """
         try:
             tree = ast.parse(type_str, mode="eval")
@@ -126,20 +128,25 @@ class Container[T]:
                         ast.keyword,
                     ),
                 ):
-                    raise ValueError(f"Forbidden AST node in type string: {type(node).__name__}")
+                    raise TypeError(f"Forbidden AST node in type string: {type(node).__name__}")
 
                 # Block dunder access to prevent escaping the restricted environment
                 if isinstance(node, ast.Name) and node.id.startswith("__"):
-                    raise ValueError(f"Forbidden dunder name: {node.id}")
+                    raise TypeError(f"Forbidden dunder name: {node.id}")
                 if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
-                    raise ValueError(f"Forbidden dunder attribute: {node.attr}")
+                    raise TypeError(f"Forbidden dunder attribute: {node.attr}")
 
                 super().generic_visit(node)
 
-        TypeValidator().visit(tree)
+        try:
+            TypeValidator().visit(tree)
+        except TypeError:
+            return None
 
         # Restricted eval: only allow basic builtin types to be resolved
         # even if they are not in the module's globals.
+        # Note: `type` is intentionally excluded — it is not needed for type annotation
+        # resolution, and allowing it as a callable would increase the attack surface.
         safe_builtins = {
             "int": int,
             "float": float,
@@ -150,13 +157,12 @@ class Container[T]:
             "dict": dict,
             "set": set,
             "frozenset": frozenset,
-            "type": type,
             "object": object,
             "bytes": bytes,
         }
 
         code = compile(tree, "<string>", "eval")
-        return eval(code, {"__builtins__": safe_builtins}, globalns)
+        return eval(code, {"__builtins__": safe_builtins}, globalns)  # noqa: S307
 
     @staticmethod
     def _unwrap_annotated(annotation: Any) -> Any:
@@ -636,7 +642,7 @@ class Container[T]:
         if self._is_union_type(interface):
             instance = await self._resolve_union_interface(interface, cache_key, _resolution_stack)
             return cast(T, instance)
-        elif interface is type(None):
+        if interface is type(None):
             return cast(T, None)
 
         # 1. Check overrides first
