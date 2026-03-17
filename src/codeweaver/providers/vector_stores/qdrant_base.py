@@ -994,6 +994,8 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Args:
             ids: List of chunk IDs to delete.
         """
+        if not ids:
+            return
         collection_name = self.collection_name
         if not collection_name:
             raise ProviderError("No collection configured")
