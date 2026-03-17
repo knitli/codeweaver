@@ -379,10 +379,14 @@ class HttpClientPool:
             results = await asyncio.gather(*close_coroutines, return_exceptions=True)
 
             for name, result in zip(active_names, results, strict=True):
-                if isinstance(result, Exception):
+                if isinstance(result, BaseException):
+                    if isinstance(result, asyncio.CancelledError):
+                        # Propagate cancellation instead of treating it as a successful close
+                        raise result
                     if isinstance(result, (httpx.HTTPError, OSError)):
                         logger.warning("Error closing HTTP client pool for %s: %s", name, result)
                     else:
+                        # Preserve existing behavior of surfacing unexpected exceptions
                         raise result
                 else:
                     logger.debug("Closed HTTP client pool for %s", name)
