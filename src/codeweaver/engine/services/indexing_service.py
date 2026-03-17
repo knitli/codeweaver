@@ -536,9 +536,10 @@ class IndexingService:
 
     async def _cleanup_deleted_files(self) -> None:
         """Remove deleted files from vector store and manifest."""
+        if self._vector_store and self._deleted_files:
+            await self._vector_store.delete_by_files(self._deleted_files)
+
         for path in self._deleted_files:
-            if self._vector_store:
-                await self._vector_store.delete_by_file(path)
             rel_path = set_relative_path(path, base_path=self._project_path)
             if rel_path and self._file_manifest:
                 async with self._manifest_lock:
