@@ -301,6 +301,10 @@ def _setup_server[TransportT: Literal["stdio", "streamable-http"]](
     run_args = mutable_args.pop("run_args", {})
     # Remove transport from args - it's not a FastMCP constructor parameter
     mutable_args.pop("transport", None)
+    # FastMCP v3: include_tags/exclude_tags are no longer constructor parameters.
+    # Extract them here and apply via app.enable()/app.disable() after construction.
+    include_tags: set[str] | None = mutable_args.pop("include_tags", None)
+    exclude_tags: set[str] | None = mutable_args.pop("exclude_tags", None)
 
     # Always use default middleware classes for this transport
     from codeweaver.server.mcp.middleware import default_middleware_for_transport
@@ -315,6 +319,11 @@ def _setup_server[TransportT: Literal["stdio", "streamable-http"]](
     )
     app = register_tools(app)
     app = register_middleware(app, cast(list[type[McpMiddleware]], middleware), middleware_opts)
+    # FastMCP v3: Apply tag-based visibility filtering using the new enable()/disable() API
+    if exclude_tags:
+        app.disable(tags=exclude_tags)
+    if include_tags:
+        app.enable(tags=include_tags, only=True)
     if is_http:
         from codeweaver.server.mcp.state import CwMcpHttpState
 
@@ -355,7 +364,7 @@ async def create_stdio_server(
         http_settings = DictView(FastMcpServerSettingsDict(**cast(dict, http_settings)))
     else:
         http_settings = _get_fastmcp_settings_map(http=True)
-        run_args = http_settings.get("run_args", {})
+    run_args = http_settings.get("run_args", {})
     resolved_host = host or run_args.get("host", LOCALHOST)
     resolved_port = port or run_args.get("port", DEFAULT_MCP_PORT)
     url = f"http://{resolved_host}:{resolved_port}{http_settings.get('path', MCP_ENDPOINT)}"
