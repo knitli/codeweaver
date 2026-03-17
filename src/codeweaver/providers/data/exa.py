@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from dataclasses import dataclass
@@ -643,8 +644,7 @@ async def register_exa_tools(
         instance = exa_answer_tool(client, **((config.answer_config) or {} | {"iden": config.iden}))
         tools.append(await _get_exa_answer_tool(instance))
     if tools and register:
-        for tool in tools:
-            await register_data_tool(tool)
+        await asyncio.gather(*(register_data_tool(tool) for tool in tools))
     return tools if return_tools else None
 
 
