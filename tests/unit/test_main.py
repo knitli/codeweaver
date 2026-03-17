@@ -52,8 +52,10 @@ def test_setup_signal_handler_suppress_errors():
         original_handler = _setup_signal_handler()
         assert original_handler is None
 
+from unittest.mock import AsyncMock
+
 @pytest.mark.asyncio
-@patch("codeweaver.main._run_stdio_server")
+@patch("codeweaver.main._run_stdio_server", new_callable=AsyncMock)
 async def test_run_stdio_transport(mock_run_stdio):
     """Test that run() with transport='stdio' delegates to _run_stdio_server."""
     from codeweaver.main import run
@@ -79,7 +81,7 @@ async def test_run_stdio_transport(mock_run_stdio):
 
 
 @pytest.mark.asyncio
-@patch("codeweaver.main._run_http_server")
+@patch("codeweaver.main._run_http_server", new_callable=AsyncMock)
 async def test_run_http_transport(mock_run_http):
     """Test that run() with transport='streamable-http' delegates to _run_http_server."""
     from codeweaver.main import run
