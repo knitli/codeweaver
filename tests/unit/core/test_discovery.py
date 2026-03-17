@@ -22,10 +22,11 @@ pytestmark = [pytest.mark.unit]
 
 @pytest.fixture
 def temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Fixture to provide a temporary project directory and set the environment variable."""
+    """Fixture to provide a temporary project directory, set the env variable, and change CWD."""
     project_dir = tmp_path / "project"
     project_dir.mkdir()
     monkeypatch.setenv("CODEWEAVER_PROJECT_PATH", str(project_dir))
+    monkeypatch.chdir(project_dir)
     return project_dir
 
 
@@ -97,12 +98,10 @@ def test_from_chunk_success(temp_project: Path) -> None:
         chunk_id=uuid7(),
     )
 
-    # We need to manually fix chunk.file_path for the test since the AfterValidator
-    # might turn it into a relative path that fails `chunk.file_path.exists()` in the from_chunk method.
-    object.__setattr__(chunk, "file_path", file_path)
-
+    # chunk.file_path is now relative to temp_project (e.g. Path("valid_file.py")),
+    # and CWD is temp_project, so exists() / is_file() resolve correctly.
     df = DiscoveredFile.from_chunk(chunk)
-    assert df.path == Path("valid_file.py") or df.path == file_path
+    assert df.path == Path("valid_file.py")
     assert df.project_path == temp_project
 
 
