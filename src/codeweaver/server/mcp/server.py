@@ -17,7 +17,8 @@ from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 from fastmcp import FastMCP
 from fastmcp.client.transports import StreamableHttpTransport
-from fastmcp.server.proxy import FastMCPProxy, ProxyClient
+from fastmcp.server import create_proxy
+from fastmcp.server.providers.proxy import FastMCPProxy, ProxyClient
 from fastmcp.tools import Tool
 from lateimport import lateimport
 
@@ -358,7 +359,12 @@ async def create_stdio_server(
     resolved_host = host or run_args.get("host", LOCALHOST)
     resolved_port = port or run_args.get("port", DEFAULT_MCP_PORT)
     url = f"http://{resolved_host}:{resolved_port}{http_settings.get('path', MCP_ENDPOINT)}"
-    return app.as_proxy(backend=ProxyClient(transport=StreamableHttpTransport(url=url)))
+    # FastMCP v3: Replace app.as_proxy() with create_proxy()
+    # create_proxy() takes a target (URL, transport, client, etc.) and settings
+    return create_proxy(
+        target=ProxyClient(transport=StreamableHttpTransport(url=url)),
+        name=app.name,
+    )
 
 
 async def create_http_server(
