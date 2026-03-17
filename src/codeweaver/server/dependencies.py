@@ -25,6 +25,7 @@ from codeweaver.core.dependencies import (
 from codeweaver.core.di import INJECTED, dependency_provider, depends
 from codeweaver.engine.dependencies import FailoverServiceDep, IndexingServiceDep
 from codeweaver.providers import RerankingProvidersDep, SparseEmbeddingProvidersDep
+from codeweaver.providers.http_pool import get_http_pool
 
 # Runtime imports needed for dependency_provider decorators
 from codeweaver.server.health.health_service import HealthService
@@ -91,6 +92,7 @@ async def _create_cw_state(
         health_service=health_service,
         failover_manager=failover_manager,
         telemetry=telemetry,
+        http_pool=get_http_pool(),
     )
 
 
