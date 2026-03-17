@@ -17,7 +17,7 @@ from codeweaver.providers import (
 )
 
 
-pytestmark = [pytest.mark.unit]
+pytestmark = [pytest.mark.unit, pytest.mark.requires_voyageai]
 
 
 @pytest.fixture(autouse=True)

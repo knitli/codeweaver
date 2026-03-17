@@ -23,7 +23,7 @@ from codeweaver.core import (
 from codeweaver.providers import RerankingModelCapabilities, VoyageRerankingProvider
 
 
-pytestmark = [pytest.mark.unit]
+pytestmark = [pytest.mark.unit, pytest.mark.requires_voyageai]
 
 
 # Create a mock VoyageRerankingResult that matches the real API structure
