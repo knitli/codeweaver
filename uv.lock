@@ -505,7 +505,7 @@ name = "brotlicffi"
 version = "1.1.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi" },
+    { name = "cffi", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/95/9d/70caa61192f570fcf0352766331b735afa931b4c6bc9a348a0925cc13288/brotlicffi-1.1.0.0.tar.gz", hash = "sha256:b77827a689905143f87915310b93b273ab17888fd43ef350d4832c4a71083c13", size = 465192, upload-time = "2023-09-14T14:22:40.707Z" }
 wheels = [
@@ -750,7 +750,7 @@ fastembed-gpu = [
     { name = "py-cpuinfo" },
 ]
 full = [
-    { name = "ddgs" },
+    { name = "ddgs", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed')" },
     { name = "eunomia-mcp" },
     { name = "exa-py" },
     { name = "permit-fastmcp" },
@@ -761,7 +761,7 @@ full = [
     { name = "tavily-python" },
 ]
 full-gpu = [
-    { name = "ddgs" },
+    { name = "ddgs", marker = "python_full_version < '3.14'" },
     { name = "eunomia-mcp" },
     { name = "exa-py" },
     { name = "fastembed-gpu", marker = "python_full_version < '3.14'" },
@@ -800,7 +800,7 @@ qdrant = [
     { name = "qdrant-client" },
 ]
 recommended = [
-    { name = "ddgs" },
+    { name = "ddgs", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
     { name = "fastembed", marker = "(python_full_version < '3.14' and extra != 'extra-11-code-weaver-full' and extra == 'project-9-fastembed') or (python_full_version < '3.14' and extra != 'extra-11-code-weaver-full-gpu' and extra != 'project-13-fastembed-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
     { name = "py-cpuinfo" },
     { name = "pydantic-ai-slim", extra = ["anthropic", "openai", "retries"] },
@@ -810,7 +810,7 @@ recommended = [
     { name = "voyageai" },
 ]
 recommended-local-only = [
-    { name = "ddgs" },
+    { name = "ddgs", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
     { name = "fastembed", marker = "(python_full_version < '3.14' and extra != 'extra-11-code-weaver-full' and extra == 'project-9-fastembed') or (python_full_version < '3.14' and extra != 'extra-11-code-weaver-full-gpu' and extra != 'project-13-fastembed-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
     { name = "py-cpuinfo" },
     { name = "pydantic-ai-slim", extra = ["openai", "retries"] },
@@ -882,10 +882,10 @@ requires-dist = [
     { name = "cohere", specifier = "==5.20.7" },
     { name = "cyclopts", specifier = ">=4.10.0" },
     { name = "ddgs", marker = "python_full_version < '3.14' and extra == 'duckduckgo'" },
-    { name = "ddgs", marker = "extra == 'full'" },
-    { name = "ddgs", marker = "extra == 'full-gpu'" },
-    { name = "ddgs", marker = "extra == 'recommended'" },
-    { name = "ddgs", marker = "extra == 'recommended-local-only'" },
+    { name = "ddgs", marker = "python_full_version < '3.14' and extra == 'full'" },
+    { name = "ddgs", marker = "python_full_version < '3.14' and extra == 'full-gpu'" },
+    { name = "ddgs", marker = "python_full_version < '3.14' and extra == 'recommended'" },
+    { name = "ddgs", marker = "python_full_version < '3.14' and extra == 'recommended-local-only'" },
     { name = "eunomia-mcp", marker = "extra == 'auth-eunomia'" },
     { name = "eunomia-mcp", marker = "extra == 'full'" },
     { name = "eunomia-mcp", marker = "extra == 'full-gpu'" },
@@ -1269,11 +1269,11 @@ name = "ddgs"
 version = "9.9.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click" },
-    { name = "fake-useragent" },
-    { name = "httpx", extra = ["brotli", "http2", "socks"] },
-    { name = "lxml" },
-    { name = "primp" },
+    { name = "click", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
+    { name = "fake-useragent", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
+    { name = "httpx", extra = ["brotli", "http2", "socks"], marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
+    { name = "lxml", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
+    { name = "primp", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f1/44/93fc35ddcca217b672554739cd731704b13245c6bfa5374189c38f7a51b3/ddgs-9.9.1.tar.gz", hash = "sha256:d33529abb56aa5b98eb436565a6bfa48f07eb04dca18d323df723b83cb007e4f", size = 36007, upload-time = "2025-11-14T16:03:51.794Z" }
 wheels = [
@@ -2129,14 +2129,14 @@ wheels = [
 
 [package.optional-dependencies]
 brotli = [
-    { name = "brotli", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
-    { name = "brotlicffi", marker = "platform_python_implementation != 'CPython' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
+    { name = "brotli", marker = "(python_full_version < '3.14' and platform_python_implementation == 'CPython') or (python_full_version >= '3.14' and extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (python_full_version >= '3.14' and extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (python_full_version >= '3.14' and extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (python_full_version >= '3.14' and extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (python_full_version >= '3.14' and extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed') or (platform_python_implementation != 'CPython' and extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (platform_python_implementation != 'CPython' and extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (platform_python_implementation != 'CPython' and extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (platform_python_implementation != 'CPython' and extra != 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (platform_python_implementation != 'CPython' and extra != 'extra-11-code-weaver-gpu-support' and extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed') or (platform_python_implementation != 'CPython' and extra != 'extra-11-code-weaver-full-gpu' and extra == 'extra-11-code-weaver-gpu-support' and extra != 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
+    { name = "brotlicffi", marker = "(python_full_version < '3.14' and platform_python_implementation != 'CPython') or (python_full_version >= '3.14' and extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (python_full_version >= '3.14' and extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (python_full_version >= '3.14' and extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (python_full_version >= '3.14' and extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (python_full_version >= '3.14' and extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed') or (platform_python_implementation == 'CPython' and extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (platform_python_implementation == 'CPython' and extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (platform_python_implementation == 'CPython' and extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (platform_python_implementation == 'CPython' and extra != 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (platform_python_implementation == 'CPython' and extra != 'extra-11-code-weaver-gpu-support' and extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed') or (platform_python_implementation == 'CPython' and extra != 'extra-11-code-weaver-full-gpu' and extra == 'extra-11-code-weaver-gpu-support' and extra != 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
 ]
 http2 = [
     { name = "h2" },
 ]
 socks = [
-    { name = "socksio" },
+    { name = "socksio", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
 ]
 
 [[package]]

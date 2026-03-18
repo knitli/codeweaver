@@ -3,11 +3,14 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-from unittest.mock import patch
 import signal
+
+from unittest.mock import patch
+
 import pytest
 
 from codeweaver.main import _setup_signal_handler
+
 
 def test_setup_signal_handler_first_interrupt():
     """Test that the first interrupt raises KeyboardInterrupt."""

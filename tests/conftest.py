@@ -842,25 +842,39 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     # Detect free-threaded Python (PEP 703)
     is_free_threaded = hasattr(sys, "_is_gil_enabled") and not sys._is_gil_enabled()
 
-    # Check package availability
+    # Check package availability - catch any exception, not just ImportError.
+    # On Python 3.14+, voyageai raises ValueError during import due to pydantic v1
+    # incompatibility ("On field ... constraints are set but not enforced"), which
+    # would crash pytest collection if not caught here.
+    _fastembed_unavailable_reason: str | None = None
     try:
         import fastembed  # noqa: F401
         has_fastembed = True
-    except ImportError:
+    except Exception as exc:
         has_fastembed = False
+        _fastembed_unavailable_reason = f"{type(exc).__name__}: {exc}"
 
+    _voyageai_unavailable_reason: str | None = None
     try:
         import voyageai  # noqa: F401
         has_voyageai = True
-    except ImportError:
+    except Exception as exc:
         has_voyageai = False
+        _voyageai_unavailable_reason = f"{type(exc).__name__}: {exc}"
 
-    skip_fastembed = pytest.mark.skip(
-        reason="fastembed not available (not installed or Python 3.14+)"
+    _fastembed_skip_reason = (
+        f"fastembed not available ({_fastembed_unavailable_reason})"
+        if _fastembed_unavailable_reason
+        else "fastembed not installed"
     )
-    skip_voyageai = pytest.mark.skip(
-        reason="voyageai not available (not installed or has pydantic v1 issues on Python 3.14+)"
+    _voyageai_skip_reason = (
+        f"voyageai not available ({_voyageai_unavailable_reason})"
+        if _voyageai_unavailable_reason
+        else "voyageai not installed"
     )
+
+    skip_fastembed = pytest.mark.skip(reason=_fastembed_skip_reason)
+    skip_voyageai = pytest.mark.skip(reason=_voyageai_skip_reason)
     skip_python_314 = pytest.mark.skip(
         reason="Test skipped on Python 3.14+ due to dependency incompatibilities"
     )
@@ -888,15 +902,29 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         if "skip_on_free_threaded" in markers and is_free_threaded:
             item.add_marker(skip_free_threaded)
 
-        # Auto-skip integration/real tests that import fastembed/voyage providers
-        # These will fail during collection on Python 3.14 due to import errors
+        # Auto-skip integration/real tests that import fastembed/voyage providers.
+        # These will fail during collection on Python 3.14 due to import errors.
         if "integration" in markers:
-            test_file = str(item.fspath)
-            # integration/conftest.py imports fastembed providers
-            if "integration/conftest.py" in test_file or "integration/real/" in test_file:
+            test_path = item.path  # pathlib.Path -- works on all platforms
+            integration_parts = {"integration"}
+            path_parts = set(test_path.parts)
+            in_integration = integration_parts & path_parts
+            is_real_test = "real" in path_parts
+            if in_integration and (is_real_test or test_path.name == "conftest.py"):
                 if not has_fastembed or not has_voyageai:
+                    missing = [
+                        pkg
+                        for pkg, available in (
+                            ("fastembed", has_fastembed),
+                            ("voyageai", has_voyageai),
+                        )
+                        if not available
+                    ]
                     item.add_marker(
                         pytest.mark.skip(
-                            reason=f"Integration test requires fastembed={has_fastembed} and voyageai={has_voyageai}"
+                            reason=(
+                                f"Integration test requires missing packages: "
+                                f"{', '.join(missing)}"
+                            )
                         )
                     )
