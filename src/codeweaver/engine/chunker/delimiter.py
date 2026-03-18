@@ -469,7 +469,10 @@ class DelimiterChunker(BaseChunker):
 
                 # Find the matching closing delimiter for the structural character
                 struct_end = self._find_matching_close(
-                    content, struct_start, struct_char or "", structural_pairs.get(struct_char, "")
+                    content,
+                    struct_start,
+                    struct_char or "",
+                    structural_pairs.get(struct_char, ""),  # ty:ignore[no-matching-overload]
                 )
 
                 if struct_end is not None:

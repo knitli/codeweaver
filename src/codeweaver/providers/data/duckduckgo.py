@@ -81,7 +81,7 @@ class DuckDuckGoSearchTool:
         """
         # using the full words is more intuitive for an agent, so we map them here
         actual_timelimit = {"day": "d", "week": "w", "month": "m", "year": "y", "None": None}.get(
-            timelimit
+            timelimit  # ty:ignore[invalid-argument-type]
         )
         return await asyncio.to_thread(
             self.client.search,

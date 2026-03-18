@@ -178,11 +178,7 @@ async def _resolve_indexer_from_container() -> IndexingService | None:
         container = get_container()
         return await container.resolve(IndexingService)
     except Exception as e:
-        logger.warning(
-            "Failed to resolve IndexingService from container: %s",
-            e,
-            exc_info=True,
-        )
+        logger.warning("Failed to resolve IndexingService from container: %s", e, exc_info=True)
         return None
 
 
@@ -324,7 +320,7 @@ async def _finalize_response(
             "rerank-strategy": telemetry.client.get_feature_flag("rerank-strategy"),
         }
         try:
-            capture_search_event(
+            await capture_search_event(
                 response=response,
                 query=query,
                 intent_type=intent_type,
@@ -381,7 +377,7 @@ async def find_code(
 
         if not index_exists or chunk_count == 0:
             # Full indexing needed - BLOCK and wait
-            log_to_client_or_fallback(
+            await log_to_client_or_fallback(
                 context,
                 "warning",
                 {
@@ -470,7 +466,7 @@ async def find_code(
         )
 
         try:
-            capture_search_event(
+            await capture_search_event(
                 response=error_response,
                 query=query,
                 intent_type=intent or IntentType.UNDERSTAND,

@@ -85,7 +85,7 @@ class FastMcpServerSettingsDict(TypedDict, total=False):
     name: NotRequired[str]
     instructions: NotRequired[str | None]
     version: NotRequired[str | None]
-    lifespan: NotRequired[LifespanResultT | None]
+    lifespan: NotRequired[LifespanResultT | None]  # ty:ignore[unbound-type-variable]
     include_tags: NotRequired[set[str] | None]
     exclude_tags: NotRequired[set[str] | None]
     transport: NotRequired[Literal["stdio", "http"] | None]
