@@ -314,7 +314,7 @@ async def _finalize_response(
         strategies_used=strategies_used,
     )
 
-    if telemetry_settings.tools_over_privacy:
+    if getattr(telemetry_settings, "tools_over_privacy", False):
         feature_flags = {
             "search-ranking-v2": telemetry.client.get_feature_flag("search-ranking-v2"),
             "rerank-strategy": telemetry.client.get_feature_flag("rerank-strategy"),
@@ -326,7 +326,7 @@ async def _finalize_response(
                 intent_type=intent_type,
                 strategies=strategies_used,
                 execution_time_ms=execution_time_ms,
-                tools_over_privacy=telemetry_settings.tools_over_privacy,
+                tools_over_privacy=getattr(telemetry_settings, "tools_over_privacy", False),
                 feature_flags=feature_flags,
             )
         except Exception:
@@ -472,7 +472,7 @@ async def find_code(
                 intent_type=intent or IntentType.UNDERSTAND,
                 strategies=strategies_used,
                 execution_time_ms=execution_time_ms,
-                tools_over_privacy=telemetry_settings.tools_over_privacy,
+                tools_over_privacy=getattr(telemetry_settings, "tools_over_privacy", False),
                 feature_flags=None,
             )
         except Exception:
