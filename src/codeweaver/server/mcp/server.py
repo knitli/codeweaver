@@ -359,7 +359,9 @@ async def create_stdio_server(
         stdio_settings = DictView(FastMcpServerSettingsDict(**cast(dict, stdio_settings)))
     else:
         stdio_settings = _get_fastmcp_settings_map(http=False)
-    app = _setup_server(stdio_settings, transport="stdio")
+    # Derive the stdio server name directly from settings instead of constructing
+    # a full FastMCP app instance just to access `app.name`.
+    stdio_name = cast(str | None, stdio_settings.get("name"))
     if settings and (http_settings := settings.get("mcp_server")) is not UNSET:
         http_settings = DictView(FastMcpServerSettingsDict(**cast(dict, http_settings)))
     else:
@@ -372,7 +374,7 @@ async def create_stdio_server(
     # create_proxy() takes a target (URL, transport, client, etc.) and settings
     return create_proxy(
         target=ProxyClient(transport=StreamableHttpTransport(url=url)),
-        name=app.name,
+        name=stdio_name or cast(str, http_settings.get("name", "codeweaver-mcp")),
     )
 
 
