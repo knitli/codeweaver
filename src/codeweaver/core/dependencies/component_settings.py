@@ -48,7 +48,11 @@ from codeweaver.core.config.telemetry import TelemetrySettings
 
 @dependency_provider(TelemetrySettings, scope="singleton")
 def _get_telemetry_settings() -> TelemetrySettings:
+    from codeweaver.core.types.sentinel import UNSET
+
     settings = _global_settings()
+    if settings.telemetry is UNSET or settings.telemetry is None:
+        return TelemetrySettings()
     return settings.telemetry
 
 
