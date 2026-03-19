@@ -325,7 +325,14 @@ class QdrantSnapshotBackupService:
         snapshots = await self.list_snapshots()
         if not snapshots:
             return None
-        return max(snapshots, key=lambda s: s.get("created_at", ""))
+        return max(
+            snapshots,
+            key=lambda s: (
+                getattr(s, "created_at", None)
+                or (s.get("created_at") if isinstance(s, dict) else "")
+                or ""
+            ),
+        )
 
     async def snapshot_and_cleanup(self, *, wait: bool = False) -> SnapshotMetaDict:
         """Create a new snapshot and clean up old ones.
