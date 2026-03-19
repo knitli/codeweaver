@@ -436,7 +436,7 @@ class TestSnapshotAndCleanup:
 
         assert result["snapshot_created"] is False
         assert result["snapshot_name"] is None
-        assert result["cleanup_stats"] == {}
+        assert result["cleanup_stats"] == {"total": 0, "kept": 0, "deleted": 0, "failed": 0}
         mock_create.assert_called_once()
         mock_cleanup.assert_not_called()
 
