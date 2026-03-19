@@ -46,12 +46,13 @@ class TestComputeAstHash:
         assert result is not None
         assert len(result) == 64  # blake3 hex digest
 
-    def test_returns_none_for_empty_content(self) -> None:
-        """Return None when parsing produces no meaningful nodes."""
+    def test_returns_hash_for_empty_content(self) -> None:
+        """Produce a hash even when parsing only yields an empty module root."""
         result = _compute_ast_hash("", "python")
-        # Empty source still produces a 'module' root node
-        # which is acceptable - the hash just captures the empty structure
-        assert result is None or len(result) == 64
+        # Empty source still produces a 'module' root node, which is acceptable;
+        # the hash just captures the empty structure.
+        assert result is not None
+        assert len(result) == 64
 
     def test_returns_none_for_unsupported_language(self) -> None:
         """Return None when the language is not supported by ast-grep."""
