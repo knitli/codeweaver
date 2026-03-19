@@ -1270,6 +1270,9 @@ class DelimiterChunker(BaseChunker):
             get_family_patterns,
         )
 
+        # Initialize delimiters list
+        delimiters: list[Delimiter] = []
+
         # Check for custom delimiters from settings
         if (
             self._governor.settings is not None
@@ -1286,15 +1289,14 @@ class DelimiterChunker(BaseChunker):
                     )
                 ):
                     # Convert DelimiterPattern to Delimiter objects
-                    # TODO: Implement proper conversion when delimiter families are integrated
-                    pass
+                    for pattern in custom_delim.delimiters:
+                        delimiters.extend(Delimiter.from_pattern(pattern))
 
         # Load from delimiter families system
         family = LanguageFamily.from_known_language(language)
         patterns = get_family_patterns(family)
 
         # Convert patterns to delimiters
-        delimiters: list[Delimiter] = []
         for pattern in patterns:
             delimiters.extend(Delimiter.from_pattern(pattern))
 
