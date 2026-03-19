@@ -272,7 +272,7 @@ class QdrantSnapshotBackupService:
                 "Cleaning up snapshots: keeping %d, deleting %d", len(to_keep), len(to_delete)
             )
             for snapshot in to_delete:
-                snapshot_name = snapshot.get("name")
+                snapshot_name = cast(dict[str, Any], snapshot).get("name")
                 if not snapshot_name:
                     logger.warning("Skipping snapshot without name during cleanup: %r", snapshot)
                     stats["failed"] += 1
