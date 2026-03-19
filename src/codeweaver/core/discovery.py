@@ -99,6 +99,7 @@ def _compute_ast_hash(content: str, language_name: str) -> BlakeHashKey | None:
     except (KeyboardInterrupt, SystemExit):
         raise
     except BaseException:
+        logger.debug("AST parsing failed for language %s", language_name, exc_info=True)
         return None
 
 
@@ -135,7 +136,11 @@ def compute_semantic_file_hash(
             if ast_hash := _compute_ast_hash(content_str, language.variable):
                 return ast_hash
         except Exception:
-            logger.debug("AST hashing failed for %s, falling back to content hash", file_path)
+            logger.debug(
+                "AST hashing failed for %s, falling back to content hash",
+                file_path,
+                exc_info=True,
+            )
     return get_blake_hash(content_bytes)
 
 
