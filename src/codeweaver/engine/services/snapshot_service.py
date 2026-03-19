@@ -164,6 +164,31 @@ class QdrantSnapshotBackupService:
             logger.warning("Snapshot creation timeout for: %s", snapshot_name)
             return False
 
+    @staticmethod
+    def _normalize_snapshot(snapshot: Any) -> SnapshotDescription:
+        """Normalize a snapshot object or dict to a consistent dict format.
+
+        Args:
+            snapshot: A snapshot object or dict from the Qdrant client.
+
+        Returns:
+            A normalized dict with name, size, and created_at keys.
+        """
+        if isinstance(snapshot, dict):
+            return cast(SnapshotDescription, snapshot)
+        # Qdrant SnapshotDescription uses "creation_time"; older versions may use "created_at"
+        return cast(
+            SnapshotDescription,
+            {
+                "name": getattr(snapshot, "name", None),
+                "size": getattr(snapshot, "size", None),
+                "created_at": (
+                    getattr(snapshot, "creation_time", None)
+                    or getattr(snapshot, "created_at", None)
+                ),
+            },
+        )
+
     async def list_snapshots(self) -> list[SnapshotDescription]:
         """List all available snapshots for the collection.
 
@@ -176,14 +201,15 @@ class QdrantSnapshotBackupService:
             ...     print(f"{snapshot['name']}: {snapshot['size']} bytes")
         """
         try:
-            snapshots: CoroutineType[Any, Any, list[SnapshotDescription]] = await asyncio.to_thread(
+            snapshots: CoroutineType[Any, Any, list[Any]] = await asyncio.to_thread(
                 self.vector_store.client.list_snapshots, collection_name=self.collection_name
             )
         except Exception as e:
             logger.warning("Failed to list snapshots: %s", e)
             return []
         else:
-            return await snapshots if isawaitable(snapshots) else snapshots
+            raw = await snapshots if isawaitable(snapshots) else snapshots
+            return [self._normalize_snapshot(s) for s in raw]
 
     async def delete_snapshot(self, snapshot_name: str) -> bool:
         """Delete a specific snapshot.
@@ -236,11 +262,7 @@ class QdrantSnapshotBackupService:
                 return CleanupStatsDict(**stats)  # ty:ignore[missing-typed-dict-key]
             snapshots_sorted = sorted(
                 snapshots,
-                key=lambda s: (
-                    getattr(s, "created_at", None)
-                    or (s.get("created_at") if isinstance(s, dict) else "")
-                    or ""
-                ),
+                key=lambda s: s.get("created_at") or "",
                 reverse=True,
             )
             to_keep = snapshots_sorted[: self.retention_count]
@@ -250,9 +272,7 @@ class QdrantSnapshotBackupService:
                 "Cleaning up snapshots: keeping %d, deleting %d", len(to_keep), len(to_delete)
             )
             for snapshot in to_delete:
-                snapshot_name = getattr(snapshot, "name", None)
-                if snapshot_name is None and isinstance(snapshot, dict):
-                    snapshot_name = snapshot.get("name")
+                snapshot_name = cast(dict[str, Any], snapshot).get("name")
                 if not snapshot_name:
                     logger.warning("Skipping snapshot without name during cleanup: %r", snapshot)
                     stats["failed"] += 1
@@ -327,11 +347,7 @@ class QdrantSnapshotBackupService:
             return None
         return max(
             snapshots,
-            key=lambda s: (
-                getattr(s, "created_at", None)
-                or (s.get("created_at") if isinstance(s, dict) else "")
-                or ""
-            ),
+            key=lambda s: s.get("created_at") or "",
         )
 
     async def snapshot_and_cleanup(self, *, wait: bool = False) -> SnapshotMetaDict:
