@@ -882,17 +882,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             _fastembed_skip_reason = f"fastembed_gpu not available ({_fastembed_gpu_unavailable_reason})"
         else:
             _fastembed_skip_reason = "fastembed or fastembed_gpu not installed"
-    else:
-        _fastembed_skip_reason = ""
 
-    _voyageai_skip_reason = (
-        f"voyageai not available ({_voyageai_unavailable_reason})"
-        if _voyageai_unavailable_reason
-        else "voyageai not installed"
-    )
-
-    skip_fastembed = pytest.mark.skip(reason=_fastembed_skip_reason)
-    skip_voyageai = pytest.mark.skip(reason=_voyageai_skip_reason)
     skip_python_314 = pytest.mark.skip(
         reason="Test skipped on Python 3.14+ due to dependency incompatibilities"
     )
@@ -904,13 +894,25 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         # Get all markers for this item
         markers = {marker.name for marker in item.iter_markers()}
 
-        # Skip tests requiring fastembed if not available or on Python 3.14+
+        # Skip tests requiring fastembed if not available or on Python 3.14+.
+        # Compute the reason here so it accurately reflects WHY we're skipping.
         if "requires_fastembed" in markers and (not has_fastembed or is_python_314_plus):
-            item.add_marker(skip_fastembed)
+            if is_python_314_plus:
+                reason = "fastembed not supported on Python 3.14+ (incompatible dependency)"
+            else:
+                reason = _fastembed_skip_reason or "fastembed or fastembed_gpu not installed"
+            item.add_marker(pytest.mark.skip(reason=reason))
 
-        # Skip tests requiring voyageai if not available or on Python 3.14+
+        # Skip tests requiring voyageai if not available or on Python 3.14+.
+        # Compute the reason here so it accurately reflects WHY we're skipping.
         if "requires_voyageai" in markers and (not has_voyageai or is_python_314_plus):
-            item.add_marker(skip_voyageai)
+            if is_python_314_plus:
+                reason = "voyageai not supported on Python 3.14+ (pydantic v1 incompatibility)"
+            elif _voyageai_unavailable_reason:
+                reason = f"voyageai not available ({_voyageai_unavailable_reason})"
+            else:
+                reason = "voyageai not installed"
+            item.add_marker(pytest.mark.skip(reason=reason))
 
         # Skip tests marked for Python 3.14+
         if "skip_on_python_314" in markers and is_python_314_plus:
