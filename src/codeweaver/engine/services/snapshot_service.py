@@ -234,7 +234,15 @@ class QdrantSnapshotBackupService:
                     self.retention_count,
                 )
                 return CleanupStatsDict(**stats)  # ty:ignore[missing-typed-dict-key]
-            snapshots_sorted = sorted(snapshots, key=lambda s: s.created_at or "", reverse=True)
+            snapshots_sorted = sorted(
+                snapshots,
+                key=lambda s: (
+                    getattr(s, "created_at", None)
+                    or (s.get("created_at") if isinstance(s, dict) else "")
+                    or ""
+                ),
+                reverse=True,
+            )
             to_keep = snapshots_sorted[: self.retention_count]
             to_delete = snapshots_sorted[self.retention_count :]
             stats["kept"] = len(to_keep)
@@ -242,7 +250,13 @@ class QdrantSnapshotBackupService:
                 "Cleaning up snapshots: keeping %d, deleting %d", len(to_keep), len(to_delete)
             )
             for snapshot in to_delete:
-                snapshot_name = snapshot.name
+                snapshot_name = getattr(snapshot, "name", None)
+                if snapshot_name is None and isinstance(snapshot, dict):
+                    snapshot_name = snapshot.get("name")
+                if not snapshot_name:
+                    logger.warning("Skipping snapshot without name during cleanup: %r", snapshot)
+                    stats["failed"] += 1
+                    continue
                 if await self.delete_snapshot(snapshot_name):
                     stats["deleted"] += 1
                 else:

@@ -847,12 +847,19 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     # incompatibility ("On field ... constraints are set but not enforced"), which
     # would crash pytest collection if not caught here.
     _fastembed_unavailable_reason: str | None = None
+    _fastembed_gpu_unavailable_reason: str | None = None
+    has_fastembed = False
     try:
         import fastembed  # noqa: F401
         has_fastembed = True
     except Exception as exc:
-        has_fastembed = False
         _fastembed_unavailable_reason = f"{type(exc).__name__}: {exc}"
+        # Treat fastembed_gpu as an alternative installation of fastembed.
+        try:
+            import fastembed_gpu  # noqa: F401
+            has_fastembed = True
+        except Exception as gpu_exc:
+            _fastembed_gpu_unavailable_reason = f"{type(gpu_exc).__name__}: {gpu_exc}"
 
     _voyageai_unavailable_reason: str | None = None
     try:
@@ -862,11 +869,22 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         has_voyageai = False
         _voyageai_unavailable_reason = f"{type(exc).__name__}: {exc}"
 
-    _fastembed_skip_reason = (
-        f"fastembed not available ({_fastembed_unavailable_reason})"
-        if _fastembed_unavailable_reason
-        else "fastembed not installed"
-    )
+    if not has_fastembed:
+        if _fastembed_unavailable_reason and _fastembed_gpu_unavailable_reason:
+            _fastembed_skip_reason = (
+                "fastembed and fastembed_gpu not available "
+                f"(fastembed: {_fastembed_unavailable_reason}; "
+                f"fastembed_gpu: {_fastembed_gpu_unavailable_reason})"
+            )
+        elif _fastembed_unavailable_reason:
+            _fastembed_skip_reason = f"fastembed not available ({_fastembed_unavailable_reason})"
+        elif _fastembed_gpu_unavailable_reason:
+            _fastembed_skip_reason = f"fastembed_gpu not available ({_fastembed_gpu_unavailable_reason})"
+        else:
+            _fastembed_skip_reason = "fastembed or fastembed_gpu not installed"
+    else:
+        _fastembed_skip_reason = ""
+
     _voyageai_skip_reason = (
         f"voyageai not available ({_voyageai_unavailable_reason})"
         if _voyageai_unavailable_reason
@@ -886,12 +904,12 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         # Get all markers for this item
         markers = {marker.name for marker in item.iter_markers()}
 
-        # Skip tests requiring fastembed if not available
-        if "requires_fastembed" in markers and not has_fastembed:
+        # Skip tests requiring fastembed if not available or on Python 3.14+
+        if "requires_fastembed" in markers and (not has_fastembed or is_python_314_plus):
             item.add_marker(skip_fastembed)
 
-        # Skip tests requiring voyageai if not available
-        if "requires_voyageai" in markers and not has_voyageai:
+        # Skip tests requiring voyageai if not available or on Python 3.14+
+        if "requires_voyageai" in markers and (not has_voyageai or is_python_314_plus):
             item.add_marker(skip_voyageai)
 
         # Skip tests marked for Python 3.14+
