@@ -51,7 +51,7 @@ class EnvVarInfo(NamedTuple):
     choices: set[str] | None = None
     variable_name: str | None = None
     """The name of the variable as used by the provider's **client**, if different from `env`."""
-    variables: NotRequired[tuple[VariableInfo, ...]] = ()
+    variables: tuple[VariableInfo, ...] = ()
     """The variables that this environment variable can configure. Use for situations where an env var does not map to the client directly or configures multiple variables."""
     resolver_key: str | None = None
     """Optional key for the resolver to deconflict multiple config sources."""

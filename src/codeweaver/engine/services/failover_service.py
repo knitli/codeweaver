@@ -11,7 +11,7 @@ import asyncio
 import logging
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from codeweaver.core.constants import ONE_MINUTE
 from codeweaver.engine.services.reconciliation_service import VectorReconciliationService
@@ -161,9 +161,11 @@ class FailoverService:
         logger.info("Starting snapshot maintenance")
 
         try:
+            from codeweaver.providers.vector_stores.qdrant import QdrantBaseProvider
+
             # Create snapshot service
             snapshot_service = QdrantSnapshotBackupService(
-                vector_store=self.primary_store,
+                vector_store=cast(QdrantBaseProvider, self.primary_store),
                 storage_path=self.settings.snapshot_storage_path,
                 retention_count=self.settings.snapshot_retention_count,
             )

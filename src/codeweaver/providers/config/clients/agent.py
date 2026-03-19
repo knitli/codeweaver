@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, override
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, cast, override
 from urllib.parse import urlparse
 
 import httpx
@@ -20,7 +20,6 @@ from codeweaver.core.types import (
     AnonymityConversion,
     FilteredKey,
     FilteredKeyT,
-    LiteralProviderType,
     LiteralStringT,
     Provider,
 )
@@ -257,12 +256,12 @@ class OpenAIAgentClientOptions(OpenAIClientOptions):
     )
     tag: Literal["openai"] = "openai"
 
-    def computed_base_url(self, provider: LiteralProviderType) -> str | None:
+    def computed_base_url(self, provider: Provider) -> str | None:
         """Return the default base URL for the OpenAI agent client based on the provider."""
         if self.base_url:
             return str(self.base_url)
-        provider = provider if isinstance(provider, Provider) else Provider.from_string(provider)  # ty:ignore[invalid-assignment]
-        if found_provider_url := super().computed_base_url(provider):
+        provider = provider if isinstance(provider, Provider) else Provider.from_string(provider)
+        if found_provider_url := super().computed_base_url(provider):  # ty:ignore[invalid-argument-type]
             return found_provider_url
         if found_agent_provider_url := {
             Provider.ALIBABA: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
@@ -278,7 +277,7 @@ class OpenAIAgentClientOptions(OpenAIClientOptions):
             Provider.OPENROUTER: "https://openrouter.ai/api/v1",
             Provider.OVHCLOUD: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
             Provider.SAMBANOVA: "https://api.sambanova.ai/v1",
-        }.get(provider):
+        }.get(cast(Provider, provider)):
             self.base_url = AnyUrl(found_agent_provider_url)
             return found_agent_provider_url
         return None

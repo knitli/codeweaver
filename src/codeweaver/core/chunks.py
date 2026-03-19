@@ -333,7 +333,7 @@ class CodeChunk(BasedModel):
                 k: v for k, v in self.metadata.items() if k in ("name", "tags", "semantic_meta")
             }
         ):
-            data["metadata"] = metadata
+            data["metadata"] = metadata  # ty:ignore[invalid-assignment]
 
         # Use pydantic_core.to_json for fast, reliable serialization
         return to_json({k: v for k, v in data.items() if v is not None}).decode("utf-8")

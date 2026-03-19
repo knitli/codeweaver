@@ -11,6 +11,19 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+
+# Guard against voyageai import failures. On Python 3.14+ the pydantic v1 incompatibility
+# raises ValueError (not ImportError), so this must come before any codeweaver.providers
+# import that loads the Voyage provider module. The whole module is skipped at collection
+# time rather than crashing pytest with INTERNALERROR.
+try:
+    import voyageai  # noqa: F401
+except Exception:
+    pytest.skip(
+        "voyageai not available or incompatible with this Python version",
+        allow_module_level=True,
+    )
+
 from codeweaver.core import (
     ChunkKind,
     CodeChunk,
@@ -23,7 +36,7 @@ from codeweaver.core import (
 from codeweaver.providers import RerankingModelCapabilities, VoyageRerankingProvider
 
 
-pytestmark = [pytest.mark.unit]
+pytestmark = [pytest.mark.unit, pytest.mark.requires_voyageai]
 
 
 # Create a mock VoyageRerankingResult that matches the real API structure

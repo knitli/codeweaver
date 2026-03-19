@@ -818,3 +818,133 @@ def test_project_path(tmp_path: Path) -> Path:
     project = tmp_path / "test_project"
     project.mkdir()
     return project
+
+
+# ===========================================================================
+# *                    Conditional Skip Markers
+# ===========================================================================
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Apply conditional skip markers based on environment and dependencies.
+
+    This hook automatically skips tests that:
+    - Require fastembed on Python 3.14+ (not available)
+    - Require voyageai on Python 3.14+ (pydantic v1 incompatibility)
+    - Require free-threaded Python support (package build failures)
+    - Are marked as integration tests requiring fastembed imports
+    """
+    import sys
+
+    # Detect Python version
+    is_python_314_plus = sys.version_info >= (3, 14)
+
+    # Detect free-threaded Python (PEP 703)
+    is_free_threaded = hasattr(sys, "_is_gil_enabled") and not sys._is_gil_enabled()
+
+    # Check package availability - catch any exception, not just ImportError.
+    # On Python 3.14+, voyageai raises ValueError during import due to pydantic v1
+    # incompatibility ("On field ... constraints are set but not enforced"), which
+    # would crash pytest collection if not caught here.
+    _fastembed_unavailable_reason: str | None = None
+    _fastembed_gpu_unavailable_reason: str | None = None
+    has_fastembed = False
+    try:
+        import fastembed  # noqa: F401
+        has_fastembed = True
+    except Exception as exc:
+        _fastembed_unavailable_reason = f"{type(exc).__name__}: {exc}"
+        # Treat fastembed_gpu as an alternative installation of fastembed.
+        try:
+            import fastembed_gpu  # noqa: F401
+            has_fastembed = True
+        except Exception as gpu_exc:
+            _fastembed_gpu_unavailable_reason = f"{type(gpu_exc).__name__}: {gpu_exc}"
+
+    _voyageai_unavailable_reason: str | None = None
+    try:
+        import voyageai  # noqa: F401
+        has_voyageai = True
+    except Exception as exc:
+        has_voyageai = False
+        _voyageai_unavailable_reason = f"{type(exc).__name__}: {exc}"
+
+    if not has_fastembed:
+        if _fastembed_unavailable_reason and _fastembed_gpu_unavailable_reason:
+            _fastembed_skip_reason = (
+                "fastembed and fastembed_gpu not available "
+                f"(fastembed: {_fastembed_unavailable_reason}; "
+                f"fastembed_gpu: {_fastembed_gpu_unavailable_reason})"
+            )
+        elif _fastembed_unavailable_reason:
+            _fastembed_skip_reason = f"fastembed not available ({_fastembed_unavailable_reason})"
+        elif _fastembed_gpu_unavailable_reason:
+            _fastembed_skip_reason = f"fastembed_gpu not available ({_fastembed_gpu_unavailable_reason})"
+        else:
+            _fastembed_skip_reason = "fastembed or fastembed_gpu not installed"
+
+    skip_python_314 = pytest.mark.skip(
+        reason="Test skipped on Python 3.14+ due to dependency incompatibilities"
+    )
+    skip_free_threaded = pytest.mark.skip(
+        reason="Test skipped on free-threaded Python builds due to package compatibility issues"
+    )
+
+    for item in items:
+        # Get all markers for this item
+        markers = {marker.name for marker in item.iter_markers()}
+
+        # Skip tests requiring fastembed if not available or on Python 3.14+.
+        # Compute the reason here so it accurately reflects WHY we're skipping.
+        if "requires_fastembed" in markers and (not has_fastembed or is_python_314_plus):
+            if is_python_314_plus:
+                reason = "fastembed not supported on Python 3.14+ (incompatible dependency)"
+            else:
+                reason = _fastembed_skip_reason or "fastembed or fastembed_gpu not installed"
+            item.add_marker(pytest.mark.skip(reason=reason))
+
+        # Skip tests requiring voyageai if not available or on Python 3.14+.
+        # Compute the reason here so it accurately reflects WHY we're skipping.
+        if "requires_voyageai" in markers and (not has_voyageai or is_python_314_plus):
+            if is_python_314_plus:
+                reason = "voyageai not supported on Python 3.14+ (pydantic v1 incompatibility)"
+            elif _voyageai_unavailable_reason:
+                reason = f"voyageai not available ({_voyageai_unavailable_reason})"
+            else:
+                reason = "voyageai not installed"
+            item.add_marker(pytest.mark.skip(reason=reason))
+
+        # Skip tests marked for Python 3.14+
+        if "skip_on_python_314" in markers and is_python_314_plus:
+            item.add_marker(skip_python_314)
+
+        # Skip tests on free-threaded Python
+        if "skip_on_free_threaded" in markers and is_free_threaded:
+            item.add_marker(skip_free_threaded)
+
+        # Auto-skip integration/real tests that import fastembed/voyage providers.
+        # These will fail during collection on Python 3.14 due to import errors.
+        if "integration" in markers:
+            test_path = item.path  # pathlib.Path -- works on all platforms
+            integration_parts = {"integration"}
+            path_parts = set(test_path.parts)
+            in_integration = integration_parts & path_parts
+            is_real_test = "real" in path_parts
+            if in_integration and (is_real_test or test_path.name == "conftest.py"):
+                if not has_fastembed or not has_voyageai:
+                    missing = [
+                        pkg
+                        for pkg, available in (
+                            ("fastembed", has_fastembed),
+                            ("voyageai", has_voyageai),
+                        )
+                        if not available
+                    ]
+                    item.add_marker(
+                        pytest.mark.skip(
+                            reason=(
+                                f"Integration test requires missing packages: "
+                                f"{', '.join(missing)}"
+                            )
+                        )
+                    )

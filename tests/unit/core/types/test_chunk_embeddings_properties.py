@@ -8,8 +8,6 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.core.utils.generation import uuid7
-
 from codeweaver.core import CodeChunk, Span
 from codeweaver.core.metadata import ChunkKind, ExtCategory
 from codeweaver.core.types import ChunkEmbeddings, CodeWeaverSparseEmbedding, EmbeddingBatchInfo

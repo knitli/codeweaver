@@ -72,7 +72,7 @@ class VectorRole(BaseEnum):
     SPARSE = "sparse"
 
 
-class VectorConfig(BasedModel, frozen=True):
+class VectorConfig(BasedModel):
     """Immutable configuration for a single named vector in Qdrant.
 
     Aligns directly with Qdrant's vector configuration while adding
@@ -93,6 +93,8 @@ class VectorConfig(BasedModel, frozen=True):
         ...     role=VectorRole.PRIMARY,
         ... )
     """
+
+    model_config = BasedModel.model_config | {"frozen": True}
 
     name: Annotated[
         str,

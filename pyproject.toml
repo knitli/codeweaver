@@ -136,7 +136,7 @@ dependencies = [
   # lazy import handling; spun off from core/utils/lazy_importer into its own package
   "lateimport>=0.1.0",
   # retries
-  "tenacity>=9.1.2",
+  "tenacity>=9.1.4",
   # for local providers (sentence-transformers, fastembed) to detect CPU/GPU features
   "py-cpuinfo>=9.0.0",
   # * ================ CLI Dependencies ==================*
@@ -149,7 +149,7 @@ dependencies = [
   "fastembed==0.7.4; python_version < '3.14'",
   "google-genai==1.56.0",
   # NOTE: We're waiting on pydantic-ai to update to 1.0+ before we can upgrade too
-  "huggingface-hub>=1.7.1",
+  "huggingface-hub>=1.0.0",
   "mistralai==1.10.0",
   "openai==2.28.0",
   "qdrant-client==1.17.1",
@@ -169,7 +169,7 @@ dependencies = [
   "ast-grep-py>=0.40.3",
   # * ================ Server and MCP Server Framework ==================*
   # fastmcp is the core MCP server framework
-  "fastmcp>=2.14.5",
+  "fastmcp>=2.14.0",
   # just used for types but we need them at runtime for Pydantic models
   "mcp>=1.23.3",
   # Runs the core admin/management server
@@ -181,7 +181,7 @@ dependencies = [
   "tomli-w>=1.2.0",
   # * ================ Telemetry and Observability ==================*
   # It's telemetry. Our implementation is lightweight and privacy-focused.
-  "posthog>=7.8.2",
+  "posthog>=7.9.12",
 
   #! Not yet used, but planned for future releases
   # * ================ Future Dependencies ==================*
@@ -216,38 +216,36 @@ auth-permitio = ["permit-fastmcp"]
 # ==== Authentication and Authorization Middleware/Addons ====
 # Settings/Config Secrets
 aws-secrets-manager = ["pydantic-settings[yaml,toml,aws-secrets-manager]"]
+# does NOT support free-threaded python 3.13 (3.14 is OK) due to cffi dependency in azure-identity
 azure-key-vault = ["pydantic-settings[yaml,toml,azure-key-vault]"]
 bedrock = ["pydantic-ai-slim[bedrock]"]
 cohere = ["pydantic-ai-slim[cohere]"]
 # ==== Data Sources ====
-duckduckgo = ["pydantic-ai-slim[duckduckgo]"]
+# duckduckgo relies on primp, which needs maturin. Maturin does not yet support python 3.14 free-threaded builds, so we exclude it from python 3.14 installs for now. If you need duckduckgo support on python 3.14, you can install the ddgs package manually in your environment.
+duckduckgo = ["ddgs; python_version < '3.14'"]
 exa = ["exa-py"]
 fastembed = ["fastembed; python_version < '3.14'", "py-cpuinfo"]
 # Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
 fastembed-gpu = ["fastembed-gpu; python_version < '3.14'", "py-cpuinfo"]
-# workos AuthKit middleware - see https://gofastmcp.com/integrations/authkit
-# No additional dependencies required, it's purely REST-based.
-# Enable with environment variables:
-#  ## Instruct FastMCP to use the AuthKit provider:
-#    FASTMCP_SERVER_AUTH=AUTHKIT
-#     configure the AuthKit provider
-#     FASTMCP_SERVER_AUTH_AUTHKITPROVIDER_AUTHKIT_DOMAIN="https://your-project-12345.authkit.app"
-#     FASTMCP_SERVER_AUTH_AUTHKITPROVIDER_BASE_URL="http://localhost:8000"
-# All groups for users - full featured with all middleware
+
 full = [
   "permit-fastmcp",
-  "ddgs",
+  "ddgs; python_version < '3.14'",
   "eunomia-mcp",
   "exa-py",
   "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,retries,xai]",
-  "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
+  # azure-key-vault requires azure-identity, which requires cffi. cffi *does* work on python 3.13, but NOT 3.13 freethreaded
+  # since we have no way to test for freethreaded builds in pyproject.toml and the build breaks with it, we leave it out.
+  # If you need azure-key-vault support on python 3.13, you can install the full group and then manually install azure-identity in your environment to get the missing dependency (with vanilla python).
+  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager]; python_version == '3.13'",
+  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]; python_version != '3.13'",
   "permit-fastmcp",
   "sentence-transformers",
   "tavily-python",
 ]
 full-gpu = [
   "permit-fastmcp",
-  "ddgs",
+  "ddgs; python_version < '3.14'",
   "eunomia-mcp",
   "fastembed-gpu; python_version < '3.14'",
   "permit-fastmcp",
@@ -284,7 +282,7 @@ recommended = [
   "tokenizers",
   "py-cpuinfo",
   "voyageai",
-  "ddgs",
+  "ddgs; python_version < '3.14'",
   "pydantic-ai-slim[openai,anthropic,retries]",
   "tavily",
 ]
@@ -292,7 +290,7 @@ recommended-local-only = [
   "fastembed; python_version < '3.14'",
   "sentence-transformers",
   "tokenizers",
-  "ddgs",
+  "ddgs; python_version < '3.14'",
   "py-cpuinfo",
   # openai for ollama local models
   "pydantic-ai-slim[openai,retries]",
@@ -321,15 +319,15 @@ xai = ["pydantic-ai-slim[xai]"]
 [dependency-groups]
 dev = [
   # black is used to format generated code
-  "black>=26.1.0",
-  "ruff>=0.15.2",
+  "black>=26.3.1",
+  "ruff>=0.15.6",
   "serena>=0.9.1",
-  "ty>=0.0.18",
-  "uv>=0.10.5",
+  "ty>=0.0.23",
+  "uv>=0.10.11",
 ]
 build = ["hatchling>=1.28.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.12.0"]
 dev-helpers = [
-  "ipython>=9.10.0",
+  "ipython>=9.11.0",
   "jsonlines>=4.0.0",
   "memory-profiler>=0.61.0",
   "pdbpp>=0.12.1",
@@ -337,9 +335,9 @@ dev-helpers = [
   "superclaude>=4.2.0",
 ]
 docs = [
-  "griffe==1.15.0",
+  "griffe>=2.0.0",
   "griffe-pydantic>=1.1.0",
-  "griffe2md>=0.1.0",
+  "griffe2md>=1.5.0",
 ]
 test = [
   "dirty-equals>=0.11.0",
@@ -347,7 +345,7 @@ test = [
   "pytest>=9.0.2",
   "pytest-asyncio>=1.3.0",
   "pytest-cov>=7.0.0",
-  "pytest-env>=1.5.0",
+  "pytest-env>=1.6.0",
   "pytest-examples>=0.0.18",
   "pytest-flakefinder>=1.1.0",
   "pytest-mock>=3.15.1",
@@ -357,7 +355,7 @@ test = [
 
 [build-system]
 requires = [
-  "hatchling>=1.28.0",
+  "hatchling>=1.29.0",
   "twine>=6.2.0",
   "uv-dynamic-versioning>=0.13.0",
 ]
@@ -518,13 +516,17 @@ markers = [
   # External dependencies
   "real_providers: Tests using actual embedding/vector store providers (not mocks)",
   "requires_api_keys: Tests requiring external API credentials and authentication",
+  "requires_fastembed: Tests requiring fastembed package (not available on Python 3.14+)",
   "requires_gpu: Tests requiring GPU hardware for execution",
   "requires_models: Tests requiring ML model downloads and local model files",
+  "requires_voyageai: Tests requiring voyageai package (has pydantic v1 issues on Python 3.14+)",
   "retry: Tests that may need retries",
   "search: Tests related to search functionality",
   "server: Tests related to server functionality",
   "services: Tests related to services layer",
   "skip_ci: Tests to skip in CI/CD environments",
+  "skip_on_free_threaded: Tests that should be skipped on free-threaded Python builds",
+  "skip_on_python_314: Tests that should be skipped on Python 3.14+ due to dependency incompatibilities",
   "slow: Tests that take a significant amount of time to run",
   "telemetry: Tests related to telemetry and metrics",
   "timeout: Tests with specific timeout requirements",
@@ -752,7 +754,10 @@ unsupported-operator = "ignore"
 no-matching-overload = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/codeweaver/__init__.py"]
+include = [
+  "src/codeweaver/__init__.py",
+  "src/codeweaver/semantic/classifications.py"
+]
 
 [tool.ty.overrides.rules]
 invalid-assignment = "ignore"

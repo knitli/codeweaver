@@ -20,11 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from codeweaver.core.utils import has_package
-from codeweaver.providers import (
-    FastEmbedEmbeddingProvider,
-    MemoryVectorStoreProvider,
-    MemoryVectorStoreProviderSettings,
-)
+from codeweaver.providers import MemoryVectorStoreProvider, MemoryVectorStoreProviderSettings
 
 
 if TYPE_CHECKING:

@@ -184,7 +184,7 @@ class FastMcpHttpServerSettings(BaseFastMcpServerSettings):
         description="""Run arguments for the FastMCP HTTP server.""",
     )
 
-    lifespan: LifespanResultT | None = None
+    lifespan: LifespanResultT | None = None  # ty:ignore[unbound-type-variable]
 
     middleware: list[type[McpMiddleware]] = Field(
         default_factory=lambda: sorted(

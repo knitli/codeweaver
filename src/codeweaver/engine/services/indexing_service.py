@@ -401,7 +401,7 @@ class IndexingService:
         for i in range(0, len(files), batch_size):
             batch = [(p, None) for p in files[i : i + batch_size]]
             task = asyncio.create_task(
-                self._run_guarded_index_batch(batch, self._indexing_semaphore, progress_callback)
+                self._run_guarded_index_batch(batch, self._indexing_semaphore, progress_callback)  # ty:ignore[invalid-argument-type]
             )
             tasks.append(task)
 
