@@ -1166,19 +1166,21 @@ class DelimiterChunker(BaseChunker):
         chunks: list[CodeChunk] = []
         lines = content.splitlines(keepends=True)
 
-        for boundary in boundaries:
-            # Extract chunk text
-            chunk_text = content[boundary.start : boundary.end]
+        # Precompute line offsets once per file (O(n))
+        # This provides O(1) lookup for line_start_pos/line_end_pos
+        line_offsets = [0]
+        for line in lines:
+            line_offsets.append(line_offsets[-1] + len(line))
 
+        for boundary in boundaries:
             # Always calculate line ranges first
             # For proper line range metadata, always expand to full lines
             start_line, end_line = self._expand_to_lines(boundary.start, boundary.end, lines)
 
-            # Extract the full lines
-            # Optimization: sum(map(len, ...)) is ~2x faster than a generator
-            # expression and avoids allocating a new string like "".join().
-            line_start_pos = sum(map(len, lines[: start_line - 1]))
-            line_end_pos = sum(map(len, lines[:end_line]))
+            # O(1) lookup per boundary
+            line_start_pos = line_offsets[start_line - 1]
+            line_end_pos = line_offsets[end_line]
+
             chunk_text = content[line_start_pos:line_end_pos]
             # Build metadata
             metadata = self._build_metadata(boundary, chunk_text, start_line, end_line, context)
@@ -1620,7 +1622,8 @@ class DelimiterChunker(BaseChunker):
             # Find position of start_line in full content
             lines = full_content.splitlines(keepends=True)
             if 0 < start_line <= len(lines):
-                # Optimization: sum(map(len, ...)) is ~2x faster than a generator
+                # Optimization: Precompute offsets if we needed to do this in a loop,
+                # but since this is only called once per merged block, we can just sum
                 pos = sum(map(len, lines[: start_line - 1]))
                 nesting_level = self._calculate_nesting_level(full_content, pos)
 
