@@ -24,6 +24,7 @@ from codeweaver.core.constants import (
     PRIMARY_SPARSE_VECTOR_NAME,
     ZERO,
 )
+from codeweaver.core.discovery import compute_semantic_file_hash
 from codeweaver.providers import EmbeddingRegistryDep
 
 
@@ -312,7 +313,7 @@ class IndexingService:
                 continue
 
             seen_files.add(relative_path)
-            current_hash = get_blake_hash(content_bytes)
+            current_hash = compute_semantic_file_hash(content_bytes, path)
             if not self._file_manifest:
                 self._file_manifest = self._manifest_manager.create_new()
             needs_reindex, _ = self._file_manifest.file_needs_reindexing(
