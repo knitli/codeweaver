@@ -308,7 +308,7 @@ class IndexFileManifest(BasedModel):
 
         # If no providers configured, return empty sets
         # Optimization: Use logical operators instead of any([a, b, c, d]) to avoid
-        # unnecessary list allocation and enable lazy short-circuiting.
+        # unnecessary list allocation from constructing a temporary list.
         if not (
             current_dense_provider
             or current_dense_model
