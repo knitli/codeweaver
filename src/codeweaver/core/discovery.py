@@ -96,11 +96,18 @@ def _compute_ast_hash(content: str, language_name: str) -> BlakeHashKey | None:
             return None
         canonical = "\n".join(parts)
         return get_blake_hash(canonical)
-    except (KeyboardInterrupt, SystemExit):
-        raise
-    except BaseException:
+    except Exception:
         logger.debug("AST parsing failed for language %s", language_name, exc_info=True)
         return None
+    except BaseException as exc:
+        # pyo3_runtime.PanicException (from ast-grep's Rust backend) inherits
+        # from BaseException, not Exception, and cannot be imported directly.
+        # Identify it by module name so we degrade gracefully without swallowing
+        # unrelated non-recoverable errors (GeneratorExit, etc.).
+        if getattr(type(exc), "__module__", None) == "pyo3_runtime":
+            logger.debug("AST parsing panicked for language %s", language_name, exc_info=True)
+            return None
+        raise
 
 
 def _get_semantic_language(
@@ -337,10 +344,11 @@ class DiscoveredFile(BasedModel):
         """Return the blake3 hash of the file, using AST-based hashing when supported."""
         if self._file_hash is not None:
             return self._file_hash
-        if self.path.exists() and self.path.is_file():
-            content_bytes = self.path.read_bytes()
+        abs_path = self.absolute_path
+        if abs_path.exists() and abs_path.is_file():
+            content_bytes = abs_path.read_bytes()
             content_hash = compute_semantic_file_hash(
-                content_bytes, self.path, ext_category=self.ext_category
+                content_bytes, abs_path, ext_category=self.ext_category
             )
             with contextlib.suppress(Exception):
                 object.__setattr__(self, "_file_hash", content_hash)
