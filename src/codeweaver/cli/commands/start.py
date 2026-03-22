@@ -472,9 +472,6 @@ async def start(
                 display.print_error("Daemon started but did not become healthy within 30 seconds")
                 display.print_info("Check logs or try: cw start --foreground")
 
-    except KeyboardInterrupt:
-        # Already handled in start_cw_services
-        pass
     except Exception as e:
         error_handler.handle_error(e, "Start command", exit_code=1)
 
