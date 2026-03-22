@@ -251,6 +251,22 @@ class TestHttpClientPool:
         assert len(pool.client_names) == 0
 
     @pytest.mark.asyncio
+    async def test_close_all_reraises_unexpected_errors(self):
+        """Test that unexpected exceptions are raised after all closes complete."""
+        pool = HttpClientPool.get_instance()
+        await pool.get_client("provider1")
+        await pool.get_client("provider2")
+
+        # Mock one client to raise an unexpected error
+        pool._clients["provider1"].aclose = AsyncMock(side_effect=ValueError("unexpected"))
+
+        with pytest.raises(ValueError, match="unexpected"):
+            await pool.close_all()
+
+        # All clients should still be removed
+        assert len(pool.client_names) == 0
+
+    @pytest.mark.asyncio
     async def test_context_manager(self):
         """Test async context manager usage."""
         async with HttpClientPool.get_instance() as pool:

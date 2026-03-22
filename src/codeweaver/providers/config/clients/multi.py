@@ -54,7 +54,7 @@ if has_package("fastembed") or has_package("fastembed_gpu"):
     except ImportError:
         OnnxProvider = Any  # type: ignore[assignment, misc]
 else:
-    OnnxProvider = Any  # type: ignore[assignment, misc]
+    OnnxProvider = Any
 
 if has_package("torch"):
     try:
@@ -62,7 +62,7 @@ if has_package("torch"):
     except ImportError:
         Module = Any  # type: ignore[assignment, misc]
 else:
-    Module = Any  # type: ignore[assignment, misc]
+    Module = Any
 if has_package("sentence_transformers"):
     # SentenceTransformerModelCardData contains these forward references:
     # - eval_results_dict: dict[SentenceEvaluator, dict[str, Any]] | None
@@ -111,7 +111,7 @@ class CohereClientOptions(ClientOptions):
                 AzureOptions(api_key=self.api_key, endpoint=str(self.base_url)), cohere=True
             ),
             Provider.HEROKU: try_for_heroku_endpoint(self.model_dump(), cohere=True),
-        }.get(provider):
+        }.get(provider):  # ty:ignore[invalid-argument-type]
             if not self.base_url:
                 self.base_url = AnyUrl(base_url)
             return base_url
@@ -163,7 +163,7 @@ class OpenAIClientOptions(ClientOptions):
             Provider.MORPH: "https://api.morphllm.com/v1",
             Provider.OLLAMA: "http://localhost:11434/v1",
             Provider.TOGETHER: "https://api.together.xyz/v1",
-        }.get(provider)
+        }.get(provider)  # ty:ignore[invalid-argument-type]
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         return {

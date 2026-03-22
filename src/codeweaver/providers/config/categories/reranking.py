@@ -70,7 +70,7 @@ def _config_factory[T: RerankingConfigT](data: dict[str, Any], config_class: typ
             case Provider.SENTENCE_TRANSFORMERS:
                 config_data["rerank"]["top_k"] = data["top_n"]
             case Provider.BEDROCK:
-                config_data["rerank"]["number_of_results"] = data["top_n"]  # ty:ignore[invalid-key]
+                config_data["rerank"]["number_of_results"] = data["top_n"]
             case Provider.COHERE:
                 config_data["rerank"]["top_k"] = data["top_n"]
     return config_class.model_validate(config_data)

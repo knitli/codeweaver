@@ -351,8 +351,8 @@ class ServiceMetadata(NamedTuple):
     """
 
     client_handler: (
-        Callable[[Any, ServiceCard, ...], Any]
-        | Callable[[Any, ServiceCard, ...], Coroutine[Any, Any, Any]]
+        Callable[..., Any]
+        | Callable[..., Coroutine[Any, Any, Any]]
         | None
     ) = None
     """Custom instantiation handler for the SDK client.
@@ -363,8 +363,8 @@ class ServiceMetadata(NamedTuple):
     """
 
     provider_handler: (
-        Callable[[Any, ServiceCard, ...], Any]
-        | Callable[[Any, ServiceCard, ...], Coroutine[Any, Any, Any]]
+        Callable[..., Any]
+        | Callable[..., Coroutine[Any, Any, Any]]
         | None
     ) = None
     """Custom instantiation handler for the provider wrapper.

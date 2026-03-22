@@ -7,14 +7,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from codeweaver.core import dependency_provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-
-
-if TYPE_CHECKING:
-    pass
 
 
 class MsMarcoRerankingCapabilities(RerankingModelCapabilities):

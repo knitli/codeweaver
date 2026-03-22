@@ -16,14 +16,9 @@ from __future__ import annotations
 
 import sys
 
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
-
-if TYPE_CHECKING:
-    pass
 
 
 @pytest.mark.unit

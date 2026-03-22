@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import inspect
 import logging
@@ -81,7 +82,87 @@ class Container[T]:
         self._shutdown_hooks: list[Callable[..., Any]] = []
         self._cleanup_stack: AsyncExitStack | None = None
         self._request_cache: dict[Any, Any] = {}  # Keys can be types or callables
-        self._providers_loaded: bool = False  # Track if auto-discovery has run  # Track if auto-discovery has run  # Track if auto-discovery has run
+        self._providers_loaded: bool = False  # Track if auto-discovery has run
+
+    def _safe_eval_type(self, type_str: str, globalns: dict[str, Any]) -> Any | None:
+        """Safely evaluate a type string using AST validation.
+
+        Parses the type string into an AST, validates that it contains only safe
+        constructs (names, attributes, subscripts, unions, calls), and evaluates
+        it in a restricted environment with a minimal set of builtins.
+
+        Args:
+            type_str: The string representation of a type.
+            globalns: The global namespace for evaluation.
+
+        Returns:
+            The evaluated type object, or None if the type string is invalid or
+            contains forbidden constructs.
+        """
+        try:
+            tree = ast.parse(type_str, mode="eval")
+        except SyntaxError:
+            return None
+
+        class TypeValidator(ast.NodeVisitor):
+            def generic_visit(self, node: ast.AST) -> None:
+                # Allowed nodes for type annotations, including support for:
+                # - Generics: List[int], dict[str, Any] (Subscript, Name, Attribute)
+                # - Unions: int | str (BinOp, BitOr)
+                # - Annotated: Annotated[int, Depends(...)] (Call, keyword, Tuple, List)
+                # - Literals: Literal["foo"] (Constant)
+                if not isinstance(
+                    node,
+                    (
+                        ast.Expression,
+                        ast.Name,
+                        ast.Attribute,
+                        ast.Subscript,
+                        ast.Constant,
+                        ast.BinOp,
+                        ast.BitOr,
+                        ast.Load,
+                        ast.Tuple,
+                        ast.List,
+                        ast.Call,
+                        ast.keyword,
+                    ),
+                ):
+                    raise TypeError(f"Forbidden AST node in type string: {type(node).__name__}")
+
+                # Block dunder access to prevent escaping the restricted environment
+                if isinstance(node, ast.Name) and node.id.startswith("__"):
+                    raise TypeError(f"Forbidden dunder name: {node.id}")
+                if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
+                    raise TypeError(f"Forbidden dunder attribute: {node.attr}")
+
+                super().generic_visit(node)
+
+        try:
+            TypeValidator().visit(tree)
+        except TypeError:
+            return None
+
+        # Restricted eval: only allow basic builtin types to be resolved
+        # even if they are not in the module's globals.
+        # Note: `type` is intentionally excluded — it is not needed for type annotation
+        # resolution, and allowing it as a callable would increase the attack surface.
+        safe_builtins = {
+            "int": int,
+            "float": float,
+            "str": str,
+            "bool": bool,
+            "list": list,
+            "tuple": tuple,
+            "dict": dict,
+            "set": set,
+            "frozenset": frozenset,
+            "object": object,
+            "bytes": bytes,
+        }
+
+        code = compile(tree, "<string>", "eval")
+        return eval(code, {"__builtins__": safe_builtins}, globalns)  # noqa: S307
 
     @staticmethod
     def _unwrap_annotated(annotation: Any) -> Any:
@@ -135,9 +216,8 @@ class Container[T]:
             return None
 
         # First, try to evaluate the string as a type reference
-        # ruff: noqa: S307 - eval is necessary for type resolution, not literal evaluation
         with suppress(Exception):
-            return eval(type_str, globalns)
+            return self._safe_eval_type(type_str, globalns)
         # If direct eval failed, check if it's an Annotated pattern like "Annotated[SomeType, ...]"
         # In this case, try to resolve the base type from registered factories
         if type_str.startswith("Annotated["):
@@ -164,7 +244,7 @@ class Container[T]:
                             enhanced_globalns[base_type_str] = factory_type
 
                             with suppress(Exception):
-                                return eval(type_str, enhanced_globalns)
+                                return self._safe_eval_type(type_str, enhanced_globalns)
         # Fallback: try to find a factory by matching type name
         return next(
             (
@@ -562,7 +642,7 @@ class Container[T]:
         if self._is_union_type(interface):
             instance = await self._resolve_union_interface(interface, cache_key, _resolution_stack)
             return cast(T, instance)
-        elif interface is type(None):
+        if interface is type(None):
             return cast(T, None)
 
         # 1. Check overrides first

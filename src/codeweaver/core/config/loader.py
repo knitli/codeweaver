@@ -16,15 +16,10 @@ import asyncio
 import logging
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from anyio import Path as AsyncPath
 
 from codeweaver.core.config.settings_type import CodeWeaverSettingsType
-
-
-if TYPE_CHECKING:
-    pass
 
 
 logger = logging.getLogger(__name__)

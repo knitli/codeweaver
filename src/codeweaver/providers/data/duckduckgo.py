@@ -27,10 +27,6 @@ from codeweaver.providers.data.utils import (
 from codeweaver.server.mcp.types import ToolRegistrationDict
 
 
-if TYPE_CHECKING:
-    pass
-
-
 if TYPE_CHECKING and has_package("ddgs"):
     from ddgs import DDGS
 else:
@@ -46,6 +42,13 @@ class DdgsResultItem(TypedDict, total=False):
     """The URL of the search result."""
     body: str
     """A brief description or snippet from the search result."""
+
+
+class DdgsSearchResults(TypedDict):
+    """Wrapped results from a DuckDuckGo search, conforming to MCP object schema requirements."""
+
+    results: list[DdgsResultItem]
+    """The list of search result items."""
 
 
 type DdgsResults = list[DdgsResultItem]
@@ -73,7 +76,7 @@ class DuckDuckGoSearchTool:
         query: str,
         *,
         timelimit: Literal["day", "week", "month", "year", "None"] | None = "year",
-    ) -> list[dict[str, Any]]:
+    ) -> DdgsSearchResults:
         """Perform a search using the DDGS client.
 
         Args:
@@ -81,13 +84,13 @@ class DuckDuckGoSearchTool:
             timelimit: The time limit for the search results. Can be "day", "week", "month", "year", or None. Defaults to "year". Pass 'None' for no time limit.
 
         Returns:
-            A list of dictionaries containing the search results.
+            A dict with a 'results' key containing a list of search result items.
         """
         # using the full words is more intuitive for an agent, so we map them here
         actual_timelimit = {"day": "d", "week": "w", "month": "m", "year": "y", "None": None}.get(
-            timelimit
+            timelimit  # ty:ignore[invalid-argument-type]
         )
-        return await asyncio.to_thread(
+        raw_results = await asyncio.to_thread(
             self.client.search,
             category="text",
             query=query,
@@ -95,11 +98,12 @@ class DuckDuckGoSearchTool:
             max_results=self.max_results,
             timelimit=actual_timelimit,
         )
+        return {"results": raw_results}
 
 
 async def _get_ddgs_search_tool(instance: DuckDuckGoSearchTool) -> Tool[DuckDuckGoSearchTool]:
     """Create and return a DuckDuckGo search tool wrapped in a FastMCP Tool."""
-    adapter = get_type_adapter(list[DdgsResultItem], module=__name__)
+    adapter = get_type_adapter(DdgsSearchResults, module=__name__)
     return await build_data_tool(
         ToolRegistrationDict(
             fn=instance.__call__,
@@ -133,4 +137,4 @@ async def duckduckgo_search_tool(
     return tool
 
 
-__all__ = ("DdgsResultItem", "DdgsResults", "DuckDuckGoSearchTool", "duckduckgo_search_tool")
+__all__ = ("DdgsResultItem", "DdgsResults", "DdgsSearchResults", "DuckDuckGoSearchTool", "duckduckgo_search_tool")

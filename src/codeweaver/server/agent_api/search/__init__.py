@@ -178,11 +178,7 @@ async def _resolve_indexer_from_container() -> IndexingService | None:
         container = get_container()
         return await container.resolve(IndexingService)
     except Exception as e:
-        logger.warning(
-            "Failed to resolve IndexingService from container: %s",
-            e,
-            exc_info=True,
-        )
+        logger.warning("Failed to resolve IndexingService from container: %s", e, exc_info=True)
         return None
 
 
@@ -318,19 +314,19 @@ async def _finalize_response(
         strategies_used=strategies_used,
     )
 
-    if telemetry_settings.tools_over_privacy:
+    if getattr(telemetry_settings, "tools_over_privacy", False):
         feature_flags = {
             "search-ranking-v2": telemetry.client.get_feature_flag("search-ranking-v2"),
             "rerank-strategy": telemetry.client.get_feature_flag("rerank-strategy"),
         }
         try:
-            capture_search_event(
+            await capture_search_event(
                 response=response,
                 query=query,
                 intent_type=intent_type,
                 strategies=strategies_used,
                 execution_time_ms=execution_time_ms,
-                tools_over_privacy=telemetry_settings.tools_over_privacy,
+                tools_over_privacy=getattr(telemetry_settings, "tools_over_privacy", False),
                 feature_flags=feature_flags,
             )
         except Exception:
@@ -381,7 +377,7 @@ async def find_code(
 
         if not index_exists or chunk_count == 0:
             # Full indexing needed - BLOCK and wait
-            log_to_client_or_fallback(
+            await log_to_client_or_fallback(
                 context,
                 "warning",
                 {
@@ -470,13 +466,13 @@ async def find_code(
         )
 
         try:
-            capture_search_event(
+            await capture_search_event(
                 response=error_response,
                 query=query,
                 intent_type=intent or IntentType.UNDERSTAND,
                 strategies=strategies_used,
                 execution_time_ms=execution_time_ms,
-                tools_over_privacy=telemetry_settings.tools_over_privacy,
+                tools_over_privacy=getattr(telemetry_settings, "tools_over_privacy", False),
                 feature_flags=None,
             )
         except Exception:

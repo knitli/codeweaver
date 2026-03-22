@@ -87,6 +87,27 @@ async def config(
     _show_config(settings.view())
 
 
+def _get_max_file_size(settings: DictView[CodeWeaverSettingsDict]) -> int | None:
+    """Resolve the effective max file size in bytes from settings.
+
+    Checks the top-level ``max_file_size`` extra field first, then falls back
+    to ``chunker.performance.max_file_size_mb`` converted to bytes.
+
+    Args:
+        settings: The current settings view.
+
+    Returns:
+        Max file size in bytes, or None if not configured.
+    """
+    max_file_size = settings.get("max_file_size")
+    if max_file_size is not None:
+        return max_file_size
+    chunker = settings.get("chunker") or {}
+    perf = chunker.get("performance") if isinstance(chunker, dict) else None
+    max_file_size_mb = perf.get("max_file_size_mb") if isinstance(perf, dict) else None
+    return max_file_size_mb * 1024 * 1024 if max_file_size_mb else None
+
+
 def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
     """Display current configuration."""
     from codeweaver.core import Unset
@@ -101,7 +122,10 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
     table.add_row("Project Path", str(settings["project_path"]))
     table.add_row("Project Name", settings["project_name"] or "auto-detected")
     table.add_row("Token Limit", str(settings["token_limit"]))
-    table.add_row("Max File Size", f"{settings['max_file_size']:,} bytes")
+    max_file_size = _get_max_file_size(settings)
+    table.add_row(
+        "Max File Size", f"{max_file_size:,} bytes" if max_file_size else "Default (10 MB)"
+    )
     table.add_row("Max Results", str(settings["max_results"]))
 
     # Feature flags
@@ -112,7 +136,7 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
         and not isinstance(settings["indexer"].get("only_index_on_command"), Unset)
         else "✅",
     )
-    table.add_row("Telemetry", "❌" if settings["telemetry"].get("disable_telemetry") else "✅")
+    table.add_row("Telemetry", "❌" if (settings.get("telemetry") or {}).get("disable_telemetry") else "✅")
 
     display.print_table(table)
 

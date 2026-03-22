@@ -49,9 +49,8 @@ from typing_extensions import TypeIs
 # make sure codeweaver is importable
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from codeweaver.providers.provider import Provider
-
-from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
+from codeweaver.core.types.provider import Provider
+from codeweaver.providers.embedding.capabilities import PartialCapabilities
 
 
 # TODO: Finish refactor to use these inline constants and eliminate the hf-models.json
@@ -372,13 +371,13 @@ type ModelMaker = Literal[
     "Snowflake",
 ]
 type HFModelProviders = Literal[
-    Provider.FASTEMBED,
-    Provider.HUGGINGFACE_INFERENCE,
-    Provider.FIREWORKS,
-    Provider.GROQ,
-    Provider.OLLAMA,
-    Provider.SENTENCE_TRANSFORMERS,
-    Provider.TOGETHER,
+    Provider.FASTEMBED,  # ty: ignore[invalid-type-form]
+    Provider.HUGGINGFACE_INFERENCE,  # ty: ignore[invalid-type-form]
+    Provider.FIREWORKS,  # ty: ignore[invalid-type-form]
+    Provider.GROQ,  # ty: ignore[invalid-type-form]
+    Provider.OLLAMA,  # ty: ignore[invalid-type-form]
+    Provider.SENTENCE_TRANSFORMERS,  # ty: ignore[invalid-type-form]
+    Provider.TOGETHER,  # ty: ignore[invalid-type-form]
 ]
 
 
