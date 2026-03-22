@@ -169,7 +169,7 @@ dependencies = [
   "ast-grep-py>=0.40.3",
   # * ================ Server and MCP Server Framework ==================*
   # fastmcp is the core MCP server framework
-  "fastmcp>=2.14.0",
+  "fastmcp>=3.0.0,<4.0.0",
   # just used for types but we need them at runtime for Pydantic models
   "mcp>=1.23.3",
   # Runs the core admin/management server
