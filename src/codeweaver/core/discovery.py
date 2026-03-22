@@ -29,9 +29,9 @@ from pydantic import (
 from codeweaver.core import BasedModel, ResolvedProjectPathDep
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.di import INJECTED
-from codeweaver.core.language import is_semantic_config_ext
+from codeweaver.core.language import SemanticSearchLanguage, is_semantic_config_ext
 from codeweaver.core.metadata import ExtCategory
-from codeweaver.core.types import MISSING, BlakeHashKey, BlakeKey, Missing
+from codeweaver.core.types import MISSING, BlakeHashKey, BlakeKey, FileExt, LiteralStringT, Missing
 from codeweaver.core.utils import (
     get_blake_hash,
     get_git_branch,
@@ -54,6 +54,101 @@ else:
     SourceIdRegistry = importlib.import_module("codeweaver.core.stores").UUIDStore
 
 logger = logging.getLogger(__name__)
+
+
+def _walk_ast_nodes(node: Any, parts: list[str]) -> None:
+    """Walk AST tree and collect semantic tokens, excluding comments.
+
+    Traverses the full AST including both named and unnamed nodes to capture
+    all semantically meaningful content (identifiers, operators, keywords, etc.)
+    while skipping comment nodes.
+    """
+    kind: str = node.kind()
+    if "comment" in kind.lower():
+        return
+    children = node.children()
+    if not children:
+        parts.append(f"{kind}:{node.text()}")
+    else:
+        parts.append(kind)
+        for child in children:
+            _walk_ast_nodes(child, parts)
+
+
+def _compute_ast_hash(content: str, language_name: str) -> BlakeHashKey | None:
+    """Compute a blake3 hash from the AST representation, excluding comments.
+
+    Parse the content using ast-grep and build a canonical string from the AST
+    node kinds and leaf text values. Comment nodes are excluded so that comment-only
+    changes do not alter the hash. Whitespace and formatting are inherently normalized
+    by the AST since they are not represented as tree nodes.
+
+    Return None if parsing fails or produces no meaningful nodes.
+    """
+    try:
+        from ast_grep_py import SgRoot
+
+        root = SgRoot(content, language_name)
+        node = root.root()
+        parts: list[str] = []
+        _walk_ast_nodes(node, parts)
+        if not parts:
+            return None
+        canonical = "\n".join(parts)
+        return get_blake_hash(canonical)
+    except Exception:
+        logger.debug("AST parsing failed for language %s", language_name, exc_info=True)
+        return None
+    except BaseException as exc:
+        # pyo3_runtime.PanicException (from ast-grep's Rust backend) inherits
+        # from BaseException, not Exception, and cannot be imported directly.
+        # Identify it by module name so we degrade gracefully without swallowing
+        # unrelated non-recoverable errors (GeneratorExit, etc.).
+        if getattr(type(exc), "__module__", None) == "pyo3_runtime":
+            logger.debug("AST parsing panicked for language %s", language_name, exc_info=True)
+            return None
+        raise
+
+
+def _get_semantic_language(
+    file_path: Path, ext_category: ExtCategory | None = None
+) -> SemanticSearchLanguage | None:
+    """Return the SemanticSearchLanguage for a file, or None if unsupported."""
+    if ext_category and isinstance(ext_category.language, SemanticSearchLanguage):
+        return ext_category.language
+    return SemanticSearchLanguage.from_extension(
+        FileExt(cast(LiteralStringT, file_path.suffix or file_path.name))
+    )
+
+
+def compute_semantic_file_hash(
+    content_bytes: bytes,
+    file_path: Path,
+    *,
+    ext_category: ExtCategory | None = None,
+) -> BlakeHashKey:
+    """Compute a file hash using AST-based hashing for supported semantic languages.
+
+    For files with a supported AST language (Python, JavaScript, etc.), parse the file
+    to an AST and hash the canonical tree representation. This ignores comments,
+    whitespace, and formatting changes so that only genuine semantic modifications
+    trigger a different hash.
+
+    Fall back to a raw content blake3 hash for unsupported languages or when AST
+    parsing fails.
+    """
+    if language := _get_semantic_language(file_path, ext_category):
+        try:
+            content_str = content_bytes.decode("utf-8", errors="replace")
+            if ast_hash := _compute_ast_hash(content_str, language.variable):
+                return ast_hash
+        except Exception:
+            logger.debug(
+                "AST hashing failed for %s, falling back to content hash",
+                file_path,
+                exc_info=True,
+            )
+    return get_blake_hash(content_bytes)
 
 
 def _get_git_branch(path: Path) -> str | None:
@@ -84,7 +179,7 @@ class DiscoveredFile(BasedModel):
     _file_hash: Annotated[
         BlakeHashKey | None,
         Field(
-            description="blake3 hash of the file contents. File hashes are from non-normalized content, so two files with different line endings, white spaces, unicode characters, etc. will have different hashes."
+            description="blake3 hash of the file. For files with a supported AST language, the hash is computed from the canonical AST representation, ignoring comments, whitespace, and formatting. For other files, the hash is computed from the raw content bytes."
         ),
     ] = None
     _git_branch: Annotated[
@@ -125,14 +220,17 @@ class DiscoveredFile(BasedModel):
         """Initialize DiscoveredFile with optional file_hash and git_branch."""
         object.__setattr__(self, "path", path)
         object.__setattr__(self, "project_path", project_path)
-        if ext_category:
-            object.__setattr__(self, "ext_category", ext_category)
-        else:
-            object.__setattr__(self, "ext_category", ExtCategory.from_file(path))
+        resolved_ext = ext_category or ExtCategory.from_file(path)
+        object.__setattr__(self, "ext_category", resolved_ext)
         if file_hash:
             object.__setattr__(self, "_file_hash", file_hash)
         elif path.is_file():
-            object.__setattr__(self, "_file_hash", get_blake_hash(path.read_bytes()))
+            content_bytes = path.read_bytes()
+            object.__setattr__(
+                self,
+                "_file_hash",
+                compute_semantic_file_hash(content_bytes, path, ext_category=resolved_ext),
+            )
         else:
             object.__setattr__(self, "_file_hash", None)
         if git_branch and git_branch is not MISSING:
@@ -179,7 +277,10 @@ class DiscoveredFile(BasedModel):
         """Create a DiscoveredFile from a file path."""
         branch = get_git_branch(path if path.is_dir() else path.parent) or "main"
         if ext_category := ExtCategory.from_file(path):
-            new_hash = get_blake_hash(path.read_bytes())
+            content_bytes = path.read_bytes()
+            new_hash = compute_semantic_file_hash(
+                content_bytes, path, ext_category=ext_category
+            )
             if file_hash and new_hash != file_hash:
                 logger.warning(
                     "Provided file_hash does not match computed hash for %s. Using computed hash.",
@@ -240,11 +341,15 @@ class DiscoveredFile(BasedModel):
     @computed_field
     @property
     def file_hash(self) -> BlakeHashKey:
-        """Return the blake3 hash of the file contents, if available."""
+        """Return the blake3 hash of the file, using AST-based hashing when supported."""
         if self._file_hash is not None:
             return self._file_hash
-        if self.path.exists() and self.path.is_file():
-            content_hash = get_blake_hash(self.path.read_bytes())
+        abs_path = self.absolute_path
+        if abs_path.exists() and abs_path.is_file():
+            content_bytes = abs_path.read_bytes()
+            content_hash = compute_semantic_file_hash(
+                content_bytes, abs_path, ext_category=self.ext_category
+            )
             with contextlib.suppress(Exception):
                 object.__setattr__(self, "_file_hash", content_hash)
             return content_hash
@@ -325,4 +430,4 @@ class DiscoveredFile(BasedModel):
         return sanitize_unicode(content)
 
 
-__all__ = ("DiscoveredFile",)
+__all__ = ("DiscoveredFile", "compute_semantic_file_hash")
