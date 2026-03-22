@@ -230,42 +230,41 @@ class TestValidateDimensions:
 
     def test_mismatched_embed_dimension(self) -> None:
         """Test that mismatched embed dimension fails validation."""
-        self._check_family_dimension_validation(
+        self._assert_dimension_validation_fails(
             512, 1024, "Embedding dimension 512 does not match query dimension 1024"
         )
 
     def test_mismatched_query_dimension(self) -> None:
         """Test that mismatched query dimension fails validation."""
-        self._check_family_dimension_validation(
+        self._assert_dimension_validation_fails(
             1024, 512, "Embedding dimension 1024 does not match query dimension 512"
         )
 
     def test_embed_and_query_dimensions_mismatch_each_other(self) -> None:
         """Test that embed and query dimensions must match each other."""
-        self._check_family_dimension_validation(
+        self._assert_dimension_validation_fails(
             768, 512, "Embedding dimension 768 does not match query dimension 512"
         )
 
     def test_both_dimensions_wrong_but_match_each_other(self) -> None:
         """Test that even if embed and query match, they must match family."""
-        self._check_family_dimension_validation(
+        self._assert_dimension_validation_fails(
             512,
             512,
             "Embedding dimension 512 is not supported by this family; expected one of (2048, 1024)",
         )
 
-    # TODO Rename this here and in `test_mismatched_embed_dimension`, `test_mismatched_query_dimension`, `test_embed_and_query_dimensions_mismatch_each_other` and `test_both_dimensions_wrong_but_match_each_other`
-    def _check_family_dimension_validation(self, arg0, arg1, arg2):
+    def _assert_dimension_validation_fails(self, embed_dim: int, query_dim: int, expected_error: str) -> None:
         family = ModelFamily(
             family_id="test-family",
             default_dimension=1024,
             output_dimensions=(2048, 1024),
             member_models=frozenset({"model-a"}),
         )
-        is_valid, error = family.validate_dimensions(arg0, arg1)
+        is_valid, error = family.validate_dimensions(embed_dim, query_dim)
         assert is_valid is False
         assert error is not None
-        assert arg2 in error
+        assert expected_error in error
 
     def test_various_dimension_sizes(self) -> None:
         """Test validation with various common dimension sizes."""
