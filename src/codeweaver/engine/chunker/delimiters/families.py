@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 
 from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from pydantic import NonNegativeFloat, NonNegativeInt
@@ -482,16 +483,19 @@ async def detect_language_family(content: str, min_confidence: int = 3) -> Langu
         )
 
 
-def _get_excluded_kinds() -> set[DelimiterKind]:
+@lru_cache(maxsize=1)
+def _get_excluded_kinds() -> frozenset[DelimiterKind]:
     """Get delimiter kinds to exclude from family detection."""
     from codeweaver.core.types import DelimiterKind
 
-    return {
-        DelimiterKind.PARAGRAPH,
-        DelimiterKind.WHITESPACE,
-        DelimiterKind.GENERIC,
-        DelimiterKind.UNKNOWN,
-    }
+    return frozenset(
+        {
+            DelimiterKind.PARAGRAPH,
+            DelimiterKind.WHITESPACE,
+            DelimiterKind.GENERIC,
+            DelimiterKind.UNKNOWN,
+        }
+    )
 
 
 def _calculate_specificity_weight(pattern_length: int) -> float:
@@ -519,8 +523,9 @@ def _calculate_specificity_weight(pattern_length: int) -> float:
 type PatternKey = tuple[DelimiterKind, tuple[str, ...]]
 
 
+@lru_cache(maxsize=1)
 def _build_pattern_family_counts(
-    excluded_kinds: set[DelimiterKind],
+    excluded_kinds: frozenset[DelimiterKind],
 ) -> tuple[dict[PatternKey, NonNegativeInt], dict[LanguageFamily, list[DelimiterPattern]]]:
     """Build pattern distinctiveness counts and family pattern mappings.
 
@@ -551,7 +556,7 @@ def _calculate_family_score(
     content: str,
     patterns: list[DelimiterPattern],
     pattern_family_counts: dict[PatternKey, NonNegativeInt],
-    excluded_kinds: set[DelimiterKind],
+    excluded_kinds: frozenset[DelimiterKind],
 ) -> tuple[NonNegativeInt, NonNegativeFloat]:
     """Calculate matches and weighted score for a family's patterns.
 
