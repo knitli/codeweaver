@@ -129,7 +129,10 @@ class TestProviderInstantiationWithClientFactory:
         mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock()
-        mock_provider_lazy = make_lazy_provider_mock("MockVoyageProvider", mock_provider_class)
+        mock_provider_lazy = Mock()
+        mock_provider_lazy.__name__ = "MockVoyageProvider"
+        mock_provider_lazy._resolve.return_value = mock_provider_class
+        mock_provider_lazy.return_value = Mock()
 
         mock_client_map = {
             Provider.VOYAGE: (
