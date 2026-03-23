@@ -21,7 +21,6 @@ from __future__ import annotations
 import asyncio
 
 from concurrent.futures import ThreadPoolExecutor
-from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from pydantic import NonNegativeFloat, NonNegativeInt
@@ -383,6 +382,9 @@ def _get_family_patterns() -> dict[LanguageFamily, list[DelimiterPattern]]:
 # Cache family patterns for performance
 _family_patterns_cache: dict[LanguageFamily, list[DelimiterPattern]] | None = None
 
+# cache excluded kinds
+_excluded_kinds: frozenset[DelimiterKind] | None = None
+
 
 def get_family_patterns(family: LanguageFamily) -> list[DelimiterPattern]:
     """Get delimiter patterns for a language family.
@@ -483,12 +485,12 @@ async def detect_language_family(content: str, min_confidence: int = 3) -> Langu
         )
 
 
-@lru_cache(maxsize=1)
 def _get_excluded_kinds() -> frozenset[DelimiterKind]:
     """Get delimiter kinds to exclude from family detection."""
     from codeweaver.core.types import DelimiterKind
-
-    return frozenset(
+    global _excluded_kinds
+    if not _excluded_kinds:
+        globals()["_excluded_kinds"] = frozenset(
         {
             DelimiterKind.PARAGRAPH,
             DelimiterKind.WHITESPACE,
@@ -496,6 +498,7 @@ def _get_excluded_kinds() -> frozenset[DelimiterKind]:
             DelimiterKind.UNKNOWN,
         }
     )
+    return _excluded_kinds
 
 
 def _calculate_specificity_weight(pattern_length: int) -> float:
