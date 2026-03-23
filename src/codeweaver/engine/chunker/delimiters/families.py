@@ -426,8 +426,6 @@ def _detect_language_family_sync(content: str, min_confidence: int = 3) -> Langu
         weighted_score = float(stats.get("weighted_score", 0.0))
         matches = int(stats.get("pattern_matches", 0))
         # Use total non-excluded patterns as another tiebreaker
-        from codeweaver.core.types import DelimiterKind
-
         pattern_count = len([
             p for p in get_family_patterns(family) if p.kind not in excluded_kinds
         ])
@@ -529,7 +527,7 @@ def _build_pattern_family_counts(
     """Build pattern distinctiveness counts and family pattern mappings.
 
     Args:
-        excluded_kinds: Set of DelimiterKind to exclude
+        excluded_kinds: frozenset of DelimiterKind to exclude
 
     Returns:
         Tuple of (pattern_family_counts, family_patterns_map)
