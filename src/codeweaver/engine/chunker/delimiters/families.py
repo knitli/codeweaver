@@ -567,7 +567,7 @@ def _calculate_family_score(
         content: Code content to analyze
         patterns: List of delimiter patterns for the family
         pattern_family_counts: Mapping of pattern keys to family counts
-        excluded_kinds: Frozenset of DelimiterKind to exclude
+        excluded_kinds: frozenset of DelimiterKind to exclude
 
     Returns:
         Tuple of (match_count, weighted_score)
