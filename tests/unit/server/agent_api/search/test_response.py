@@ -2,30 +2,31 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from pydantic import BaseModel
 
-from codeweaver.core import SearchStrategy
+from codeweaver.core import (
+    ChunkKind,
+    CodeChunk,
+    ConfigLanguage,
+    DiscoveredFile,
+    ExtCategory,
+    SearchStrategy,
+    SemanticSearchLanguage,
+    Span,
+)
+from codeweaver.core.utils import uuid7
 from codeweaver.server.agent_api.search.intent import IntentType
-from pathlib import Path
-from codeweaver.core import SearchStrategy, CodeChunk, DiscoveredFile, ExtCategory, Span, SemanticSearchLanguage, LanguageName, ChunkKind, ConfigLanguage
-from codeweaver.server.agent_api.search.intent import IntentType
+from codeweaver.server.agent_api.search.response import (
+    build_success_response,
+    calculate_token_count,
+    extract_languages,
+    generate_summary,
+)
 from codeweaver.server.agent_api.search.types import CodeMatch, CodeMatchType
-
-class MockCodeChunk(BaseModel):
-    content: str
-    language: str = "python"
-
-class MockSpan(BaseModel):
-    start: int
-    end: int
-
-# Update CodeMatch in types.py locally for the test if it restricts content type,
-# actually the easiest way is to mock CodeMatch completely or use dicts if it accepts it.
-# Wait, CodeMatch expects CodeChunk. Let's patch types.CodeMatch
-from codeweaver.server.agent_api.search.response import build_success_response, calculate_token_count, generate_summary, extract_languages
 
 
 @pytest.fixture
@@ -84,18 +85,14 @@ def test_build_success_response_search_modes(
         assert not response.warnings
 
 
-class FakeCodeMatch:
-    def __init__(self, file, content, span, relevance_score, match_type):
-        self.file = file
-        self.content = content
-        self.span = span
-        self.relevance_score = relevance_score
-        self.match_type = match_type
-
 @pytest.fixture
 def sample_code_matches():
+    chunk1_id = uuid7()
+    chunk2_id = uuid7()
+    chunk3_id = uuid7()
+
     return [
-        FakeCodeMatch(
+        CodeMatch(
             file=DiscoveredFile(
                 path=Path("src/main.py"),
                 ext_category=ExtCategory(
@@ -103,12 +100,19 @@ def sample_code_matches():
                 ),
                 mime_type="text/x-python",
             ),
-            content=MockCodeChunk(content="def hello_world():\n    print('Hello World!')"),
-            span=MockSpan(start=1, end=2),
+            content=CodeChunk(
+                chunk_id=chunk1_id,
+                chunk_name="main.py:hello_world",
+                file_path=Path("src/main.py"),
+                language="python",
+                content="def hello_world():\n    print('Hello World!')",
+                line_range=Span(start=1, end=2, source_id=chunk1_id),
+            ),
+            span=Span(start=1, end=2, source_id=chunk1_id),
             relevance_score=0.9,
             match_type=CodeMatchType.SEMANTIC,
         ),
-        FakeCodeMatch(
+        CodeMatch(
             file=DiscoveredFile(
                 path=Path("src/utils.py"),
                 ext_category=ExtCategory(
@@ -116,12 +120,19 @@ def sample_code_matches():
                 ),
                 mime_type="text/x-python",
             ),
-            content=MockCodeChunk(content="def helper():\n    pass"),
-            span=MockSpan(start=1, end=2),
+            content=CodeChunk(
+                chunk_id=chunk2_id,
+                chunk_name="utils.py:helper",
+                file_path=Path("src/utils.py"),
+                language="python",
+                content="def helper():\n    pass",
+                line_range=Span(start=1, end=2, source_id=chunk2_id),
+            ),
+            span=Span(start=1, end=2, source_id=chunk2_id),
             relevance_score=0.8,
             match_type=CodeMatchType.SEMANTIC,
         ),
-        FakeCodeMatch(
+        CodeMatch(
             file=DiscoveredFile(
                 path=Path("config.json"),
                 ext_category=ExtCategory(
@@ -129,8 +140,15 @@ def sample_code_matches():
                 ),
                 mime_type="application/json",
             ),
-            content=MockCodeChunk(content='{"key": "value"}'),
-            span=MockSpan(start=1, end=1),
+            content=CodeChunk(
+                chunk_id=chunk3_id,
+                chunk_name="config.json",
+                file_path=Path("config.json"),
+                language="json",
+                content='{"key": "value"}',
+                line_range=Span(start=1, end=1, source_id=chunk3_id),
+            ),
+            span=Span(start=1, end=1, source_id=chunk3_id),
             relevance_score=0.5,
             match_type=CodeMatchType.KEYWORD,
         ),
