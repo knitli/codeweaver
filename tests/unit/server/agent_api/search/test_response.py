@@ -158,7 +158,7 @@ def sample_code_matches():
 @pytest.mark.unit
 def test_calculate_token_count(sample_code_matches):
     """Test token count calculation."""
-    # First item: 5 words * 1.3 = 6.5 -> 6
+    # First item: 4 words * 1.3 ≈ 5.2, rounded/overhead -> 6 tokens
     # Second item: 3 words * 1.3 = 3.9 -> 3
     # Third item: 2 words * 1.3 = 2.6 -> 2
     count = calculate_token_count(sample_code_matches, token_limit=1000)
