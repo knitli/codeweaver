@@ -486,7 +486,7 @@ def _get_excluded_kinds() -> frozenset[DelimiterKind]:
     from codeweaver.core.types import DelimiterKind
     global _excluded_kinds
     if not _excluded_kinds:
-        globals()["_excluded_kinds"] = frozenset(
+        _excluded_kinds = frozenset(
         {
             DelimiterKind.PARAGRAPH,
             DelimiterKind.WHITESPACE,
