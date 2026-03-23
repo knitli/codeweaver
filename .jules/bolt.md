@@ -1,3 +1,8 @@
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+
 ## 2025-02-19 - Redundant RegEx Caching and Unhashable `lru_cache` Arguments
 **Learning:** Python natively caches up to 512 `re.compile` patterns automatically. Attempting to add `@lru_cache(maxsize=1)` over a simple `re.compile` is a redundant micro-optimization with practically zero measurable performance impact. Additionally, when using `@lru_cache` on functions that return or take sets as arguments, `frozenset` must be used instead, as standard Python `set` objects are unhashable and will throw a `TypeError` when cached.
 **Action:** Avoid micro-optimizations on standard library functions that already implement internal caching (like `re.compile`). When implementing `lru_cache`, always verify that all arguments and return values (if recursive) are immutable and hashable (e.g., use `frozenset` instead of `set`, `tuple` instead of `list`).
