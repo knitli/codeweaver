@@ -22,6 +22,7 @@ import asyncio
 
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
+from types import MappingProxyType
 
 from pydantic import NonNegativeFloat, NonNegativeInt
 
@@ -51,7 +52,7 @@ def defined_languages() -> tuple[str, ...]:
 
 # Family delimiter pattern mappings
 # Lazy import to avoid circular dependencies
-def _get_family_patterns() -> dict[LanguageFamily, list[DelimiterPattern]]:
+def _get_family_patterns() -> MappingProxyType[LanguageFamily, list[DelimiterPattern]]:
     """Get family delimiter patterns with lazy import."""
     from codeweaver.engine.chunker.delimiters.patterns import (
         ARRAY_PATTERN,
@@ -118,7 +119,7 @@ def _get_family_patterns() -> dict[LanguageFamily, list[DelimiterPattern]]:
         WHITESPACE_PATTERN,
     )
 
-    return {
+    return MappingProxyType({
         LanguageFamily.C_STYLE: [
             # Code elements
             FUNCTION_PATTERN,
@@ -376,11 +377,11 @@ def _get_family_patterns() -> dict[LanguageFamily, list[DelimiterPattern]]:
             WHITESPACE_PATTERN,
             EMPTY_PATTERN,
         ],
-    }
+    })
 
 
 # Cache family patterns for performance
-_family_patterns_cache: dict[LanguageFamily, list[DelimiterPattern]] | None = None
+_family_patterns_cache: MappingProxyType[LanguageFamily, list[DelimiterPattern]] | None = None
 
 # cache excluded kinds
 _excluded_kinds: frozenset[DelimiterKind] | None = None
@@ -419,6 +420,7 @@ def _detect_language_family_sync(content: str, min_confidence: int = 3) -> Langu
     best_weighted_score = -1.0
     best_matches = -1
     best_pattern_count = 0
+    excluded_kinds = _get_excluded_kinds()
 
     for family, stats in characteristics.items():
         weighted_score = float(stats.get("weighted_score", 0.0))
@@ -426,12 +428,6 @@ def _detect_language_family_sync(content: str, min_confidence: int = 3) -> Langu
         # Use total non-excluded patterns as another tiebreaker
         from codeweaver.core.types import DelimiterKind
 
-        excluded_kinds = {
-            DelimiterKind.PARAGRAPH,
-            DelimiterKind.WHITESPACE,
-            DelimiterKind.GENERIC,
-            DelimiterKind.UNKNOWN,
-        }
         pattern_count = len([
             p for p in get_family_patterns(family) if p.kind not in excluded_kinds
         ])
