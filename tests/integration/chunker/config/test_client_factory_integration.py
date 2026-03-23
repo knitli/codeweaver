@@ -168,8 +168,8 @@ class TestProviderInstantiationWithClientFactory:
         mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock()
-        mock_provider_lazy = make_lazy_provider_mock("MockVoyageProvider", mock_provider_class)
-        mock_provider_lazy.return_value = Mock()
+        mock_provider_instance = Mock()
+        mock_provider_lazy = make_lazy_provider_mock("MockVoyageProvider", mock_provider_class, mock_provider_instance)
 
         mock_client_map = {
             Provider.VOYAGE: (
@@ -242,8 +242,8 @@ class TestVectorStoreProviderWithClientFactory:
         mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock()
-        mock_provider_lazy = make_lazy_provider_mock("MockQdrantProvider", mock_provider_class)
-        mock_provider_lazy.return_value = Mock()
+        mock_provider_instance = Mock()
+        mock_provider_lazy = make_lazy_provider_mock("MockQdrantProvider", mock_provider_class, mock_provider_instance)
 
         mock_client_map = {
             Provider.QDRANT: (
@@ -283,8 +283,8 @@ class TestVectorStoreProviderWithClientFactory:
         mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock()
-        mock_provider_lazy = make_lazy_provider_mock("MockQdrantProvider", mock_provider_class)
-        mock_provider_lazy.return_value = Mock()
+        mock_provider_instance = Mock()
+        mock_provider_lazy = make_lazy_provider_mock("MockQdrantProvider", mock_provider_class, mock_provider_instance)
 
         mock_client_map = {
             Provider.QDRANT: (
@@ -378,8 +378,8 @@ class TestProviderCategoryStringHandling:
         mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock()
-        mock_provider_lazy = make_lazy_provider_mock("MockVoyageProvider", mock_provider_class)
-        mock_provider_lazy.return_value = Mock()
+        mock_provider_instance = Mock()
+        mock_provider_lazy = make_lazy_provider_mock("MockVoyageProvider", mock_provider_class, mock_provider_instance)
 
         mock_client_map = {
             Provider.VOYAGE: (
