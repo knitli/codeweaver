@@ -307,12 +307,14 @@ class IndexFileManifest(BasedModel):
         result: dict[str, set[Path]] = {"dense_only": set(), "sparse_only": set()}
 
         # If no providers configured, return empty sets
-        if not any([
-            current_dense_provider,
-            current_dense_model,
-            current_sparse_provider,
-            current_sparse_model,
-        ]):
+        # Optimization: Use logical operators instead of any([a, b, c, d]) to avoid
+        # unnecessary list allocation from constructing a temporary list.
+        if not (
+            current_dense_provider
+            or current_dense_model
+            or current_sparse_provider
+            or current_sparse_model
+        ):
             return result
 
         for raw_path, entry in self.files.items():

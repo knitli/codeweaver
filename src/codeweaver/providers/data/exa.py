@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from dataclasses import dataclass
@@ -643,8 +644,19 @@ async def register_exa_tools(
         instance = exa_answer_tool(client, **((config.answer_config) or {} | {"iden": config.iden}))
         tools.append(await _get_exa_answer_tool(instance))
     if tools and register:
-        for tool in tools:
-            await register_data_tool(tool)
+        # Run all registrations and aggregate any failures so that
+        # registration behavior is deterministic and does not depend on timing.
+        results = await asyncio.gather(
+            *(register_data_tool(tool) for tool in tools),
+            return_exceptions=True,
+        )
+        errors = [exc for exc in results if isinstance(exc, Exception)]
+        if errors:
+            # Raise a single error summarizing all registration failures.
+            error_messages = "; ".join(f"{type(e).__name__}: {e}" for e in errors)
+            raise RuntimeError(
+                f"One or more Exa tool registrations failed: {error_messages}"
+            ) from errors[0]
     return tools if return_tools else None
 
 

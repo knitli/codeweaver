@@ -3,11 +3,14 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-from unittest.mock import patch
 import signal
+
+from unittest.mock import patch
+
 import pytest
 
 from codeweaver.main import _setup_signal_handler
+
 
 def test_setup_signal_handler_first_interrupt():
     """Test that the first interrupt raises KeyboardInterrupt."""
@@ -51,3 +54,56 @@ def test_setup_signal_handler_suppress_errors():
     with patch("signal.signal", side_effect=OSError):
         original_handler = _setup_signal_handler()
         assert original_handler is None
+
+from unittest.mock import AsyncMock
+
+@pytest.mark.asyncio
+@patch("codeweaver.main._run_stdio_server", new_callable=AsyncMock)
+async def test_run_stdio_transport(mock_run_stdio):
+    """Test that run() with transport='stdio' delegates to _run_stdio_server."""
+    from codeweaver.main import run
+
+    await run(
+        config_file=None,
+        project_path=None,
+        host="127.0.0.1",
+        port=8080,
+        transport="stdio",
+        verbose=True,
+        debug=False,
+    )
+
+    mock_run_stdio.assert_called_once_with(
+        config_file=None,
+        project_path=None,
+        host="127.0.0.1",
+        port=8080,
+        verbose=True,
+        debug=False,
+    )
+
+
+@pytest.mark.asyncio
+@patch("codeweaver.main._run_http_server", new_callable=AsyncMock)
+async def test_run_http_transport(mock_run_http):
+    """Test that run() with transport='streamable-http' delegates to _run_http_server."""
+    from codeweaver.main import run
+
+    await run(
+        config_file=None,
+        project_path=None,
+        host="0.0.0.0",
+        port=9090,
+        transport="streamable-http",
+        verbose=False,
+        debug=True,
+    )
+
+    mock_run_http.assert_called_once_with(
+        config_file=None,
+        project_path=None,
+        host="0.0.0.0",
+        port=9090,
+        verbose=False,
+        debug=True,
+    )

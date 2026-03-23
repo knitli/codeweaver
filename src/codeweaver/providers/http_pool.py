@@ -352,7 +352,11 @@ class HttpClientPool:
             return False
 
     async def close_all(self) -> None:
-        """Close all pooled clients (cleanup on shutdown).
+        """Close all pooled clients concurrently (cleanup on shutdown).
+
+        All clients are closed in parallel to minimize shutdown latency.
+        Expected errors (HTTPError, OSError) are logged as warnings.
+        Unexpected exceptions are re-raised after all close operations complete.
 
         This method should be called during application shutdown to properly
         close all HTTP connections and release resources.
@@ -361,20 +365,34 @@ class HttpClientPool:
         if self._async_lock is None:
             self._async_lock = asyncio.Lock()
 
+        close_coroutines = []
+        active_names = []
+
         async with self._async_lock:
             client_names = list(self._clients.keys())
+
             for name in client_names:
                 client = self._clients.pop(name, None)
                 if client is None:
                     continue
-                try:
-                    await client.aclose()
-                    logger.debug("Closed HTTP client pool for %s", name)
-                except (httpx.HTTPError, OSError) as e:
-                    logger.warning("Error closing HTTP client pool for %s: %s", name, e)
+                active_names.append(name)
+                close_coroutines.append(client.aclose())
 
-            if client_names:
-                logger.debug("Closed %d HTTP client pool(s)", len(client_names))
+        if not close_coroutines:
+            return
+
+        results = await asyncio.gather(*close_coroutines, return_exceptions=True)
+
+        for name, result in zip(active_names, results, strict=True):
+            if isinstance(result, Exception):
+                if isinstance(result, (httpx.HTTPError, OSError)):
+                    logger.warning("Error closing HTTP client pool for %s: %s", name, result)
+                else:
+                    raise result
+            else:
+                logger.debug("Closed HTTP client pool for %s", name)
+
+        logger.debug("Closed %d HTTP client pool(s)", len(active_names))
 
     async def __aenter__(self) -> Self:
         """Async context manager entry."""

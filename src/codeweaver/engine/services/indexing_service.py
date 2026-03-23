@@ -24,6 +24,7 @@ from codeweaver.core.constants import (
     PRIMARY_SPARSE_VECTOR_NAME,
     ZERO,
 )
+from codeweaver.core.discovery import compute_semantic_file_hash
 from codeweaver.providers import EmbeddingRegistryDep
 
 
@@ -312,7 +313,7 @@ class IndexingService:
                 continue
 
             seen_files.add(relative_path)
-            current_hash = get_blake_hash(content_bytes)
+            current_hash = compute_semantic_file_hash(content_bytes, path)
             if not self._file_manifest:
                 self._file_manifest = self._manifest_manager.create_new()
             needs_reindex, _ = self._file_manifest.file_needs_reindexing(
@@ -401,7 +402,7 @@ class IndexingService:
         for i in range(0, len(files), batch_size):
             batch = [(p, None) for p in files[i : i + batch_size]]
             task = asyncio.create_task(
-                self._run_guarded_index_batch(batch, self._indexing_semaphore, progress_callback)
+                self._run_guarded_index_batch(batch, self._indexing_semaphore, progress_callback)  # ty:ignore[invalid-argument-type]
             )
             tasks.append(task)
 
@@ -536,11 +537,20 @@ class IndexingService:
 
     async def _cleanup_deleted_files(self) -> None:
         """Remove deleted files from vector store and manifest."""
+        if not self._deleted_files:
+            return
+
+        rel_paths: list[Path] = []
         for path in self._deleted_files:
-            if self._vector_store:
-                await self._vector_store.delete_by_file(path)
             rel_path = set_relative_path(path, base_path=self._project_path)
-            if rel_path and self._file_manifest:
+            if rel_path:
+                rel_paths.append(rel_path)
+
+        if self._vector_store and rel_paths:
+            await self._vector_store.delete_by_files(rel_paths)
+
+        if self._file_manifest:
+            for rel_path in rel_paths:
                 async with self._manifest_lock:
                     self._file_manifest.remove_file(rel_path)
 

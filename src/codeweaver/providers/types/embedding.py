@@ -70,7 +70,7 @@ class ConfiguredCapability(NamedTuple):
         embedding_config = (
             self.config.sparse_embedding_config
             if isinstance(self.config, _sparse_settings_type())
-            else self.config.embedding_config
+            else self.config.embedding_config  # ty:ignore[unresolved-attribute]
         )
         return ModelName(
             self.config.model_name
@@ -84,7 +84,7 @@ class ConfiguredCapability(NamedTuple):
         embedding_config = (
             self.config.sparse_embedding_config
             if isinstance(self.config, _sparse_settings_type())
-            else self.config.embedding_config
+            else self.config.embedding_config  # ty:ignore[unresolved-attribute]
         )
         return await embedding_config.get_datatype()
 
@@ -116,7 +116,7 @@ class ConfiguredCapability(NamedTuple):
         embedding_config = (
             self.config.sparse_embedding_config
             if isinstance(self.config, _sparse_settings_type())
-            else self.config.embedding_config
+            else self.config.embedding_config  # ty:ignore[unresolved-attribute]
         )
         configured_dimension = await embedding_config.get_dimension() or default_dimension
         allowed_values = (
