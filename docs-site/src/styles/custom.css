@@ -7,6 +7,11 @@
 
 @layer base, starlight, theme, components, utilities
 
+/* Knitli subnav bar height */
+:root {
+  --sl-subnav-height: 2rem;
+}
+
 @theme {
   :root {
 	--sl-color-accent-low: #321f10;

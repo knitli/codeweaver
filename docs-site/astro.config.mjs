@@ -32,7 +32,12 @@ export default defineConfig({
         href: 'https://github.com/knitli/codeweaver',
       },
     ],
+    components: {
+      PageFrame: '@knitli/docs-components/PageFrame.astro',
+      Footer: '@knitli/docs-components/Footer.astro',
+    },
     customCss: [
+      '@knitli/docs-components/assets/styles/variables.css',
       './src/styles/custom.css',
     ],
     sidebar: [
@@ -84,5 +89,8 @@ export default defineConfig({
   }), starlightIconsIntegration(), astroD2({ skipGeneration: true }), markdoc()],
   vite: {
     plugins: [],
+    define: {
+      'import.meta.env.PUBLIC_DOCS_PRODUCT': JSON.stringify('CodeWeaver'),
+    },
   },
 });
