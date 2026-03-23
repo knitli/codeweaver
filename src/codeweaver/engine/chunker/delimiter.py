@@ -472,7 +472,7 @@ class DelimiterChunker(BaseChunker):
                     content,
                     struct_start,
                     struct_char or "",
-                    structural_pairs.get(struct_char, ""),  # ty:ignore[no-matching-overload]
+                    structural_pairs.get(cast(str, struct_char), ""),
                 )
 
                 if struct_end is not None:
@@ -1168,13 +1168,10 @@ class DelimiterChunker(BaseChunker):
 
         chunks: list[CodeChunk] = []
         lines = content.splitlines(keepends=True)
-
         # Precompute line offsets once per file (O(n))
         # This provides O(1) lookup for line_start_pos/line_end_pos
         line_offsets = [0]
-        for line in lines:
-            line_offsets.append(line_offsets[-1] + len(line))
-
+        line_offsets.extend(line_offsets[-1] + len(line) for line in lines)
         for boundary in boundaries:
             # Always calculate line ranges first
             # For proper line range metadata, always expand to full lines

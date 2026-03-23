@@ -220,6 +220,14 @@ server.yaml.license
 src/codeweaver/_version.py
 test-results.xml
 
+# docs-site
+node_modules/
+# because we should only have bun.lock:
+package-lock.json
+.astro/
+.wrangler/
+worker-configuration.d.ts
+
 .jj/
 
 # Finally, stuff we *really* don't want to let leak

@@ -22,10 +22,9 @@ from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from pydantic import NonNegativeInt
 
-from codeweaver import QdrantBaseProvider
-from codeweaver.core import get_user_state_dir
 from codeweaver.core.constants import DEFAULT_SNAPSHOT_RETENTION_COUNT, ONE_MINUTE
-from codeweaver.core.utils.general import generate_collection_name
+from codeweaver.core.utils import generate_collection_name, get_user_state_dir
+from codeweaver.providers.vector_stores.qdrant import QdrantBaseProvider
 
 
 if TYPE_CHECKING:
@@ -251,7 +250,7 @@ class QdrantSnapshotBackupService:
         """
         try:
             snapshots = await self.list_snapshots()
-            stats = {"total": len(snapshots), "kept": 0, "deleted": 0, "failed": 0}
+            stats = CleanupStatsDict(total=len(snapshots), kept=0, deleted=0, failed=0)
             if len(snapshots) <= self.retention_count:
                 stats["kept"] = len(snapshots)
                 logger.debug(
@@ -259,7 +258,7 @@ class QdrantSnapshotBackupService:
                     len(snapshots),
                     self.retention_count,
                 )
-                return CleanupStatsDict(**stats)  # ty:ignore[missing-typed-dict-key]
+                return stats
             snapshots_sorted = sorted(
                 snapshots,
                 key=lambda s: s.get("created_at") or "",
@@ -289,8 +288,7 @@ class QdrantSnapshotBackupService:
         except Exception as e:
             logger.warning("Snapshot cleanup failed: %s", e, exc_info=True)
             return CleanupStatsDict(total=0, kept=0, deleted=0, failed=0)
-        else:
-            return CleanupStatsDict(**stats)  # ty:ignore[missing-typed-dict-key]
+        return stats
 
     async def restore_snapshot(self, snapshot_name: str, *, wait: bool = True) -> bool:
         """Restore the collection from a snapshot.
@@ -360,7 +358,7 @@ class QdrantSnapshotBackupService:
             wait: Whether to wait for snapshot creation to complete
 
         Returns:
-            Dictionary with operation results:
+            SnapshotCleanupResults: Dictionary with operation results:
             - snapshot_created: Whether new snapshot was created successfully
             - snapshot_name: Name of new snapshot (None if failed)
             - cleanup_stats: Statistics from cleanup operation

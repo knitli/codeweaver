@@ -26,6 +26,7 @@ Usage:
 """
 
 import argparse
+import logging
 import sys
 
 from pathlib import Path
@@ -35,6 +36,9 @@ import numpy as np
 import torch
 
 from transformers import AutoModel
+
+
+logger = logging.getLogger(__name__)
 
 
 def convert_to_onnx(model_id: str, output_dir: Path) -> bool:
@@ -51,7 +55,7 @@ def convert_to_onnx(model_id: str, output_dir: Path) -> bool:
     try:
         return _convert_model_and_tokenizer(model_id, output_dir)
     except Exception as e:
-        print(f"❌ Conversion failed: {e}")
+        logger.warning("❌ Conversion failed", exc_info=e)
         return False
 
 
@@ -145,6 +149,9 @@ def validate_conversion(
                     print(f"      Module {idx}: {type(module).__name__}")
                     if hasattr(module, "get_config_dict"):
                         print(f"        Config: {cast(torch.nn.Model, module).get_config_dict()}")
+            if not tokenizer or not callable(tokenizer):
+                logger.warning("Tokenizer not found for ONNX model. Skipping validation.")
+                return False
             inputs = tokenizer(
                 text, padding=True, truncation=True, return_tensors="pt", max_length=32768
             )  # ty:ignore[call-non-callable]

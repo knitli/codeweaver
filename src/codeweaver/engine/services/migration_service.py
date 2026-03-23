@@ -489,7 +489,7 @@ class MigrationService:
         """
         if isinstance(record.vector, dict):
             dense = record.vector.get("dense", [])
-            truncated_dense = dense[:new_dimension] if dense else []
+            truncated_dense = dense[:new_dimension] if dense else []  # ty:ignore[not-subscriptable]
             new_vector = {"dense": truncated_dense}
             if "sparse" in record.vector and record.vector["sparse"] is not None:
                 new_vector["sparse"] = record.vector["sparse"]
@@ -694,6 +694,7 @@ class MigrationService:
             target_collection,
         )
         from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
+
         try:
             if not isinstance(self.vector_store, QdrantBaseProvider):
                 logger.warning(
@@ -702,7 +703,9 @@ class MigrationService:
                     target_collection,
                 )
                 return
-            if hasattr(self.vector_store, "delete_collection") and callable(self.vector_store.delete_collection):
+            if hasattr(self.vector_store, "delete_collection") and callable(
+                self.vector_store.delete_collection
+            ):
                 await self.vector_store.delete_collection(target_collection)
             else:
                 logger.warning(

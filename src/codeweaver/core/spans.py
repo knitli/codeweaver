@@ -380,7 +380,7 @@ class SpanGroup(BasedModel):
         """Get the source_id of the span group."""
         if not self.spans or not self.is_uniform:
             return None
-        return next(iter(self.spans)).source_id
+        return next(iter(self.spans)).source_id.hex
 
     @computed_field
     @property

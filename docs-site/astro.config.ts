@@ -81,10 +81,10 @@ export default defineConfig({
     ],
     plugins: [
       starlightLinksValidator(),
-      starlightScrollToTop({showOnHomepage: false }),
+      starlightScrollToTop({ showOnHomepage: false }),
       starlightChangelogs(),
       starlightIconsPlugin(),
-      starlightPageActions({ actions: ["copy", "view", "claude", "chatgpt"], share: true }),
+      starlightPageActions({ actions: { claude: true, chatgpt: true, markdown: true }, share: true }),
     ],
   }), starlightIconsIntegration(), astroD2({ skipGeneration: true }), markdoc()],
   vite: {

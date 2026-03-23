@@ -8,11 +8,11 @@
 from __future__ import annotations
 
 import contextlib
-import importlib
 import logging
 import os
 import sys
 
+from importlib import util as importlib_util
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -31,7 +31,7 @@ from codeweaver.core.utils.checks import has_package
 
 logger = logging.getLogger(__name__)
 
-if importlib.util.find_spec("rich") is not None:
+if importlib_util.find_spec("rich") is not None:
     from rich.console import Console
 else:
     type Console = object
@@ -161,15 +161,15 @@ def detect_root_package() -> Literal["server", "engine", "provider", "core"]:
         The package type that should serve as root settings
     """
     # Check in priority order - highest level package wins
-    if importlib.util.find_spec("codeweaver.server") is not None:
+    if importlib_util.find_spec("codeweaver.server") is not None:
         logger.debug("Detected server package - using CodeWeaverSettings")
         return "server"
 
-    if importlib.util.find_spec("codeweaver.engine") is not None:
+    if importlib_util.find_spec("codeweaver.engine") is not None:
         logger.debug("Detected engine package - using CodeWeaverEngineSettings")
         return "engine"
 
-    if importlib.util.find_spec("codeweaver.providers") is not None:
+    if importlib_util.find_spec("codeweaver.providers") is not None:
         logger.debug("Detected providers package - using CodeWeaverProviderSettings")
         return "provider"
 

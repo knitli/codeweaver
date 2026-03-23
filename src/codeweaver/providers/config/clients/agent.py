@@ -260,7 +260,9 @@ class OpenAIAgentClientOptions(OpenAIClientOptions):
         """Return the default base URL for the OpenAI agent client based on the provider."""
         if self.base_url:
             return str(self.base_url)
-        provider = provider if isinstance(provider, Provider) else Provider.from_string(provider)
+        provider: Provider = (
+            provider if isinstance(provider, Provider) else Provider.from_string(provider)
+        )
         if found_provider_url := super().computed_base_url(provider):  # ty:ignore[invalid-argument-type]
             return found_provider_url
         if found_agent_provider_url := {

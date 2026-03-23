@@ -12,7 +12,7 @@ import logging
 import os
 import platform
 import sys
-import urllib
+import urllib.parse as urllib_parse
 
 from functools import cache
 from importlib import metadata, util
@@ -47,17 +47,17 @@ LOCALHOST_INDICATORS = {
 }
 
 
-def is_local_host(host: str | AnyUrl | httpx.URL | urllib.parse.ParseResult) -> bool:
+def is_local_host(host: str | AnyUrl | httpx.URL | urllib_parse.ParseResult) -> bool:
     """Check if a host is a localhost address."""
     if isinstance(host, (AnyUrl, httpx.URL)):
         filtered_host = host.host
-    elif isinstance(host, urllib.parse.ParseResult):
+    elif isinstance(host, urllib_parse.ParseResult):
         filtered_host = host.hostname or ""
     else:
         filtered_host = str(host)
         if any(c in filtered_host for c in ("/", ":", "\\")):
             # likely a url, parse it
-            parsed = urllib.parse.urlparse(filtered_host)
+            parsed = urllib_parse.urlparse(filtered_host)
             filtered_host = parsed.hostname or ""
     return filtered_host in LOCALHOST_INDICATORS if filtered_host else False
 
