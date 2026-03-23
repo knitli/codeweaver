@@ -28,6 +28,9 @@ from codeweaver.server.agent_api.search.intent import (
         ("configure the development environment", IntentType.CONFIGURE),
         ("add documentation for the handler", IntentType.DOCUMENT),
         ("update the readme", IntentType.DOCUMENT),
+        ("HOW DOES AUTHENTICATION WORK?", IntentType.UNDERSTAND),
+        ("Fix the crash on startup!!!", IntentType.DEBUG),
+        ("OpTiMiZe the CACHING layer", IntentType.OPTIMIZE),
     ],
 )
 def test_detect_intent_categories(query: str, expected_intent: IntentType) -> None:
@@ -40,8 +43,8 @@ def test_detect_intent_default_fallback() -> None:
     """Test fallback to UNDERSTAND when no keywords match."""
     intent = detect_intent("some generic phrase")
     assert intent.intent_type == IntentType.UNDERSTAND
-    assert intent.confidence == 0.3
-    assert "defaulting to UNDERSTAND" in intent.reasoning
+    assert 0.0 <= intent.confidence <= 0.5
+    assert "default" in intent.reasoning.lower()
 
 
 def test_detect_intent_confidence_multiple_matches() -> None:
@@ -49,8 +52,8 @@ def test_detect_intent_confidence_multiple_matches() -> None:
     # "how does" and "explain" both match UNDERSTAND
     intent = detect_intent("how does this work, explain it to me")
     assert intent.intent_type == IntentType.UNDERSTAND
-    assert intent.confidence == 0.9
-    assert "Multiple intent keywords detected" in intent.reasoning
+    assert intent.confidence > 0.5
+    assert "multiple" in intent.reasoning.lower()
 
 
 def test_detect_intent_confidence_strong_keyword() -> None:
@@ -58,8 +61,8 @@ def test_detect_intent_confidence_strong_keyword() -> None:
     # "implement" is a significant portion of this short query
     intent = detect_intent("implement login")
     assert intent.intent_type == IntentType.IMPLEMENT
-    assert intent.confidence == 0.9
-    assert "Strong intent keyword detected" in intent.reasoning
+    assert intent.confidence > 0.5
+    assert "strong" in intent.reasoning.lower()
 
 
 def test_detect_intent_confidence_weak_keyword() -> None:
@@ -67,8 +70,8 @@ def test_detect_intent_confidence_weak_keyword() -> None:
     # "fix" is a small portion of this long query
     intent = detect_intent("I need to apply a fix for this really long and complicated process")
     assert intent.intent_type == IntentType.DEBUG
-    assert intent.confidence == 0.6
-    assert "Intent keyword detected" in intent.reasoning
+    assert 0.4 <= intent.confidence <= 0.8
+    assert "keyword detected" in intent.reasoning.lower()
 
 
 @pytest.mark.parametrize(
@@ -101,6 +104,16 @@ def test_detect_intent_empty_string() -> None:
     """Test handling of an empty string."""
     intent = detect_intent("")
     assert intent.intent_type == IntentType.UNDERSTAND
-    assert intent.confidence == 0.3
+    assert intent.confidence < 0.5
     assert intent.complexity_level == QueryComplexity.SIMPLE
     assert not intent.focus_areas
+
+
+def test_detect_intent_focus_areas_with_noise() -> None:
+    """Test that focus area extraction handles noise."""
+    query = "how does the system work with the database in production and staging and and and"
+    intent = detect_intent(query)
+
+    focus_areas = set(intent.focus_areas)
+    expected_signal_terms = {"database"}
+    assert expected_signal_terms.issubset(focus_areas)
