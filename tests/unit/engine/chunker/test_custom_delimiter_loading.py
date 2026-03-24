@@ -244,7 +244,7 @@ class TestCustomDelimiterErrorHandling:
             call_count += 1
             if call_count == 2:  # second pattern is "bad"
                 raise ValueError("Simulated bad pattern")
-            return _real(pattern)  # type: ignore[arg-type]
+            return _real(pattern)
 
         import logging
 
