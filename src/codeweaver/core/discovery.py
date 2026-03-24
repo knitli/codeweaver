@@ -122,10 +122,7 @@ def _get_semantic_language(
 
 
 def compute_semantic_file_hash(
-    content_bytes: bytes,
-    file_path: Path,
-    *,
-    ext_category: ExtCategory | None = None,
+    content_bytes: bytes, file_path: Path, *, ext_category: ExtCategory | None = None
 ) -> BlakeHashKey:
     """Compute a file hash using AST-based hashing for supported semantic languages.
 
@@ -144,9 +141,7 @@ def compute_semantic_file_hash(
                 return ast_hash
         except Exception:
             logger.debug(
-                "AST hashing failed for %s, falling back to content hash",
-                file_path,
-                exc_info=True,
+                "AST hashing failed for %s, falling back to content hash", file_path, exc_info=True
             )
     return get_blake_hash(content_bytes)
 
@@ -278,9 +273,7 @@ class DiscoveredFile(BasedModel):
         branch = get_git_branch(path if path.is_dir() else path.parent) or "main"
         if ext_category := ExtCategory.from_file(path):
             content_bytes = path.read_bytes()
-            new_hash = compute_semantic_file_hash(
-                content_bytes, path, ext_category=ext_category
-            )
+            new_hash = compute_semantic_file_hash(content_bytes, path, ext_category=ext_category)
             if file_hash and new_hash != file_hash:
                 logger.warning(
                     "Provided file_hash does not match computed hash for %s. Using computed hash.",

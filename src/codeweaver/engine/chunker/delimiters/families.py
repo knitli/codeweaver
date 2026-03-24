@@ -21,8 +21,9 @@ from __future__ import annotations
 import asyncio
 
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING
+from functools import lru_cache
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
 from pydantic import NonNegativeFloat, NonNegativeInt
 
@@ -482,16 +483,15 @@ async def detect_language_family(content: str, min_confidence: int = 3) -> Langu
 def _get_excluded_kinds() -> frozenset[DelimiterKind]:
     """Get delimiter kinds to exclude from family detection."""
     from codeweaver.core.types import DelimiterKind
+
     global _excluded_kinds
     if not _excluded_kinds:
-        _excluded_kinds = frozenset(
-        {
+        _excluded_kinds = frozenset({
             DelimiterKind.PARAGRAPH,
             DelimiterKind.WHITESPACE,
             DelimiterKind.GENERIC,
             DelimiterKind.UNKNOWN,
-        }
-    )
+        })
     return _excluded_kinds
 
 

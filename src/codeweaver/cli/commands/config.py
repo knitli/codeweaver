@@ -142,7 +142,9 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
         and not isinstance(settings["indexer"].get("only_index_on_command"), Unset)
         else "✅",
     )
-    table.add_row("Telemetry", "❌" if (settings.get("telemetry") or {}).get("disable_telemetry") else "✅")
+    table.add_row(
+        "Telemetry", "❌" if (settings.get("telemetry") or {}).get("disable_telemetry") else "✅"
+    )
 
     display.print_table(table)
 

@@ -647,8 +647,7 @@ async def register_exa_tools(
         # Run all registrations and aggregate any failures so that
         # registration behavior is deterministic and does not depend on timing.
         results = await asyncio.gather(
-            *(register_data_tool(tool) for tool in tools),
-            return_exceptions=True,
+            *(register_data_tool(tool) for tool in tools), return_exceptions=True
         )
         errors = [exc for exc in results if isinstance(exc, Exception)]
         if errors:

@@ -9,6 +9,7 @@ from __future__ import annotations
 import contextlib
 import sys
 
+from types import GeneratorType
 from typing import TYPE_CHECKING
 
 from codeweaver.core import CodeWeaverError
@@ -130,7 +131,7 @@ class CLIErrorHandler:
 
 
 @contextlib.contextmanager
-def handle_keyboard_interrupt_gracefully():
+def handle_keyboard_interrupt_gracefully() -> GeneratorType[None, None, None]:
     """Context manager to handle KeyboardInterrupt gracefully for CLI commands."""
     try:
         yield

@@ -254,7 +254,9 @@ class TestValidateDimensions:
             "Embedding dimension 512 is not supported by this family; expected one of (2048, 1024)",
         )
 
-    def _assert_dimension_validation_fails(self, embed_dim: int, query_dim: int, expected_error: str) -> None:
+    def _assert_dimension_validation_fails(
+        self, embed_dim: int, query_dim: int, expected_error: str
+    ) -> None:
         family = ModelFamily(
             family_id="test-family",
             default_dimension=1024,

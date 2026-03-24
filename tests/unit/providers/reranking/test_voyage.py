@@ -20,8 +20,7 @@ try:
     import voyageai  # noqa: F401
 except Exception:
     pytest.skip(
-        "voyageai not available or incompatible with this Python version",
-        allow_module_level=True,
+        "voyageai not available or incompatible with this Python version", allow_module_level=True
     )
 
 from codeweaver.core import (

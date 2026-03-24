@@ -85,8 +85,7 @@ async def _check_profile(container: Container) -> bool | None:
         from codeweaver.providers.config.profiles import ProviderProfile
 
         return (
-            profile is ProviderProfile.RECOMMENDED_CLOUD
-            or profile is ProviderProfile.RECOMMENDED
+            profile is ProviderProfile.RECOMMENDED_CLOUD or profile is ProviderProfile.RECOMMENDED
         )
     return None
 

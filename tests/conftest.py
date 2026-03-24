@@ -851,12 +851,14 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     has_fastembed = False
     try:
         import fastembed  # noqa: F401
+
         has_fastembed = True
     except Exception as exc:
         _fastembed_unavailable_reason = f"{type(exc).__name__}: {exc}"
         # Treat fastembed_gpu as an alternative installation of fastembed.
         try:
             import fastembed_gpu  # noqa: F401
+
             has_fastembed = True
         except Exception as gpu_exc:
             _fastembed_gpu_unavailable_reason = f"{type(gpu_exc).__name__}: {gpu_exc}"
@@ -864,6 +866,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     _voyageai_unavailable_reason: str | None = None
     try:
         import voyageai  # noqa: F401
+
         has_voyageai = True
     except Exception as exc:
         has_voyageai = False
@@ -879,7 +882,9 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         elif _fastembed_unavailable_reason:
             _fastembed_skip_reason = f"fastembed not available ({_fastembed_unavailable_reason})"
         elif _fastembed_gpu_unavailable_reason:
-            _fastembed_skip_reason = f"fastembed_gpu not available ({_fastembed_gpu_unavailable_reason})"
+            _fastembed_skip_reason = (
+                f"fastembed_gpu not available ({_fastembed_gpu_unavailable_reason})"
+            )
         else:
             _fastembed_skip_reason = "fastembed or fastembed_gpu not installed"
 
@@ -943,8 +948,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
                     item.add_marker(
                         pytest.mark.skip(
                             reason=(
-                                f"Integration test requires missing packages: "
-                                f"{', '.join(missing)}"
+                                f"Integration test requires missing packages: {', '.join(missing)}"
                             )
                         )
                     )

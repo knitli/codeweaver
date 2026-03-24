@@ -33,9 +33,7 @@ def mock_no_version_file(monkeypatch):
     monkeypatch.delitem(sys.modules, "codeweaver._version", raising=False)
     # Block re-import from disk: empty module has no __version__, so
     # `from codeweaver._version import __version__` raises ImportError
-    monkeypatch.setitem(
-        sys.modules, "codeweaver._version", types.ModuleType("codeweaver._version")
-    )
+    monkeypatch.setitem(sys.modules, "codeweaver._version", types.ModuleType("codeweaver._version"))
     if hasattr(codeweaver, "_version"):
         monkeypatch.delattr(codeweaver, "_version", raising=False)
 

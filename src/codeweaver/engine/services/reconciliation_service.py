@@ -350,8 +350,7 @@ class VectorReconciliationService:
                 try:
                     # Attempt batched update first
                     await self.vector_store.client.update_vectors(
-                        collection_name=collection_name,
-                        points=points_to_update,
+                        collection_name=collection_name, points=points_to_update
                     )
                     batch_stats["repaired"] += len(points_to_update)
 
@@ -368,8 +367,7 @@ class VectorReconciliationService:
                         point_id = point["id"]
                         try:
                             await self.vector_store.client.update_vectors(
-                                collection_name=collection_name,
-                                points=[point],
+                                collection_name=collection_name, points=[point]
                             )
                             batch_stats["repaired"] += 1
                         except Exception as e:

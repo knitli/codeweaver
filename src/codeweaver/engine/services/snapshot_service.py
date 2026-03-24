@@ -260,9 +260,7 @@ class QdrantSnapshotBackupService:
                 )
                 return stats
             snapshots_sorted = sorted(
-                snapshots,
-                key=lambda s: s.get("created_at") or "",
-                reverse=True,
+                snapshots, key=lambda s: s.get("created_at") or "", reverse=True
             )
             to_keep = snapshots_sorted[: self.retention_count]
             to_delete = snapshots_sorted[self.retention_count :]
@@ -343,10 +341,7 @@ class QdrantSnapshotBackupService:
         snapshots = await self.list_snapshots()
         if not snapshots:
             return None
-        return max(
-            snapshots,
-            key=lambda s: s.get("created_at") or "",
-        )
+        return max(snapshots, key=lambda s: s.get("created_at") or "")
 
     async def snapshot_and_cleanup(self, *, wait: bool = False) -> SnapshotMetaDict:
         """Create a new snapshot and clean up old ones.

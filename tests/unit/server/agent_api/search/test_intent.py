@@ -4,11 +4,7 @@
 
 import pytest
 
-from codeweaver.server.agent_api.search.intent import (
-    IntentType,
-    QueryComplexity,
-    detect_intent,
-)
+from codeweaver.server.agent_api.search.intent import IntentType, QueryComplexity, detect_intent
 
 
 @pytest.mark.parametrize(
@@ -83,7 +79,10 @@ def test_detect_intent_confidence_weak_keyword() -> None:
             "explain how the user authentication middleware interacts with the caching layer and the database models",
             QueryComplexity.COMPLEX,
         ),  # > 15 words
-        ("implement user login and user registration", QueryComplexity.COMPLEX),  # contains " and ", >= 5 words
+        (
+            "implement user login and user registration",
+            QueryComplexity.COMPLEX,
+        ),  # contains " and ", >= 5 words
         ("fix the crash or fix the fail", QueryComplexity.COMPLEX),  # contains " or ", >= 5 words
     ],
 )

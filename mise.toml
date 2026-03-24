@@ -372,7 +372,7 @@ uv run ruff format .
 uv run ruff check --fix --unsafe-fixes . || true
 git ls-files "*.yaml" "*.yml" "*.json" 2>/dev/null | xargs -r yq -iP --indent=2 eval "." 2>/dev/null || true
 toml_files="$(git ls-files "*.toml" 2>/dev/null)"
-exportify fix || true
+# exportify fix || true
 if [ -n "$toml_files" ]; then
     printf '%s\n' "$toml_files" | xargs -r tombi format 2>/dev/null || true
 fi

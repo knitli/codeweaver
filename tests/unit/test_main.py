@@ -25,6 +25,7 @@ def test_setup_signal_handler_first_interrupt():
         with pytest.raises(KeyboardInterrupt):
             force_shutdown_handler(signal.SIGINT, None)
 
+
 def test_setup_signal_handler_second_interrupt():
     """Test that the second interrupt exits immediately."""
     with patch("signal.signal") as mock_signal:
@@ -37,11 +38,15 @@ def test_setup_signal_handler_second_interrupt():
             force_shutdown_handler(signal.SIGINT, None)
 
         # Second call exits with 1
-        with patch("sys.exit") as mock_exit, patch("codeweaver.main.logger.warning") as mock_warning:
+        with (
+            patch("sys.exit") as mock_exit,
+            patch("codeweaver.main.logger.warning") as mock_warning,
+        ):
             force_shutdown_handler(signal.SIGINT, None)
 
             mock_warning.assert_called_with("Force shutdown requested, exiting immediately...")
             mock_exit.assert_called_with(1)
+
 
 def test_setup_signal_handler_suppress_errors():
     """Test that ValueError and OSError are suppressed when setting the signal."""
@@ -55,7 +60,9 @@ def test_setup_signal_handler_suppress_errors():
         original_handler = _setup_signal_handler()
         assert original_handler is None
 
+
 from unittest.mock import AsyncMock
+
 
 @pytest.mark.asyncio
 @patch("codeweaver.main._run_stdio_server", new_callable=AsyncMock)
@@ -74,12 +81,7 @@ async def test_run_stdio_transport(mock_run_stdio):
     )
 
     mock_run_stdio.assert_called_once_with(
-        config_file=None,
-        project_path=None,
-        host="127.0.0.1",
-        port=8080,
-        verbose=True,
-        debug=False,
+        config_file=None, project_path=None, host="127.0.0.1", port=8080, verbose=True, debug=False
     )
 
 
@@ -100,10 +102,5 @@ async def test_run_http_transport(mock_run_http):
     )
 
     mock_run_http.assert_called_once_with(
-        config_file=None,
-        project_path=None,
-        host="0.0.0.0",
-        port=9090,
-        verbose=False,
-        debug=True,
+        config_file=None, project_path=None, host="0.0.0.0", port=9090, verbose=False, debug=True
     )
