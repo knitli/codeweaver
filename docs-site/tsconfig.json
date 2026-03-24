@@ -1,18 +1,38 @@
 {
   "extends": "astro/tsconfigs/strict",
   "include": [
+    "worker-configuration.d.ts",
     ".astro/types.d.ts",
-    "**/*"
+    "./src"
   ],
   "exclude": [
     "dist"
   ],
+  "target": "esnext",
   "compilerOptions": {
-    "baseUrl": ".",
+    "rootDir": "./src",
     "paths": {
       "@/*": [
-        "src/*"
+        "./src/*"
       ]
-    }
+    },
+    "lib": [
+      "esnext",
+      "es2020",
+      "dom"
+    ],
+    "moduleResolution": "bundler",
+    "types": [
+      "node",
+      "unist",
+      "./node_modules/starlight-changelogs/virtual.d.ts",
+      "./node_modules/starlight-page-actions/virtual.d.ts",
+      "./node_modules/starlight-plugin-icons/src/env.d.ts",
+      "./node_modules/starlight-sidebar-topics/virtual.d.ts",
+      "./node_modules/astro",
+      "./node_modules/@astrojs/starlight/global.d.ts",
+      "./.astro/types.d.ts",
+      "./@types/i18n.d.ts"
+    ]
   }
 }
