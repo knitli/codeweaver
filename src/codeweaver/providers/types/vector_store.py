@@ -777,7 +777,7 @@ class CollectionMetadata(BasedModel):
                     )
 
             case CollectionPolicy.UNLOCKED:
-                """Allow everything without validation."""
+                ...  # Allow everything without validation.
 
     def _exact_match(
         self,
