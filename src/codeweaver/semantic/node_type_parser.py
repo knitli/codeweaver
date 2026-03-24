@@ -1,4 +1,4 @@
-# sourcery skip: avoid-builtin-shadow, lambdas-should-be-short, no-complex-if-expressions
+# sourcery skip: avoid-builtin-shadow, lambdas-should-be-short, no-complex-if-expressions, upper-camel-case-classes
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #

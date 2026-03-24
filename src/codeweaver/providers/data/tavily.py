@@ -168,7 +168,6 @@ async def tavily_search_tool(
             fn=instance.__call__,
             name="get_web_context_information",
             description="Use the `get_web_context_information` tool to get tailored information on a topic from the web. The tool will return curated snippets that are relevant and concise.",
-            enabled=True,
             tags=CONTEXT_AGENT_TAGS | {"tavily"},
             annotations=ToolAnnotations(
                 readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True

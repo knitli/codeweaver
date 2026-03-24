@@ -254,7 +254,7 @@ def get_optimizations(model_kind: Literal["dense", "sparse", "both"]) -> Optimiz
         sparse_opts = dense_opts
         for key in ("use_small_chunks_for_dense", "chunk_func"):
             _ = sparse_opts.pop(key, None)
-        sparse_opts = OptimizationDecisions(  # ty: ignore[missing-typed-dict-key]
+        sparse_opts = OptimizationDecisions(
             **(
                 sparse_opts
                 | {

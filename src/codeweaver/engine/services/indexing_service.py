@@ -402,7 +402,7 @@ class IndexingService:
         for i in range(0, len(files), batch_size):
             batch = [(p, None) for p in files[i : i + batch_size]]
             task = asyncio.create_task(
-                self._run_guarded_index_batch(batch, self._indexing_semaphore, progress_callback)  # ty:ignore[invalid-argument-type]
+                self._run_guarded_index_batch(batch, self._indexing_semaphore, progress_callback)
             )
             tasks.append(task)
 
@@ -540,11 +540,7 @@ class IndexingService:
         if not self._deleted_files:
             return
 
-        rel_paths: list[Path] = []
-        for path in self._deleted_files:
-            rel_path = set_relative_path(path, base_path=self._project_path)
-            if rel_path:
-                rel_paths.append(rel_path)
+        rel_paths: list[Path] = [rel_path for path in self._deleted_files if (rel_path := set_relative_path(path, base_path=self._project_path))]
 
         if self._vector_store and rel_paths:
             await self._vector_store.delete_by_files(rel_paths)

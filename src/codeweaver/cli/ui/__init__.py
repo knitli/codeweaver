@@ -18,7 +18,10 @@ from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.cli.ui.error_handler import CLIErrorHandler
+    from codeweaver.cli.ui.error_handler import (
+        CLIErrorHandler,
+        handle_keyboard_interrupt_gracefully,
+    )
     from codeweaver.cli.ui.interaction import (
         RichUserInteraction,
         UserInteraction,

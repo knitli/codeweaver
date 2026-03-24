@@ -62,7 +62,6 @@ def get_bulk_tool(server: FastMCP[Any]) -> Tool:
             serializer=registration_info.get("serializer"),
             output_schema=registration_info.get("output_schema", None),
             meta=registration_info.get("meta", {}),
-            enabled=registration_info.get("enabled", True),
         )
     )
 
@@ -74,7 +73,6 @@ TOOL_DEFINITIONS: DictView[ToolCollectionDict] = DictView(
                 fn=find_code_tool,
                 name="find_code",
                 description=FIND_CODE_DESCRIPTION,
-                enabled=True,
                 tags=USER_AGENT_TAGS | {"find_code"},
                 annotations=ToolAnnotations(
                     title=FIND_CODE_TITLE,
