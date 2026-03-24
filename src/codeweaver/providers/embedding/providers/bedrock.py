@@ -659,12 +659,12 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
                 "embedding_types": self._model_config.get("embedding_types", ["float"]),
                 **body_kwargs,
             })
-            requests.extend([
+            requests.append(
                 BedrockInvokeEmbeddingRequest.model_validate({
                     "body": body,
                     "model_id": self._model_arn,
                 })
-            ])
+            )
         return [InvokeRequestDict(**dict(req.model_dump(by_alias=True))) for req in requests]  # ty: ignore[missing-typed-dict-key]
 
     async def _create_request(
