@@ -172,10 +172,17 @@ class Span(NamedTuple):
         diff1 = self - other
         diff2 = other - self
         result: list[Span] = []
+        # Optimization: Avoid allocating a single-element list for extend()
         if diff1:
-            result.extend([diff1] if isinstance(diff1, Span) else diff1)
+            if isinstance(diff1, Span):
+                result.append(diff1)
+            else:
+                result.extend(diff1)
         if diff2:
-            result.extend([diff2] if isinstance(diff2, Span) else diff2)
+            if isinstance(diff2, Span):
+                result.append(diff2)
+            else:
+                result.extend(diff2)
         return tuple(result) if result else None
 
     @override
@@ -440,7 +447,11 @@ class SpanGroup(BasedModel):
                     new_leftovers: list[Span] = []
                     for lf in leftovers:
                         if diff := lf - s2:
-                            new_leftovers.extend([diff] if isinstance(diff, Span) else diff)
+                            # Optimization: Avoid allocating a single-element list for extend()
+                            if isinstance(diff, Span):
+                                new_leftovers.append(diff)
+                            else:
+                                new_leftovers.extend(diff)
                     leftovers = new_leftovers
             result.update(leftovers)
         return SpanGroup(spans={r for r in result if r})
