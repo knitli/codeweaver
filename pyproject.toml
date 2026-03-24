@@ -783,6 +783,7 @@ call-non-callable = "ignore"
 invalid-return-type = "ignore"
 
 [tool.uv]
+default-groups = ["dev", "test"]
 cache-keys = [
   { file = "uv.lock" },
   { file = "pyproject.toml" },

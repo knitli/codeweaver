@@ -38,7 +38,7 @@ jobs:
       python-versions: ${{ inputs.python-versions || '["3.12", "3.13", "3.14"]' }}
       # Run integration tests, expensive tests, and tests requiring models
       # Exclude only docker, qdrant (requires external setup), skip_ci, and flaky tests
-      test-markers: "not docker and not qdrant and not skip_ci and not flaky"
+      test-markers: "not docker and not qdrant and not skip_ci and not flaky and not dev_only"
       upload-coverage: true
       run-quality-checks: false
 

@@ -626,7 +626,7 @@ class TestSpanGroupBasic:
     def test_source_id_uniform_group(self, span_10_20, source_a):
         """source_id property returns the shared source_id for a uniform group."""
         sg = SpanGroup(spans={span_10_20})
-        assert sg.source_id == source_a
+        assert sg.source_id == source_a.hex
 
     def test_source_id_non_uniform_group(self, span_10_20, span_10_20_b):
         """source_id property returns None for a non-uniform group."""

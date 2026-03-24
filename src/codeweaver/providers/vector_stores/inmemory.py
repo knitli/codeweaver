@@ -61,6 +61,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
     _shutdown: bool = PrivateAttr(default=False)
     _collection_metadata: dict = PrivateAttr(default_factory=dict)
     _collection_metadata_lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
+    _persist_lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
 
     @property
     def base_url(self) -> str | None:
@@ -95,6 +96,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         object.__setattr__(self, "_shutdown", False)
         object.__setattr__(self, "_collection_metadata", {})
         object.__setattr__(self, "_collection_metadata_lock", asyncio.Lock())
+        object.__setattr__(self, "_persist_lock", asyncio.Lock())
 
         import sys
 
@@ -141,18 +143,30 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         Raises:
             PersistenceError: Failed to write persistence file.
         """
+        # Serialize concurrent persist calls so cleanup and creation don't race
+        async with cast(asyncio.Lock, self._persist_lock):
+            await self._persist_to_disk_locked()
+
+    async def _persist_to_disk_locked(self) -> None:
+        """Internal helper for atomic disk persistence; must be called with _persist_lock held.
+
+        Creates a temporary Qdrant snapshot at `persist_path.tmp`, then atomically
+        renames it to the final persist path so readers always see a consistent state.
+        """
+        import shutil
+
         # Atomic persistence via temporary directory
         persist_path = AsyncPath(str(self.persist_path))
         temp_path = persist_path.with_suffix(".tmp")
-        if await temp_path.exists():
-            import shutil
-
-            if await temp_path.is_dir():
-                await asyncio.to_thread(shutil.rmtree, str(temp_path))
-            else:
-                await temp_path.unlink()
 
         try:
+            # Clean up any leftover temp path from a previous interrupted persist
+            if await temp_path.exists():
+                if await temp_path.is_dir():
+                    await asyncio.to_thread(shutil.rmtree, str(temp_path))
+                else:
+                    await temp_path.unlink()
+
             # Ensure parent directory exists before creating Qdrant client
             await temp_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -169,8 +183,6 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             # Atomic replace
             if await temp_path.exists():
                 if await persist_path.exists():
-                    import shutil
-
                     if await persist_path.is_dir():
                         await asyncio.to_thread(shutil.rmtree, str(self.persist_path))
                     else:
@@ -178,13 +190,13 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
 
                 await temp_path.rename(str(self.persist_path))
         except Exception as e:
-            if await temp_path.exists():
-                import shutil
-
-                if await temp_path.is_dir():
-                    await asyncio.to_thread(shutil.rmtree, str(temp_path))
-                else:
-                    await temp_path.unlink()
+            # Best-effort cleanup of the temp path on failure
+            with contextlib.suppress(Exception):
+                if await temp_path.exists():
+                    if await temp_path.is_dir():
+                        await asyncio.to_thread(shutil.rmtree, str(temp_path))
+                    else:
+                        await temp_path.unlink()
             raise PersistenceError(f"Failed to persist to disk: {e}") from e
 
     async def _restore_from_disk(self) -> None:
@@ -308,9 +320,17 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         """Trigger persistence if auto_persist is enabled.
 
         Called after upsert and delete operations to persist changes.
+        Persistence failures are logged but do not propagate, since data
+        remains safe in memory and a failed persist should not abort a write.
         """
         if self.auto_persist:
-            await self._persist_to_disk()
+            try:
+                await self._persist_to_disk()
+            except Exception:
+                logger.warning(
+                    "Persistence after upsert failed; data remains safe in memory",
+                    exc_info=True,
+                )
 
 
 # Ensure the model is fully defined for Pydantic
