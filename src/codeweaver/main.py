@@ -70,7 +70,7 @@ def _setup_logging_filters(*, verbose: bool, debug: bool) -> None:
         access_filter = UvicornAccessLogFilter()
         logging.getLogger().addFilter(access_filter)
 
-        for logger_name in ["uvicorn", "uvicorn.access", "uvicorn.error"]:
+        for logger_name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
             logger_obj = logging.getLogger(logger_name)
             logger_obj.setLevel(logging.CRITICAL)
             logger_obj.handlers.clear()

@@ -18,7 +18,12 @@ from cyclopts import App
 from pydantic_core import from_json
 from rich.table import Table
 
-from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+from codeweaver.cli.ui import (
+    CLIErrorHandler,
+    StatusDisplay,
+    get_display,
+    handle_keyboard_interrupt_gracefully,
+)
 from codeweaver.core import UNSET, SettingsMapDep
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.di.dependency import INJECTED
@@ -368,9 +373,10 @@ def _format_duration(seconds: float) -> str:
 if __name__ == "__main__":
     display = _display
     error_handler = CLIErrorHandler(display, verbose=True, debug=True)
-    try:
-        app()
-    except Exception as e:
-        error_handler.handle_error(e, "Status command", exit_code=1)
+    with handle_keyboard_interrupt_gracefully():
+        try:
+            app()
+        except Exception as e:
+            error_handler.handle_error(e, "Status command", exit_code=1)
 
 __all__ = ()

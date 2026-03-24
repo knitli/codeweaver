@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import sys
 
 from typing import TYPE_CHECKING
@@ -128,4 +129,15 @@ class CLIErrorHandler:
         )
 
 
-__all__ = ("CLIErrorHandler",)
+@contextlib.contextmanager
+def handle_keyboard_interrupt_gracefully():
+    """Context manager to handle KeyboardInterrupt gracefully for CLI commands."""
+    try:
+        yield
+    except KeyboardInterrupt:
+        from codeweaver.cli.__main__ import _handle_keyboard_interrupt
+
+        _handle_keyboard_interrupt()
+
+
+__all__ = ("CLIErrorHandler", "handle_keyboard_interrupt_gracefully")

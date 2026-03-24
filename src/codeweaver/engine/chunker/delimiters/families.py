@@ -22,6 +22,7 @@ import asyncio
 
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
+from types import MappingProxyType
 
 from pydantic import NonNegativeFloat, NonNegativeInt
 
@@ -51,7 +52,7 @@ def defined_languages() -> tuple[str, ...]:
 
 # Family delimiter pattern mappings
 # Lazy import to avoid circular dependencies
-def _get_family_patterns() -> dict[LanguageFamily, list[DelimiterPattern]]:
+def _get_family_patterns() -> MappingProxyType[LanguageFamily, list[DelimiterPattern]]:
     """Get family delimiter patterns with lazy import."""
     from codeweaver.engine.chunker.delimiters.patterns import (
         ARRAY_PATTERN,
@@ -118,7 +119,7 @@ def _get_family_patterns() -> dict[LanguageFamily, list[DelimiterPattern]]:
         WHITESPACE_PATTERN,
     )
 
-    return {
+    return MappingProxyType({
         LanguageFamily.C_STYLE: [
             # Code elements
             FUNCTION_PATTERN,
@@ -376,11 +377,14 @@ def _get_family_patterns() -> dict[LanguageFamily, list[DelimiterPattern]]:
             WHITESPACE_PATTERN,
             EMPTY_PATTERN,
         ],
-    }
+    })
 
 
 # Cache family patterns for performance
-_family_patterns_cache: dict[LanguageFamily, list[DelimiterPattern]] | None = None
+_family_patterns_cache: MappingProxyType[LanguageFamily, list[DelimiterPattern]] | None = None
+
+# cache excluded kinds
+_excluded_kinds: frozenset[DelimiterKind] | None = None
 
 
 def get_family_patterns(family: LanguageFamily) -> list[DelimiterPattern]:
@@ -416,19 +420,12 @@ def _detect_language_family_sync(content: str, min_confidence: int = 3) -> Langu
     best_weighted_score = -1.0
     best_matches = -1
     best_pattern_count = 0
+    excluded_kinds = _get_excluded_kinds()
 
     for family, stats in characteristics.items():
         weighted_score = float(stats.get("weighted_score", 0.0))
         matches = int(stats.get("pattern_matches", 0))
         # Use total non-excluded patterns as another tiebreaker
-        from codeweaver.core.types import DelimiterKind
-
-        excluded_kinds = {
-            DelimiterKind.PARAGRAPH,
-            DelimiterKind.WHITESPACE,
-            DelimiterKind.GENERIC,
-            DelimiterKind.UNKNOWN,
-        }
         pattern_count = len([
             p for p in get_family_patterns(family) if p.kind not in excluded_kinds
         ])
@@ -482,16 +479,20 @@ async def detect_language_family(content: str, min_confidence: int = 3) -> Langu
         )
 
 
-def _get_excluded_kinds() -> set[DelimiterKind]:
+def _get_excluded_kinds() -> frozenset[DelimiterKind]:
     """Get delimiter kinds to exclude from family detection."""
     from codeweaver.core.types import DelimiterKind
-
-    return {
-        DelimiterKind.PARAGRAPH,
-        DelimiterKind.WHITESPACE,
-        DelimiterKind.GENERIC,
-        DelimiterKind.UNKNOWN,
-    }
+    global _excluded_kinds
+    if not _excluded_kinds:
+        _excluded_kinds = frozenset(
+        {
+            DelimiterKind.PARAGRAPH,
+            DelimiterKind.WHITESPACE,
+            DelimiterKind.GENERIC,
+            DelimiterKind.UNKNOWN,
+        }
+    )
+    return _excluded_kinds
 
 
 def _calculate_specificity_weight(pattern_length: int) -> float:
@@ -519,13 +520,14 @@ def _calculate_specificity_weight(pattern_length: int) -> float:
 type PatternKey = tuple[DelimiterKind, tuple[str, ...]]
 
 
+@lru_cache(maxsize=1)
 def _build_pattern_family_counts(
-    excluded_kinds: set[DelimiterKind],
+    excluded_kinds: frozenset[DelimiterKind],
 ) -> tuple[dict[PatternKey, NonNegativeInt], dict[LanguageFamily, list[DelimiterPattern]]]:
     """Build pattern distinctiveness counts and family pattern mappings.
 
     Args:
-        excluded_kinds: Set of DelimiterKind to exclude
+        excluded_kinds: frozenset of DelimiterKind to exclude
 
     Returns:
         Tuple of (pattern_family_counts, family_patterns_map)
@@ -551,7 +553,7 @@ def _calculate_family_score(
     content: str,
     patterns: list[DelimiterPattern],
     pattern_family_counts: dict[PatternKey, NonNegativeInt],
-    excluded_kinds: set[DelimiterKind],
+    excluded_kinds: frozenset[DelimiterKind],
 ) -> tuple[NonNegativeInt, NonNegativeFloat]:
     """Calculate matches and weighted score for a family's patterns.
 
@@ -559,7 +561,7 @@ def _calculate_family_score(
         content: Code content to analyze
         patterns: List of delimiter patterns for the family
         pattern_family_counts: Mapping of pattern keys to family counts
-        excluded_kinds: Set of DelimiterKind to exclude
+        excluded_kinds: frozenset of DelimiterKind to exclude
 
     Returns:
         Tuple of (match_count, weighted_score)

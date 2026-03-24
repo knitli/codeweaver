@@ -42,6 +42,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "IndexingProgress": (__spec__.parent, "status_display"),
     "StatusDisplay": (__spec__.parent, "status_display"),
     "CLIErrorHandler": (__spec__.parent, "error_handler"),
+    "handle_keyboard_interrupt_gracefully": (__spec__.parent, "error_handler"),
     "get_display": (__spec__.parent, "status_display"),
     "RichUserInteraction": (__spec__.parent, "interaction"),
     "UserInteraction": (__spec__.parent, "interaction"),
@@ -62,6 +63,7 @@ __all__ = (
     "UserInteraction",
     "UserInteractionDep",
     "get_display",
+    "handle_keyboard_interrupt_gracefully",
 )
 
 

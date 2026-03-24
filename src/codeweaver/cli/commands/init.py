@@ -25,7 +25,12 @@ from pydantic import AnyHttpUrl
 from pydantic_core import from_json as from_json
 from pydantic_core import to_json as to_json
 
-from codeweaver.cli.ui import CLIErrorHandler, UserInteractionDep, get_display
+from codeweaver.cli.ui import (
+    CLIErrorHandler,
+    UserInteractionDep,
+    get_display,
+    handle_keyboard_interrupt_gracefully,
+)
 from codeweaver.core import CodeWeaverError, get_project_path, get_user_config_dir
 from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.dependencies.core_settings import SettingsDep
@@ -1422,13 +1427,11 @@ def main() -> None:
     display = _display
     error_handler = CLIErrorHandler(display)
 
-    try:
-        app()
-    except KeyboardInterrupt:
-        display.print_warning("Looks like you cancelled the operation. Exiting.")
-        sys.exit(0)
-    except Exception as e:
-        error_handler.handle_error(e, "Init command", exit_code=1)
+    with handle_keyboard_interrupt_gracefully():
+        try:
+            app()
+        except Exception as e:
+            error_handler.handle_error(e, "Init command", exit_code=1)
 
 
 if __name__ == "__main__":

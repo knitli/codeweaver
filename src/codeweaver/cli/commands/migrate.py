@@ -6,8 +6,6 @@
 
 from __future__ import annotations
 
-import sys
-
 from typing import Annotated
 
 import cyclopts
@@ -15,7 +13,12 @@ import cyclopts
 from cyclopts import App
 from rich.console import Console
 
-from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+from codeweaver.cli.ui import (
+    CLIErrorHandler,
+    StatusDisplay,
+    get_display,
+    handle_keyboard_interrupt_gracefully,
+)
 from codeweaver.core.di import INJECTED
 from codeweaver.engine.dependencies import MigrationServiceDep
 
@@ -205,14 +208,11 @@ def main() -> None:
     display_instance = StatusDisplay()
     error_handler = CLIErrorHandler(display_instance, verbose=True, debug=True)
 
-    try:
-        app()
-    except KeyboardInterrupt:
-        display_instance.console.print()
-        display_instance.print_warning("Operation cancelled by user")
-        sys.exit(1)
-    except Exception as e:
-        error_handler.handle_error(e, "Migration", exit_code=1)
+    with handle_keyboard_interrupt_gracefully():
+        try:
+            app()
+        except Exception as e:
+            error_handler.handle_error(e, "Migration", exit_code=1)
 
 
 if __name__ == "__main__":
