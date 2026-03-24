@@ -19,6 +19,7 @@ from pydantic import PrivateAttr
 
 from codeweaver.core import (
     CodeChunk,
+    DEFAULT_PERSIST_INTERVAL,
     PersistenceError,
     Provider,
     ProviderError,
@@ -83,9 +84,13 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         if auto_persist is None:
             auto_persist = not is_test_environment()
 
-        persist_interval = self.config.in_memory_config.get("persist_interval")
-        if persist_interval is None:
-            persist_interval = 300
+        persist_interval: int | None
+        in_memory_config = self.config.in_memory_config
+        if "persist_interval" not in in_memory_config:
+            persist_interval = DEFAULT_PERSIST_INTERVAL
+        else:
+            # Explicit None means "disable periodic persistence"
+            persist_interval = in_memory_config.get("persist_interval")
 
         # Store as private attributes
         object.__setattr__(self, "_persist_path", self.config.in_memory_config.get("persist_path"))
@@ -119,8 +124,9 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         if await AsyncPath(str(self.persist_path)).exists():
             await self._restore_from_disk()
 
-        # Set up periodic persistence if configured (disabled in test environments)
-        if auto_persist and not is_test_environment():
+        # Set up periodic persistence if configured (disabled in test environments
+        # or when persist_interval is explicitly set to None)
+        if auto_persist and persist_interval is not None and not is_test_environment():
             periodic_task = asyncio.create_task(self._periodic_persist_task())
             object.__setattr__(self, "_periodic_task", periodic_task)
 
@@ -215,7 +221,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         """
         while not self._shutdown:
             try:
-                await asyncio.sleep(self._persist_interval or 300)
+                await asyncio.sleep(self._persist_interval or DEFAULT_PERSIST_INTERVAL)
                 if not self._shutdown:
                     await self._persist_to_disk()
             except asyncio.CancelledError:
