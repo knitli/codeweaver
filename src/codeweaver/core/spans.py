@@ -172,17 +172,19 @@ class Span(NamedTuple):
         diff1 = self - other
         diff2 = other - self
         result: list[Span] = []
+
+        # Helper to normalize diffs for extension
+        def _add_diff(diff: Span | tuple[Span, ...] | None, target: list[Span]) -> None:
+            if not diff:
+                return
+            if isinstance(diff, Span):
+                target.append(diff)
+            else:
+                target.extend(diff)
+
         # Optimization: Avoid allocating a single-element list for extend()
-        if diff1:
-            if isinstance(diff1, Span):
-                result.append(diff1)
-            else:
-                result.extend(diff1)
-        if diff2:
-            if isinstance(diff2, Span):
-                result.append(diff2)
-            else:
-                result.extend(diff2)
+        _add_diff(diff1, result)
+        _add_diff(diff2, result)
         return tuple(result) if result else None
 
     @override
@@ -440,18 +442,23 @@ class SpanGroup(BasedModel):
     def __sub__(self, other: Self) -> SpanGroup:  # Difference
         """Return a new SpanGroup that is the difference between this group and another."""
         result: set[Span] = set()
+
+        # Helper to normalize diffs for extension
+        def _add_diff(diff: Span | tuple[Span, ...] | None, target: list[Span]) -> None:
+            if not diff:
+                return
+            if isinstance(diff, Span):
+                target.append(diff)
+            else:
+                target.extend(diff)
+
         for s1 in self.spans:
             leftovers = [s1]
             for s2 in other.spans:
                 if s1.source_id == s2.source_id:
                     new_leftovers: list[Span] = []
                     for lf in leftovers:
-                        if diff := lf - s2:
-                            # Optimization: Avoid allocating a single-element list for extend()
-                            if isinstance(diff, Span):
-                                new_leftovers.append(diff)
-                            else:
-                                new_leftovers.extend(diff)
+                        _add_diff(lf - s2, new_leftovers)
                     leftovers = new_leftovers
             result.update(leftovers)
         return SpanGroup(spans={r for r in result if r})
