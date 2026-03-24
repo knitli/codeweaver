@@ -1252,45 +1252,96 @@ class DelimiterChunker(BaseChunker):
 
         return metadata
 
+    def _load_custom_delimiters(
+        self,
+        normalized_language: str,
+        language: str,
+    ) -> list[object]:
+        """Load custom delimiter patterns from settings that match the given language.
+
+        Custom delimiters are returned first so they override built-in family
+        patterns when merged with the full delimiter list.
+
+        Args:
+            normalized_language: Snake-case normalised language identifier.
+            language: Original language string (used for logging only).
+
+        Returns:
+            List of ``Delimiter`` objects converted from matching custom patterns.
+        """
+        import logging
+
+        import textcase
+
+        from codeweaver.core import ConfigLanguage, SemanticSearchLanguage
+        from codeweaver.engine.chunker.delimiter_model import Delimiter
+
+        if (
+            self._governor.settings is None
+            or not hasattr(self._governor.settings, "custom_delimiters")
+            or not self._governor.settings.custom_delimiters
+        ):
+            return []
+
+        logger = logging.getLogger(__name__)
+
+        def _normalize(lang: object) -> str:
+            if isinstance(lang, SemanticSearchLanguage | ConfigLanguage):
+                return textcase.snake(lang.variable)
+            return textcase.snake(str(lang))
+
+        delimiters: list[object] = []
+        for custom_delim in self._governor.settings.custom_delimiters:
+            lang_match = (
+                custom_delim.language is not None
+                and _normalize(custom_delim.language) == normalized_language
+            )
+            ext_match = custom_delim.extensions and any(
+                _normalize(ext.language) == normalized_language
+                for ext in custom_delim.extensions
+                if hasattr(ext, "language") and ext.language is not None
+            )
+            if lang_match or ext_match:
+                for pattern in custom_delim.delimiters:
+                    try:
+                        delimiters.extend(Delimiter.from_pattern(pattern))
+                    except (ValueError, TypeError) as exc:
+                        logger.warning(
+                            "Skipping invalid custom delimiter pattern for language %r: %r - %s",
+                            language,
+                            pattern,
+                            exc,
+                        )
+        return delimiters
+
     def _load_delimiters_for_language(self, language: str) -> list[Delimiter]:
         """Load delimiter set for language.
 
-        Checks for custom delimiters in settings first, then falls back to
-        delimiter families system.
+        Checks for custom delimiters in settings first (prepended to override
+        defaults), then falls back to delimiter families system.
 
         Args:
-            language: Programming language name
+            language: Programming language name (snake_case)
 
         Returns:
-            List of Delimiter objects for the language
+            List of Delimiter objects for the language, with custom delimiters
+            prepended so they take priority over built-in family patterns.
         """
+        import textcase
+
         from codeweaver.engine.chunker.delimiter_model import Delimiter, DelimiterKind
         from codeweaver.engine.chunker.delimiters.families import (
             LanguageFamily,
             get_family_patterns,
         )
 
-        # Initialize delimiters list
-        delimiters: list[Delimiter] = []
+        normalized_language = textcase.snake(language)
 
-        # Check for custom delimiters from settings
-        if (
-            self._governor.settings is not None
-            and hasattr(self._governor.settings, "custom_delimiters")
-            and self._governor.settings.custom_delimiters
-        ):
-            for custom_delim in self._governor.settings.custom_delimiters:
-                if custom_delim.language == language or (
-                    custom_delim.extensions
-                    and any(
-                        ext.language == language
-                        for ext in custom_delim.extensions
-                        if hasattr(ext, "language")
-                    )
-                ):
-                    # Convert DelimiterPattern to Delimiter objects
-                    for pattern in custom_delim.delimiters:
-                        delimiters.extend(Delimiter.from_pattern(pattern))
+        # Custom entries are prepended so they override the built-in family
+        # patterns for known languages and are the sole source for new languages.
+        delimiters: list[Delimiter] = self._load_custom_delimiters(  # type: ignore[assignment]
+            normalized_language, language
+        )
 
         # Load from delimiter families system
         family = LanguageFamily.from_known_language(language)
