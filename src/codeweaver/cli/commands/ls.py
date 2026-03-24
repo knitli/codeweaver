@@ -17,7 +17,7 @@ import cyclopts
 from cyclopts import App
 from rich.table import Table
 
-from codeweaver.cli.ui import CLIErrorHandler, get_display
+from codeweaver.cli.ui import CLIErrorHandler, get_display, handle_keyboard_interrupt_gracefully
 from codeweaver.cli.utils import check_provider_package_available
 from codeweaver.core import Provider, ProviderCategory, TypeIs, get_container
 from codeweaver.providers import EmbeddingModelCapabilities, RerankingModelCapabilities
@@ -480,13 +480,11 @@ def main() -> None:
     display = _display
     error_handler = CLIErrorHandler(display)
 
-    try:
-        app()
-    except KeyboardInterrupt:
-        display.print_warning("Looks like you cancelled the operation. Exiting...")
-        sys.exit(1)
-    except Exception as e:
-        error_handler.handle_error(e, "List command", exit_code=1)
+    with handle_keyboard_interrupt_gracefully():
+        try:
+            app()
+        except Exception as e:
+            error_handler.handle_error(e, "List command", exit_code=1)
 
 
 if __name__ == "__main__":

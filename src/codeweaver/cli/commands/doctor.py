@@ -24,7 +24,12 @@ from pydantic import AnyUrl, FilePath, ValidationError
 from rich.table import Table
 
 from codeweaver.cli.dependencies import setup_cli_di
-from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+from codeweaver.cli.ui import (
+    CLIErrorHandler,
+    StatusDisplay,
+    get_display,
+    handle_keyboard_interrupt_gracefully,
+)
 from codeweaver.cli.utils import check_provider_package_available
 from codeweaver.core import (
     ProviderCategory,
@@ -1032,14 +1037,11 @@ def main() -> None:
     display = StatusDisplay()
     error_handler = CLIErrorHandler(display, verbose=True, debug=True)
 
-    try:
-        app()
-    except KeyboardInterrupt:
-        display.console.print()
-        display.print_warning("Operation cancelled by user")
-        sys.exit(1)
-    except Exception as e:
-        error_handler.handle_error(e, "Doctor", exit_code=1)
+    with handle_keyboard_interrupt_gracefully():
+        try:
+            app()
+        except Exception as e:
+            error_handler.handle_error(e, "Doctor", exit_code=1)
 
 
 if __name__ == "__main__":
