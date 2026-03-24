@@ -119,8 +119,8 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         if await AsyncPath(str(self.persist_path)).exists():
             await self._restore_from_disk()
 
-        # Set up periodic persistence if configured
-        if auto_persist:
+        # Set up periodic persistence if configured (disabled in test environments)
+        if auto_persist and not is_test_environment():
             periodic_task = asyncio.create_task(self._periodic_persist_task())
             object.__setattr__(self, "_periodic_task", periodic_task)
 

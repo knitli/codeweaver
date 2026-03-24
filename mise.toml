@@ -236,7 +236,7 @@ run = [
   "mise -y trust --all 2>&1 || true",
   "mise install 2>&1 || true",
   "hk install --mise 2>&1 || mise x hk@latest -- hk install --mise 2>&1 || true",
-  "mise x uv@latest -- uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name='MISE_PYTHON', default='3.13') }} .venv 2>&1",
+  "mise x uv@latest -- uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name='PYTHON_VERSION', default='3.13') }} .venv 2>&1",
   "source .venv/bin/activate 2>&1 || true",
   "mise x uv@latest -- uv sync --group dev --group test 2>&1",
   "git config include.path .gitconfig 2>&1 || true",
@@ -562,12 +562,12 @@ depends = ["sync"]  # ensure test dependencies are installed
 run = '''
 echo "running test-cov task"
 echo "${CW_PREFIX} Running tests with coverage..."
-uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v "$@"
+uv run --group test pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v "$@"
 '''
 run_windows = '''
 echo "running test-cov task"
 echo [codeweaver] Running tests with coverage...
-uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v %*
+uv run --group test pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v %*
 '''
 
 [tasks.test-categories]
