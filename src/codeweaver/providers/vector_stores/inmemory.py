@@ -18,8 +18,8 @@ from anyio import Path as AsyncPath
 from pydantic import PrivateAttr
 
 from codeweaver.core import (
-    CodeChunk,
     DEFAULT_PERSIST_INTERVAL,
+    CodeChunk,
     PersistenceError,
     Provider,
     ProviderError,
