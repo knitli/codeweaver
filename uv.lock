@@ -923,7 +923,7 @@ requires-dist = [
     { name = "fastembed-gpu", marker = "python_full_version < '3.14' and extra == 'fastembed-gpu'" },
     { name = "fastembed-gpu", marker = "python_full_version < '3.14' and extra == 'full-gpu'" },
     { name = "fastembed-gpu", marker = "python_full_version < '3.14' and extra == 'gpu-support'" },
-    { name = "fastmcp", specifier = ">=3.0.0,<4.0.0" },
+    { name = "fastmcp", specifier = ">=3.0.0" },
     { name = "google-genai", specifier = "==1.56.0" },
     { name = "huggingface-hub", specifier = ">=1.0.0" },
     { name = "lateimport", specifier = ">=0.1.0" },

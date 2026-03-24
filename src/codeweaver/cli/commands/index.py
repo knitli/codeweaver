@@ -18,7 +18,13 @@ from cyclopts import App
 from pydantic import FilePath
 
 from codeweaver.cli.dependencies import setup_cli_di
-from codeweaver.cli.ui import CLIErrorHandler, IndexingProgress, StatusDisplay, get_display
+from codeweaver.cli.ui import (
+    CLIErrorHandler,
+    IndexingProgress,
+    StatusDisplay,
+    get_display,
+    handle_keyboard_interrupt_gracefully,
+)
 from codeweaver.core import CodeWeaverError, SettingsMapDep
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.constants import ONE_MINUTE
@@ -430,10 +436,11 @@ def main() -> None:
     display = StatusDisplay()
     error_handler = CLIErrorHandler(display, verbose=True, debug=True)
 
-    try:
-        app()
-    except Exception as e:
-        error_handler.handle_error(e, "Index Command", exit_code=1)
+    with handle_keyboard_interrupt_gracefully():
+        try:
+            app()
+        except Exception as e:
+            error_handler.handle_error(e, "Index Command", exit_code=1)
 
 
 if __name__ == "__main__":

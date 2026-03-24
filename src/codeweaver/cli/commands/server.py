@@ -14,7 +14,12 @@ import cyclopts
 from cyclopts import App
 from pydantic import FilePath
 
-from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+from codeweaver.cli.ui import (
+    CLIErrorHandler,
+    StatusDisplay,
+    get_display,
+    handle_keyboard_interrupt_gracefully,
+)
 from codeweaver.core import CodeWeaverError
 
 
@@ -126,10 +131,11 @@ def main() -> None:
     display = StatusDisplay()
     error_handler = CLIErrorHandler(display, verbose=True, debug=True)
 
-    try:
-        app()
-    except Exception as e:
-        error_handler.handle_error(e, "CLI", exit_code=1)
+    with handle_keyboard_interrupt_gracefully():
+        try:
+            app()
+        except Exception as e:
+            error_handler.handle_error(e, "CLI", exit_code=1)
 
 
 if __name__ == "__main__":

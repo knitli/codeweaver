@@ -15,7 +15,12 @@ from codeweaver_daemon import check_daemon_health, request_daemon_shutdown, wait
 from cyclopts import App, Parameter
 from pydantic import PositiveInt
 
-from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+from codeweaver.cli.ui import (
+    CLIErrorHandler,
+    StatusDisplay,
+    get_display,
+    handle_keyboard_interrupt_gracefully,
+)
 from codeweaver.core import SettingsMapDep
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.di import INJECTED
@@ -125,9 +130,10 @@ async def stop(
 if __name__ == "__main__":
     display = _display
     error_handler = CLIErrorHandler(display, verbose=True, debug=True)
-    try:
-        app()
-    except Exception as e:
-        error_handler.handle_error(e, "Stop command", exit_code=1)
+    with handle_keyboard_interrupt_gracefully():
+        try:
+            app()
+        except Exception as e:
+            error_handler.handle_error(e, "Stop command", exit_code=1)
 
 __all__ = ()

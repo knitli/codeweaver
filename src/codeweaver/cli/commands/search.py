@@ -22,7 +22,12 @@ from pydantic import FilePath
 from rich.table import Table
 
 from codeweaver.cli.dependencies import setup_cli_di
-from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+from codeweaver.cli.ui import (
+    CLIErrorHandler,
+    StatusDisplay,
+    get_display,
+    handle_keyboard_interrupt_gracefully,
+)
 from codeweaver.core import CodeWeaverError
 from codeweaver.core.config.loader import CodeWeaverSettingsType
 from codeweaver.server.agent_api.search import (
@@ -221,10 +226,11 @@ def main() -> None:
     display = StatusDisplay()
     error_handler = CLIErrorHandler(display, verbose=True, debug=True)
 
-    try:
-        app()
-    except Exception as e:
-        error_handler.handle_error(e, "Search CLI", exit_code=1)
+    with handle_keyboard_interrupt_gracefully():
+        try:
+            app()
+        except Exception as e:
+            error_handler.handle_error(e, "Search CLI", exit_code=1)
 
 
 if __name__ == "__main__":

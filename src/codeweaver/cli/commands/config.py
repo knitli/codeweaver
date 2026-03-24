@@ -17,7 +17,13 @@ from cyclopts import App
 from pydantic import FilePath
 from rich.table import Table
 
-from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, UserInteractionDep, get_display
+from codeweaver.cli.ui import (
+    CLIErrorHandler,
+    StatusDisplay,
+    UserInteractionDep,
+    get_display,
+    handle_keyboard_interrupt_gracefully,
+)
 from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.dependencies import ResolvedProjectPathDep, SettingsDep
@@ -322,12 +328,11 @@ def main() -> None:
     display_instance = StatusDisplay()
     error_handler = CLIErrorHandler(display_instance, verbose=True, debug=True)
 
-    try:
-        app()
-    except KeyboardInterrupt:
-        display_instance.print_warning("Operation cancelled by user")
-    except Exception as e:
-        error_handler.handle_error(e, "CLI", exit_code=1)
+    with handle_keyboard_interrupt_gracefully():
+        try:
+            app()
+        except Exception as e:
+            error_handler.handle_error(e, "CLI", exit_code=1)
 
 
 if __name__ == "__main__":
