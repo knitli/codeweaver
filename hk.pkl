@@ -28,13 +28,13 @@ local linters = new Mapping<String, Step> {
         // yaml
 
         ["yq"] = new Step {
-        glob = List("*.{yaml,yml,json,jsonc}")
+        glob = List("*.{yaml,yml,json}")
         batch = false
         check  = "printf '%s\\n' {{ files }} | xargs -n1 yq -P eval '.' >/dev/null"
         fix = "printf '%s\\n' {{ files }} | xargs -n1 yq -iP --indent=2 '.'"
         stage = List("*.{yaml,yml,json,jsonc}")
         }
-    
+
         ["typos"] = new Step {
             workspace_indicator = "_typos.toml"
             glob = typosFilter
