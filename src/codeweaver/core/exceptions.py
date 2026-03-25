@@ -18,6 +18,9 @@ import sys
 from typing import Any, ClassVar, NamedTuple
 
 
+_BULLET = "\u2022"
+
+
 class LocationInfo(NamedTuple):
     """Location information for where an exception was raised.
 
@@ -100,6 +103,11 @@ class CodeWeaverError(Exception):
 
     Provides structured error information including details and suggestions
     for resolution.
+
+    Use ``format_for_display()`` to render a single exception node with full
+    context for the user.  Use ``log_record()`` to get a structured dict for
+    structured-logging systems.  ``__str__`` returns a concise message
+    appropriate for tracebacks and plain log lines.
     """
 
     _issue_information: ClassVar[tuple[str, ...]] = _get_issue_information()
@@ -118,6 +126,7 @@ class CodeWeaverError(Exception):
             message: Human-readable error message
             details: Additional context about the error
             suggestions: Actionable suggestions for resolving the error
+            location: Where the exception was raised (auto-detected when omitted)
         """
         super().__init__(message)
         self.message = message
@@ -126,24 +135,60 @@ class CodeWeaverError(Exception):
         self.location = location or LocationInfo.from_frame(2)
 
     def __str__(self) -> str:
-        """Return descriptive error message with context details."""
+        """Return a concise error message suitable for logs and tracebacks.
+
+        Returns only the error message and a brief location hint so that
+        exception chains don't repeat boilerplate at every level.  For the
+        full user-facing display (details, suggestions, issue links) call
+        ``format_for_display()`` instead.
+        """
+        if self.location and self.location.filename:
+            return (
+                f"{self.message} "
+                f"(in '{self.location.module_name}', line {self.location.line_number})"
+            )
+        return self.message
+
+    def format_for_display(
+        self,
+        *,
+        include_suggestions: bool = True,
+        include_details: bool = True,
+        include_issue_info: bool = False,
+    ) -> str:
+        """Format this exception node for user-facing display.
+
+        Unlike ``__str__``, this produces richly formatted output with all
+        contextual information attached to *this* exception.  When displaying
+        an exception chain, call this only on the node you want to show in
+        full; use ``include_issue_info=True`` only on the outermost display
+        call so that the reporting boilerplate appears exactly once.
+
+        Args:
+            include_suggestions: Include the suggestions list.
+            include_details: Include the details dict.
+            include_issue_info: Append the alpha/issue-reporting boilerplate.
+
+        Returns:
+            Formatted string for display to the user.
+        """
         from codeweaver.core.utils.environment import format_file_link
         from codeweaver.core.utils.environment import is_tty as _is_tty
 
-        if _is_tty():
-            location_info = (
-                f"\n[bold red]Encountered error[/bold red] in '{self.location.module_name}' at {format_file_link(self.location.filename, self.location.line_number)}\n"
-                if self.location and self.location.filename
-                else ""
-            )
-        else:
-            location_info = (
-                f"\nEncountered error in '{self.location.module_name}' at {format_file_link(self.location.filename, self.location.line_number)}\n"
-                if self.location and self.location.filename
-                else ""
-            )
-        parts: list[str] = [self.message, location_info]
-        if self.details:
+        tty = _is_tty()
+        parts: list[str] = [self.message]
+
+        if self.location and self.location.filename:
+            link = format_file_link(self.location.filename, self.location.line_number)
+            if tty:
+                parts.append(
+                    f"[bold red]Encountered error[/bold red] in "
+                    f"'{self.location.module_name}' at {link}"
+                )
+            else:
+                parts.append(f"Encountered error in '{self.location.module_name}' at {link}")
+
+        if include_details and self.details:
             detail_parts: list[str] = []
             if "file_path" in self.details:
                 detail_parts.append(f"file: {self.details['file_path']}")
@@ -164,8 +209,43 @@ class CodeWeaverError(Exception):
             )
             if detail_parts:
                 parts.append(_get_reporting_info(detail_parts))
-        parts.extend(type(self)._issue_information)
+
+        if include_suggestions and self.suggestions:
+            parts.append("\n".join(f"  {_BULLET} {s}" for s in self.suggestions))
+
+        if include_issue_info:
+            parts.extend(type(self)._issue_information)
+
         return "\n".join(parts)
+
+    def log_record(self) -> dict[str, Any]:
+        """Return a structured record for use with structured logging systems.
+
+        Produces a plain ``dict`` containing all exception data so that
+        logging back-ends (structlog, Python logging with a JSON formatter,
+        etc.) can emit fully-structured log lines without parsing strings.
+
+        Example::
+
+            logger.error("Indexing failed", **error.log_record())
+
+        Returns:
+            Dict with ``error_type``, ``message``, ``details``,
+            ``suggestions``, and ``location`` keys.
+        """
+        return {
+            "error_type": type(self).__name__,
+            "message": self.message,
+            "details": dict(self.details),
+            "suggestions": list(self.suggestions),
+            "location": {
+                "filename": self.location.filename,
+                "line_number": self.location.line_number,
+                "module_name": self.location.module_name,
+            }
+            if self.location
+            else None,
+        }
 
 
 class InitializationError(CodeWeaverError):
