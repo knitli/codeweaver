@@ -154,7 +154,9 @@ dependencies = [
   "qdrant-client==1.17.1",
   "pydantic-ai-slim>=1.68.0",
   "sentence-transformers==5.2.0; python_version <= '3.14'",
-  "voyageai==0.3.7",
+  # voyageai declares requires_python: <3.14 — uv respects this automatically,
+  # but pip does not filter by requires_python during install, so we must gate it here.
+  "voyageai==0.3.7; python_version < '3.14'",
   # * ================ Indexing and Engine ==================*
   # Also known as: the land of python rust extensions
   # the core code-weaver-daemon package that keeps indexing continuously updated
@@ -279,7 +281,7 @@ recommended = [
   "sentence-transformers",
   "tokenizers",
   "py-cpuinfo",
-  "voyageai",
+  "voyageai; python_version < '3.14'",
   "tavily",
 ]
 recommended-local-only = [
@@ -309,8 +311,9 @@ tavily = ["tavily"]
 #     "sentence-transformers[openvino]",
 #     "py-cpuinfo",
 # ]
-# voyageai self-excludes on 3.14+ via its own requires_python: <3.14
-voyageai = ["voyageai"]
+# voyageai self-excludes on 3.14+ via its own requires_python: <3.14,
+# but pip doesn't filter on requires_python during install, so we gate here too.
+voyageai = ["voyageai; python_version < '3.14'"]
 xai = ["pydantic-ai-slim[xai]"]
 
 [dependency-groups]
