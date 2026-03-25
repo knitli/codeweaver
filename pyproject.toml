@@ -229,7 +229,6 @@ fastembed = ["fastembed; python_version < '3.14'", "py-cpuinfo"]
 fastembed-gpu = ["fastembed-gpu; python_version < '3.14'", "py-cpuinfo"]
 
 full = [
-  "permit-fastmcp",
   "ddgs; python_version < '3.14'",
   "eunomia-mcp",
   "exa-py",
@@ -239,19 +238,21 @@ full = [
   # If you need azure-key-vault support on python 3.13, you can install the full group and then manually install azure-identity in your environment to get the missing dependency (with vanilla python).
   "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager]; python_version == '3.13'",
   "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]; python_version != '3.13'",
-  "permit-fastmcp",
+  # permit-fastmcp depends on cffi which cannot be built on free-threaded python 3.13 (3.14 is OK)
+  "permit-fastmcp; python_version != '3.13'",
   "sentence-transformers",
   "tavily-python",
 ]
 full-gpu = [
-  "permit-fastmcp",
   "ddgs; python_version < '3.14'",
   "eunomia-mcp",
   "fastembed-gpu; python_version < '3.14'",
-  "permit-fastmcp",
   "exa-py",
   "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,retries,xai]",
-  "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
+  # see full extra comments about cffi and free-threaded python 3.13
+  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager]; python_version == '3.13'",
+  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]; python_version != '3.13'",
+  "permit-fastmcp; python_version != '3.13'",
   "sentence-transformers",
   # see note below about why this is commented out
   #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",

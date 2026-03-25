@@ -78,10 +78,13 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         from codeweaver.core import is_test_environment
 
         # Logic for auto_persist:
-        # 1. If explicitly provided in config, use that value.
-        # 2. If not provided, disable in test mode, enable otherwise.
+        # 1. In test environments, always disable — even if the config explicitly says True.
+        #    _default_memory_config() hardcodes auto_persist=True, which would otherwise
+        #    trigger handle_persistence() after every upsert and race-fail on the .tmp path.
+        # 2. If not provided (None), default based on environment (disabled in tests).
+        # 3. If explicitly provided and not in a test environment, use the config value.
         auto_persist = self.config.in_memory_config.get("auto_persist")
-        if auto_persist is None:
+        if auto_persist is None or is_test_environment():
             auto_persist = not is_test_environment()
 
         persist_interval: int | None
