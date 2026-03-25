@@ -106,7 +106,9 @@ jobs:
             pkg-config \
             python3-dev \
             libffi-dev \
-            libssl-dev
+            libssl-dev \
+            libxml2-dev \
+            libxslt-dev
       - name: Setup Python environment with Mise
         uses: ./.github/actions/setup-mise-env
         with:
