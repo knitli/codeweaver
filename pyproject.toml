@@ -841,11 +841,15 @@ conflicts = [
 ]
 preview = true
 override-dependencies = [
-  # Pin cffi to 1.17.1 on Python 3.13 to prevent cffi 2.0 resolution.
-  # cffi 2.0 explicitly rejects free-threaded 3.13 (segfault in sync primitives)
-  # but supports 3.14t. No PEP 508 marker distinguishes 3.13t from 3.13, so this
-  # applies to both — harmless on standard 3.13 since cryptography has pre-built wheels.
+  # cffi 2.0 segfaults on free-threaded 3.13 (sync primitive differences vs 3.14t).
+  # No PEP 508 marker distinguishes 3.13t from 3.13, so this applies to both —
+  # harmless on standard 3.13 since cryptography has pre-built wheels there.
   "cffi==1.17.1; python_version == '3.13'",
+  # Pin cryptography to 45.0.7 on 3.13: its build-system.requires uses cffi>=1.12,
+  # compatible with our cffi pin. cryptography 46+ requires cffi>=2.0.0 to build,
+  # which conflicts with the cffi<2.0 build constraint needed for 3.13t.
+  # On 3.14+, cryptography 46+ resolves naturally (has pre-built wheels + cffi 2.0 works).
+  "cryptography==45.0.7; python_version == '3.13'",
 ]
 # Constrain cffi in build isolation environments. override-dependencies only affects
 # runtime resolution; when cryptography builds from source on 3.13t, its build env
