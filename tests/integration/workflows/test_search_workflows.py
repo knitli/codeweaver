@@ -29,6 +29,10 @@ from pathlib import Path
 import pytest
 
 
+# Search pipeline requires fastembed as the default embedding provider
+pytestmark = [pytest.mark.integration, pytest.mark.requires_fastembed]
+
+
 # =============================================================================
 # Test Fixtures
 # =============================================================================
