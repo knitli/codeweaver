@@ -252,16 +252,28 @@ class ChunkerSelector:
                 pair_ext = f".{pair_ext}"
             if pair_ext.lower() != file_ext.lower():
                 continue
+            pair_lang = getattr(pair, "language", None)
             delim_lang = getattr(custom_delim, "language", None)
+            # Prefer per-extension language over the top-level custom_delim language.
+            if pair_lang is not None:
+                if (
+                    delim_lang is not None
+                    and str(delim_lang) != str(pair_lang)
+                ):
+                    logger.warning(
+                        "Custom delimiter language mismatch for extension %s: "
+                        "using pair.language=%r over custom_delim.language=%r",
+                        pair_ext,
+                        pair_lang,
+                        delim_lang,
+                    )
+                if isinstance(pair_lang, SemanticSearchLanguage | ConfigLanguage):
+                    return pair_lang
+                return textcase.snake(str(pair_lang))
             if delim_lang is not None:
                 if isinstance(delim_lang, SemanticSearchLanguage | ConfigLanguage):
                     return delim_lang
                 return textcase.snake(str(delim_lang))
-            pair_lang = getattr(pair, "language", None)
-            if pair_lang is not None:
-                if isinstance(pair_lang, SemanticSearchLanguage | ConfigLanguage):
-                    return pair_lang
-                return textcase.snake(str(pair_lang))
         return None
 
     def _detect_language(
