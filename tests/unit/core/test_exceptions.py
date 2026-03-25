@@ -76,7 +76,7 @@ def _make_chain(depth: int = 3) -> CodeWeaverError:
         except CodeWeaverError as exc:
             current = exc
     assert isinstance(current, CodeWeaverError)
-    return current  # type: ignore[return-value]
+    return current
 
 
 # ---------------------------------------------------------------------------
