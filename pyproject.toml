@@ -155,7 +155,7 @@ dependencies = [
   "qdrant-client==1.17.1",
   "pydantic-ai-slim>=1.68.0",
   "sentence-transformers==5.2.0; python_version <= '3.14'",
-  "voyageai==0.3.7",
+  "voyageai==0.3.7; python_version < '3.14'",
   # * ================ Indexing and Engine ==================*
   # Also known as: the land of python rust extensions
   # the core code-weaver-daemon package that keeps indexing continuously updated
@@ -282,9 +282,7 @@ recommended = [
   "sentence-transformers",
   "tokenizers",
   "py-cpuinfo",
-  "voyageai",
-  "ddgs; python_version < '3.14'",
-  "pydantic-ai-slim[openai,anthropic,retries]",
+  "voyageai; python_version < '3.14'",
   "tavily",
 ]
 recommended-local-only = [
@@ -314,7 +312,7 @@ tavily = ["tavily"]
 #     "sentence-transformers[openvino]",
 #     "py-cpuinfo",
 # ]
-voyageai = ["voyageai"]
+voyageai = ["voyageai; python_version < '3.14'"]
 xai = ["pydantic-ai-slim[xai]"]
 
 [dependency-groups]
@@ -357,7 +355,6 @@ test = [
 [build-system]
 requires = [
   "hatchling>=1.29.0",
-  "twine>=6.2.0",
   "uv-dynamic-versioning>=0.13.0",
 ]
 build-backend = "hatchling.build"
