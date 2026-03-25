@@ -255,7 +255,7 @@ class ChunkerSelector:
             delim_lang = getattr(custom_delim, "language", None)
             if delim_lang is not None:
                 if isinstance(delim_lang, SemanticSearchLanguage | ConfigLanguage):
-                    return textcase.snake(delim_lang.variable)
+                    return delim_lang
                 return textcase.snake(str(delim_lang))
             pair_lang = getattr(pair, "language", None)
             if pair_lang is not None:
