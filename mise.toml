@@ -553,9 +553,11 @@ if "%usage_cov%"=="true" (
 [tasks.test.env]
 CODEWEAVER_TEST_MODE = "true"
 PYTHONPATH = "src"
+PYTHONWARNINGS = "ignore:Core Pydantic V1:UserWarning"
 
 [tasks.test-cov]
 env.PYTHONPATH = "src"
+env.PYTHONWARNINGS = "ignore:Core Pydantic V1:UserWarning"
 tools.uv = "latest"
 tools.python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 depends = ["sync"]  # ensure test dependencies are installed
