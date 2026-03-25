@@ -21,6 +21,8 @@ import logging
 
 from typing import TYPE_CHECKING, Any
 
+import textcase
+
 from codeweaver.core import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.engine.chunker.base import BaseChunker
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
@@ -216,14 +218,12 @@ class ChunkerSelector:
         if self.governor.settings is None:
             return None
 
-        import textcase
-
         custom_delimiters = getattr(self.governor.settings, "custom_delimiters", None)
         if not custom_delimiters:
             return None
 
         for custom_delim in custom_delimiters:
-            if lang := self._match_custom_ext_pair(custom_delim, file_ext, textcase):
+            if lang := self._match_custom_ext_pair(custom_delim, file_ext):
                 return lang
         return None
 
@@ -231,14 +231,12 @@ class ChunkerSelector:
     def _match_custom_ext_pair(
         custom_delim: object,
         file_ext: str,
-        textcase: object,
     ) -> SemanticSearchLanguage | ConfigLanguage | str | None:
         """Return the language for a matching extension pair in *custom_delim*.
 
         Args:
             custom_delim: A ``CustomDelimiter`` instance from settings.
             file_ext: File extension including the leading dot.
-            textcase: The textcase module (passed in to avoid repeated imports).
 
         Returns:
             Matching language, or ``None``.
@@ -256,12 +254,14 @@ class ChunkerSelector:
                 continue
             delim_lang = getattr(custom_delim, "language", None)
             if delim_lang is not None:
-                return textcase.snake(str(delim_lang))  # type: ignore[attr-defined]
+                if isinstance(delim_lang, SemanticSearchLanguage | ConfigLanguage):
+                    return textcase.snake(delim_lang.variable)
+                return textcase.snake(str(delim_lang))
             pair_lang = getattr(pair, "language", None)
             if pair_lang is not None:
                 if isinstance(pair_lang, SemanticSearchLanguage | ConfigLanguage):
                     return pair_lang
-                return textcase.snake(str(pair_lang))  # type: ignore[attr-defined]
+                return textcase.snake(str(pair_lang))
         return None
 
     def _detect_language(
