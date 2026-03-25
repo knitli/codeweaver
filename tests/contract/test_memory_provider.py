@@ -356,15 +356,13 @@ class TestMemoryProviderContract:
         )
 
     async def test_auto_persist_on_upsert(
-        self, memory_config, sample_chunk, temp_persist_path, test_embedding_caps
+        self, memory_config, sample_chunk, temp_persist_path, test_embedding_caps, monkeypatch
     ):
         """Test auto_persist triggers persistence on upsert."""
-        # Config is already a settings object, we need to create a new one with modified inner config
-        # or just modify the dict used to create it if we were doing that.
-        # Since memory_config is a Pydantic model, we should use model_copy with update if possible,
-        # but in_memory_config is a dict inside.
+        # Mock is_test_environment so auto_persist isn't force-disabled in __init__
+        monkeypatch.setattr("codeweaver.core.is_test_environment", lambda: False)
+        monkeypatch.setattr("codeweaver.core.utils.checks.is_test_environment", lambda: False)
 
-        # Easiest way is to create a new settings object
         new_config = memory_config.in_memory_config.copy()
         new_config["auto_persist"] = True
 

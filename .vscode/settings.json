@@ -14,18 +14,18 @@
     }
   },
   "debug.javascript.defaultRuntimeExecutable": {
-    "pwa-node": "${userHome}/.local/share/mise/shims/node"
+    "pwa-node": "/home/knitli/.local/share/mise/shims/node"
   },
-  "python.defaultInterpreterPath": ".venv/bin/python",
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
   "python.languageServer": "None",
   "python.terminal.activateEnvironment": false,
   "ruff.interpreter": [
-    "${userHome}/.local/share/mise/shims/python"
+    "/home/knitli/.local/share/mise/shims/python"
   ],
   "ruff.path": [
-    "${userHome}/.local/share/mise/shims/ruff"
+    "/home/knitli/.local/share/mise/shims/ruff"
   ],
-  "shellcheck.executablePath": "${userHome}/.local/share/mise/shims/shellcheck",
+  "shellcheck.executablePath": "/home/knitli/.local/share/mise/shims/shellcheck",
   "terminal.integrated.defaultProfile.linux": "zsh",
   "terminal.integrated.env.linux": {
     "CODEWEAVER_IN_VSCODE": "1",
