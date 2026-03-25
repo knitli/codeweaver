@@ -24,7 +24,8 @@
     "starlight-sidebar-topics": "^0.7.1"
   },
   "devDependencies": {
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "wrangler": "^4.77.0"
   },
   "name": "codeweaver-docs",
   "scripts": {
