@@ -3,9 +3,9 @@
     "codeweaver/.vscode/mcp.json: codeweaver": {
       "allowedModels": [
         "copilot/claude-haiku-4.5",
-        "copilot/claude-sonnet-4.5",
+        "copilot/claude-sonnet-4.6",
         "copilot/gemini-3-flash",
-        "claude/claude-sonnet-4.5",
+        "claude/claude-sonnet-4.6",
         "claude/claude-haiku-4.5",
         "sourcery/*",
         "gemini/gemini-3-flash",
@@ -15,6 +15,12 @@
   },
   "debug.javascript.defaultRuntimeExecutable": {
     "pwa-node": "/home/knitli/.local/share/mise/shims/node"
+  },
+  "files.associations": {
+    "wrangler.json": "jsonc",
+    "wrangler.jsonc": "jsonc",
+    "tsconfig.json": "jsonc",
+    "tsconfig.*.json": "jsonc"
   },
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
   "python.languageServer": "None",

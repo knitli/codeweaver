@@ -16,7 +16,9 @@ import markdoc from '@astrojs/markdoc';
 
 // https://astro.build/config
 export default defineConfig({
-  integrations: [starlight({
+  integrations: [
+    astroD2({ skipGeneration: true }), markdoc(),
+    starlight({
     title: 'CodeWeaver',
     description: 'Official CodeWeaver documentation - semantic code search and understanding',
     logo: {
@@ -86,7 +88,7 @@ export default defineConfig({
       starlightIconsPlugin(),
       starlightPageActions({ actions: { claude: true, chatgpt: true, markdown: true }, share: true }),
     ],
-  }), starlightIconsIntegration(), astroD2({ skipGeneration: true }), markdoc()],
+  }), starlightIconsIntegration()],
   vite: {
     plugins: [],
     define: {

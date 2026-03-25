@@ -1,0 +1,22 @@
+// SPDX-FileCopyrightText: 2026 Knitli Inc.
+//
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "assets": {
+    "directory": "./public"
+  },
+  "compatibility_date": "2026-03-17",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "name": "codeweaver-docs",
+  "observability": {
+    "enabled": true
+  },
+  "placement": {
+    "mode": "smart"
+  },
+  "upload_source_maps": false
+}
