@@ -13,6 +13,7 @@ from types import GeneratorType
 from typing import TYPE_CHECKING
 
 from codeweaver.core import CodeWeaverError
+from codeweaver.core.exceptions import _BULLET
 from codeweaver.core.utils import get_codeweaver_prefix
 
 
@@ -25,7 +26,6 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 _MAX_CHAIN_DEPTH = 10
-_BULLET = "\u2022"
 
 
 def _collect_codeweaver_chain(exc: BaseException) -> list[CodeWeaverError]:
@@ -49,8 +49,11 @@ def _collect_codeweaver_chain(exc: BaseException) -> list[CodeWeaverError]:
         if exc_id in seen:
             break
         seen.add(exc_id)
-        if isinstance(current, CodeWeaverError):
-            chain.append(current)
+        if not isinstance(current, CodeWeaverError):
+            # Stop walking once we leave the CodeWeaverError chain so we don't
+            # traverse an arbitrarily long external __cause__/__context__ chain.
+            break
+        chain.append(current)
         # Explicit cause (raise X from Y) takes priority; fall back to implicit
         # context only when it has not been suppressed by ``raise X from None``.
         next_exc: BaseException | None = current.__cause__ or (
@@ -202,7 +205,7 @@ class CLIErrorHandler:
                 self.display.console.print(f"  {_BULLET} {suggestion}")
             self.display.console.print()
 
-        for line in CodeWeaverError._issue_information:
+        for line in CodeWeaverError.issue_information:
             self.display.console.print(line)
 
         if self.verbose or self.debug:
@@ -296,10 +299,4 @@ def handle_keyboard_interrupt_gracefully() -> GeneratorType[None, None, None]:
         _handle_keyboard_interrupt()
 
 
-__all__ = (
-    "CLIErrorHandler",
-    "_collect_codeweaver_chain",
-    "_deduplicate_suggestions",
-    "_get_external_root",
-    "handle_keyboard_interrupt_gracefully",
-)
+__all__ = ("CLIErrorHandler", "handle_keyboard_interrupt_gracefully")

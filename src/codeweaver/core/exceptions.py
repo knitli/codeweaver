@@ -110,7 +110,7 @@ class CodeWeaverError(Exception):
     appropriate for tracebacks and plain log lines.
     """
 
-    _issue_information: ClassVar[tuple[str, ...]] = _get_issue_information()
+    issue_information: ClassVar[tuple[str, ...]] = _get_issue_information()
 
     def __init__(
         self,
@@ -214,7 +214,7 @@ class CodeWeaverError(Exception):
             parts.append("\n".join(f"  {_BULLET} {s}" for s in self.suggestions))
 
         if include_issue_info:
-            parts.extend(type(self)._issue_information)
+            parts.extend(type(self).issue_information)
 
         return "\n".join(parts)
 
