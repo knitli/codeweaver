@@ -15,7 +15,7 @@ from codeweaver.core.utils import has_package
 
 _FASTEMBED_AVAILABLE = has_package("fastembed") or has_package("fastembed-gpu")
 
-if TYPE_CHECKING or _FASTEMBED_AVAILABLE:
+if TYPE_CHECKING:
     from fastembed.common.model_description import (
         BaseModelDescription,
         DenseModelDescription,
@@ -26,7 +26,21 @@ if TYPE_CHECKING or _FASTEMBED_AVAILABLE:
     from fastembed.rerank.cross_encoder import TextCrossEncoder
     from fastembed.sparse import SparseTextEmbedding
     from fastembed.text import TextEmbedding
-else:
+elif _FASTEMBED_AVAILABLE:
+    try:
+        from fastembed.common.model_description import (
+            BaseModelDescription,
+            DenseModelDescription,
+            ModelSource,
+            PoolingType,
+        )
+        from fastembed.rerank.cross_encoder import TextCrossEncoder
+        from fastembed.sparse import SparseTextEmbedding
+        from fastembed.text import TextEmbedding
+    except ImportError:
+        _FASTEMBED_AVAILABLE = False
+
+if not (TYPE_CHECKING or _FASTEMBED_AVAILABLE):
     BaseModelDescription = Any
     DenseModelDescription = Any
     ModelSource = Any
@@ -43,7 +57,7 @@ def _require_fastembed() -> None:
 
         raise ConfigurationError(
             "fastembed is not installed. Please install it with "
-            "`pip install code-weaver[fastembed]` or `codeweaver[fastembed-gpu]`."
+            "`pip install code-weaver[fastembed]` or `pip install code-weaver[fastembed-gpu]`."
         )
 
 

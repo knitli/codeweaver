@@ -25,10 +25,27 @@ logger = logging.getLogger(__name__)
 
 _FASTEMBED_AVAILABLE = has_package("fastembed") or has_package("fastembed-gpu")
 
-if TYPE_CHECKING or _FASTEMBED_AVAILABLE:
+if TYPE_CHECKING:
     from fastembed.rerank.cross_encoder import TextCrossEncoder
-else:
+elif _FASTEMBED_AVAILABLE:
+    try:
+        from fastembed.rerank.cross_encoder import TextCrossEncoder
+    except ImportError:
+        _FASTEMBED_AVAILABLE = False
+
+if not (TYPE_CHECKING or _FASTEMBED_AVAILABLE):
     TextCrossEncoder = Any
+
+
+def _require_fastembed() -> None:
+    """Raise ConfigurationError if fastembed is not installed."""
+    if not _FASTEMBED_AVAILABLE:
+        from codeweaver.core import ConfigurationError
+
+        raise ConfigurationError(
+            "fastembed is not installed. Please install it with "
+            "`pip install code-weaver[fastembed]` or `pip install code-weaver[fastembed-gpu]`."
+        )
 
 
 class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
@@ -50,6 +67,7 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
         **kwargs: Any,
     ) -> Any:
         """Execute the reranking process."""
+        _require_fastembed()
         try:
             # our batch_size needs to be the number of documents because we only get back the scores.
             # If we set it to a lower number, we wouldn't know what documents the scores correspond to without some extra setup.

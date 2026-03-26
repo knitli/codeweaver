@@ -40,7 +40,7 @@ from codeweaver.providers.embedding.providers.base import (
 
 _FASTEMBED_AVAILABLE = has_package("fastembed") or has_package("fastembed-gpu")
 
-if TYPE_CHECKING or _FASTEMBED_AVAILABLE:
+if TYPE_CHECKING:
     from fastembed.sparse import SparseTextEmbedding
     from fastembed.text import TextEmbedding
 
@@ -48,7 +48,19 @@ if TYPE_CHECKING or _FASTEMBED_AVAILABLE:
         get_sparse_embedder,
         get_text_embedder,
     )
-else:
+elif _FASTEMBED_AVAILABLE:
+    try:
+        from fastembed.sparse import SparseTextEmbedding
+        from fastembed.text import TextEmbedding
+
+        from codeweaver.providers.embedding.fastembed_extensions import (
+            get_sparse_embedder,
+            get_text_embedder,
+        )
+    except ImportError:
+        _FASTEMBED_AVAILABLE = False
+
+if not (TYPE_CHECKING or _FASTEMBED_AVAILABLE):
     TextEmbedding = Any
     SparseTextEmbedding = Any
 
@@ -58,6 +70,17 @@ if _FASTEMBED_AVAILABLE:
 else:
     _TextEmbedding = None
     _SparseTextEmbedding = None
+
+
+def _require_fastembed() -> None:
+    """Raise ConfigurationError if fastembed is not installed."""
+    if not _FASTEMBED_AVAILABLE:
+        from codeweaver.core import ConfigurationError
+
+        raise ConfigurationError(
+            "fastembed is not installed. Please install it with "
+            "`pip install code-weaver[fastembed]` or `pip install code-weaver[fastembed-gpu]`."
+        )
 
 
 logger = logging.getLogger(__name__)
@@ -113,6 +136,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         **kwargs: Any,
     ) -> None:
         """Initialize the FastEmbed client."""
+        _require_fastembed()
 
     @property
     def base_url(self) -> str | None:
@@ -180,6 +204,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         **kwargs: Any,
     ) -> None:
         """Initialize the FastEmbed sparse client."""
+        _require_fastembed()
         # impl_deps and custom_deps are ignored for FastEmbed sparse provider;
         # caps may be passed as a keyword argument via **kwargs from the base class.
         # 1. Set caps using object.__setattr__ because pydantic model isn't fully initialized yet
