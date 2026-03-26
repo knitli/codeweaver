@@ -234,12 +234,15 @@ full = [
   "eunomia-mcp",
   "exa-py",
   "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,retries,xai]",
-  # azure-key-vault requires azure-identity, which requires cffi. cffi *does* work on python 3.13, but NOT 3.13 freethreaded
-  # since we have no way to test for freethreaded builds in pyproject.toml and the build breaks with it, we leave it out.
-  # If you need azure-key-vault support on python 3.13, you can install the full group and then manually install azure-identity in your environment to get the missing dependency (with vanilla python).
-  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]",
-  # permit-fastmcp depends on cffi which cannot be built on free-threaded python 3.13 (3.14 is OK)
-  "permit-fastmcp",
+  # azure-key-vault → azure-identity → cryptography → cffi. On 3.13t (free-threaded),
+  # cryptography has no pre-built wheel and building from source requires Rust + cffi<2.0.
+  # No PEP 508 marker distinguishes 3.13t from 3.13, so we exclude azure-key-vault on all 3.13.
+  # Standard 3.13 users can install azure-identity manually. The _special-dependencies task
+  # handles this for non-free-threaded 3.13 builds.
+  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager]; python_version == '3.13'",
+  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]; python_version != '3.13'",
+  # permit-fastmcp depends on cffi — same 3.13t issue as azure-key-vault
+  "permit-fastmcp; python_version != '3.13'",
   "sentence-transformers",
   "tavily-python",
 ]
@@ -249,9 +252,10 @@ full-gpu = [
   "fastembed-gpu; python_version < '3.14'",
   "exa-py",
   "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,retries,xai]",
-  # see full extra comments about cffi and free-threaded python 3.13
-  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]",
-  "permit-fastmcp",
+  # see full extra comments about cffi/cryptography and free-threaded python 3.13
+  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager]; python_version == '3.13'",
+  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]; python_version != '3.13'",
+  "permit-fastmcp; python_version != '3.13'",
   "sentence-transformers",
   # see note below about why this is commented out
   #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
