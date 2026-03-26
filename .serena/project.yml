@@ -128,7 +128,7 @@ read_only_memory_patterns: []
 # line ending convention to use when writing source files.
 # Possible values: unset (use global setting), "lf", "crlf", or "native" (platform default)
 # This does not affect Serena's own files (e.g. memories and configuration files), which always use native line endings.
-line_ending:
+line_ending: "lf"
 # list of regex patterns for memories to completely ignore.
 # Matching memories will not appear in list_memories or activate_project output
 # and cannot be accessed via read_memory or write_memory.

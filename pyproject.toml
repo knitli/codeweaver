@@ -124,7 +124,7 @@ dependencies = [
   # psutil used for resource governance/limiting by engine
   "psutil>=7.2.2",
   "textcase>=0.4.5",
-  "typing_extensions>=4.15.0",
+  "typing_extensions>=4.15.0; python_version < '3.13'",
   "uuid7>=0.1.0; python_version < '3.14'",
   "uvloop>=0.22.1; python_implementation == 'CPython' and platform_system != 'Windows'",
   # * ================ Core Provider Dependencies ==================*
@@ -148,14 +148,15 @@ dependencies = [
   "cohere==5.20.7",
   "fastembed==0.7.4; python_version < '3.14'",
   "google-genai==1.56.0",
-  # NOTE: We're waiting on pydantic-ai to update to 1.0+ before we can upgrade too
   "huggingface-hub>=1.0.0",
   "mistralai==1.10.0",
   "openai==2.28.0",
   "qdrant-client==1.17.1",
   "pydantic-ai-slim>=1.68.0",
   "sentence-transformers==5.2.0; python_version <= '3.14'",
-  "voyageai==0.3.7",
+  # voyageai declares requires_python: <3.14 — uv respects this automatically,
+  # but pip does not filter by requires_python during install, so we must gate it here.
+  "voyageai==0.3.7; python_version < '3.14'",
   # * ================ Indexing and Engine ==================*
   # Also known as: the land of python rust extensions
   # the core code-weaver-daemon package that keeps indexing continuously updated
@@ -221,37 +222,40 @@ azure-key-vault = ["pydantic-settings[yaml,toml,azure-key-vault]"]
 bedrock = ["pydantic-ai-slim[bedrock]"]
 cohere = ["pydantic-ai-slim[cohere]"]
 # ==== Data Sources ====
-# duckduckgo relies on primp, which needs maturin. Maturin does not yet support python 3.14 free-threaded builds, so we exclude it from python 3.14 installs for now. If you need duckduckgo support on python 3.14, you can install the ddgs package manually in your environment.
-duckduckgo = ["ddgs; python_version < '3.14'"]
+duckduckgo = ["ddgs"]
 exa = ["exa-py"]
+# fastembed blocked on 3.14 by py-rust-stemmers (no cp314/cp314t wheels)
 fastembed = ["fastembed; python_version < '3.14'", "py-cpuinfo"]
 # Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
 fastembed-gpu = ["fastembed-gpu; python_version < '3.14'", "py-cpuinfo"]
 
 full = [
-  "permit-fastmcp",
-  "ddgs; python_version < '3.14'",
+  "ddgs",
   "eunomia-mcp",
   "exa-py",
   "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,retries,xai]",
-  # azure-key-vault requires azure-identity, which requires cffi. cffi *does* work on python 3.13, but NOT 3.13 freethreaded
-  # since we have no way to test for freethreaded builds in pyproject.toml and the build breaks with it, we leave it out.
-  # If you need azure-key-vault support on python 3.13, you can install the full group and then manually install azure-identity in your environment to get the missing dependency (with vanilla python).
+  # azure-key-vault → azure-identity → cryptography → cffi. On 3.13t (free-threaded),
+  # cryptography has no pre-built wheel and building from source requires Rust + cffi<2.0.
+  # No PEP 508 marker distinguishes 3.13t from 3.13, so we exclude azure-key-vault on all 3.13.
+  # Standard 3.13 users can install azure-identity manually. The _special-dependencies task
+  # handles this for non-free-threaded 3.13 builds.
   "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager]; python_version == '3.13'",
   "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]; python_version != '3.13'",
-  "permit-fastmcp",
+  # permit-fastmcp depends on cffi — same 3.13t issue as azure-key-vault
+  "permit-fastmcp; python_version != '3.13'",
   "sentence-transformers",
   "tavily-python",
 ]
 full-gpu = [
-  "permit-fastmcp",
-  "ddgs; python_version < '3.14'",
+  "ddgs",
   "eunomia-mcp",
   "fastembed-gpu; python_version < '3.14'",
-  "permit-fastmcp",
   "exa-py",
   "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,retries,xai]",
-  "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
+  # see full extra comments about cffi/cryptography and free-threaded python 3.13
+  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager]; python_version == '3.13'",
+  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]; python_version != '3.13'",
+  "permit-fastmcp; python_version != '3.13'",
   "sentence-transformers",
   # see note below about why this is commented out
   #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
@@ -281,16 +285,14 @@ recommended = [
   "sentence-transformers",
   "tokenizers",
   "py-cpuinfo",
-  "voyageai",
-  "ddgs; python_version < '3.14'",
-  "pydantic-ai-slim[openai,anthropic,retries]",
+  "voyageai; python_version < '3.14'",
   "tavily",
 ]
 recommended-local-only = [
   "fastembed; python_version < '3.14'",
   "sentence-transformers",
   "tokenizers",
-  "ddgs; python_version < '3.14'",
+  "ddgs",
   "py-cpuinfo",
   # openai for ollama local models
   "pydantic-ai-slim[openai,retries]",
@@ -313,7 +315,9 @@ tavily = ["tavily"]
 #     "sentence-transformers[openvino]",
 #     "py-cpuinfo",
 # ]
-voyageai = ["voyageai"]
+# voyageai self-excludes on 3.14+ via its own requires_python: <3.14,
+# but pip doesn't filter on requires_python during install, so we gate here too.
+voyageai = ["voyageai; python_version < '3.14'"]
 xai = ["pydantic-ai-slim[xai]"]
 
 [dependency-groups]
@@ -322,17 +326,17 @@ dev = [
   "black>=26.3.1",
   "ruff>=0.15.6",
   "serena>=0.9.1",
-  "ty>=0.0.23",
-  "uv>=0.10.11",
+  "ty>=0.0.25",
+  "uv>=0.11.1",
 ]
-build = ["hatchling>=1.28.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.12.0"]
+build = ["hatchling>=1.28.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.14.0"]
 dev-helpers = [
   "ipython>=9.11.0",
   "jsonlines>=4.0.0",
   "memory-profiler>=0.61.0",
   "pdbpp>=0.12.1",
   "pyperclip>=1.11.0",
-  "superclaude>=4.2.0",
+  "superclaude>=4.3.0",
 ]
 docs = [
   "griffe>=2.0.0",
@@ -344,7 +348,7 @@ test = [
   "hypothesis>=6.151.9",
   "pytest>=9.0.2",
   "pytest-asyncio>=1.3.0",
-  "pytest-cov>=7.0.0",
+  "pytest-cov>=7.1.0",
   "pytest-env>=1.6.0",
   "pytest-examples>=0.0.18",
   "pytest-flakefinder>=1.1.0",
@@ -356,8 +360,7 @@ test = [
 [build-system]
 requires = [
   "hatchling>=1.29.0",
-  "twine>=6.2.0",
-  "uv-dynamic-versioning>=0.13.0",
+  "uv-dynamic-versioning>=0.14.0",
 ]
 build-backend = "hatchling.build"
 
@@ -365,17 +368,49 @@ build-backend = "hatchling.build"
 #  - readme: https://github.com/hynek/hatch-fancy-pypi-readme
 
 [tool.coverage.run]
+concurrency = ["multiprocessing", "thread"]
+patch = ["_exit", "subprocess"]
+relative_files = true
+parallel = true
 omit = [
-  "scripts/*",
-  "mise-tasks/*",
-  "typings/*",
-  ".venv/*",
-  "tests/*",
-  "vendored/*",
-  "src/codeweaver/__init__.py",
-  "src/codeweaver/**/__init__.py",
-  "src/codeweaver/**/types/*",
-  "src/codeweaver/**/types.py",
+  "*/scripts/*",
+  "*/mise-tasks/*",
+  "*/tests/*",
+  "*/__init__.py",
+  "*/__main__.py",
+  "*/_version.py",
+]
+
+[tool.coverage.report]
+skip_empty = true
+sort = "-cover"
+omit = [
+  "*/scripts/*",
+  "*/mise-tasks/*",
+  "*/tests/*",
+  "*/__init__.py",
+  "*/__main__.py",
+  "*/_version.py",
+]
+exclude_also = [
+  '@(abc\.)?abstractmethod',
+  '@(dataclasses\.)?dataclass',
+  '@(typing\.)?overload',
+  '@(typing\.)?override',
+  '@(typing\.)?runtime_checkable',
+  '@(typing\.)?type_check_only',
+  '[ \t]+?pass\n',
+  'class .*\bProtocol\):',
+  "def __repr__",
+  "if __name__ == .__main__.:",
+  "if 0:",
+  "if self.debug:",
+  "if settings.DEBUG",
+  "if TYPE_CHECKING:",
+  "no cover: start(?s:.)*?no cover: stop",
+  "raise AssertionError",
+  "raise NotImplementedError",
+  '\s*def .*\)\s*->\s*TypeIs\[.+\]:[\n\sA-za-z0-9_-]+?\n\n',
 ]
 
 [tool.hatch.build.hooks.version]
@@ -412,7 +447,6 @@ artifacts = ["*.so", "src/**", "vendored/**", "packages/**"]
 [tool.hatch.build.targets.sdist]
 include = [
   ".gitignore",
-  "ARCHITECTURE.md",
   "CHANGELOG.md",
   "CONTRIBUTORS_LICENSE_AGREEMENT.py",
   "LICENSE",
@@ -428,7 +462,7 @@ include = [
   "packages/**",
   "pyproject.toml",
   "sbom.spdx",
-  "schema/**",
+  "schema/latest/*",
   "src/**",
   "tests/**",
   "typings/**",
@@ -519,7 +553,7 @@ markers = [
   "requires_fastembed: Tests requiring fastembed package (not available on Python 3.14+)",
   "requires_gpu: Tests requiring GPU hardware for execution",
   "requires_models: Tests requiring ML model downloads and local model files",
-  "requires_voyageai: Tests requiring voyageai package (has pydantic v1 issues on Python 3.14+)",
+  "requires_voyageai: Tests requiring voyageai package (upstream requires_python caps at <3.14)",
   "retry: Tests that may need retries",
   "search: Tests related to search functionality",
   "server: Tests related to server functionality",
@@ -813,6 +847,24 @@ conflicts = [
   ],
 ]
 preview = true
+override-dependencies = [
+  # cffi 2.0 segfaults on free-threaded 3.13 (sync primitive differences vs 3.14t).
+  # No PEP 508 marker distinguishes 3.13t from 3.13, so this applies to both —
+  # harmless on standard 3.13 since cryptography has pre-built wheels there.
+  "cffi==1.17.1; python_version == '3.13'",
+  # Pin cryptography to 45.0.7 on 3.13: its build-system.requires uses cffi>=1.12,
+  # compatible with our cffi pin. cryptography 46+ requires cffi>=2.0.0 to build,
+  # which conflicts with the cffi<2.0 build constraint needed for 3.13t.
+  # On 3.14+, cryptography 46+ resolves naturally (has pre-built wheels + cffi 2.0 works).
+  "cryptography==45.0.7; python_version == '3.13'",
+]
+# Constrain cffi in build isolation environments. override-dependencies only affects
+# runtime resolution; when cryptography builds from source on 3.13t, its build env
+# pulls cffi>=1.12 independently. This prevents cffi 2.0 from entering build envs.
+build-constraint-dependencies = [
+  "cffi<2.0; python_version == '3.13'",
+]
+prerelease = "allow"
 
 [tool.uv.workspace]
 members = ["packages/*"]

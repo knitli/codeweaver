@@ -6,11 +6,14 @@
 import asyncio
 import sys
 
+import pytest
+
 from codeweaver.core.dependencies import bootstrap_settings
 from codeweaver.core.di import get_container, reset_container_state
 from codeweaver.server.server import CodeWeaverState
 
 
+@pytest.mark.requires_fastembed
 async def test_di_resolution():
     print("Resetting container...")
     reset_container_state()

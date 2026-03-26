@@ -18,6 +18,7 @@ from anyio import Path as AsyncPath
 from pydantic import PrivateAttr
 
 from codeweaver.core import (
+    DEFAULT_PERSIST_INTERVAL,
     CodeChunk,
     PersistenceError,
     Provider,
@@ -77,15 +78,22 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         from codeweaver.core import is_test_environment
 
         # Logic for auto_persist:
-        # 1. If explicitly provided in config, use that value.
-        # 2. If not provided, disable in test mode, enable otherwise.
+        # 1. In test environments, always disable — even if the config explicitly says True.
+        #    _default_memory_config() hardcodes auto_persist=True, which would otherwise
+        #    trigger handle_persistence() after every upsert and race-fail on the .tmp path.
+        # 2. If not provided (None), default based on environment (disabled in tests).
+        # 3. If explicitly provided and not in a test environment, use the config value.
         auto_persist = self.config.in_memory_config.get("auto_persist")
-        if auto_persist is None:
+        if auto_persist is None or is_test_environment():
             auto_persist = not is_test_environment()
 
-        persist_interval = self.config.in_memory_config.get("persist_interval")
-        if persist_interval is None:
-            persist_interval = 300
+        persist_interval: int | None
+        in_memory_config = self.config.in_memory_config
+        if "persist_interval" not in in_memory_config:
+            persist_interval = DEFAULT_PERSIST_INTERVAL
+        else:
+            # Explicit None means "disable periodic persistence"
+            persist_interval = in_memory_config.get("persist_interval")
 
         # Store as private attributes
         object.__setattr__(self, "_persist_path", self.config.in_memory_config.get("persist_path"))
@@ -119,8 +127,9 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         if await AsyncPath(str(self.persist_path)).exists():
             await self._restore_from_disk()
 
-        # Set up periodic persistence if configured
-        if auto_persist:
+        # Set up periodic persistence if configured (disabled in test environments
+        # or when persist_interval is explicitly set to None)
+        if auto_persist and persist_interval is not None and not is_test_environment():
             periodic_task = asyncio.create_task(self._periodic_persist_task())
             object.__setattr__(self, "_periodic_task", periodic_task)
 
@@ -215,7 +224,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         """
         while not self._shutdown:
             try:
-                await asyncio.sleep(self._persist_interval or 300)
+                await asyncio.sleep(self._persist_interval or DEFAULT_PERSIST_INTERVAL)
                 if not self._shutdown:
                     await self._persist_to_disk()
             except asyncio.CancelledError:

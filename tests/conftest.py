@@ -7,6 +7,12 @@
 """Global pytest configuration and fixtures for CodeWeaver tests."""
 
 import contextlib
+import warnings
+
+
+# Suppress pydantic v1 compat warnings from transitive deps (langsmith, voyageai)
+# on Python 3.14+ — fires at import time before pytest filterwarnings takes effect
+warnings.filterwarnings("ignore", message="Core Pydantic V1", category=UserWarning)
 
 from collections.abc import Generator, Sequence
 from pathlib import Path
