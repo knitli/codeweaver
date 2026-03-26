@@ -8,12 +8,14 @@
 
 from __future__ import annotations
 
-from typing import overload
+from typing import TYPE_CHECKING, Any, overload
 
 from codeweaver.core.di import dependency_provider
+from codeweaver.core.utils import has_package
 
+_FASTEMBED_AVAILABLE = has_package("fastembed") or has_package("fastembed-gpu")
 
-try:
+if TYPE_CHECKING or _FASTEMBED_AVAILABLE:
     from fastembed.common.model_description import (
         BaseModelDescription,
         DenseModelDescription,
@@ -24,87 +26,104 @@ try:
     from fastembed.rerank.cross_encoder import TextCrossEncoder
     from fastembed.sparse import SparseTextEmbedding
     from fastembed.text import TextEmbedding
+else:
+    BaseModelDescription = Any
+    DenseModelDescription = Any
+    ModelSource = Any
+    PoolingType = Any
+    TextCrossEncoder = Any
+    SparseTextEmbedding = Any
+    TextEmbedding = Any
 
-except ImportError as e:
-    from codeweaver.core import ConfigurationError
 
-    raise ConfigurationError(
-        "fastembed is not installed. Please install it with `pip install code-weaver[fastembed]` or `codeweaver[fastembed-gpu]`."
-    ) from e
+def _require_fastembed() -> None:
+    """Raise ConfigurationError if fastembed is not installed."""
+    if not _FASTEMBED_AVAILABLE:
+        from codeweaver.core import ConfigurationError
 
-"""
-SPARSE_MODELS = (
-    SparseModelDescription(
-        model="prithivida/Splade_PP_en_v2",
-        vocab_size=30522,  # BERT base uncased vocab
-        description="SPLADE++ v2",
-        license="apache-2.0",
-        size_in_GB=0.6,
-        sources=ModelSource(hf="prithivida/Splade_PP_en_v2"),
-        model_file="model.onnx",
-    ),
-)
-"""
-DENSE_MODELS = (
-    DenseModelDescription(
-        model="Alibaba-NLP/gte-modernbert-base",
-        license="apache-2.0",
-        sources=ModelSource(hf="Alibaba-NLP/gte-modernbert-base"),
-        description="""Text embeddings, Unimodal (text), multilingual, 8192 input tokens truncation, Prefixes for queries/documents: not necessary, 2024 year.""",
-        model_file="onnx/model.onnx",
-        size_in_GB=0.60,
-        dim=768,
-    ),
-    DenseModelDescription(
-        model="BAAI/bge-m3",
-        license="mit",
-        sources=ModelSource(hf="BAAI/bge-m3"),
-        # if this seems like a strange description, it's because it mirrors the FastEmbed format, which gets parsed
-        description="""Text embeddings, Unimodal (text), multilingual, 8192 input tokens truncation, Prefixes for queries/documents: not necessary, 2024 year.""",
-        model_file="onnx/model.onnx",
-        additional_files=["onnx/model.onnx_data"],
-        size_in_GB=2.27,
-        dim=1024,
-    ),
-    DenseModelDescription(
-        model="WhereIsAI/UAE-Large-V1",
-        license="mit",
-        sources=ModelSource(hf="WhereIsAI/UAE-Large-V1"),
-        description="""Text embeddings, Unimodal (text), multilingual, 512 input tokens truncation, Prefixes for queries/documents: necessary, 2024 year.""",
-        model_file="onnx/model.onnx",
-        size_in_GB=1.23,
-        dim=1024,
-    ),
-    DenseModelDescription(
-        model="snowflake/snowflake-arctic-embed-l-v2.0",
-        license="apache-2.0",
-        sources=ModelSource(hf="Snowflake/snowflake-arctic-embed-l-v2.0"),
-        description="""Text embeddings, Unimodal (text), multilingual, 8192 input tokens truncation, Prefixes for queries/documents: necessary, 2024 year.""",
-        model_file="onnx/model.onnx",
-        size_in_GB=1.79,
-        dim=1024,
-    ),
-    DenseModelDescription(
-        model="snowflake/snowflake-arctic-embed-m-v2.0",
-        license="apache-2.0",
-        sources=ModelSource(hf="Snowflake/snowflake-arctic-embed-m-v2.0"),
-        description="""Text embeddings, Unimodal (text), multilingual, 8192 input tokens truncation, Prefixes for queries/documents: necessary, 2024 year.""",
-        model_file="onnx/model.onnx",
-        size_in_GB=1.23,
-        dim=768,
-    ),
-)
+        raise ConfigurationError(
+            "fastembed is not installed. Please install it with "
+            "`pip install code-weaver[fastembed]` or `codeweaver[fastembed-gpu]`."
+        )
 
-RERANKING_MODELS: tuple[BaseModelDescription, ...] = (
-    BaseModelDescription(
-        model="Alibaba-NLP/gte-reranker-modernbert-base",
-        license="apache-2.0",
-        sources=ModelSource(hf="Alibaba-NLP/gte-reranker-modernbert-base"),
-        description="""A lightweight high-performance cross-encoder with 8192 token context length.""",
-        model_file="onnx/model_fp16.onnx",
-        size_in_GB=0.3,
-    ),
-)
+
+if _FASTEMBED_AVAILABLE:
+    """
+    SPARSE_MODELS = (
+        SparseModelDescription(
+            model="prithivida/Splade_PP_en_v2",
+            vocab_size=30522,  # BERT base uncased vocab
+            description="SPLADE++ v2",
+            license="apache-2.0",
+            size_in_GB=0.6,
+            sources=ModelSource(hf="prithivida/Splade_PP_en_v2"),
+            model_file="model.onnx",
+        ),
+    )
+    """
+    DENSE_MODELS = (
+        DenseModelDescription(
+            model="Alibaba-NLP/gte-modernbert-base",
+            license="apache-2.0",
+            sources=ModelSource(hf="Alibaba-NLP/gte-modernbert-base"),
+            description="""Text embeddings, Unimodal (text), multilingual, 8192 input tokens truncation, Prefixes for queries/documents: not necessary, 2024 year.""",
+            model_file="onnx/model.onnx",
+            size_in_GB=0.60,
+            dim=768,
+        ),
+        DenseModelDescription(
+            model="BAAI/bge-m3",
+            license="mit",
+            sources=ModelSource(hf="BAAI/bge-m3"),
+            # if this seems like a strange description, it's because it mirrors the FastEmbed format, which gets parsed
+            description="""Text embeddings, Unimodal (text), multilingual, 8192 input tokens truncation, Prefixes for queries/documents: not necessary, 2024 year.""",
+            model_file="onnx/model.onnx",
+            additional_files=["onnx/model.onnx_data"],
+            size_in_GB=2.27,
+            dim=1024,
+        ),
+        DenseModelDescription(
+            model="WhereIsAI/UAE-Large-V1",
+            license="mit",
+            sources=ModelSource(hf="WhereIsAI/UAE-Large-V1"),
+            description="""Text embeddings, Unimodal (text), multilingual, 512 input tokens truncation, Prefixes for queries/documents: necessary, 2024 year.""",
+            model_file="onnx/model.onnx",
+            size_in_GB=1.23,
+            dim=1024,
+        ),
+        DenseModelDescription(
+            model="snowflake/snowflake-arctic-embed-l-v2.0",
+            license="apache-2.0",
+            sources=ModelSource(hf="Snowflake/snowflake-arctic-embed-l-v2.0"),
+            description="""Text embeddings, Unimodal (text), multilingual, 8192 input tokens truncation, Prefixes for queries/documents: necessary, 2024 year.""",
+            model_file="onnx/model.onnx",
+            size_in_GB=1.79,
+            dim=1024,
+        ),
+        DenseModelDescription(
+            model="snowflake/snowflake-arctic-embed-m-v2.0",
+            license="apache-2.0",
+            sources=ModelSource(hf="Snowflake/snowflake-arctic-embed-m-v2.0"),
+            description="""Text embeddings, Unimodal (text), multilingual, 8192 input tokens truncation, Prefixes for queries/documents: necessary, 2024 year.""",
+            model_file="onnx/model.onnx",
+            size_in_GB=1.23,
+            dim=768,
+        ),
+    )
+
+    RERANKING_MODELS: tuple[BaseModelDescription, ...] = (
+        BaseModelDescription(
+            model="Alibaba-NLP/gte-reranker-modernbert-base",
+            license="apache-2.0",
+            sources=ModelSource(hf="Alibaba-NLP/gte-reranker-modernbert-base"),
+            description="""A lightweight high-performance cross-encoder with 8192 token context length.""",
+            model_file="onnx/model_fp16.onnx",
+            size_in_GB=0.3,
+        ),
+    )
+else:
+    DENSE_MODELS = ()
+    RERANKING_MODELS = ()
 
 
 @overload
@@ -161,6 +180,7 @@ def get_cross_encoder() -> type[TextCrossEncoder]:
     """
     Get the cross encoder with added custom models.
     """
+    _require_fastembed()
     return add_models(TextCrossEncoder, RERANKING_MODELS)
 
 
@@ -171,6 +191,7 @@ def get_sparse_embedder() -> type[SparseTextEmbedding]:
 
     TODO: Temporarily disabled until we can work out the bugs on added sparse models in FastEmbed.
     """
+    _require_fastembed()
     # splade_pp.supported_splade_models.append(SPARSE_MODELS[0])
     return SparseTextEmbedding
 
@@ -182,6 +203,7 @@ def get_text_embedder() -> type[TextEmbedding]:
 
     Only adds models that aren't already in FastEmbed's native registry to avoid conflicts.
     """
+    _require_fastembed()
     from fastembed.common.model_description import PoolingType
 
     # we don't add these yet, but they're here for when we do

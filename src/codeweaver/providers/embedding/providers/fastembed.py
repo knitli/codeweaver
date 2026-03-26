@@ -17,7 +17,7 @@ import asyncio
 import logging
 
 from collections.abc import Callable, Iterable, Sequence
-from typing import Any, ClassVar, Literal, cast, override
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast, override
 
 import numpy as np
 
@@ -26,10 +26,10 @@ from pydantic import SkipValidation
 from codeweaver.core import (
     CodeChunk,
     CodeWeaverSparseEmbedding,
-    ConfigurationError,
     Provider,
     rpartial,
 )
+from codeweaver.core.utils import has_package
 from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import (
     EmbeddingCustomDeps,
@@ -38,8 +38,9 @@ from codeweaver.providers.embedding.providers.base import (
     SparseEmbeddingProvider,
 )
 
+_FASTEMBED_AVAILABLE = has_package("fastembed") or has_package("fastembed-gpu")
 
-try:
+if TYPE_CHECKING or _FASTEMBED_AVAILABLE:
     from fastembed.sparse import SparseTextEmbedding
     from fastembed.text import TextEmbedding
 
@@ -47,13 +48,16 @@ try:
         get_sparse_embedder,
         get_text_embedder,
     )
-except ImportError as e:
-    raise ConfigurationError(
-        r"FastEmbed is not installed. Please install it with `pip install code-weaver\[fastembed]` or `code-weaver\[fastembed-gpu]`."
-    ) from e
+else:
+    TextEmbedding = Any
+    SparseTextEmbedding = Any
 
-_TextEmbedding = get_text_embedder()
-_SparseTextEmbedding = get_sparse_embedder()
+if _FASTEMBED_AVAILABLE:
+    _TextEmbedding = get_text_embedder()
+    _SparseTextEmbedding = get_sparse_embedder()
+else:
+    _TextEmbedding = None
+    _SparseTextEmbedding = None
 
 
 logger = logging.getLogger(__name__)
