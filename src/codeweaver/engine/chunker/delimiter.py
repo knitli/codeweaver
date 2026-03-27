@@ -451,6 +451,9 @@ class DelimiterChunker(BaseChunker):
         # Filter out delimiters with empty start strings - they match everywhere!
         keyword_delimiters = [d for d in keyword_delimiters if d.start]
 
+        if not keyword_delimiters:
+            return matches
+
         # Define structural delimiters that can complete keywords
         # Map opening structural chars to their closing counterparts
         structural_pairs = {
@@ -459,49 +462,56 @@ class DelimiterChunker(BaseChunker):
             "=>": "",  # Arrow functions often have expression bodies
         }
 
-        for delimiter in keyword_delimiters:
-            # Find all keyword occurrences using word boundary matching
-            pattern = rf"\b{re.escape(delimiter.start)}\b"
+        # Optimization: Combine all keyword start strings into a single compiled regex pattern.
+        # This allows us to make a single pass over the content rather than iterating over
+        # `re.finditer` for each keyword delimiter individually, significantly reducing overhead.
+        start_strings = [d.start for d in keyword_delimiters]
+        combined_pattern = re.compile(rf"\b(?:{'|'.join(map(re.escape, start_strings))})\b")
 
-            for match in re.finditer(pattern, content):
-                keyword_pos = match.start()
+        # Create a mapping to quickly look up the delimiter by its matched start string
+        delimiter_map = {d.start: d for d in keyword_delimiters}
 
-                # Skip if keyword is inside a string or comment
-                if self._is_inside_string_or_comment(content, keyword_pos):
-                    continue
+        for match in combined_pattern.finditer(content):
+            matched_text = match.group(0)
+            delimiter = delimiter_map[matched_text]
+            keyword_pos = match.start()
 
-                # Find the next structural opening after the keyword
-                struct_start, struct_char = self._find_next_structural_with_char(
-                    content,
-                    start=keyword_pos + len(delimiter.start),
-                    allowed=set(structural_pairs.keys()),
-                )
+            # Skip if keyword is inside a string or comment
+            if self._is_inside_string_or_comment(content, keyword_pos):
+                continue
 
-                if struct_start is None:
-                    continue
+            # Find the next structural opening after the keyword
+            struct_start, struct_char = self._find_next_structural_with_char(
+                content,
+                start=keyword_pos + len(delimiter.start),
+                allowed=set(structural_pairs.keys()),
+            )
 
-                # Find the matching closing delimiter for the structural character
-                struct_end = self._find_matching_close(
-                    content,
-                    struct_start,
-                    struct_char or "",
-                    structural_pairs.get(cast(str, struct_char), ""),
-                )
+            if struct_start is None:
+                continue
 
-                if struct_end is not None:
-                    # Calculate nesting level by counting parent structures
-                    nesting_level = self._calculate_nesting_level(content, keyword_pos)
+            # Find the matching closing delimiter for the structural character
+            struct_end = self._find_matching_close(
+                content,
+                struct_start,
+                struct_char or "",
+                structural_pairs.get(cast(str, struct_char), ""),
+            )
 
-                    # Create a complete match from keyword to closing structure
-                    # This represents the entire construct (e.g., function...})
-                    matches.append(
-                        DelimiterMatch(
-                            delimiter=delimiter,
-                            start_pos=keyword_pos,
-                            end_pos=struct_end,
-                            nesting_level=nesting_level,
-                        )
+            if struct_end is not None:
+                # Calculate nesting level by counting parent structures
+                nesting_level = self._calculate_nesting_level(content, keyword_pos)
+
+                # Create a complete match from keyword to closing structure
+                # This represents the entire construct (e.g., function...})
+                matches.append(
+                    DelimiterMatch(
+                        delimiter=delimiter,
+                        start_pos=keyword_pos,
+                        end_pos=struct_end,
+                        nesting_level=nesting_level,
                     )
+                )
 
         return matches
 
@@ -1280,7 +1290,7 @@ class DelimiterChunker(BaseChunker):
         patterns when merged with the full delimiter list.
 
         Args:
-            normalized_language: Snake-case normalised language identifier.
+            normalized_language: Snake-case normalized language identifier.
             language: Original language string (used for logging only).
 
         Returns:
