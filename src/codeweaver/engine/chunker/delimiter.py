@@ -11,13 +11,24 @@ and priority-based overlap resolution.
 
 from __future__ import annotations
 
+import logging
 import re
 
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
-from codeweaver.core import CodeChunk, Metadata, Span, get_blake_hash, uuid7
+import textcase
+
+from codeweaver.core import (
+    CodeChunk,
+    ConfigLanguage,
+    Metadata,
+    SemanticSearchLanguage,
+    Span,
+    get_blake_hash,
+    uuid7,
+)
 from codeweaver.engine.chunker.base import AdaptiveChunkBehavior, BaseChunker, ChunkGovernor
 from codeweaver.engine.chunker.delimiter_model import Boundary, Delimiter, DelimiterMatch
 from codeweaver.engine.chunker.exceptions import (
@@ -31,6 +42,8 @@ from codeweaver.engine.chunker.exceptions import (
 if TYPE_CHECKING:
     from codeweaver.core import DiscoveredFile
 
+
+logger = logging.getLogger(__name__)
 
 PERFORMANCE_THRESHOLD_MS = 1000.0  # 1 second
 
@@ -1256,49 +1269,91 @@ class DelimiterChunker(BaseChunker):
 
         return metadata
 
+    def _load_custom_delimiters(
+        self,
+        normalized_language: str,
+        language: str,
+    ) -> list[Delimiter]:
+        """Load custom delimiter patterns from settings that match the given language.
+
+        Custom delimiters are returned first so they override built-in family
+        patterns when merged with the full delimiter list.
+
+        Args:
+            normalized_language: Snake-case normalised language identifier.
+            language: Original language string (used for logging only).
+
+        Returns:
+            List of ``Delimiter`` objects converted from matching custom patterns.
+        """
+        if (
+            self._governor.settings is None
+            or not hasattr(self._governor.settings, "custom_delimiters")
+            or not self._governor.settings.custom_delimiters
+        ):
+            return []
+
+        def _normalize(lang: object) -> str:
+            if isinstance(lang, SemanticSearchLanguage | ConfigLanguage):
+                return textcase.snake(lang.variable)
+            return textcase.snake(str(lang))
+
+        delimiters: list[Delimiter] = []
+        for custom_delim in self._governor.settings.custom_delimiters:
+            lang_match = (
+                custom_delim.language is not None
+                and _normalize(custom_delim.language) == normalized_language
+            )
+            ext_match = custom_delim.extensions and any(
+                _normalize(ext.language) == normalized_language
+                for ext in custom_delim.extensions
+                if hasattr(ext, "language") and ext.language is not None
+            )
+            if lang_match or ext_match:
+                for pattern in custom_delim.delimiters:
+                    try:
+                        delimiters.extend(Delimiter.from_pattern(pattern))
+                    except (ValueError, TypeError) as exc:
+                        logger.warning(
+                            "Skipping invalid custom delimiter pattern for language %r: %r - %s",
+                            language,
+                            pattern,
+                            exc,
+                        )
+        return delimiters
+
     def _load_delimiters_for_language(self, language: str) -> list[Delimiter]:
         """Load delimiter set for language.
 
-        Checks for custom delimiters in settings first, then falls back to
-        delimiter families system.
+        Checks for custom delimiters in settings first (prepended to override
+        defaults), then falls back to delimiter families system.
 
         Args:
-            language: Programming language name
+            language: Programming language name (snake_case)
 
         Returns:
-            List of Delimiter objects for the language
+            List of Delimiter objects for the language, with custom delimiters
+            prepended so they take priority over built-in family patterns.
         """
-        from codeweaver.engine.chunker.delimiter_model import Delimiter, DelimiterKind
+        from codeweaver.engine.chunker.delimiter_model import DelimiterKind
         from codeweaver.engine.chunker.delimiters.families import (
             LanguageFamily,
             get_family_patterns,
         )
 
-        # Check for custom delimiters from settings
-        if (
-            self._governor.settings is not None
-            and hasattr(self._governor.settings, "custom_delimiters")
-            and self._governor.settings.custom_delimiters
-        ):
-            for custom_delim in self._governor.settings.custom_delimiters:
-                if custom_delim.language == language or (
-                    custom_delim.extensions
-                    and any(
-                        ext.language == language
-                        for ext in custom_delim.extensions
-                        if hasattr(ext, "language")
-                    )
-                ):
-                    # Convert DelimiterPattern to Delimiter objects
-                    # TODO: Implement proper conversion when delimiter families are integrated
-                    pass
+        normalized_language = textcase.snake(language)
+
+        # Custom entries are prepended so they override the built-in family
+        # patterns for known languages and are the sole source for new languages.
+        delimiters: list[Delimiter] = self._load_custom_delimiters(
+            normalized_language, language
+        )
 
         # Load from delimiter families system
         family = LanguageFamily.from_known_language(language)
         patterns = get_family_patterns(family)
 
         # Convert patterns to delimiters
-        delimiters: list[Delimiter] = []
         for pattern in patterns:
             delimiters.extend(Delimiter.from_pattern(pattern))
 

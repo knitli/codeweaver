@@ -21,6 +21,8 @@ import logging
 
 from typing import TYPE_CHECKING, Any
 
+import textcase
+
 from codeweaver.core import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.engine.chunker.base import BaseChunker
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
@@ -199,6 +201,81 @@ class ChunkerSelector:
         )
         return DelimiterChunker(self.governor, language=language_repr)
 
+    def _detect_language_from_custom_ext(
+        self, file_ext: str
+    ) -> SemanticSearchLanguage | ConfigLanguage | str | None:
+        """Resolve a file extension against custom delimiter extension maps in settings.
+
+        Called only when the standard extension registry has no match.
+
+        Args:
+            file_ext: File extension including the leading dot (e.g. ``'.myl'``).
+
+        Returns:
+            Detected language (enum or plain string), or ``None`` when no
+            custom mapping is found.
+        """
+        if self.governor.settings is None:
+            return None
+
+        custom_delimiters = getattr(self.governor.settings, "custom_delimiters", None)
+        if not custom_delimiters:
+            return None
+
+        for custom_delim in custom_delimiters:
+            if lang := self._match_custom_ext_pair(custom_delim, file_ext):
+                return lang
+        return None
+
+    @staticmethod
+    def _match_custom_ext_pair(
+        custom_delim: object,
+        file_ext: str,
+    ) -> SemanticSearchLanguage | ConfigLanguage | str | None:
+        """Return the language for a matching extension pair in *custom_delim*.
+
+        Args:
+            custom_delim: A ``CustomDelimiter`` instance from settings.
+            file_ext: File extension including the leading dot.
+
+        Returns:
+            Matching language, or ``None``.
+        """
+        extensions = getattr(custom_delim, "extensions", None)
+        if not extensions:
+            return None
+        for pair in extensions:
+            if not (hasattr(pair, "ext") and pair.ext):
+                continue
+            pair_ext = str(pair.ext)
+            if not pair_ext.startswith("."):
+                pair_ext = f".{pair_ext}"
+            if pair_ext.lower() != file_ext.lower():
+                continue
+            pair_lang = getattr(pair, "language", None)
+            delim_lang = getattr(custom_delim, "language", None)
+            # Prefer per-extension language over the top-level custom_delim language.
+            if pair_lang is not None:
+                if (
+                    delim_lang is not None
+                    and str(delim_lang) != str(pair_lang)
+                ):
+                    logger.warning(
+                        "Custom delimiter language mismatch for extension %s: "
+                        "using pair.language=%r over custom_delim.language=%r",
+                        pair_ext,
+                        pair_lang,
+                        delim_lang,
+                    )
+                if isinstance(pair_lang, SemanticSearchLanguage | ConfigLanguage):
+                    return pair_lang
+                return textcase.snake(str(pair_lang))
+            if delim_lang is not None:
+                if isinstance(delim_lang, SemanticSearchLanguage | ConfigLanguage):
+                    return delim_lang
+                return textcase.snake(str(delim_lang))
+        return None
+
     def _detect_language(
         self, file: DiscoveredFile
     ) -> SemanticSearchLanguage | ConfigLanguage | str:
@@ -208,14 +285,16 @@ class ChunkerSelector:
         extensions to language enums. Returns the extension string if no
         mapping is found.
 
-        Also checks custom language mappings from settings if available.
+        Also checks custom delimiter extension mappings from settings when the
+        standard extension registry has no match, allowing users to introduce
+        new languages via ``ChunkerSettings.custom_delimiters``.
 
         Args:
             file: DiscoveredFile with path attribute containing extension
 
         Returns:
-            SemanticSearchLanguage enum if supported, else extension string
-            (without leading dot, lowercased)
+            SemanticSearchLanguage enum if supported, else a plain language
+            name string (without leading dot, lowercased)
 
         Examples:
             >>> file_py = DiscoveredFile.from_path(Path("script.py"))
@@ -232,8 +311,11 @@ class ChunkerSelector:
                 if isinstance(file.ext_category.language, (SemanticSearchLanguage, ConfigLanguage))
                 else str(file.ext_category.language)
             )
-        ext = file.absolute_path.suffix
-        return ext.lstrip(".").lower()
+
+        file_ext = file.absolute_path.suffix  # includes the leading dot
+        if custom_lang := self._detect_language_from_custom_ext(file_ext):
+            return custom_lang
+        return file_ext.lstrip(".").lower()
 
 
 class GracefulChunker(BaseChunker):
