@@ -11,29 +11,41 @@ import logging
 
 from collections.abc import Callable, Sequence
 from functools import partial
-from typing import Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import numpy as np
 
 from codeweaver.core import Provider, ProviderError
 from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
+from codeweaver.core.utils import has_package
 from codeweaver.providers.reranking.providers.base import RerankingProvider
 
 
 logger = logging.getLogger(__name__)
 
-try:
+_FASTEMBED_AVAILABLE = has_package("fastembed") or has_package("fastembed-gpu")
+
+if TYPE_CHECKING:
     from fastembed.rerank.cross_encoder import TextCrossEncoder
+elif _FASTEMBED_AVAILABLE:
+    try:
+        from fastembed.rerank.cross_encoder import TextCrossEncoder
+    except ImportError:
+        _FASTEMBED_AVAILABLE = False
 
-except ImportError as e:
-    logger.warning(
-        "Failed to import TextCrossEncoder from fastembed.rerank.cross_encoder", exc_info=True
-    )
-    from codeweaver.core import ConfigurationError
+if not (TYPE_CHECKING or _FASTEMBED_AVAILABLE):
+    TextCrossEncoder = Any
 
-    raise ConfigurationError(
-        r"FastEmbed is not installed. Please install it with `pip install code-weaver\[fastembed]` or `codeweaver\[fastembed-gpu]`."
-    ) from e
+
+def _require_fastembed() -> None:
+    """Raise ConfigurationError if fastembed is not installed."""
+    if not _FASTEMBED_AVAILABLE:
+        from codeweaver.core import ConfigurationError
+
+        raise ConfigurationError(
+            "fastembed is not installed. Please install it with "
+            "`pip install code-weaver[fastembed]` or `pip install code-weaver[fastembed-gpu]`."
+        )
 
 
 class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
@@ -55,6 +67,7 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
         **kwargs: Any,
     ) -> Any:
         """Execute the reranking process."""
+        _require_fastembed()
         try:
             # our batch_size needs to be the number of documents because we only get back the scores.
             # If we set it to a lower number, we wouldn't know what documents the scores correspond to without some extra setup.

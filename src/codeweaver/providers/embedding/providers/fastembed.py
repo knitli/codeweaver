@@ -17,7 +17,7 @@ import asyncio
 import logging
 
 from collections.abc import Callable, Iterable, Sequence
-from typing import Any, ClassVar, Literal, cast, override
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast, override
 
 import numpy as np
 
@@ -26,10 +26,10 @@ from pydantic import SkipValidation
 from codeweaver.core import (
     CodeChunk,
     CodeWeaverSparseEmbedding,
-    ConfigurationError,
     Provider,
     rpartial,
 )
+from codeweaver.core.utils import has_package
 from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import (
     EmbeddingCustomDeps,
@@ -38,8 +38,9 @@ from codeweaver.providers.embedding.providers.base import (
     SparseEmbeddingProvider,
 )
 
+_FASTEMBED_AVAILABLE = has_package("fastembed") or has_package("fastembed-gpu")
 
-try:
+if TYPE_CHECKING:
     from fastembed.sparse import SparseTextEmbedding
     from fastembed.text import TextEmbedding
 
@@ -47,13 +48,39 @@ try:
         get_sparse_embedder,
         get_text_embedder,
     )
-except ImportError as e:
-    raise ConfigurationError(
-        r"FastEmbed is not installed. Please install it with `pip install code-weaver\[fastembed]` or `code-weaver\[fastembed-gpu]`."
-    ) from e
+elif _FASTEMBED_AVAILABLE:
+    try:
+        from fastembed.sparse import SparseTextEmbedding
+        from fastembed.text import TextEmbedding
 
-_TextEmbedding = get_text_embedder()
-_SparseTextEmbedding = get_sparse_embedder()
+        from codeweaver.providers.embedding.fastembed_extensions import (
+            get_sparse_embedder,
+            get_text_embedder,
+        )
+    except ImportError:
+        _FASTEMBED_AVAILABLE = False
+
+if not (TYPE_CHECKING or _FASTEMBED_AVAILABLE):
+    TextEmbedding = Any
+    SparseTextEmbedding = Any
+
+if _FASTEMBED_AVAILABLE:
+    _TextEmbedding = get_text_embedder()
+    _SparseTextEmbedding = get_sparse_embedder()
+else:
+    _TextEmbedding = None
+    _SparseTextEmbedding = None
+
+
+def _require_fastembed() -> None:
+    """Raise ConfigurationError if fastembed is not installed."""
+    if not _FASTEMBED_AVAILABLE:
+        from codeweaver.core import ConfigurationError
+
+        raise ConfigurationError(
+            "fastembed is not installed. Please install it with "
+            "`pip install code-weaver[fastembed]` or `pip install code-weaver[fastembed-gpu]`."
+        )
 
 
 logger = logging.getLogger(__name__)
@@ -109,6 +136,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         **kwargs: Any,
     ) -> None:
         """Initialize the FastEmbed client."""
+        _require_fastembed()
 
     @property
     def base_url(self) -> str | None:
@@ -176,6 +204,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         **kwargs: Any,
     ) -> None:
         """Initialize the FastEmbed sparse client."""
+        _require_fastembed()
         # impl_deps and custom_deps are ignored for FastEmbed sparse provider;
         # caps may be passed as a keyword argument via **kwargs from the base class.
         # 1. Set caps using object.__setattr__ because pydantic model isn't fully initialized yet
