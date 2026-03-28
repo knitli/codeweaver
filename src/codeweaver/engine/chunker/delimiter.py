@@ -14,7 +14,6 @@ from __future__ import annotations
 import logging
 import re
 
-from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
@@ -465,9 +464,11 @@ class DelimiterChunker(BaseChunker):
 
         # Optimization: combining multiple keyword delimiters into a single compiled regex pattern
         # using alternation (?:...) avoids looping over keywords with individual re.finditer calls.
-        # Use defaultdict(list) to support multiple delimiters sharing the same start string
-        # (e.g., "type" matches both STRUCT and TYPE_ALIAS patterns).
-        delimiter_map: defaultdict[str, list[Delimiter]] = defaultdict(list)
+
+        # Build map of start strings to lists of delimiters to handle collisions
+        # e.g. 'type' or 'extension' being used for multiple structures
+        from collections import defaultdict
+        delimiter_map = defaultdict(list)
         for d in keyword_delimiters:
             delimiter_map[d.start].append(d)
 
@@ -477,44 +478,43 @@ class DelimiterChunker(BaseChunker):
             keyword_pos = match.start()
             matched_text = match.group(0)
 
-            # Skip if keyword is inside a string or comment (same position for all delimiters)
-            if self._is_inside_string_or_comment(content, keyword_pos):
-                continue
+            for delimiter in delimiter_map[matched_text]:
+                # Skip if keyword is inside a string or comment
+                if self._is_inside_string_or_comment(content, keyword_pos):
+                    continue
 
-            # Find the next structural opening after the keyword.
-            # All delimiters sharing this start string have the same length, so we compute once.
-            struct_start, struct_char = self._find_next_structural_with_char(
-                content,
-                start=keyword_pos + len(matched_text),
-                allowed=set(structural_pairs.keys()),
-            )
-
-            if struct_start is None:
-                continue
-
-            # Find the matching closing delimiter for the structural character
-            struct_end = self._find_matching_close(
-                content,
-                struct_start,
-                struct_char or "",
-                structural_pairs.get(cast(str, struct_char), ""),
-            )
-
-            if struct_end is not None:
-                # Calculate nesting level by counting parent structures
-                nesting_level = self._calculate_nesting_level(content, keyword_pos)
-
-                # Create a complete match for every delimiter that shares this start string
-                # (e.g., both STRUCT and TYPE_ALIAS for "type")
-                matches.extend(
-                    DelimiterMatch(
-                        delimiter=delimiter,
-                        start_pos=keyword_pos,
-                        end_pos=struct_end,
-                        nesting_level=nesting_level,
-                    )
-                    for delimiter in delimiter_map[matched_text]
+                # Find the next structural opening after the keyword
+                struct_start, struct_char = self._find_next_structural_with_char(
+                    content,
+                    start=keyword_pos + len(delimiter.start),
+                    allowed=set(structural_pairs.keys()),
                 )
+
+                if struct_start is None:
+                    continue
+
+                # Find the matching closing delimiter for the structural character
+                struct_end = self._find_matching_close(
+                    content,
+                    struct_start,
+                    struct_char or "",
+                    structural_pairs.get(cast(str, struct_char), ""),
+                )
+
+                if struct_end is not None:
+                    # Calculate nesting level by counting parent structures
+                    nesting_level = self._calculate_nesting_level(content, keyword_pos)
+
+                    # Create a complete match from keyword to closing structure
+                    # This represents the entire construct (e.g., function...})
+                    matches.append(
+                        DelimiterMatch(
+                            delimiter=delimiter,
+                            start_pos=keyword_pos,
+                            end_pos=struct_end,
+                            nesting_level=nesting_level,
+                        )
+                    )
 
         return matches
 
