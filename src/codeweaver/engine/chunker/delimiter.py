@@ -461,13 +461,13 @@ class DelimiterChunker(BaseChunker):
             ":": "\n",  # Python uses : followed by indented block (simplified to newline)
             "=>": "",  # Arrow functions often have expression bodies
         }
-
+        allowed_keys = frozenset(structural_pairs.keys())
         # Optimization: Combine all keyword start strings into a single compiled regex pattern.
         # This allows us to make a single pass over the content rather than iterating over
         # `re.finditer` for each keyword delimiter individually, significantly reducing overhead.
         start_strings = list(dict.fromkeys(d.start for d in keyword_delimiters))
         combined_pattern = re.compile(rf"\b(?:{'|'.join(map(re.escape, start_strings))})\b")
-
+        
         # Group delimiters by matched start string so duplicate keyword starts
         # preserve the original "process each delimiter independently" behavior.
         delimiter_map: dict[str, list[Delimiter]] = {}
@@ -487,7 +487,7 @@ class DelimiterChunker(BaseChunker):
                 struct_start, struct_char = self._find_next_structural_with_char(
                     content,
                     start=keyword_pos + len(delimiter.start),
-                    allowed=set(structural_pairs.keys()),
+                    allowed=allowed_keys,
                 )
 
                 if struct_start is None:
