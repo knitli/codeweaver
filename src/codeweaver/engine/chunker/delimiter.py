@@ -465,53 +465,56 @@ class DelimiterChunker(BaseChunker):
         # Optimization: Combine all keyword start strings into a single compiled regex pattern.
         # This allows us to make a single pass over the content rather than iterating over
         # `re.finditer` for each keyword delimiter individually, significantly reducing overhead.
-        start_strings = [d.start for d in keyword_delimiters]
+        start_strings = list(dict.fromkeys(d.start for d in keyword_delimiters))
         combined_pattern = re.compile(rf"\b(?:{'|'.join(map(re.escape, start_strings))})\b")
 
-        # Create a mapping to quickly look up the delimiter by its matched start string
-        delimiter_map = {d.start: d for d in keyword_delimiters}
+        # Group delimiters by matched start string so duplicate keyword starts
+        # preserve the original "process each delimiter independently" behavior.
+        delimiter_map: dict[str, list[Delimiter]] = {}
+        for delimiter in keyword_delimiters:
+            delimiter_map.setdefault(delimiter.start, []).append(delimiter)
 
         for match in combined_pattern.finditer(content):
             matched_text = match.group(0)
-            delimiter = delimiter_map[matched_text]
             keyword_pos = match.start()
 
             # Skip if keyword is inside a string or comment
             if self._is_inside_string_or_comment(content, keyword_pos):
                 continue
 
-            # Find the next structural opening after the keyword
-            struct_start, struct_char = self._find_next_structural_with_char(
-                content,
-                start=keyword_pos + len(delimiter.start),
-                allowed=set(structural_pairs.keys()),
-            )
-
-            if struct_start is None:
-                continue
-
-            # Find the matching closing delimiter for the structural character
-            struct_end = self._find_matching_close(
-                content,
-                struct_start,
-                struct_char or "",
-                structural_pairs.get(cast(str, struct_char), ""),
-            )
-
-            if struct_end is not None:
-                # Calculate nesting level by counting parent structures
-                nesting_level = self._calculate_nesting_level(content, keyword_pos)
-
-                # Create a complete match from keyword to closing structure
-                # This represents the entire construct (e.g., function...})
-                matches.append(
-                    DelimiterMatch(
-                        delimiter=delimiter,
-                        start_pos=keyword_pos,
-                        end_pos=struct_end,
-                        nesting_level=nesting_level,
-                    )
+            for delimiter in delimiter_map[matched_text]:
+                # Find the next structural opening after the keyword
+                struct_start, struct_char = self._find_next_structural_with_char(
+                    content,
+                    start=keyword_pos + len(delimiter.start),
+                    allowed=set(structural_pairs.keys()),
                 )
+
+                if struct_start is None:
+                    continue
+
+                # Find the matching closing delimiter for the structural character
+                struct_end = self._find_matching_close(
+                    content,
+                    struct_start,
+                    struct_char or "",
+                    structural_pairs.get(cast(str, struct_char), ""),
+                )
+
+                if struct_end is not None:
+                    # Calculate nesting level by counting parent structures
+                    nesting_level = self._calculate_nesting_level(content, keyword_pos)
+
+                    # Create a complete match from keyword to closing structure
+                    # This represents the entire construct (e.g., function...})
+                    matches.append(
+                        DelimiterMatch(
+                            delimiter=delimiter,
+                            start_pos=keyword_pos,
+                            end_pos=struct_end,
+                            nesting_level=nesting_level,
+                        )
+                    )
 
         return matches
 
