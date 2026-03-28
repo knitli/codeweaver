@@ -16,7 +16,9 @@ from pathlib import Path
 
 import pytest
 
+from codeweaver.core.types import DelimiterKind
 from codeweaver.engine import ChunkGovernor, DelimiterChunker
+from codeweaver.engine.chunker.delimiter_model import Delimiter
 
 
 pytestmark = [pytest.mark.unit]
@@ -207,6 +209,41 @@ a, b, c = 1, 2, 3; total = a + b + c  # Another multi-statement line
 @pytest.mark.unit
 class TestUnusualPatterns:
     """Test delimiter chunker with unusual patterns."""
+
+    def test_duplicate_keyword_starts_preserve_all_delimiters(
+        self, delimiter_chunker: DelimiterChunker
+    ) -> None:
+        """Verify duplicate keyword starts keep all matching delimiters.
+
+        Keyword delimiters with the same start string used to be processed
+        independently. The optimized single-regex path must preserve that
+        behavior instead of collapsing duplicates down to the last delimiter.
+        """
+        content = """type Person struct {
+    name string
+}"""
+        keyword_delimiters = [
+            Delimiter(
+                start="type",
+                end="",
+                kind=DelimiterKind.STRUCT,
+                priority=DelimiterKind.STRUCT.default_priority,
+            ),
+            Delimiter(
+                start="type",
+                end="",
+                kind=DelimiterKind.TYPE_ALIAS,
+                priority=DelimiterKind.TYPE_ALIAS.default_priority,
+            ),
+        ]
+
+        matches = delimiter_chunker._match_keyword_delimiters(content, keyword_delimiters)
+
+        assert len(matches) == 2, "Duplicate keyword starts should preserve all delimiters"
+        assert {match.delimiter.kind for match in matches} == {
+            DelimiterKind.STRUCT,
+            DelimiterKind.TYPE_ALIAS,
+        }
 
     def test_nested_delimiter_structures(
         self, delimiter_chunker: DelimiterChunker, tmp_path: Path

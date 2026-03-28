@@ -451,6 +451,9 @@ class DelimiterChunker(BaseChunker):
         # Filter out delimiters with empty start strings - they match everywhere!
         keyword_delimiters = [d for d in keyword_delimiters if d.start]
 
+        if not keyword_delimiters:
+            return matches
+
         # Define structural delimiters that can complete keywords
         # Map opening structural chars to their closing counterparts
         structural_pairs = {
@@ -458,23 +461,33 @@ class DelimiterChunker(BaseChunker):
             ":": "\n",  # Python uses : followed by indented block (simplified to newline)
             "=>": "",  # Arrow functions often have expression bodies
         }
-
+        allowed_keys = frozenset(structural_pairs.keys())
+        # Optimization: Combine all keyword start strings into a single compiled regex pattern.
+        # This allows us to make a single pass over the content rather than iterating over
+        # `re.finditer` for each keyword delimiter individually, significantly reducing overhead.
+        start_strings = list(dict.fromkeys(d.start for d in keyword_delimiters))
+        combined_pattern = re.compile(rf"\b(?:{'|'.join(map(re.escape, start_strings))})\b")
+        
+        # Group delimiters by matched start string so duplicate keyword starts
+        # preserve the original "process each delimiter independently" behavior.
+        delimiter_map: dict[str, list[Delimiter]] = {}
         for delimiter in keyword_delimiters:
-            # Find all keyword occurrences using word boundary matching
-            pattern = rf"\b{re.escape(delimiter.start)}\b"
+            delimiter_map.setdefault(delimiter.start, []).append(delimiter)
 
-            for match in re.finditer(pattern, content):
-                keyword_pos = match.start()
+        for match in combined_pattern.finditer(content):
+            matched_text = match.group(0)
+            keyword_pos = match.start()
 
-                # Skip if keyword is inside a string or comment
-                if self._is_inside_string_or_comment(content, keyword_pos):
-                    continue
+            # Skip if keyword is inside a string or comment
+            if self._is_inside_string_or_comment(content, keyword_pos):
+                continue
 
+            for delimiter in delimiter_map[matched_text]:
                 # Find the next structural opening after the keyword
                 struct_start, struct_char = self._find_next_structural_with_char(
                     content,
                     start=keyword_pos + len(delimiter.start),
-                    allowed=set(structural_pairs.keys()),
+                    allowed=allowed_keys,
                 )
 
                 if struct_start is None:
@@ -1280,7 +1293,7 @@ class DelimiterChunker(BaseChunker):
         patterns when merged with the full delimiter list.
 
         Args:
-            normalized_language: Snake-case normalised language identifier.
+            normalized_language: Snake-case normalized language identifier.
             language: Original language string (used for logging only).
 
         Returns:
