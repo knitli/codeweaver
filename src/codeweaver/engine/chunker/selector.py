@@ -126,6 +126,14 @@ class ChunkerSelector:
             Returns SemanticChunker for supported languages or
             DelimiterChunker for unsupported languages.
 
+        Raises:
+            FileTooLargeError: When the file size exceeds the configured
+                ``max_file_size_mb`` limit in performance settings. The error
+                includes the actual file size, the configured limit, and
+                resolution suggestions. Callers should catch this before the
+                generic ``Exception`` fallback to log structured size details.
+                Configure via ``governor.settings.performance.max_file_size_mb``.
+
         Notes:
             - Each call creates a new chunker instance (no reuse)
             - Falls back to DelimiterChunker for unsupported languages

@@ -44,7 +44,7 @@ from typing import TYPE_CHECKING, Any
 from codeweaver.core import BaseEnum
 from codeweaver.core.constants import DEFAULT_MAX_CONCURRENT_BATCHES, ZERO
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
-from codeweaver.engine.chunker.exceptions import ChunkingError
+from codeweaver.engine.chunker.exceptions import ChunkingError, FileTooLargeError
 from codeweaver.engine.chunker.selector import ChunkerSelector
 
 
@@ -117,6 +117,14 @@ def _chunk_single_file(
             chunks = fallback_chunker.chunk(content, file=file)
 
         logger.debug("Chunked %s: %d chunks generated", file.path, len(chunks))
+    except FileTooLargeError as e:
+        logger.info(
+            "Skipping oversized file: %s (%s)",
+            file.path,
+            e,
+            extra={"file_size_mb": e.file_size_mb, "max_size_mb": e.max_size_mb},
+        )
+        return (file.path, None)
     except Exception:
         # Only log at warning level - these are operational issues, not critical errors
         # The file is simply skipped, server continues normally
