@@ -1,0 +1,15 @@
+{
+  "codeweaver": {
+    "command": "uvx",
+    "args": [
+      "--from",
+      "code-weaver",
+      "cw",
+      "server",
+      "--transport",
+      "stdio",
+      "--project-path",
+      "${workspaceFolder}"
+    ]
+  }
+}

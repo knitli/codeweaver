@@ -1,0 +1,34 @@
+{
+  "name": "codeweaver",
+  "version": "0.6.0-alpha",
+  "description": "Exquisite Context for AI Agents — Semantic code search MCP server with hybrid search, AST-level understanding, and intelligent chunking for 166+ languages",
+  "author": "Knitli Inc.",
+  "homepage": "https://knitli.com",
+  "repository": "https://github.com/knitli/codeweaver",
+  "license": "MIT OR Apache-2.0",
+  "keywords": [
+    "mcp",
+    "code-search",
+    "semantic-search",
+    "ast",
+    "embeddings",
+    "vector-search",
+    "hybrid-search",
+    "codebase-analysis"
+  ],
+  "mcpServers": {
+    "codeweaver": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "code-weaver",
+        "cw",
+        "server",
+        "--transport",
+        "stdio",
+        "--project-path",
+        "${workspaceFolder}"
+      ]
+    }
+  }
+}
