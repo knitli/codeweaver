@@ -8,7 +8,7 @@
       "server",
       "--transport",
       "stdio",
-      "--project-path",
+      "--project",
       "${workspaceFolder}"
     ]
   }

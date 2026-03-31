@@ -24,7 +24,7 @@ Skills follow the [Agent Skills](https://agentskills.io) open standard, making t
 - Cursor
 - Windsurf
 - Gemini CLI
-- VS Code Copilot
+- GitHub Copilot
 - And other Agent Skills-compatible tools
 
 ## Contributing
