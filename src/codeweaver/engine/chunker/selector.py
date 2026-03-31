@@ -26,7 +26,7 @@ import textcase
 from codeweaver.core import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.engine.chunker.base import BaseChunker
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
-from codeweaver.engine.chunker.exceptions import ParseError
+from codeweaver.engine.chunker.exceptions import FileTooLargeError, ParseError
 from codeweaver.engine.chunker.semantic import SemanticChunker
 
 
@@ -146,18 +146,6 @@ class ChunkerSelector:
             max_size_bytes = self.governor.settings.performance.max_file_size_mb * 1024 * 1024
             try:
                 file_size = file.absolute_path.stat().st_size
-                if file_size > max_size_bytes:
-                    logger.warning(
-                        "File %s exceeds max size limit (%d MB > %d MB). Skipping chunking.",
-                        file.absolute_path,
-                        file_size / (1024 * 1024),
-                        self.governor.settings.performance.max_file_size_mb,
-                        extra={
-                            "file_path": str(file.absolute_path),
-                            "file_size_mb": file_size / (1024 * 1024),
-                            "max_size_mb": self.governor.settings.performance.max_file_size_mb,
-                        },
-                    )
             except OSError as e:
                 logger.warning(
                     "Could not stat file %s: %s",
@@ -165,6 +153,17 @@ class ChunkerSelector:
                     e,
                     extra={"file_path": str(file.absolute_path), "error": str(e)},
                 )
+            else:
+                if file_size > max_size_bytes:
+                    file_size_mb = file_size / (1024 * 1024)
+                    raise FileTooLargeError(
+                        f"File {file.absolute_path} exceeds maximum size limit "
+                        f"({file_size_mb:.2f} MB > "
+                        f"{self.governor.settings.performance.max_file_size_mb} MB)",
+                        file_size_mb=file_size_mb,
+                        max_size_mb=self.governor.settings.performance.max_file_size_mb,
+                        file_path=str(file.absolute_path),
+                    )
         is_large_file = False
         with contextlib.suppress(OSError, AttributeError):
             if file.absolute_path.stat().st_size > 500 * 1024:
@@ -228,9 +227,8 @@ class ChunkerSelector:
         return None
 
     @staticmethod
-    def _match_custom_ext_pair(
-        custom_delim: object,
-        file_ext: str,
+    def _match_custom_ext_pair(  # noqa: C901
+        custom_delim: object, file_ext: str
     ) -> SemanticSearchLanguage | ConfigLanguage | str | None:
         """Return the language for a matching extension pair in *custom_delim*.
 
@@ -256,10 +254,7 @@ class ChunkerSelector:
             delim_lang = getattr(custom_delim, "language", None)
             # Prefer per-extension language over the top-level custom_delim language.
             if pair_lang is not None:
-                if (
-                    delim_lang is not None
-                    and str(delim_lang) != str(pair_lang)
-                ):
+                if delim_lang is not None and str(delim_lang) != str(pair_lang):
                     logger.warning(
                         "Custom delimiter language mismatch for extension %s: "
                         "using pair.language=%r over custom_delim.language=%r",

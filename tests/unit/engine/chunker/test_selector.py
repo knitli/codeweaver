@@ -102,3 +102,25 @@ def test_selector_creates_fresh_instances(chunk_governor: ChunkGovernor) -> None
     chunker2 = selector.select_for_file(file)
 
     assert id(chunker1) != id(chunker2), "Should create fresh instances"
+
+
+def test_selector_raises_error_for_oversized_file(chunk_governor: ChunkGovernor) -> None:
+    """Verify selector raises FileTooLargeError for files exceeding max_file_size_mb."""
+    from codeweaver.engine.chunker.exceptions import FileTooLargeError
+
+    selector = ChunkerSelector(chunk_governor)
+
+    # Create mock file that exceeds the default 10 MB limit
+    file = _create_mock_file(Path("test.py"))
+    # Set file size to 15 MB (exceeds default 10 MB limit)
+    file.absolute_path.stat.return_value.st_size = 15 * 1024 * 1024
+
+    with pytest.raises(FileTooLargeError) as exc_info:
+        selector.select_for_file(file)
+
+    # Verify error details
+    error = exc_info.value
+    assert error.file_size_mb == 15.0
+    assert error.max_size_mb == 10
+    assert error.file_path == str(file.absolute_path)
+    assert "15.00 MB > 10 MB" in str(error)
