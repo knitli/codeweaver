@@ -8,8 +8,10 @@
 
 set -euo pipefail
 
-# Ensure CLAUDE_PLUGIN_DATA is set for a clearer error message under `set -u`
-: "${CLAUDE_PLUGIN_DATA:?CLAUDE_PLUGIN_DATA must be set}"
+# If CLAUDE_PLUGIN_DATA is not set/empty, skip onboarding logic and exit successfully
+if [ -z "${CLAUDE_PLUGIN_DATA:-}" ]; then
+    exit 0
+fi
 
 # Flag file location using Claude Code plugin data directory
 CONFIGURED_FLAG="${CLAUDE_PLUGIN_DATA}/state/codeweaver/.configured"

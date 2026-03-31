@@ -75,7 +75,8 @@ Enter your Voyage AI API key (get one at https://voyage.ai):
 
 **Validation**: Test the key before saving:
 ```bash
-curl -H "Authorization: Bearer ${VOYAGE_API_KEY}" \
+curl --fail-with-body -sS \
+     -H "Authorization: Bearer ${VOYAGE_API_KEY}" \
      -H "Content-Type: application/json" \
      https://api.voyageai.com/v1/models
 ```
@@ -123,9 +124,9 @@ Would you like me to reindex your repository now?
 (yes/no)
 ```
 
-If yes:
+If yes, trigger an explicit reindex (using `--standalone` to force indexing regardless of whether the server is running):
 ```bash
-cw index --project {repo_path}
+cw index --standalone --project {repo_path}
 ```
 
 Show progress and results.
@@ -157,7 +158,14 @@ CodeWeaver is working correctly with your new configuration.
 
 ### 7. Completion
 
-No need to update the configured flag - it already exists. Just confirm success:
+Write the configured flag if it doesn't already exist (handles both fresh setup and retry after a failed initial onboarding):
+
+```bash
+mkdir -p "${CLAUDE_PLUGIN_DATA}/state/codeweaver"
+touch "${CLAUDE_PLUGIN_DATA}/state/codeweaver/.configured"
+```
+
+Then confirm success:
 
 ```
 🎉 Setup complete!

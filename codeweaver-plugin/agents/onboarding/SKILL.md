@@ -77,8 +77,9 @@ Wait for the user to provide the API key.
 
 **Validation**: Test the API key works:
 ```bash
-# Use the bash tool to test the key
-curl -H "Authorization: Bearer ${VOYAGE_API_KEY}" \
+# Use the bash tool to test the key; this will fail on non-2xx responses
+curl --fail-with-body -sS \
+     -H "Authorization: Bearer ${VOYAGE_API_KEY}" \
      -H "Content-Type: application/json" \
      https://api.voyageai.com/v1/models
 ```
@@ -121,9 +122,9 @@ Now I'll index your codebase. This may take a few minutes depending on size.
 Indexing in progress...
 ```
 
-Run the indexing command:
+Run the indexing command. If the CodeWeaver server is already running, indexing is automatic — use `cw status` to monitor progress. If not, trigger an explicit index:
 ```bash
-cw index --project {repo_path}
+cw index --standalone --project {repo_path}
 ```
 
 Show progress if possible. When complete:
@@ -138,7 +139,7 @@ Test that search works:
 Let me verify everything's working by running a test search...
 ```
 
-Use the `find_code` tool (or `codeweaver__find_code` depending on MCP naming) to search for something generic like "main" or "function":
+Use the `find_code` tool to search for something generic like "main" or "function":
 
 ```
 Testing search: find_code("function definition")
