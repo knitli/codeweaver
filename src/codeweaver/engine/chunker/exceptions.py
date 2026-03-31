@@ -340,12 +340,70 @@ class ASTDepthExceededError(ChunkingError):
         self.file_path = file_path
 
 
+class FileTooLargeError(ChunkingError):
+    """File exceeds maximum size limit for chunking.
+
+    Raised when a file is too large to process safely within resource
+    constraints. This prevents performance degradation and resource
+    exhaustion from oversized files.
+
+    Files exceeding the size limit should be excluded from indexing,
+    split into smaller components, or the limit should be increased
+    if appropriate for the use case.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        file_size_mb: float | None = None,
+        max_size_mb: int | None = None,
+        file_path: str | None = None,
+        details: dict[str, Any] | None = None,
+        suggestions: list[str] | None = None,
+    ) -> None:
+        """Initialize file too large error with size metrics.
+
+        Args:
+            message: Description of the size limit violation
+            file_size_mb: Actual file size in megabytes
+            max_size_mb: Configured maximum file size in megabytes
+            file_path: Path to the oversized file
+            details: Additional size-related diagnostics
+            suggestions: Strategies for handling oversized files
+        """
+        error_details = dict(details) if details is not None else {}
+        if file_size_mb is not None:
+            error_details["file_size_mb"] = file_size_mb
+        if max_size_mb is not None:
+            error_details["max_size_mb"] = max_size_mb
+            if file_size_mb is not None and max_size_mb != 0:
+                error_details["size_ratio"] = file_size_mb / max_size_mb
+        if file_path:
+            error_details["file_path"] = file_path
+
+        default_suggestions = suggestions or [
+            f"Increase max_file_size_mb in performance settings (currently {max_size_mb} MB)"
+            if max_size_mb is not None
+            else "Increase max_file_size_mb in performance settings",
+            "Exclude this file pattern from indexing",
+            "Split file into smaller components",
+            "Use external filtering to skip large generated files",
+        ]
+
+        super().__init__(message, details=error_details, suggestions=default_suggestions)
+        self.file_size_mb = file_size_mb
+        self.max_size_mb = max_size_mb
+        self.file_path = file_path
+
+
 __all__ = (
     "ASTDepthExceededError",
     "BinaryFileError",
     "ChunkLimitExceededError",
     "ChunkingError",
     "ChunkingTimeoutError",
+    "FileTooLargeError",
     "OversizedChunkError",
     "ParseError",
 )

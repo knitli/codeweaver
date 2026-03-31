@@ -17,7 +17,7 @@ from codeweaver.core import SemanticSearchLanguage
 from codeweaver.core.constants import PARALLEL_CHUNKING_THRESHOLD
 from codeweaver.engine.chunker import ChunkerSelector, chunk_files_parallel
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
-from codeweaver.engine.chunker.exceptions import ChunkingError
+from codeweaver.engine.chunker.exceptions import ChunkingError, FileTooLargeError
 
 
 if TYPE_CHECKING:
@@ -94,6 +94,13 @@ class ChunkingService:
                     chunks = fallback_chunker.chunk(content, file=file)
 
                 yield (file.path, chunks)
+            except FileTooLargeError as e:
+                logger.info(
+                    "Skipping oversized file: %s (%s)",
+                    file.path,
+                    e,
+                    extra={"file_size_mb": e.file_size_mb, "max_size_mb": e.max_size_mb},
+                )
             except Exception:
                 logger.warning("Skipping file %s: chunking failed", file.path, exc_info=True)
 
