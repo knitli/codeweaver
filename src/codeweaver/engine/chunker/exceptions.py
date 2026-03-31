@@ -372,16 +372,16 @@ class FileTooLargeError(ChunkingError):
             details: Additional size-related diagnostics
             suggestions: Strategies for handling oversized files
         """
-+        error_details = dict(details) if details is not None else {}
-+        if file_size_mb:
-+            error_details["file_size_mb"] = file_size_mb
-+        if max_size_mb:
-+            error_details["max_size_mb"] = max_size_mb
-+            if file_size_mb:
-+                error_details["size_ratio"] = file_size_mb / max_size_mb
-+        if file_path:
-+            error_details["file_path"] = file_path
-+
+        error_details = dict(details) if details is not None else {}
+        if file_size_mb:
+            error_details["file_size_mb"] = file_size_mb
+        if max_size_mb:
+            error_details["max_size_mb"] = max_size_mb
+            if file_size_mb:
+                error_details["size_ratio"] = file_size_mb / max_size_mb
+        if file_path:
+            error_details["file_path"] = file_path
+
         default_suggestions = suggestions or [
             f"Increase max_file_size_mb in performance settings (currently {max_size_mb} MB)"
             if max_size_mb
