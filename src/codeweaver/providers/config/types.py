@@ -134,8 +134,7 @@ class DocumentRepr:
     async def serialize_for_upsert(self, texts: list[str]) -> list[Document]:
         """Serialize the document representations for Qdrant upsert."""
         await asyncio.sleep(ZERO)
-        # Optimization: sum(map(len, map(str.strip, texts))) is significantly faster than a generator comprehension
-        avg_length = int(sum(map(len, map(str.strip, texts))) / len(texts)) if texts else 0
+        avg_length = sum(len(text.strip()) for text in texts) // len(texts) if texts else 0
         options = await self.options.serialize_for_upsert(avg_length)
         return [Document(text=text, model=self.model, options=options) for text in texts]
 
