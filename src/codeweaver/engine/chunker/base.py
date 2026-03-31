@@ -108,15 +108,24 @@ class ChunkGovernor(BasedModel):
     @computed_field
     @property
     def chunk_limit(self) -> PositiveInt:
-        """The absolute maximum chunk size in tokens."""
+        """The absolute maximum chunk size in tokens.
+
+        Considers both context_window and max_input from capabilities.
+        Uses the minimum of all available limits to ensure chunks fit
+        within all model constraints.
+        """
         # Use default of 512 tokens when capabilities aren't available
         if not self._limit_established and self.capabilities:
             self._limit_established = True
-            self._limit = min(
-                capability.context_window
-                for capability in self.capabilities
-                if hasattr(capability, "context_window")
-            )
+            limits = []
+            for capability in self.capabilities:
+                # Prefer max_input over context_window for stricter limits
+                if hasattr(capability, "max_input") and capability.max_input:
+                    limits.append(capability.max_input)
+                elif hasattr(capability, "context_window"):
+                    limits.append(capability.context_window)
+            if limits:
+                self._limit = min(limits)
         return self._limit
 
     @computed_field

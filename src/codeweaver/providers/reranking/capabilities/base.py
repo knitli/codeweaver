@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
@@ -19,6 +21,9 @@ from codeweaver.core import ValidationError as CodeWeaverValidationError
 
 if TYPE_CHECKING:
     from codeweaver.core import CodeChunk
+
+
+logger = logging.getLogger(__name__)
 
 
 class RerankingModelCapabilities(BasedModel):
@@ -111,12 +116,37 @@ class RerankingModelCapabilities(BasedModel):
     def _process_max_input_with_tokenizer(
         self, input_chunks: Sequence[str]
     ) -> tuple[bool, NonNegativeInt]:
-        """Process max_input using the specified tokenizer."""
-        # we can prevent it if we pass the max_input down to the chunker, but we should also handle it here.
+        """Process max_input using the specified tokenizer.
+
+        Returns:
+            Tuple of (all_chunks_fit, last_valid_index).
+            - If all_chunks_fit is True, all chunks can be processed.
+            - If False, only chunks up to last_valid_index can be processed.
+        """
         if not self.max_input or not isinstance(self.max_input, int):
             return True, 0
         tokenizer = self.token_processor
         chunk_counts = [tokenizer.estimate(chunk) for chunk in input_chunks]
+
+        # Handle first chunk exceeding max_input (defensive layer)
+        # This matches the graceful degradation pattern from embedding providers
+        if chunk_counts and chunk_counts[0] > self.max_input:
+            logger.warning(
+                "First chunk exceeds max_input (%d > %d tokens). "
+                "This chunk should have been split during chunking. "
+                "Including first chunk anyway to avoid data loss.",
+                chunk_counts[0],
+                self.max_input,
+                extra={
+                    "chunk_tokens": chunk_counts[0],
+                    "max_input": self.max_input,
+                    "model": self.name,
+                },
+            )
+            # Return True with index 0 to allow processing first chunk despite size
+            # The reranking API will handle any actual limits on its end
+            return True, 0
+
         total_count = sum(chunk_counts)
         if total_count <= self.max_input:
             return True, 0
@@ -124,7 +154,7 @@ class RerankingModelCapabilities(BasedModel):
         while summed_count < self.max_input and chunk_counts:
             for i, count in enumerate(chunk_counts):
                 if summed_count + count > self.max_input:
-                    return False, i - 1 if i > 0 else 0
+                    return False, max(0, i - 1)
                 summed_count += count
         return False, len(chunk_counts) - 1
 
