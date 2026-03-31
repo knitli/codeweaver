@@ -27,7 +27,7 @@ Claude Code supports several hook types:
 
 ## Contributing
 
-Interested in contributing hooks? See our [onboarding issue](https://github.com/knitli/codeweaver/issues) for planned hooks and contribution guidelines.
+Interested in contributing hooks? Open a [plugin contribution issue](https://github.com/knitli/codeweaver/issues/new?template=plugin-contribution.yml) to propose a new hook or track progress on planned hooks.
 
 ## Structure
 

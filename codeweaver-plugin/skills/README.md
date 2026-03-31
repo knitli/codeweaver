@@ -29,7 +29,7 @@ Skills follow the [Agent Skills](https://agentskills.io) open standard, making t
 
 ## Contributing
 
-Interested in contributing skills? See our [onboarding issue](https://github.com/knitli/codeweaver/issues) for planned skills and contribution guidelines.
+Interested in contributing skills? Open a [plugin contribution issue](https://github.com/knitli/codeweaver/issues/new?template=plugin-contribution.yml) to propose a new skill or track progress on planned skills.
 
 ## Structure
 

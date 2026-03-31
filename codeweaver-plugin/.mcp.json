@@ -1,15 +1,23 @@
 {
-  "codeweaver": {
-    "command": "uvx",
-    "args": [
-      "--from",
-      "code-weaver",
-      "cw",
-      "server",
-      "--transport",
-      "stdio",
-      "--project",
-      "${workspaceFolder}"
-    ]
+  "mcpServers": {
+    "codeweaver": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "code-weaver",
+        "cw",
+        "server",
+        "--transport",
+        "stdio",
+        "--project",
+        "${workspaceFolder}"
+      ],
+      "env": {
+        "XDG_DATA_HOME": "${CLAUDE_PLUGIN_DATA}/data",
+        "XDG_CACHE_HOME": "${CLAUDE_PLUGIN_DATA}/cache",
+        "XDG_STATE_HOME": "${CLAUDE_PLUGIN_DATA}/state",
+        "XDG_CONFIG_HOME": "${CLAUDE_PLUGIN_DATA}/config"
+      }
+    }
   }
 }

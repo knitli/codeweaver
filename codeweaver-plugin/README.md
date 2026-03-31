@@ -45,7 +45,16 @@ CodeWeaver automatically indexes your project on first use. Claude can then sear
 
 ## Storage
 
-CodeWeaver stores its index and cache in `${CLAUDE_PLUGIN_DATA}/codeweaver`, which persists across plugin updates.
+CodeWeaver redirects all storage to the plugin's designated data directory via XDG environment variables set in the plugin configuration:
+
+- **Index data**: `${CLAUDE_PLUGIN_DATA}/state/codeweaver/indexes/`
+- **Vector store**: `${CLAUDE_PLUGIN_DATA}/state/codeweaver/vectors/`
+- **Model cache**: `${CLAUDE_PLUGIN_DATA}/cache/codeweaver/`
+- **Configuration**: `${CLAUDE_PLUGIN_DATA}/config/codeweaver/`
+
+This ensures data persists across plugin updates and is stored in the standard plugin data directory.
+
+> **Note**: XDG directory overrides apply on Linux. On macOS, storage falls back to `~/Library/...` directories unless you configure paths explicitly via `CODEWEAVER_INDEX_STORAGE_PATH` and related settings.
 
 ## Configuration
 
@@ -59,7 +68,7 @@ Default configuration uses:
 ## Requirements
 
 - Python 3.12 or later
-- [uv](https://astral.sh/uv) package manager (bundled with plugin)
+- [uv](https://astral.sh/uv) package manager (must be installed separately; see the [installation guide](https://docs.astral.sh/uv/getting-started/installation/))
 
 ## Support
 
