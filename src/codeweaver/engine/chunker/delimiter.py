@@ -11,6 +11,7 @@ and priority-based overlap resolution.
 
 from __future__ import annotations
 
+import itertools
 import logging
 import re
 
@@ -467,7 +468,7 @@ class DelimiterChunker(BaseChunker):
         # `re.finditer` for each keyword delimiter individually, significantly reducing overhead.
         start_strings = list(dict.fromkeys(d.start for d in keyword_delimiters))
         combined_pattern = re.compile(rf"\b(?:{'|'.join(map(re.escape, start_strings))})\b")
-        
+
         # Group delimiters by matched start string so duplicate keyword starts
         # preserve the original "process each delimiter independently" behavior.
         delimiter_map: dict[str, list[Delimiter]] = {}
@@ -1197,7 +1198,8 @@ class DelimiterChunker(BaseChunker):
         # Precompute line offsets once per file (O(n))
         # This provides O(1) lookup for line_start_pos/line_end_pos
         line_offsets = [0]
-        line_offsets.extend(line_offsets[-1] + len(line) for line in lines)
+        # ~2-3x faster execution by shifting evaluation to C with itertools.accumulate
+        line_offsets.extend(itertools.accumulate(map(len, lines)))
         for boundary in boundaries:
             # Always calculate line ranges first
             # For proper line range metadata, always expand to full lines
