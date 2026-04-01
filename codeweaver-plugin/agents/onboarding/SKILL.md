@@ -75,9 +75,10 @@ Once you have your API key, paste it below. It will be stored securely in your s
 
 Wait for the user to provide the API key.
 
-**Validation**: Test the API key works:
+**Validation**: Test the API key works by assigning it inline so it doesn't need to be exported first:
 ```bash
 # Use the bash tool to test the key; this will fail on non-2xx responses
+VOYAGE_API_KEY="<key-provided-by-user>" \
 curl --fail-with-body -sS \
      -H "Authorization: Bearer ${VOYAGE_API_KEY}" \
      -H "Content-Type: application/json" \
@@ -188,7 +189,7 @@ Recoverable failures should retry the current step. Critical failures (permissio
 ## Important Notes
 
 - **Be conversational but efficient** - don't over-explain
-- **Use emojis sparingly** - only for major milestones (✓, 🎉)
+- **Use emojis sparingly** - only for major milestones (✓, 🎉) or brief greetings (👋)
 - **Show progress** - users should know what's happening
 - **Handle interruptions** - if setup is interrupted, it should be safe to restart
 - **Security first** - emphasize that credentials are stored securely

@@ -73,8 +73,9 @@ If they need to update credentials:
 Enter your Voyage AI API key (get one at https://voyage.ai):
 ```
 
-**Validation**: Test the key before saving:
+**Validation**: Test the key before saving by assigning it inline so it doesn't need to be exported first:
 ```bash
+VOYAGE_API_KEY="<key-provided-by-user>" \
 curl --fail-with-body -sS \
      -H "Authorization: Bearer ${VOYAGE_API_KEY}" \
      -H "Content-Type: application/json" \
@@ -258,5 +259,5 @@ Related commands:
 - /codeweaver:setup - Run this setup again (you're here now)
 - cw doctor - Diagnose configuration issues
 - cw index --project {path} - Reindex manually
-- cw server status - Check if MCP server is running
+- cw status - Check if MCP server is running
 ```
