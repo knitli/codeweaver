@@ -7,11 +7,20 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # CodeWeaver Skills
 
-This directory is reserved for future Agent Skills that will extend CodeWeaver's capabilities.
+This directory contains Agent Skills that extend CodeWeaver's capabilities.
+
+## Current Skills
+
+### Setup Skill (`/codeweaver:setup`)
+Re-run CodeWeaver configuration to change embedding providers, update API credentials, or switch repositories.
+
+**Location:** `skills/setup/SKILL.md`
+
+**Usage:** Type `/codeweaver:setup` or `/cw:setup` in your Claude Code session.
 
 ## Coming Soon
 
-We're planning to add skills for:
+We're planning to add additional skills for:
 - **Code exploration workflows**: Guided codebase discovery
 - **Architecture analysis**: Understanding system structure
 - **Refactoring assistance**: Code improvement patterns

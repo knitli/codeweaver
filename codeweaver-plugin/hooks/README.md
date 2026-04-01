@@ -7,11 +7,20 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # CodeWeaver Hooks
 
-This directory is reserved for future Claude Code hooks that will provide event-driven automation.
+This directory contains Claude Code hooks for event-driven automation.
+
+## Current Hooks
+
+### SessionStart Hook
+Detects first-run to trigger interactive onboarding. Checks for a configured flag and sets `CODEWEAVER_FIRST_RUN=true` if not found, which activates the onboarding agent.
+
+**Files:**
+- `hooks.json` - Hook configuration
+- `scripts/check-first-run.sh` - First-run detection script
 
 ## Coming Soon
 
-We're planning to add hooks for:
+We're planning to add additional hooks for:
 - **Pre-search optimization**: Query enhancement before code search
 - **Post-search enrichment**: Adding context to search results
 - **Indexing triggers**: Automatic reindexing on file changes
