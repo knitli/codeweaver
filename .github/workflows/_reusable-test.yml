@@ -10,7 +10,7 @@ on:
   workflow_call:
     inputs:
       python-versions:
-        description: JSON array of Python versions to test (e.g., ["3.12", "3.13"]). Experimental versions (3.13t, 3.14t) are always included via matrix.include.
+        description: JSON array of Python versions to test (e.g., ["3.12", "3.13"]). Free-threaded experimental versions (3.13t, 3.14t) are temporarily disabled pending resolution of upstream package compatibility issues.
         required: false
         type: string
         default: '["3.12", "3.13", "3.14"]'
@@ -85,11 +85,14 @@ jobs:
         experimental:
           - false
         include:
-          # Experimental free-threaded Python versions (no-GIL)
-          - python-version: 3.13t
-            experimental: true
-          - python-version: 3.14t
-            experimental: true
+          # Free-threaded Python versions (no-GIL) are temporarily disabled because upstream
+          # package compatibility issues prevent them from building successfully. Re-enable
+          # once the blocking dependencies add free-threaded Python support:
+          #
+          #   - python-version: 3.13t
+          #     experimental: true
+          #   - python-version: 3.14t
+          #     experimental: true
     env:
       MISE_PYTHON_VERSION: ${{ matrix.python-version }}
       UV_PYTHON: ${{ matrix.python-version }}
