@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
@@ -14,7 +14,7 @@ version = 1
 [[annotations]]
 path = ["**/__pycache__/**", "**/*.pyc", "**/*.pyo"]
 precedence = "override"
-SPDX-FileCopyrightText = "2025 Knitli Inc."
+SPDX-FileCopyrightText = "2026 Knitli Inc."
 SPDX-License-Identifier = "MIT OR Apache-2.0"
 
 # =============================================================================
@@ -310,7 +310,7 @@ path = "data/node_types/analysis/**"
 precedence = "override"
 SPDX-FileCopyrightText = [
   "2014-2021 Tree-sitter grammar contributors (see individual grammar licenses)",
-  "2025 Knitli Inc."
+  "2026 Knitli Inc."
 ]
 SPDX-License-Identifier = "MIT"
 
@@ -336,3 +336,9 @@ path = [".specify/scripts/bash/*.sh"]
 precedence = "override"
 SPDX-FileCopyrightText = "2025 GitHub Inc."
 SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = ["docs-site/src/**"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Knitli Inc."
+SPDX-License-Identifier = "MIT OR Apache-2.0"

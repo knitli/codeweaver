@@ -161,3 +161,6 @@ if (( $+functions[add-zsh-hook] )); then
   add-zsh-hook precmd _prompt
   add-zsh-hook preexec _cw_preexec
 fi
+
+# bun completions
+[ -s "/home/knitli/.oh-my-zsh/completions/_bun" ] && source "/home/knitli/.oh-my-zsh/completions/_bun"
