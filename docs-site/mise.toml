@@ -1,27 +1,65 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
-# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-License-Identifier: Apache-2.0
+
 #:tombi schema.strict = false
 
-[tools]
-bun = "latest"
-node = "24"
-
-[env]
-
-[tasks]
-astro = "bun run astro"
-build = "bun run build"
-dev = "bun run dev"
-preview = "bun run preview"
-sync = "bun install"
-
-[tasks.gen-api-docs]
-tools.uv = "latest"
-run = "uvx ../scripts/gen_api_docs.py"
-
-[tasks.gen-cloudflare-types]
+[tasks.installdeps]
+description = "Install dependencies for the project"
+run = "bun install"
 tools.bun = "latest"
+
+[tasks.gentypes]
+description = "Generate Cloudflare types for the project"
 run = "bunx wrangler types"
-dir = "./"
+tools.bun = "latest"
+tools.wrangler = "latest"
+depends = ["installdeps"]
+
+[tasks.dev]
+description = "Start the development server"
+run = "bun run dev"
+tools.bun = "latest"
+depends = ["gentypes"]
+
+[tasks.build]
+description = "Build the project for production"
+run = "bun run build"
+tools.bun = "latest"
+depends = ["gentypes"]
+
+[tasks.deploy]
+description = "Deploy the project to Cloudflare"
+run = '''
+bun run deploy
+'''
+tools.bun = "latest"
+depends = ["build"]
+
+[tasks.clean]
+description = "Clean the project by removing the dist directory"
+run = [
+  "rm -rf dist",
+  "rm -rf .wrangler",
+  "rm -rf node_modules",
+  "rm -rf .astro",
+]
+
+[tasks.clean-install]
+description = "Clean the project and install dependencies"
+depends = ["clean", "installdeps"]
+
+[tasks.fmt]
+description = "Format the codebase using Biome"
+run = "biome format . --write --changed"
+tools.biome = "latest"
+
+[tasks.lint]
+description = "Lint the codebase using Biome"
+run = "biome check . --changed"
+tools.biome = "latest"
+
+[tasks.fix]
+description = "Fix linting issues using Biome"
+run = "biome check . --write --changed"
+tools.biome = "latest"

@@ -1,22 +1,32 @@
-// SPDX-FileCopyrightText: 2026 Knitli Inc.
-//
-// SPDX-License-Identifier: MIT OR Apache-2.0
-
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "assets": {
-    "directory": "./public"
-  },
+  "account_id": "5def525918a785eeda6decf66cf6b99b",
   "compatibility_date": "2026-03-17",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["global_fetch_strictly_public", "nodejs_compat"],
   "name": "codeweaver-docs",
+  "main": "@astrojs/cloudflare/entrypoints/server",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+    "run_worker_first": false
+  },
   "observability": {
     "enabled": true
   },
   "placement": {
     "mode": "smart"
   },
-  "upload_source_maps": false
+  "preview_urls": true,
+  "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "https://docs.knitli.com/codeweaver/*",
+      "zone_name": "knitli.com"
+    }
+  ],
+  "vars": {
+    "PUBLIC_DOCS_PRODUCT": "CodeWeaver"
+  }
 }
