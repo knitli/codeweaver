@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 import createConfig from "@knitli/astro-docs-template/config";
+import type { AstroUserConfig } from "astro/config";
 import { DocsAssets } from "@knitli/docs-components"
 import { DocsTemplateOptions } from "@knitli/astro-docs-template/config";
+import { remarkVersion } from "./src/plugins/remark-version";
 
 const { codeweaverPrimary, codeweaverReverse } = DocsAssets;
 
@@ -51,7 +53,7 @@ const configOptions: DocsTemplateOptions = {
         { label: 'Exquisite Context', slug: 'concepts/exquisite-context' },
         { label: 'DI Architecture', slug: 'concepts/di-system' },
         { label: 'Language Support', slug: 'concepts/languages' },
-        { label: 'Roadmap to Alpha 7', slug: 'concepts/roadmap' },
+        { label: 'Roadmap', slug: 'concepts/roadmap' },
       ],
     },
     {
@@ -78,4 +80,13 @@ const configOptions: DocsTemplateOptions = {
   ],
 };
 
-export default createConfig(configOptions);
+const config = createConfig(configOptions) as AstroUserConfig;
+
+// Inject remark-version plugin for {{VERSION}} substitution in markdown
+const existingRemarkPlugins = config.markdown?.remarkPlugins ?? [];
+config.markdown = {
+  ...config.markdown,
+  remarkPlugins: [...existingRemarkPlugins, remarkVersion],
+};
+
+export default config;

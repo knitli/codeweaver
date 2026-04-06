@@ -7,9 +7,9 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # Security
 
-CodeWeaver is **alpha** software. It may have bugs and vulnerabilities, and we do not provide support for any version except the current release.
+CodeWeaver is **pre-1.0** software. It may have bugs and vulnerabilities, and we do not provide support for any version except the current release.
 
-Beta software has bugs, probably lots of them, and some of those may be security vulnerabilities.
+Pre-1.0 software has bugs, probably lots of them, and some of those may be security vulnerabilities.
 
 ## Reporting a Security Concern
 

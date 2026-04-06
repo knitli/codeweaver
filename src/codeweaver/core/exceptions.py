@@ -60,14 +60,14 @@ def _get_issue_information() -> tuple[str, ...]:
 
     if _is_tty():
         return (
-            "[dark orange]CodeWeaver[/dark orange] [bold magenta]is in alpha[/bold magenta]. Please report possible bugs at https://github.com/knitli/codeweaver/issues",
+            "[dark orange]CodeWeaver[/dark orange] [bold magenta]is pre-1.0[/bold magenta]. Please report possible bugs at https://github.com/knitli/codeweaver/issues",
             "",
             "If you're not sure something is a bug, you can open a discussion at: https://github.com/knitli/codeweaver/discussions",
             "",
             "[bold]Thank you for helping us improve CodeWeaver! ❤️[/bold]",
         )
     return (
-        "CodeWeaver is in alpha. Please report possible bugs at https://github.com/knitli/codeweaver/issues",
+        "CodeWeaver is pre-1.0. Please report possible bugs at https://github.com/knitli/codeweaver/issues",
         "",
         "If you're not sure something is a bug, you can open a discussion at: https://github.com/knitli/codeweaver/discussions",
         "",

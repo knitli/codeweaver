@@ -13,13 +13,13 @@ SPDX-License-Identifier: MIT OR Apache-2.0
   <img alt="CodeWeaver logo" src="docs/assets/codeweaver-primary.webp" height="150px" width="150px">
 </picture>
 
-# CodeWeaver Alpha 6
+# CodeWeaver
 
 ### Exquisite Context for Agents — Infrastructure that is Extensible, Predictable, and Resilient.
 
 [![Python Version][badge_python]][link_python]
 [![License][badge_license]][link_license]
-[![Alpha Release][badge_release]][link_release]
+[![Release][badge_release]][link_release]
 [![MCP Compatible][badge_mcp]][link_mcp]
 
 [Documentation][nav_docs] •
@@ -35,7 +35,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 **CodeWeaver gives Claude and other AI agents precise context from your codebase.** Not keyword grep. Not whole-file dumps. Actual structural understanding through hybrid semantic search.
 
-CodeWeaver Alpha 6 transforms from a "Search Tool" into **Professional Context Infrastructure**. With 100% Dependency Injection (DI) and a Pydantic-driven configuration system, it provides the reliability and extensibility required for industrial-grade AI deployments.
+CodeWeaver is **Professional Context Infrastructure**. With 100% Dependency Injection (DI) and a Pydantic-driven configuration system, it provides the reliability and extensibility required for industrial-grade AI deployments.
 
 **Example:**
 ```
@@ -49,7 +49,7 @@ With CodeWeaver:
   Result: Precise answers, focused context, 60-80% token reduction
 ```
 
-> ⚠️ **Alpha Release**: CodeWeaver is in active development. [Use it, break it, help shape it][issues].
+> **Early Release (0.x)**: CodeWeaver is in active development. APIs may change between minor versions. [Use it, break it, help shape it][issues].
 
 ---
 
@@ -57,7 +57,7 @@ With CodeWeaver:
 
 ### Quick Reference Matrix
 
-| Feature | CodeWeaver Alpha 6 | Legacy Search Tools |
+| Feature | CodeWeaver | Legacy Search Tools |
 | :--- | :--- | :--- |
 | **Search Type** | Hybrid (Semantic + AST + Keyword) | Keyword Only |
 | **Context Quality** | **Exquisite** / High-Precision | Noisy / Irrelevant |
@@ -171,7 +171,7 @@ AI agents face **too much irrelevant context**, causing token waste, missed patt
 [badge_license]: <https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green.svg> "License Badge"
 [badge_mcp]: <https://img.shields.io/badge/MCP-compatible-purple.svg> "MCP Compatible Badge"
 [badge_python]: <https://img.shields.io/badge/python-3.12%2B-blue.svg> "Python Version Badge"
-[badge_release]: <https://img.shields.io/badge/release-alpha%205-orange.svg> "Release Badge"
+[badge_release]: <https://img.shields.io/pypi/v/code-weaver.svg> "PyPI Version"
 
 <!-- Other links -->
 

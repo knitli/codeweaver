@@ -4,7 +4,7 @@ title: "Installation and Setup"
 
 # Installation & Setup
 
-> **TL;DR:** This guide handles the initial installation and configuration of CodeWeaver Alpha 6. Use it to set up your environment and prepare your codebase for AI agent interaction. It saves time by providing a streamlined path from empty directory to "Exquisite Context."
+> **TL;DR:** This guide handles the initial installation and configuration of CodeWeaver. Use it to set up your environment and prepare your codebase for AI agent interaction. It saves time by providing a streamlined path from empty directory to "Exquisite Context."
 
 CodeWeaver transforms your codebase into a structured, semantic search engine for AI agents. This guide walks you through the 5-minute setup process to get CodeWeaver running on your machine.
 

@@ -4,7 +4,7 @@ title: "Language Support"
 
 # Language Support
 
-> **TL;DR:** CodeWeaver Alpha 6 supports **166+ languages**. Use it to get deep structural context for 27 core languages (AST-aware) or reliable heuristic search for everything else. It saves agents from "context blindness" by understanding the logical boundaries of almost any codebase.
+> **TL;DR:** CodeWeaver supports **166+ languages**. Use it to get deep structural context for 27 core languages (AST-aware) or reliable heuristic search for everything else. It saves agents from "context blindness" by understanding the logical boundaries of almost any codebase.
 
 CodeWeaver is designed to be universal. While it provides the deepest intelligence for modern programming languages, its resilient architecture ensures that even legacy systems or niche configuration formats are searchable and understandable for AI agents.
 
