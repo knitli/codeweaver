@@ -79,7 +79,6 @@ def get_cohere_reranking_capabilities() -> tuple[CohereRerankingCapabilities, ..
             "rerank-v4.0-fast",
         )
     ]
-    capabilities.extend([])
     return (
         *capabilities,
         CohereRerankingCapabilities.model_validate({

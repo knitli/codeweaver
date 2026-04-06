@@ -28,9 +28,9 @@ def ensure_endpoint_version(url: str, *, cohere: bool = False) -> str:
 def _get_heroku_envs(*, cohere: bool = False) -> tuple[str, ...]:
     envs = ["INFERENCE_URL", "HEROKU_INFERENCE_URL", "HEROKU_BASE_URL"]
     if cohere:
-        envs.extend(["CO_API_URL", "COHERE_BASE_URL", "COHERE_API_BASE"])
+        envs.extend(("CO_API_URL", "COHERE_BASE_URL", "COHERE_API_BASE"))
     else:
-        envs.extend(["OPENAI_API_URL", "OPENAI_API_BASE_URL", "OPENAI_API_BASE"])
+        envs.extend(("OPENAI_API_URL", "OPENAI_API_BASE_URL", "OPENAI_API_BASE"))
     return tuple(envs)
 
 
