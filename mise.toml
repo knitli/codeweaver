@@ -61,6 +61,7 @@ python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 uv = "latest"
 "pipx:exportify" = "latest"
 hk = "1.38.0"
+pkl = "0.31.1"
 
 # Quick note for those unfamiliar with mise:
 #   - despite the namespace, tools prefixed with "pipx:" are installed via "uv" (I assume once upon a time they were installed with pipx before uv came along)

@@ -78,15 +78,16 @@ jobs:
         python-version: ${{ fromJSON(inputs.python-versions) }}
         experimental:
           - false
-        include:
-          # Free-threaded Python versions (no-GIL) are temporarily disabled because upstream
-          # package compatibility issues prevent them from building successfully. Re-enable
-          # once the blocking dependencies add free-threaded Python support:
-          #
-          #   - python-version: 3.13t
-          #     experimental: true
-          #   - python-version: 3.14t
-          #     experimental: true
+        # include:
+        # Free-threaded Python versions (no-GIL) are temporarily disabled because upstream
+        # package compatibility issues prevent them from building successfully. Re-enable
+        # once the blocking dependencies add free-threaded Python support:
+        #
+        #   include:
+        #     - python-version: 3.13t
+        #       experimental: true
+        #     - python-version: 3.14t
+        #       experimental: true
     env:
       MISE_PYTHON_VERSION: ${{ matrix.python-version }}
       UV_PYTHON: ${{ matrix.python-version }}
