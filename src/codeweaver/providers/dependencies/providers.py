@@ -359,7 +359,7 @@ async def _create_embedding_providers() -> tuple[EmbeddingProvider, ...]:
             query_provider = await _instantiate_provider_from_settings(
                 settings.query_provider, EmbeddingProvider
             )
-            providers.extend([embed_provider, query_provider])
+            providers.extend((embed_provider, query_provider))
         else:
             provider = await _instantiate_provider_from_settings(settings, EmbeddingProvider)
             providers.append(provider)
