@@ -85,7 +85,7 @@ keywords = [
   "voyageai",
 ]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "Intended Audience :: Information Technology",
@@ -108,7 +108,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 # Some notes:
-#   - Starting with Alpha 6, we pin client versions to ensure our `ClientOptions` subclasses work correctly.
+#   - We pin client versions to ensure our `ClientOptions` subclasses work correctly.
 #   - We like to stay toward the edge, so we'll update these regularly but ensure they work first.
 #   -
 # tombi: format.rules.array-values-order.disabled = true
