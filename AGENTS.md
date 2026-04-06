@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code), Github Copilot, Roo, and other AI agents when working with code in this repository. 
+This file provides guidance to Claude Code (claude.ai/code), Github Copilot, Roo, and other AI agents when working with code in this repository.
 
 ## Project Overview
 
@@ -19,12 +19,12 @@ CodeWeaver is an extensible MCP (Model Context Protocol) server for semantic cod
 - **MCP HTTP Server**: FastMCP at port 9328 for HTTP clients
 - **MCP stdio**: Lightweight proxy that forwards to the HTTP backend (default transport)
 
-**Current Status**: Alpha Release 2. Most core features complete and relatively stable. Advanced functionality planned in several epics.
+**Current Status**: Early release (0.x). Most core features complete and relatively stable. Advanced functionality planned in several epics.
 
 > [!IMPORTANT]
 > Because it is an MCP server, you can use CodeWeaver while assisting with CodeWeaver development!
 > In your list of available tools, you may see `find_code` or `codeweaver__find_code`
-> Congrats! You're both an alpha tester and contributor!
+> Congrats! You're both an early tester and contributor!
 
 ## Project Constitution (DEFINITIVE GUIDANCE)
 
@@ -52,7 +52,7 @@ mise run setup
 # Install dependencies
 mise run sync
 
-# Activate environment  
+# Activate environment
 mise run activate
 ```
 
@@ -307,7 +307,7 @@ src/codeweaver/
 │   │       ├── base.py
 │   │       ├── bedrock.py # AWS Bedrock
 │   │       ├── cohere.py  # also includes Azure and Heroku cohere providers
-│   │       ├── fastembed.py  
+│   │       ├── fastembed.py
 │   │       ├── google.py
 │   │       ├── huggingface.py
 │   │       ├── litellm.py  **scaffolding**
@@ -342,7 +342,7 @@ src/codeweaver/
 │       ├── __init__.py
 │       ├── base.py      # Base vector store interface
 │       ├── inmemory.py  # In-memory vector store (qdrant_client w/ json persistence)
-│       ├── metadata.py  # Vector metadata handling 
+│       ├── metadata.py  # Vector metadata handling
 │       ├── qdrant_base.py # Qdrant base class for all common function to inmemory and qdrant
 │       ├── qdrant.py    # Qdrant vector database (local and cloud/remote)
 │       └── utils.py     # Vector store utilities
@@ -425,7 +425,7 @@ src/codeweaver/
 
 ### Test Categories (via pytest markers)
 - **unit**: Individual component tests
-- **integration**: Component interaction tests  
+- **integration**: Component interaction tests
 - **e2e**: End-to-end workflow tests
 - **benchmark**: Performance tests
 - **network/external_api**: Tests requiring external services
@@ -447,13 +447,13 @@ Apply relevant pytest markers to new tests (see pyproject.toml for full list).
 7. Integrate telemetry and observability
 8. Build comprehensive test suite
 
-### Phase 3: Advanced Orchestration ❌ **Planned for Next Two Major Alpha Releases**
+### Phase 3: Advanced Orchestration ❌ **Planned for Next Two Minor Releases**
 9. Integrate agentic handling of query response (Context agent and Context agent API)
 10. Add Context agent tools
 11. Pluggable pipeline orchestration with `pydantic-graph`
 12. Pipeline/response evaluation and validation with `pydantic-eval`
 13. Expanded testing
-14. Replace registry system with dependency injection pattern, deprecate existing system ~4th major alpha release
+14. Replace registry system with dependency injection pattern, deprecate existing system ~0.4.0
 
 ### Key Implementation Notes
 - Entry point in pyproject.toml: `codeweaver = "codeweaver.cli.app:main"`
@@ -638,9 +638,9 @@ class MyModel(BasedModel)
           FilteredKey("project_path"): AnonymityConversion.HASH, # hashes the value
           # can also be one of BOOLEAN (present/not), COUNT, DISTRIBUTION, AGGREGATE, and TEXT_COUNT
         }
-      
+
     # NOTE: For more complex handling, classes may additionally implement the `_telemetry_handler` method
-    # See `codeweaver.core.types.models.BasedModel` for the API signature. 
+    # See `codeweaver.core.types.models.BasedModel` for the API signature.
 
 ```
 

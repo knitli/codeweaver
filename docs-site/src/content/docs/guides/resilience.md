@@ -6,7 +6,7 @@ title: "Resilience: The Safety Net"
 
 > **TL;DR:** This module handles Resilient Intelligence. Use it to ensure your agents never lose context, even when cloud APIs fail. It saves your workflow by automatically switching to local providers (FastEmbed/Sentence-Transformers) during outages.
 
-CodeWeaver Alpha 6 includes an industrial-grade "Safety Net" that protects your AI agents from cloud provider failures. Whether it's an API timeout, a rate limit, or a total service outage, CodeWeaver keeps your context pipeline flowing.
+CodeWeaver includes an industrial-grade "Safety Net" that protects your AI agents from cloud provider failures. Whether it's an API timeout, a rate limit, or a total service outage, CodeWeaver keeps your context pipeline flowing.
 
 ---
 

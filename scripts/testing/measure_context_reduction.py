@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """
-Context Reduction Measurement Script for CodeWeaver Alpha 6.
+Context Reduction Measurement Script for CodeWeaver.
 
 This script measures the "Exquisite Context" claim (60-80% context reduction) by:
 1. Calculating the 'Naive' baseline (all source files for a given language/query).
@@ -68,7 +68,7 @@ async def calculate_naive_baseline(project_path: Path, languages: Sequence[str])
 
 async def measure_reduction():
     print("=" * 70)
-    print("CodeWeaver Alpha 6: Context Reduction Benchmark")
+    print("CodeWeaver: Context Reduction Benchmark")
     print("=" * 70)
 
     # Initialize DI

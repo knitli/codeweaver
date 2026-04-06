@@ -6,7 +6,7 @@ title: "Custom Providers"
 
 > **TL;DR:** This module handles the registration and implementation of custom providers via the Dependency Injection (DI) system. Use it when you need to integrate a niche embedding model or vector store. It saves development time by allowing you to extend CodeWeaver without modifying the core codebase.
 
-The Dependency Injection (DI) architecture of CodeWeaver Alpha 6 makes it simple to add support for new providers. Whether you have a proprietary internal embedding API or want to experiment with a new vector database, you can plug your implementation into CodeWeaver with just a few classes.
+The Dependency Injection (DI) architecture of CodeWeaver makes it simple to add support for new providers. Whether you have a proprietary internal embedding API or want to experiment with a new vector database, you can plug your implementation into CodeWeaver with just a few classes.
 
 ---
 
@@ -93,4 +93,4 @@ Raise a `ProviderError` if your API fails. CodeWeaver will catch this and automa
 
 ## Summary
 
-Custom providers turn CodeWeaver into a truly universal context platform. By following the DI-driven patterns of Alpha 6, you can ensure your integrations are as robust and resilient as the built-in providers.
+Custom providers turn CodeWeaver into a truly universal context platform. By following the DI-driven patterns, you can ensure your integrations are as robust and resilient as the built-in providers.

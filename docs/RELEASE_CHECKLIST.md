@@ -7,13 +7,12 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # Release Checklist
 
-## Alpha Release (v0.1.0-alpha.1)
+## Minor Release (e.g., v0.2.0)
 
 ### Pre-Release Preparation
 
 - [ ] **Review README.md**
   - [ ] Installation instructions are current
-  - [ ] Alpha status is clearly communicated
   - [ ] Known limitations are documented
   - [ ] API key requirements are listed
 
@@ -41,43 +40,42 @@ SPDX-License-Identifier: MIT OR Apache-2.0
   ```bash
   # Commit all changes
   git add -A
-  git commit -m "chore: prepare for v0.1.0-alpha.1 release"
-  
-  # Create alpha tag
-  git tag v0.1.0-alpha.1
-  
+  git commit -m "chore: prepare for v0.2.0 release"
+
+  # Create version tag
+  git tag v0.2.0
+
   # Verify version
   uv build
-  ls -la dist/  # Should show: codeweaver.server.mcp-0.1.0a1-py3-none-any.whl
+  ls -la dist/  # Should show: code_weaver-0.2.0-py3-none-any.whl
   ```
 
 - [ ] **Push Release**
   ```bash
   # Push commit
   git push origin HEAD
-  
+
   # Push tag (triggers GitHub Actions)
-  git push origin v0.1.0-alpha.1
+  git push origin v0.2.0
   ```
 
 - [ ] **Verify Build**
   - [ ] GitHub Actions workflow completes successfully
   - [ ] Tests pass on all Python versions (3.12, 3.13, 3.14)
   - [ ] Package builds without errors
-  - [ ] GitHub release created and marked as "pre-release"
+  - [ ] GitHub release created
 
 - [ ] **Verify PyPI Upload**
-  - [ ] Package appears on PyPI: https://pypi.org/project/codeweaver/
-  - [ ] Version shows as `0.1.0a1`
+  - [ ] Package appears on PyPI: https://pypi.org/project/code-weaver/
+  - [ ] Version shows correctly
   - [ ] README renders correctly on PyPI
-  - [ ] Installation works: `pip install --pre codeweaver`
+  - [ ] Installation works: `pip install code-weaver`
 
 ### Post-Release
 
 - [ ] **Announcement**
   - [ ] Update project status in README (if needed)
   - [ ] Announce on relevant channels
-  - [ ] Set expectations: "Alpha - feature complete but not heavily tested"
 
 - [ ] **Monitoring**
   - [ ] Watch for GitHub issues
@@ -89,21 +87,10 @@ SPDX-License-Identifier: MIT OR Apache-2.0
   - [ ] Create issue template for feature requests
   - [ ] Document known issues in GitHub
 
-## Beta Release (v0.1.0-beta.1)
+## Stable Release (v1.0.0)
 
 ### Prerequisites
-- [ ] Alpha testing phase complete (2-4 weeks recommended)
-- [ ] Critical bugs from alpha addressed
-- [ ] Documentation updated based on alpha feedback
-- [ ] Core functionality validated by early testers
-
-### Process
-Follow same steps as alpha, but use `v0.1.0-beta.1` tag.
-
-## Stable Release (v0.1.0)
-
-### Prerequisites
-- [ ] Beta testing phase complete
+- [ ] All 0.x development milestones complete
 - [ ] All critical bugs resolved
 - [ ] Documentation comprehensive and accurate
 - [ ] Breaking changes documented
@@ -114,18 +101,17 @@ Follow same steps as alpha, but use `v0.1.0-beta.1` tag.
 ### Additional Steps
 - [ ] Create CHANGELOG.md if not exists
 - [ ] Update version references in docs
-- [ ] Remove "alpha/beta" warnings from README
 - [ ] Announce stable release
 
 ## Version Progression
 
 ```
-v0.1.0-alpha.1    → Alpha testing, gather feedback
-v0.1.0-alpha.2    → Bug fixes from alpha.1
-v0.1.0-beta.1     → Feature complete, wider testing
-v0.1.0-beta.2     → Bug fixes from beta.1
-v0.1.0-rc.1       → Release candidate, final validation
-v0.1.0            → Stable release
+v0.1.0            → Initial public release
+v0.1.1            → Patch fixes
+v0.2.0            → Monorepo split, extensibility
+v0.3.0            → Context Agent, pipeline orchestration
+v0.4.0            → Cloud orchestration, distributed indexing
+v1.0.0            → Stable release, API guarantees
 ```
 
 ## Rollback Procedure
@@ -141,13 +127,11 @@ If critical issues are discovered after release:
 2. **Create GitHub issue** documenting the problem
 
 3. **Fix the issue** and release new version
-   - For alpha: increment to `alpha.2`
-   - For beta: increment to `beta.2`
-   - For stable: create patch release `v0.1.1`
+   - For minor: create patch release (e.g., `v0.2.1`)
+   - For stable: create patch release (e.g., `v1.0.1`)
 
 ## Notes
 
-- **PyPI version normalization**: Git tag `v0.1.0-alpha.1` becomes `0.1.0a1` on PyPI (this is correct per PEP 440)
-- **Pre-release visibility**: Users must use `--pre` flag to install alpha/beta versions
 - **Version immutability**: Once published to PyPI, a version cannot be re-uploaded (must increment)
-- **Tag naming**: Always prefix with `v` (e.g., `v0.1.0-alpha.1` not `0.1.0-alpha.1`)
+- **Tag naming**: Always prefix with `v` (e.g., `v0.2.0` not `0.2.0`)
+- **SemVer 0.x**: Under `0.x.y`, minor version bumps may include breaking changes per SemVer convention

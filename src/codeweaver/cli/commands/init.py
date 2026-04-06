@@ -1006,7 +1006,7 @@ def init(
             "You can use CodeWeaver to search your codebase outside of an MCP client with [dim]codeweaver search[/dim]",
             "Check status with [dim]cw status[/dim]",
             "To check your config setup, run [dim]codeweaver doctor[/dim]",
-            "[red]CodeWeaver is in Alpha. There are bugs.[/red] Help us by reporting them: https://github.com/knitli/codeweaver/issues",
+            "[red]CodeWeaver is pre-1.0. There are bugs.[/red] Help us by reporting them: https://github.com/knitli/codeweaver/issues",
         ],
         title="Tips for Best Experience:",
     )

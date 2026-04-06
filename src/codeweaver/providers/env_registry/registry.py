@@ -52,7 +52,7 @@ class ProviderEnvRegistry:
         """Register provider configuration.
 
         Note: External registration is an internal API and may change.
-        CodeWeaver has no stable public API during alpha phase.
+        CodeWeaver has no stable public API during 0.x development.
 
         Args:
             provider: Provider name (lowercase)
