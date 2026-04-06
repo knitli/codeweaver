@@ -118,7 +118,7 @@ class MyModel(BasedModel):
 ✅ **DO**: Use `%s` formatting or `extra={"key": value}`
 ❌ **DON'T**: Use f-strings in log statements
 ❌ **DON'T**: Use print statements in production code
-✅ **DO**: Use `logging.exception` for exceptions (includes traceback automatically)
+✅ **DO**: Use `logging.warning` for most errors (allows CodeWeaver's UI to handle display based on severity and `--verbose` flag; `logging.exception` bypasses the UI handler)
 
 ### Exception Handling
 ✅ **DO**: Specify exception types (no bare `except:`)

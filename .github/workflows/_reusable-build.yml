@@ -59,17 +59,33 @@ jobs:
           activate-venv: "false"
           skip-checkout: true
         id: setup-uv
-      - name: Build package with UV
+      - name: Prepare build
         env:
           UV_PATH: ${{ steps.setup-uv.outputs.uv-path }}
         run: |
-          if [ "${{ inputs.clean-build }}" = "true" ]; then
-            "$UV_PATH" build --clear
-          else
-            "$UV_PATH" build
+          "$UV_PATH" run python scripts/build/prepare-build.py
+      - name: Build all packages
+        env:
+          UV_PATH: ${{ steps.setup-uv.outputs.uv-path }}
+          CLEAN_BUILD: ${{ inputs.clean-build }}
+        run: |
+          CLEAR_FLAG=""
+          if [ "$CLEAN_BUILD" = "true" ]; then
+            CLEAR_FLAG="--clear"
           fi
+
+          # Build sub-packages first, then root package
+          for pkg in packages/codeweaver-daemon packages/codeweaver-tokenizers .; do
+            echo "Building $pkg..."
+            (cd "$pkg" && "$UV_PATH" build $CLEAR_FLAG --out-dir "$GITHUB_WORKSPACE/dist")
+          done
       - name: Check build artifacts
-        run: "ls -la dist/\necho \"Built packages:\"\nfor file in dist/*; do\n  echo \"\U0001F4E6 $(basename \"$file\")\"\ndone\n"
+        run: |
+          ls -la dist/
+          echo "Built packages:"
+          for file in dist/*; do
+            echo "📦 $(basename "$file")"
+          done
       - name: Verify package integrity with twine
         env:
           UVX_PATH: ${{ steps.setup-uv.outputs.uvx-path }}

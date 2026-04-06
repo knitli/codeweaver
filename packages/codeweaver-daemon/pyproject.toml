@@ -8,12 +8,35 @@
 [project]
 name = "code-weaver-daemon"
 version = "0.1.0"
-description = "Daemon utilities for CodeWeaver"
+description = "Daemon utilities for CodeWeaver — process management, health checks, and lifecycle coordination"
 readme = "README.md"
 requires-python = ">=3.12"
+license = "MIT OR Apache-2.0"
+authors = [
+  { name = "Knitli Inc." },
+  { name = "Adam Poulemanos", email = "adam@knit.li" },
+]
+keywords = ["codeweaver", "daemon", "mcp", "process-management"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
 dependencies = [
   "httpx[http2]>=0.28.1",
 ]
+
+[project.urls]
+Homepage = "https://knitli.com"
+Repository = "https://github.com/knitli/codeweaver"
+Issues = "https://github.com/knitli/codeweaver/issues"
 
 [project.optional-dependencies]
 build = ["hatchling"]

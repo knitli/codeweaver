@@ -59,7 +59,7 @@ mise run activate
 ### Code Quality
 ```bash
 # Fix code issues (imports, formatting, linting)
-mise run fix
+mise run fix-python
 
 # Run linting checks
 mise run lint
@@ -98,7 +98,7 @@ mise run build
 # Clean build artifacts and cache files
 mise run clean
 
-# Full CI pipeline
+# Full CI pipeline (nonfunctional on 4/6/2026)
 mise run ci
 ```
 
@@ -116,29 +116,16 @@ mise run ci
 ### Project Structure
 ```
 src/codeweaver/
-├── agent_api/           # Tool interfaces and implementations for agents
-│   ├── __init__.py      # Exported API for User Agent and Context Agent
-│   └── find_code/       # Primary `find_code` tool - exposed to User Agent and CLI
-│       ├── __init__.py           # Tool interface and entry point
-│       ├── conversion.py         # Convert between result/response objects and API CodeMatch
-│       ├── filters.py            # Search filtering logic
-│       ├── intent.py             # Query intent classification
-│       ├── pipeline.py           # Search execution pipeline
-│       ├── response.py           # Response formatting and assembly
-│       ├── results.py            # Result processing and ranking
-│       ├── scoring.py            # Result scoring and relevance calculation
-│       ├── types.py              # Type definitions for find_code API
-│       ├── ARCHITECTURE.md       # Architecture documentation for find_code
-│       └── README.md             # Usage guide
-│
 ├── cli/                 # Command-line interface
 │   ├── __main__.py      # CLI entry point
 │   ├── __init__.py
+│   ├── dependencies.py  # CLI dependency injection
 │   ├── utils.py         # CLI utilities
-│   └── ui/              # CLI/TUI UI management
-        ├── __init__.py
-        ├── status_display.py # main StatusDisplay class
-        ├── error_handler.py # class to filter and display errors for the UI
+│   ├── ui/              # CLI/TUI UI management
+│   │   ├── __init__.py
+│   │   ├── error_handler.py  # Error filtering and display for UI
+│   │   ├── interaction.py    # User interaction utilities
+│   │   └── status_display.py # Main StatusDisplay class
 │   └── commands/        # CLI command implementations
 │       ├── __init__.py
 │       ├── config.py    # Configuration management commands
@@ -146,79 +133,87 @@ src/codeweaver/
 │       ├── doctor.py    # Health check and diagnostics
 │       ├── index.py     # Indexing commands
 │       ├── init.py      # Project initialization + service persistence
-│       ├── list.py      # List resources (models, providers, etc.)
+│       ├── ls.py        # List resources (models, providers, etc.)
+│       ├── migrate.py   # Migration commands
 │       ├── search.py    # Search command (wraps find_code)
 │       ├── server.py    # MCP server management (stdio/HTTP transports)
 │       ├── start.py     # Start daemon in background (or --foreground)
+│       ├── status.py    # Status display commands
 │       └── stop.py      # Stop the running daemon
 │
-├── common/              # Shared utilities and infrastructure
+├── core/                # Core domain models, business logic, and shared infrastructure
 │   ├── __init__.py
-│   ├── logging.py       # Centralized logging configuration
+│   ├── chunks.py        # Immutable CodeChunk model (principal data object in the codebase)
+│   ├── constants.py     # Core constants
+│   ├── discovery.py     # DiscoveredFile model (created from indexing and watch operations)
+│   ├── exceptions.py    # Global exception definitions
+│   ├── file_extensions.py # File extension mappings (150+ languages)
+│   ├── language.py      # Language detection for AST-based semantic support (20+ languages)
+│   ├── _logging.py      # Centralized logging configuration
+│   ├── metadata.py      # Metadata models supporting `CodeChunk`
+│   ├── repo.py          # Repository abstraction *scaffolding*
+│   ├── secondary_languages.py # Script-generated literal types for all supported languages
+│   ├── spans.py         # `Span` (immutable) and `SpanGroup` (mutable) for context-aware code span operations
 │   ├── statistics.py    # Statistics collection and reporting
-│   ├── types.py         # Common type definitions
-│   ├── registry/        # Provider and component registry system
+│   ├── stores.py        # Data store abstractions - `UUIDStore` for storage/caching and `BlakeStore` for deduplication
+│   ├── ui_protocol.py   # UI protocol definitions
+│   ├── config/          # Core configuration (pydantic-settings based)
 │   │   ├── __init__.py
-│   │   ├── models.py    # Registry data models
-│   │   ├── provider.py  # Provider registration
-│   │   ├── services.py  # Registry services
-│   │   ├── types.py     # Registry type definitions
-│   │   └── utils.py     # Registry utilities
+│   │   ├── core_settings.py  # Core settings definitions
+│   │   ├── envs.py           # Environment variable definitions
+│   │   ├── loader.py         # Configuration loading
+│   │   ├── _logging.py       # Logging configuration
+│   │   ├── settings_type.py  # Settings type definitions
+│   │   ├── telemetry.py      # Telemetry configuration
+│   │   └── types.py          # Configuration type definitions
+│   ├── dependencies/    # Core dependency injection bindings
+│   │   ├── __init__.py
+│   │   ├── component_settings.py
+│   │   ├── core_settings.py
+│   │   ├── services.py
+│   │   └── utils.py
+│   ├── di/              # Dependency injection framework
+│   │   ├── __init__.py
+│   │   ├── container.py # DI container
+│   │   ├── dependency.py # Dependency definitions
+│   │   └── utils.py     # DI utilities -- defines `@dependency_provider` decorator used for registration
 │   ├── telemetry/       # Usage tracking and analytics
 │   │   ├── __init__.py
 │   │   ├── client.py    # PostHog telemetry client
 │   │   ├── events.py    # Event definitions and tracking
-│   │   └── README.md
+│   │   ├── _project.py  # Project telemetry config
+│   │   └── utils.py     # Telemetry utilities
+│   ├── types/           # Core type definitions for codebase
+│   │   ├── __init__.py
+│   │   ├── aliases.py   # NewType definitions for string types, other aliases
+│   │   ├── dataclasses.py # `DataclassSerializationMixin` for dataclasses throughout the codebase
+│   │   ├── delimiter.py # Delimiter type definitions
+│   │   ├── dictview.py  # Serializable `DictView` type for readonly views of TypedDicts
+│   │   ├── embeddings.py # Embedding type definitions
+│   │   ├── enum.py      # `BaseEnum` and `BaseDataclassEnum` subclassed throughout codebase
+│   │   ├── env.py       # Environment type definitions
+│   │   ├── models.py    # `BasedModel`, `RootedRoot` pydantic models subclassed throughout codebase
+│   │   ├── provider.py  # `Provider` and `ProviderCategory` enums
+│   │   ├── search.py    # Search type definitions
+│   │   ├── sentinel.py  # Base `Sentinel` type with serialization support - `Unset` & `Missing` sentinels
+│   │   ├── service_cards.py # Service card type definitions for provider instantiation
+│   │   ├── settings_model.py # Settings model (BaseSettings object subclassed by domain configs)
+│   │   ├── statistics.py # Statistics type definitions for telemetry and reporting
+│   │   └── utils.py     # Type utilities
 │   └── utils/           # Common utility functions
 │       ├── __init__.py
 │       ├── checks.py    # Validation and checking utilities
-│       ├── git.py       # Git repository and file utilities
+│       ├── environment.py # Environment utilities
+│       ├── filesystem.py # Filesystem utilities
+│       ├── general.py   # General utilities
+│       ├── generation.py # Generation utilities
 │       ├── introspect.py # Reflection and introspection
-│       ├── lazy_importer.py # Lazy dependency and module loading
-│       ├── normalize.py # Data normalization utilities
-        ├── procs.py     # process management utilities
-        ├── textify.py   # text manipulation utilities
-│       └── utils.py     # General utilities
-│
-├── config/              # Configuration system (pydantic-settings based)
-│   ├── __init__.py
-│   ├── _project.py      # Project-specific configuration
-│   ├── chunker.py       # Chunker configuration
-│   ├── envs.py          # environment variable definitions
-│   ├── indexer.py       # Indexer configuration
-│   ├── logging.py       # Logging configuration
-│   ├── mcp.py           # MCP server configuration (supports cli/commands/init.py)
-│   ├── middleware.py    # Middleware configuration
-│   ├── profiles.py      # Configuration profiles
-│   ├── providers.py     # Provider configuration including default settings
-│   ├── server_defaults.py # Server default settings
-│   ├── settings.py      # Main settings class
-│   ├── telemetry.py     # Telemetry configuration
-│   └── types.py         # Configuration type definitions
-│
-├── core/                # Core domain models and business logic
-│   ├── __init__.py
-│   ├── chunks.py        # Immutable CodeChunk model and data structure (principal data object in the codebase)
-│   ├── discovery.py     # DiscoveredFile model and data structure (created from indexing and watch operations)
-│   ├── file_extensions.py # File extension mappings (150+ languages)
-│   ├── language.py      # Language detection for AST-based semantic support (20+ languages)
-│   ├── metadata.py      # Metadata models supporting `CodeChunk`
-│   ├── repo.py          # Repository abstraction *scaffolding*
-│   ├── secondary_languages.py # script-generated literal types for all supported languages
-│   ├── spans.py         # `Span` (immutable) and `SpanGroup` (mutable) objects provide context-aware set-like operations for code spans and groups of code spans
-│   ├── stores.py        # Data store abstractions - `UUIDStore` for storage/caching and `BladeStore` for deduplication
-│   ├── utils.py         # utilities for core packages
-│   └── types/           # Core type definitions for codebase
-│       ├── __init__.py
-│       ├── aliases.py   # Primarily newtype definitions for string types used across the codebase, other aliases
-│       ├── dictview.py  # the serializable `DictView` type which is used for readonly views in the codebase, particularly of TypedDicts
-│       ├── enum.py      # The `BaseEnum` and `BaseDataclassEnum` objects subclassed throughout the codebase.
-│       ├── models.py    # `BasedModel`, `RootedRoot` pydantic models subclassed throughout codebase, and the `DataclassSerializationMixin`, which adapts dataclasses throughout the codebase
-│       └── sentinel.py  # A base `Sentinel` type with serialization support
+│       ├── procs.py     # Process management utilities
+│       └── text.py      # Text manipulation utilities
 │
 ├── engine/              # Core indexing and search engine
 │   ├── __init__.py
-│   ├── chunking_service.py # Chunking service coordination
+│   ├── dependencies.py  # Engine dependency injection
 │   ├── chunker/         # Code chunking implementations
 │   │   ├── __init__.py
 │   │   ├── base.py      # Base chunker interface
@@ -226,159 +221,196 @@ src/codeweaver/
 │   │   ├── delimiter_model.py # Delimiter models
 │   │   ├── exceptions.py # Chunker exceptions
 │   │   ├── governance.py # Chunking governance and rules
-│   │   ├── logging.py   # Chunker-specific logging
+│   │   ├── _logging.py  # Chunker-specific logging
 │   │   ├── parallel.py  # Parallel chunking
 │   │   ├── registry.py  # Chunker registry
 │   │   ├── selector.py  # Chunker selection logic
 │   │   ├── semantic.py  # Semantic/AST-based chunking
 │   │   └── delimiters/  # Delimiter definitions for delimiter-based chunker
 │   │       ├── __init__.py
-│   │       ├── custom.py # Custom delimiter patterns
-│   │       ├── families.py # Delimiter families by language
-│   │       ├── category.py   # Delimiter category classification
-│   │       └── patterns.py # Delimiter pattern definitions
-│   ├── indexer/         # Indexing engine
+│   │       ├── custom.py    # Custom delimiter patterns
+│   │       ├── families.py  # Delimiter families by language
+│   │       └── patterns.py  # Delimiter pattern definitions
+│   ├── config/          # Engine configuration
 │   │   ├── __init__.py
-│   │   ├── checkpoint.py # Indexing checkpoint management
-│   │   ├── indexer.py   # Main indexer implementation
-│   │   ├── manifest.py  # Index manifest management for state between sessions
-│   │   └── progress.py  # Progress tracking
-│   ├── search/          # Search filtering and matching **not integrated**
+│   │   ├── chunker.py       # Chunker configuration
+│   │   ├── failover.py      # Failover configuration
+│   │   ├── failover_detector.py # Failover detection config
+│   │   ├── indexer.py       # Indexer configuration
+│   │   └── root_settings.py # Engine root settings
+│   ├── managers/        # Engine state managers
 │   │   ├── __init__.py
-│   │   ├── condition.py # Search condition builders
-│   │   ├── filter_factory.py # Filter creation
-│   │   ├── geo.py       # Geospatial filters (if applicable)
-│   │   ├── match.py     # Match filters
-│   │   ├── payload.py   # Payload filtering
-│   │   ├── range.py     # Range filters
-│   │   └── wrap_filters.py # Filter wrappers
+│   │   ├── checkpoint_manager.py # Indexing checkpoint management
+│   │   ├── manifest_manager.py   # Index manifest for state between sessions
+│   │   └── progress_tracker.py   # Progress tracking
+│   ├── services/        # Engine services
+│   │   ├── __init__.py
+│   │   ├── chunking_service.py      # Chunking service coordination
+│   │   ├── config_analyzer.py       # Configuration analysis
+│   │   ├── failover_service.py      # Failover handling
+│   │   ├── indexing_service.py      # Main indexing implementation
+│   │   ├── migration_service.py     # Migration service
+│   │   ├── reconciliation_service.py # Data reconciliation
+│   │   ├── snapshot_service.py      # Snapshot management
+│   │   └── watching_service.py      # File system watcher service
 │   └── watcher/         # File system watching for incremental indexing
 │       ├── __init__.py
-│       ├── logging.py   # Watcher-specific logging
-│       ├── types.py     # Watcher type definitions
-│       ├── watch_filters.py # File filtering for watching, primarily `IgnoreFilter`, which wraps `rignore`
-│       └── watcher.py   # File system watcher implementation
+│       ├── _logging.py       # Watcher-specific logging
+│       ├── progress.py       # Watch progress tracking
+│       ├── types.py          # Watcher type definitions
+│       └── watch_filters.py  # File filtering, primarily `IgnoreFilter` (wraps `rignore`)
 │
-├── middleware/          # FastMCP middleware components (legacy/minimal)
+├── providers/           # Provider implementations for embeddings, vector stores, reranking, agents, data sources
 │   ├── __init__.py
-│   └── statistics.py    # Statistics middleware (times MCP request/response)
-│
-├── providers/           # Provider implementations for embeddings, vector stores, reranking, agents, data sources.
-│   ├── __init__.py
-│   ├── capabilities.py  # Provider capability definitions/constants
-│   ├── optimize.py      # optimization utilities for sentence-transformers and fastembed
-│   ├── provider.py      # `Provider` and `ProviderCategory` enums
-│   ├── types.py         # *general* provider type definitions
+│   ├── exceptions.py    # Provider exceptions
+│   ├── http_pool.py     # HTTP connection pooling
+│   ├── optimize.py      # Optimization utilities for sentence-transformers and fastembed
 │   ├── agent/           # Agent providers (Context Agent, etc.) -- wraps `pydantic-ai`
 │   │   ├── __init__.py
-│   │   ├── agent_models.py # Re-exports pydantic-ai models
-│   │   └── agent_providers.py # Re-exports pydantic-ai provider implementations
-│   ├── data/            # Data providers, currently re-exports from `pydantic-ai`
-│   │   └── __init__.py
+│   │   ├── capabilities.py # Agent capability definitions
+│   │   ├── providers.py    # Agent provider implementations
+│   │   └── resolver.py     # Agent provider resolution
+│   ├── config/          # Provider configuration (pydantic-settings based)
+│   │   ├── __init__.py
+│   │   ├── backup_models.py  # Backup configuration models
+│   │   ├── profiles.py       # Configuration profiles
+│   │   ├── providers.py      # Provider configuration
+│   │   ├── root_settings.py  # Provider root settings
+│   │   ├── types.py          # Provider config types
+│   │   ├── categories/       # Per-category provider configuration
+│   │   │   └── (agent, embedding, reranking, vector_store, data, sparse_embedding, etc.)
+│   │   ├── clients/          # Provider client configuration
+│   │   │   └── (agent, vector_store, data, multi, etc.)
+│   │   └── sdk/              # SDK-specific provider configuration
+│   │       └── (agent, embedding, reranking, vector_store, data, sparse_embedding)
+│   ├── data/            # Data source providers
+│   │   ├── __init__.py
+│   │   ├── duckduckgo.py # DuckDuckGo search provider
+│   │   ├── exa.py        # Exa search provider
+│   │   ├── providers.py  # Data provider registry
+│   │   ├── tavily.py     # Tavily search provider
+│   │   └── utils.py      # Data provider utilities
+│   ├── dependencies/    # Provider dependency injection
+│   │   ├── __init__.py
+│   │   ├── capabilities.py # Provider capability definitions/constants
+│   │   ├── config.py       # Provider DI config
+│   │   ├── providers.py    # Provider DI registration
+│   │   └── services.py     # Provider DI services
 │   ├── embedding/       # Embedding providers
 │   │   ├── __init__.py
-│   │   ├── fastembed_extensions.py # FastEmbed extensions (adds additional model support)
-│   │   ├── registry.py  # Registry for *embedding results* -- a temporary store/backup
-│   │   ├── types.py     # Embedding types for *embedding results*
-│   │   ├── capabilities/ # Model capability definitions by model creator
-│   │   │   ├── __init__.py
-│   │   │   ├── alibaba_nlp.py
-│   │   │   ├── amazon.py
-│   │   │   ├── baai.py
-│   │   │   ├── base.py
-│   │   │   ├── cohere.py
-│   │   │   ├── google.py
-│   │   │   ├── ibm_granite.py
-│   │   │   ├── intfloat.py
-│   │   │   ├── jinaai.py
-│   │   │   ├── mistral.py
-│   │   │   ├── mixedbread_ai.py
-│   │   │   ├── nomic_ai.py
-│   │   │   ├── openai.py
-│   │   │   ├── qwen.py
-│   │   │   ├── sentence_transformers.py
-│   │   │   ├── snowflake.py
-│   │   │   ├── thenlper.py
-│   │   │   ├── types.py
-│   │   │   ├── voyage.py
-│   │   │   └── whereisai.py
-│   │   └── providers/   # Provider implementations by client interface
-│   │       ├── __init__.py
-│   │       ├── base.py
-│   │       ├── bedrock.py # AWS Bedrock
-│   │       ├── cohere.py  # also includes Azure and Heroku cohere providers
-│   │       ├── fastembed.py
-│   │       ├── google.py
-│   │       ├── huggingface.py
-│   │       ├── litellm.py  **scaffolding**
-│   │       ├── mistral.py
-│   │       ├── openai_factory.py  # provider class *factory* for ~8 openai API-compatible providers
-│   │       ├── sentence_transformers.py
-│   │       └── voyage.py
+│   │   ├── cache_manager.py      # Embedding cache management
+│   │   ├── fastembed_extensions.py # FastEmbed extensions
+│   │   ├── registry.py           # Embedding results registry (temporary store/backup)
+│   │   ├── capabilities/         # Model capability definitions by creator (20+ providers)
+│   │   │   └── (alibaba_nlp, amazon, baai, cohere, google, ibm_granite, intfloat,
+│   │   │       jinaai, minishlab, mistral, mixedbread_ai, morph, nomic_ai, openai,
+│   │   │       qwen, sentence_transformers, snowflake, thenlper, voyage, whereisai, etc.)
+│   │   └── providers/            # Provider implementations by client interface
+│   │       └── (base, bedrock, cohere, fastembed, google, huggingface,
+│   │           litellm, mistral, openai_factory, sentence_transformers, voyage)
+│   ├── env_registry/    # Environment-based provider registry
+│   │   ├── __init__.py
+│   │   ├── builders.py      # Registry builders
+│   │   ├── conversion.py    # Registry conversion
+│   │   ├── models.py        # Registry models
+│   │   ├── registry.py      # Registry implementation
+│   │   └── definitions/     # Provider definitions
+│   │       └── (cloud_platforms, openai_compatible, specialized)
 │   ├── reranking/       # Reranking providers
 │   │   ├── __init__.py
-│   │   ├── capabilities/ # Reranker model capability definitions by model creator
-│   │   │   ├── __init__.py
-│   │   │   ├── alibaba_nlp.py
-│   │   │   ├── amazon.py
-│   │   │   ├── baai.py
-│   │   │   ├── base.py
-│   │   │   ├── cohere.py
-│   │   │   ├── jinaai.py
-│   │   │   ├── mixed_bread_ai.py
-│   │   │   ├── ms_marco.py
-│   │   │   ├── qwen.py
-│   │   │   ├── types.py
-│   │   │   └── voyage.py
-│   │   └── providers/   # Provider implementations
-│   │       ├── __init__.py
-│   │       ├── base.py
-│   │       ├── bedrock.py
-│   │       ├── cohere.py  (cohere only)
-│   │       ├── fastembed.py
-│   │       ├── sentence_transformers.py
-│   │       └── voyage.py
+│   │   ├── capabilities/    # Reranker model capabilities by creator
+│   │   │   └── (alibaba_nlp, amazon, baai, cohere, jinaai, mixed_bread_ai,
+│   │   │       ms_marco, qwen, voyage, etc.)
+│   │   └── providers/       # Provider implementations
+│   │       └── (base, bedrock, cohere, fastembed, sentence_transformers, voyage, types)
+│   ├── types/           # Provider type definitions
+│   │   ├── __init__.py
+│   │   ├── circuit_breaker.py # Circuit breaker types
+│   │   ├── embedding.py      # Embedding types
+│   │   ├── resolvers.py      # Provider resolver types
+│   │   ├── search.py         # Search types
+│   │   ├── vectors.py        # Vector types
+│   │   └── vector_store.py   # Vector store types
 │   └── vector_stores/   # Vector database providers
 │       ├── __init__.py
-│       ├── base.py      # Base vector store interface
-│       ├── inmemory.py  # In-memory vector store (qdrant_client w/ json persistence)
-│       ├── metadata.py  # Vector metadata handling
-│       ├── qdrant_base.py # Qdrant base class for all common function to inmemory and qdrant
-│       ├── qdrant.py    # Qdrant vector database (local and cloud/remote)
-│       └── utils.py     # Vector store utilities
+│       ├── base.py          # Base vector store interface
+│       ├── inmemory.py      # In-memory vector store (qdrant_client w/ RocksDB persistence)
+│       ├── qdrant_base.py   # Qdrant base class for shared inmemory/qdrant functions
+│       ├── qdrant.py        # Qdrant vector database (local and cloud/remote)
+│       ├── qdrant_service.py # Qdrant service layer
+│       └── search/          # Search filtering and matching
+│           ├── __init__.py
+│           ├── condition.py      # Search condition builders
+│           ├── filter_factory.py # Filter creation
+│           ├── geo.py            # Geospatial filters
+│           ├── match.py          # Match filters
+│           ├── payload.py        # Payload filtering
+│           ├── range.py          # Range filters
+│           └── wrap_filters.py   # Filter wrappers
 │
-├── semantic/            # Semantic Grammar characterization and normalization
+├── semantic/            # Semantic grammar characterization and normalization
 │   ├── __init__.py
 │   ├── ast_grep.py      # AST-grep integration
 │   ├── classifications.py # Code classification definitions
 │   ├── classifier.py    # Code classifier implementation
+│   ├── dependencies.py  # Semantic dependency injection
 │   ├── grammar.py       # Grammar definitions for semantic analysis
 │   ├── node_type_parser.py # AST node-type.json parsing
 │   ├── registry.py      # Node characterization and classifications by language
 │   ├── scoring.py       # Semantic scoring (node, purpose and objective layered weighting)
 │   ├── token_patterns.py # Token pattern matching for cross-language token identification
-│   └── types.py         # Semantic analysis types
+│   ├── types.py         # Semantic analysis types
+│   └── data/            # Semantic data files
+│       ├── classifications/ # Classification definitions (with overrides/)
+│       └── node_types/      # AST node type definitions
 │
 ├── server/              # Server implementations
 │   ├── __init__.py
-│   ├── app_bindings.py  # Application dependency bindings and http admin endpoints
-│   ├── health_endpoint.py # Health check endpoint
-│   ├── health_models.py # Health check data models
-│   ├── health_service.py # Health check service
+│   ├── _assets.py       # Server asset management
+│   ├── background_services.py # Background service coordination
+│   ├── dependencies.py  # Server dependency injection
+│   ├── lifespan.py      # Server lifespan management
+│   ├── _logging.py      # Server-specific logging
 │   ├── management.py    # Management server (Starlette, port 9329)
-│   ├── mcp_http.py      # MCP HTTP server (FastMCP, port 9328)
-│   ├── server.py        # Main MCP server entry point
-│   └── stdio_proxy.py   # stdio-to-HTTP proxy for MCP clients
-│
-├── tokenizers/          # Token counting for various models
-│   ├── __init__.py
-│   ├── base.py          # Base tokenizer interface
-│   ├── tiktoken.py      # OpenAI tiktoken integration
-│   └── tokenizers.py    # Tokenizers implementation (most models use this tokenizer)
+│   ├── server.py        # Main server entry point
+│   ├── agent_api/       # Tool interfaces and implementations for agents
+│   │   ├── __init__.py
+│   │   └── search/      # Primary `find_code` tool - exposed to User Agent and CLI
+│   │       ├── __init__.py    # Tool interface and entry point
+│   │       ├── conversion.py  # Convert between result/response objects and API CodeMatch
+│   │       ├── filters.py     # Search filtering logic
+│   │       ├── intent.py      # Query intent classification
+│   │       ├── pipeline.py    # Search execution pipeline
+│   │       ├── response.py    # Response formatting and assembly
+│   │       ├── scoring.py     # Result scoring and relevance calculation
+│   │       └── types.py       # Type definitions for find_code API
+│   ├── config/          # Server configuration
+│   │   ├── __init__.py
+│   │   ├── helpers.py        # Configuration helpers
+│   │   ├── mcp.py            # MCP server configuration
+│   │   ├── middleware.py     # Middleware configuration
+│   │   ├── server_defaults.py # Server default settings
+│   │   ├── settings.py       # Main server settings
+│   │   └── types.py          # Server config types
+│   ├── health/          # Health check system
+│   │   ├── __init__.py
+│   │   ├── endpoint.py       # Health check endpoint
+│   │   ├── health_service.py # Health check service
+│   │   └── models.py         # Health check data models
+│   └── mcp/             # MCP protocol implementation
+│       ├── __init__.py
+│       ├── server.py         # MCP server (FastMCP, port 9328)
+│       ├── state.py          # MCP state management
+│       ├── tools.py          # MCP tool definitions
+│       ├── types.py          # MCP type definitions
+│       ├── user_agent.py     # User agent interface
+│       └── middleware/       # FastMCP middleware
+│           ├── __init__.py
+│           ├── fastmcp.py    # FastMCP middleware integration
+│           └── statistics.py # Statistics middleware (times MCP request/response)
 │
 ├── __init__.py          # Package root
-├── _version.py          # Version information
-├── exceptions.py        # Global exception definitions
+├── _version.py          # Version information (generated)
 ├── main.py              # Application entry point
 └── py.typed             # PEP 561 marker for type checking
 ```
@@ -389,12 +421,12 @@ src/codeweaver/
 - **qdrant-client**: Vector database
 - **voyageai**: Code embeddings (primary provider)
 - **rignore**: File discovery with gitignore support
-- **cyclopts**: CLI framework (for future CLI implementation)
+- **cyclopts**: CLI framework
 
 ### Missing Components (Implementation Needed)
-- Provider system (vector store)
+- Agent integration
 - Pipeline orchestration with pydantic-graph
-- Comprehensive testing framework
+- Testing strong but has big gaps in places
 
 ## Code Style Guidelines
 
@@ -404,20 +436,22 @@ src/codeweaver/
 - **Line length**: 100 characters
 - **Docstrings**: Google convention, active voice, start with verbs
 - **Type hints**: Modern Python ≥3.12 syntax (`int | str`, `typing.Self`)
-- **Models**: Prefer `pydantic.BaseModel` with `frozen=True` for immutable data
-- **Lazy evaluation and immutables**: Use generators, tuples, frozensets when appropriate
+- **Models**: Prefer `pydantic.BaseModel` with `frozen=True` for immutable data. Subclass codebase's types.
+- **Lazy evaluation and immutables**: Use generators, tuples, frozensets, DictView/MappingProxyType when appropriate
 
 ### Architecture Patterns
 - **Flat Structure**: Avoid deep nesting, group related modules in packages
-- **Dependency Injection**: FastMCP Context pattern for providers (think: FastAPI patterns if unfamiliar)
+- **Dependency Injection**: Custom type-safe system mostly based on FastAPI with important differences and improvements
 - **Provider Pattern**: Abstract base classes for pluggable backends
 - **Graceful Degradation**: AST → text fallback, AI → NLP → rule-based fallback
 
 ### Typing Requirements
-- **Strict typing** with opinionated pyright rules
+- **Strict typing** with opinionated `ty` rules
 - Use `TypedDict`, `Protocol`, `NamedTuple`, `enum.Enum` for structured data
-- Prefer domain-specific dataclasses/BaseModels over `dict[str, Any]`
+- Prefer domain-specific dataclasses/BaseModels (`BasedModel`) over `dict[str, Any]`
 - Define proper generic types using `ParamSpec`/`Concatenate`
+- Generics defined with parameterized types; don't use `Generic`
+- type aliases defined with `type` keyword
 
 ## Testing Approach
 
@@ -453,22 +487,19 @@ Apply relevant pytest markers to new tests (see pyproject.toml for full list).
 11. Pluggable pipeline orchestration with `pydantic-graph`
 12. Pipeline/response evaluation and validation with `pydantic-eval`
 13. Expanded testing
-14. Replace registry system with dependency injection pattern, deprecate existing system ~0.4.0
+14. ~~Replace registry system with dependency injection pattern~~ ✅ **complete** (DI refactor shipped)
 
 ### Key Implementation Notes
-- Entry point in pyproject.toml: `codeweaver = "codeweaver.cli.app:main"`
+- **pypi package name is `code-weaver`** (naming collision).
+- Entry point in pyproject.toml: `codeweaver = "codeweaver.cli.__main__:main"`
 - Main tool interface: `find_code(query: str, intent: IntentType | None = None, ...)`
 - Provider system: Abstract `EmbeddingProvider`, `SparseEmbeddingProvider`, `RerankingProvider` and `VectorStoreProvider` classes
 - Settings: Unified hierarchical config via `pydantic-settings` with env vars and TOML files and cloud secret integration (pydantic settings handles all the heavy lifting here)
 
 ## Documentation
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Unified architectural decisions and design principles (authoritative reference)
-- Architecture high-level plans in `plans/` directory
 - Specifications, tasks, and associated files in `specs`
-- External API documentation in `data/context/apis/` API (summaries and practical guides)
-- Complete docs for select external libraries are available in `context/apis/
-- MkDocs configuration for documentation site
-- Use `mise run docs-serve` for local documentation development
+- `docs-site/` Astro/Starlight based documentation at <docs.knitli.com/codeweaver>
+- Use `mise run dev` for local documentation development (nonfunctional on 4/6/2026)
 
 ## Instructions
 

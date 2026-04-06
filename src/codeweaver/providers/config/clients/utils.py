@@ -148,7 +148,8 @@ def _discriminate_embedding_clients_by_keys(value: dict[str, Any]) -> str | None
 
 def _discriminate_embedding_clients_by_url(value: dict[str, Any]) -> str | None:
     """Try to identify the provider based on URL patterns and key presence."""
-    url = str(value.get("base_url") or value.get("server_url"))
+    raw_url = value.get("base_url") or value.get("server_url")
+    url = str(raw_url) if raw_url else ""
     if _test_keys(
         ["environment", "client_name", "thread_pool_executor", "log_experimental"], value
     ) or (url and ("cohere" in url or "heroku" in url)):

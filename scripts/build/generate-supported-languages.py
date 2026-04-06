@@ -17,13 +17,8 @@ from textwrap import dedent
 import black
 import textcase
 
-from codeweaver.core import (
-    ALL_LANGUAGES,
-    ConfigLanguage,
-    LanguageName,
-    LanguageNameT,
-    SemanticSearchLanguage,
-)
+from codeweaver.core import ConfigLanguage, LanguageName, LanguageNameT, SemanticSearchLanguage
+from codeweaver.core.file_extensions import ALL_LANGUAGES
 
 
 ALL_LANGUAGES = frozenset(ALL_LANGUAGES)

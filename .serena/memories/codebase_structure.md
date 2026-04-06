@@ -14,11 +14,9 @@ codeweaver/
 ├── src/codeweaver/              # Main source code
 ├── tests/                       # Test suite
 ├── scripts/                     # Development and build scripts
-├── docs/                        # MkDocs documentation
-├── plans/                       # Architecture specifications
+├── docs/                        # MkDocs documentation + archive
 ├── specs/                       # Detailed specifications
 ├── .specify/memory/             # Project memory and constitution
-├── claudedocs/                  # Claude-specific documentation
 ├── examples/                    # Usage examples
 ├── typings/                     # Type stub files
 └── mise-tasks/                  # Mise task scripts
@@ -29,75 +27,68 @@ codeweaver/
 ### Core Modules (Root Level)
 - `__init__.py` - Package initialization
 - `main.py` - Application entry point
-- `exceptions.py` - Custom exception definitions
 - `_version.py` - Version information (auto-generated)
 - `py.typed` - PEP 561 marker for type stubs
 
 ### Major Packages
 
-#### `agent_api/` - MCP Agent Interface
-MCP tool interface and agent-facing API.
-- **Purpose**: `find_code` tool implementation for MCP agents
-- **Key**: Single tool interface for semantic code search
-
 #### `cli/` - Command Line Interface
 CLI commands and entry points.
-- **Commands**: `server`, `search`, `config`
+- **Commands**: `server`, `search`, `config`, `doctor`, `index`, `init`, `ls`, `migrate`, `start`, `status`, `stop`
 - **Entry Point**: `codeweaver.cli.__main__:main`
 - **Framework**: cyclopts for argument parsing
+- **UI**: `cli/ui/` with `StatusDisplay`, error handling, user interaction
 
-#### `common/` - Shared Utilities
-Cross-cutting utilities and helpers.
-- **Contents**: Logging, telemetry, statistics, utilities
-
-#### `config/` - Configuration Management
-Settings and configuration handling.
-- **Framework**: pydantic-settings
-- **Formats**: TOML, YAML, environment variables
-- **Hierarchy**: Multi-source configuration with validation
-
-#### `core/` - Core Types and Abstractions
-Fundamental types, protocols, and base classes.
-- **Key Classes**: `BasedModel`, `BaseEnum`, type definitions
-- **Purpose**: Foundation for all other modules
+#### `core/` - Core Domain Models, Business Logic, and Shared Infrastructure
+Fundamental types, protocols, base classes, DI framework, configuration, telemetry, and utilities.
+- **Key Classes**: `CodeChunk`, `DiscoveredFile`, `Span`, `SpanGroup`, `UUIDStore`, `BlakeStore`, `BasedModel`, `BaseEnum`
+- **Sub-packages**:
+  - `config/` - Core configuration (pydantic-settings based)
+  - `dependencies/` - Core dependency injection bindings
+  - `di/` - Dependency injection framework (container, dependency definitions)
+  - `telemetry/` - PostHog usage tracking and analytics
+  - `types/` - Type definitions (`Provider`, `ProviderCategory` enums, aliases, models, sentinel, etc.)
+  - `utils/` - Common utilities (checks, environment, filesystem, introspection, process management, text)
 
 #### `engine/` - Indexing and Search Engine
 Core indexing, chunking, and search functionality.
-- **Components**: 
-  - Indexer: File processing and chunk creation
-  - Chunking service: AST-based code segmentation
-  - Search pipeline: Query execution
-  - Progress tracking: Indexing progress monitoring
-  - Checkpointing: Resume interrupted operations
-
-#### `middleware/` - FastMCP Middleware
-FastMCP middleware components.
-- **Components**:
-  - `chunking.py` - Code chunking middleware
-  - `filtering.py` - File discovery with gitignore
-  - `telemetry.py` - PostHog usage tracking
+- **Sub-packages**:
+  - `chunker/` - Code chunking (AST-based semantic + delimiter-based for 150+ languages)
+  - `config/` - Engine configuration (chunker, indexer, failover settings)
+  - `managers/` - State managers (checkpoint, manifest, progress tracking)
+  - `services/` - Engine services (chunking, indexing, watching, failover, migration, reconciliation, snapshot)
+  - `watcher/` - File system watching for incremental indexing (`IgnoreFilter` wraps `rignore`)
 
 #### `providers/` - Pluggable Provider System
 Extensible provider implementations.
-- **Embedding Providers**: VoyageAI, OpenAI, fastembed, sentence-transformers
-- **Vector Stores**: Qdrant, in-memory
-- **Reranking**: VoyageAI rerank
-- **Pattern**: Protocol-based interfaces with registry
+- **Embedding Providers**: 11+ providers (VoyageAI, OpenAI, fastembed, sentence-transformers, Bedrock, Cohere, Google, HuggingFace, LiteLLM, Mistral, and OpenAI-compatible factory)
+- **Vector Stores**: Qdrant (local/cloud), in-memory (with search filtering)
+- **Reranking**: VoyageAI, Cohere, Bedrock, fastembed, sentence-transformers
+- **Agent Providers**: wraps pydantic-ai
+- **Data Providers**: DuckDuckGo, Exa, Tavily
+- **Sub-packages**:
+  - `config/` - Provider configuration (categories, clients, SDK configs, profiles)
+  - `dependencies/` - Provider DI (capabilities, registration, services)
+  - `embedding/` - Embedding providers and 20+ model capability definitions
+  - `env_registry/` - Environment-based provider registry
+  - `reranking/` - Reranking providers and capabilities
+  - `types/` - Provider type definitions (circuit breaker, embedding, resolvers, search, vectors)
+  - `vector_stores/` - Vector database providers with search filtering
 
 #### `semantic/` - AST and Semantic Analysis
 Code understanding and analysis.
 - **Purpose**: AST-based chunking, language detection, semantic classification
 - **Tools**: ast-grep integration, tree-sitter grammars
+- **Data**: Classification definitions and AST node type definitions
 
-#### `server/` - MCP Server Implementation
-FastMCP server and HTTP endpoints.
-- **Server**: MCP protocol server
-- **Health Service**: Health monitoring endpoint
-- **Framework**: FastMCP + uvicorn
-
-#### `tokenizers/` - Token Counting
-Token calculation utilities.
-- **Purpose**: Context budget management, chunk sizing
+#### `server/` - Server Implementations
+FastMCP server, HTTP management, and agent API.
+- **Sub-packages**:
+  - `agent_api/` - Tool interfaces (`find_code` tool in `search/` subpackage)
+  - `config/` - Server configuration (MCP, middleware, settings)
+  - `health/` - Health check system (endpoint, service, models)
+  - `mcp/` - MCP protocol implementation (FastMCP server at port 9328, middleware, tools, user agent)
+- **Key files**: `management.py` (Starlette at port 9329), `server.py` (entry point), `background_services.py`, `lifespan.py`
 
 ## Testing Structure (`tests/`)
 
@@ -154,19 +145,19 @@ scripts/
 
 ### Primary Documentation Files
 - `README.md` - Project overview and quickstart
-- `ARCHITECTURE.md` - Design decisions and principles
-- `PRODUCT.md` - Product overview and roadmap
 - `CODE_STYLE.md` - Code style guide
-- `AGENTS.md` - Agent development guidance and context
+- `AGENTS.md` - Agent development guidance and context (CLAUDE.md symlinks here)
 - `.specify/memory/constitution.md` - Project constitution (v2.0.1)
 
-### API Documentation (`context/apis/`)
-- External API references
-- Complete documentation for select libraries:
-  - `pydantic-evals`, `pydantic-graph`, `fastmcp`
+### Archived Documentation
+- `docs/archive/ARCHITECTURE.md` - Design decisions and principles (stale, archived)
+- `docs/archive/PRODUCT.md` - Product overview and roadmap (stale, archived)
 
-### MkDocs Site (`docs/`)
-Run local documentation server: `mise run docs-serve`
+### Documentation Site (`docs-site/`)
+Astro/Starlight based documentation at docs.knitli.com/codeweaver.
+
+### Internal Development Docs (`docs/`)
+Smattering of internal development docs (migration guides, research, troubleshooting). May be stale in places.
 
 ## Configuration Files
 
@@ -220,7 +211,7 @@ from codeweaver.core import CodeWeaverError
 
 ### Internal Package Structure
 - **Public API**: Exposed through `__init__.py`
-- **Private modules**: Prefixed with `_` (e.g., `_chunking.py`)
+- **Private modules**: Prefixed with `_` (e.g., `_logging.py`)
 - **Internals**: Complex logic in `_internals/` subpackage
 
 ## Flat Structure Philosophy
@@ -228,5 +219,7 @@ from codeweaver.core import CodeWeaverError
 Following pydantic ecosystem patterns:
 - **Group related modules**: In packages (e.g., all providers together)
 - **Keep root-level otherwise**: Avoid unnecessary nesting
+- **Configuration distributed**: Each domain package owns its config (core/config/, engine/config/, server/config/, providers/config/)
+- **Dependency injection**: Each domain has dependencies.py for DI bindings
 
 This structure balances discoverability with organization.

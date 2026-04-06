@@ -59,20 +59,21 @@ def _config_factory[T: RerankingConfigT](data: dict[str, Any], config_class: typ
             "model_arn": data["model_arn"]
         }
     if (
-        data["top_n"] != DEFAULT_RERANKING_MAX_RESULTS
+        data.get("top_n", DEFAULT_RERANKING_MAX_RESULTS) != DEFAULT_RERANKING_MAX_RESULTS
         and (provider := config_data.get("provider"))
         and provider not in {Provider.VOYAGE, Provider.FASTEMBED}
     ):
         assert config_data["rerank"] is not None, (  # noqa: S101
             "rerank config must be provided if top_n is set to a value other than the default"
         )
+        rerank = cast(dict[str, Any], config_data["rerank"])
         match provider:
             case Provider.SENTENCE_TRANSFORMERS:
-                config_data["rerank"]["top_k"] = data["top_n"]
+                rerank["top_k"] = data["top_n"]
             case Provider.BEDROCK:
-                config_data["rerank"]["number_of_results"] = data["top_n"]
+                rerank["number_of_results"] = data["top_n"]
             case Provider.COHERE:
-                config_data["rerank"]["top_k"] = data["top_n"]
+                rerank["top_k"] = data["top_n"]
     return config_class.model_validate(config_data)
 
 

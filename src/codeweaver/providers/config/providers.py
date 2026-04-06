@@ -18,7 +18,17 @@ from __future__ import annotations
 import logging
 import os
 
-from typing import Annotated, Any, Literal, NamedTuple, NotRequired, TypedDict, cast, is_typeddict
+from typing import (
+    Annotated,
+    Any,
+    ClassVar,
+    Literal,
+    NamedTuple,
+    NotRequired,
+    TypedDict,
+    cast,
+    is_typeddict,
+)
 
 from pydantic import Field, SecretStr, computed_field, model_validator
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
@@ -577,6 +587,10 @@ class ProviderSettings(BasedModel):
         in ENV_EXPLICIT_TRUE_VALUES
     )
 
+    _PROVIDER_CATEGORY_FIELDS: ClassVar[frozenset[str]] = frozenset(
+        {"embedding", "sparse_embedding", "reranking", "vector_store", "data", "agent"}
+    )
+
     def __init__(self, **data: Any) -> None:
         """Initialize ProviderSettings and register with DI container if available."""
         # We'll set the _category field on each class
@@ -593,6 +607,62 @@ class ProviderSettings(BasedModel):
                 e,
             )
         super().__init__(**data)
+
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_provider_fields_to_tuples(cls, data: Any) -> Any:
+        """Normalize provider category fields before field validation.
+
+        When provider settings arrive from TOML configs or pydantic-settings
+        source merging, they may be bare dicts instead of sequences and may
+        lack discriminator fields needed by pydantic's tagged unions.  This
+        validator:
+        1. Wraps bare dicts/models in lists so pydantic can coerce to tuples.
+        2. Injects missing discriminator fields (``config_type``,
+           ``provider``) into nested dicts so pydantic can resolve the
+           correct union member.
+        """
+        if not isinstance(data, dict):
+            return data
+        for field in cls._PROVIDER_CATEGORY_FIELDS:
+            value = data.get(field)
+            if value is None:
+                continue
+            # Ensure the value is a list (pydantic coerces to tuple)
+            if not isinstance(value, tuple | list):
+                value = [value]
+                data[field] = value
+            if not isinstance(value, list):
+                continue
+            for item in value:
+                if not isinstance(item, dict):
+                    continue
+                provider = item.get("provider")
+                # Inject config_type discriminator for embedding union
+                if field == "embedding" and "config_type" not in item:
+                    if "embed_provider" in item or "query_provider" in item:
+                        item["config_type"] = "asymmetric"
+                    else:
+                        item["config_type"] = "symmetric"
+                # Propagate provider into nested config dicts that use it
+                # as a discriminator (embedding_config, reranking_config, etc.)
+                if provider:
+                    for config_key in (
+                        "embedding_config",
+                        "sparse_embedding_config",
+                        "reranking_config",
+                    ):
+                        if config_key in item and isinstance(item[config_key], dict):
+                            item[config_key].setdefault("provider", provider)
+                            item[config_key].setdefault(
+                                "model_name", item.get("model_name")
+                            )
+                    # Inject tag into client_options for provider discrimination
+                    if "client_options" in item and isinstance(
+                        item["client_options"], dict
+                    ):
+                        item["client_options"].setdefault("tag", provider)
+        return data
 
     @model_validator(mode="after")
     def validate_and_normalize_providers(self) -> ProviderSettings:
@@ -700,8 +770,8 @@ class ProviderSettings(BasedModel):
             else (settings,)
             if settings and settings is not UNSET
             else ()
-            for field_name, settings in self.model_dump().items()
-            if field_name in self._field_names
+            for field_name in self._field_names
+            if (settings := getattr(self, field_name, None)) is not None
         }
 
     @property

@@ -778,7 +778,12 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         """Customize settings sources for CodeWeaverSettings and subclasses.
 
-        This method defines the configuration source hierarchy for CodeWeaver settings classes. It prioritizes environment variables, dotenv files, multiple configuration file formats in various locations, and secret management services. Subclasses can override this method to modify the source order or add additional sources as needed.
+        This method defines the configuration source hierarchy for CodeWeaver
+        settings classes.  Init settings are deliberately excluded — the
+        ``nested_model_default_partial_update`` config causes
+        InitSettingsSource to serialise model instances to dicts, losing
+        type information needed for discriminated unions.  Profile-based
+        defaults are handled by ``ProviderSettings`` validators instead.
         """
         return cls._base_settings_sources(settings_cls)
 
