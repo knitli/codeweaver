@@ -1,5 +1,5 @@
 ---
-title: CLI Reference (Alpha 6)
+title: CLI Reference
 description: Complete command-line interface reference for CodeWeaver
 ---
 
@@ -8,7 +8,7 @@ description: Complete command-line interface reference for CodeWeaver
 The `cw` command (alias for `codeweaver`) is your primary interface for managing CodeWeaver. It provides tools for initialization, indexing, searching, and diagnostics.
 
 :::note
-Alpha 6 introduces `cw doctor` for deep diagnostics and `cw init --profile` for rapid setup.
+CodeWeaver includes `cw doctor` for deep diagnostics and `cw init --profile` for rapid setup.
 :::
 
 ## Core Workflow
@@ -108,7 +108,7 @@ cw status
 
 ## Configuration
 
-CodeWeaver Alpha 6 uses `codeweaver.toml` as its primary configuration format.
+CodeWeaver uses `codeweaver.toml` as its primary configuration format.
 
 ### File Locations (Priority Order)
 1. **Project Root:** `./codeweaver.toml`

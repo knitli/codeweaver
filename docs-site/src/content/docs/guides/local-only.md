@@ -4,7 +4,7 @@ title: "Local-Only Operation"
 
 # Local-Only Operation
 
-> **TL;DR:** CodeWeaver Alpha 6 can run 100% locally with zero internet dependencies. Use it for airgapped environments or sensitive codebases where privacy is paramount. It saves your data from leaving your network while still providing high-quality semantic search.
+> **TL;DR:** CodeWeaver can run 100% locally with zero internet dependencies. Use it for airgapped environments or sensitive codebases where privacy is paramount. It saves your data from leaving your network while still providing high-quality semantic search.
 
 Many of our users work on proprietary or sensitive projects that cannot be shared with cloud-based AI providers. CodeWeaver is built with a **Privacy-First** architecture, allowing you to run all indexing, search, and storage locally on your own hardware.
 
@@ -61,4 +61,4 @@ Local-only operation doesn't mean slow search. CodeWeaver leverages specialized 
 
 ## Summary: Industrial-Grade Privacy
 
-CodeWeaver Alpha 6 ensures that privacy doesn't have to come at the cost of intelligence. By using its local-only mode, you can give your AI agents deep structural and semantic context without compromising your most sensitive data.
+CodeWeaver ensures that privacy doesn't have to come at the cost of intelligence. By using its local-only mode, you can give your AI agents deep structural and semantic context without compromising your most sensitive data.

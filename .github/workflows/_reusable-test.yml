@@ -59,17 +59,11 @@ on:
         description: Whether benchmark results were generated
         value: ${{ jobs.test.outputs.benchmark-available }}
 env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MISE_EXPERIMENTAL: 1
   MISE_YES: 1
   PROFILE: "dev"
   CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
   CODEWEAVER_TEST_MODE: "true"
-  CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
-  QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
-  VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
-  MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
 jobs:
   test:
@@ -96,6 +90,12 @@ jobs:
     env:
       MISE_PYTHON_VERSION: ${{ matrix.python-version }}
       UV_PYTHON: ${{ matrix.python-version }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
+      QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8

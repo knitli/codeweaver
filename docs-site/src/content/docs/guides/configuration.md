@@ -4,7 +4,7 @@ title: "Configuration Architecture"
 
 # Configuration Architecture
 
-> **TL;DR:** CodeWeaver Alpha 6 features a completely overhauled configuration system powered by Pydantic. Use it to define your providers, server settings, and performance limits. It catches setup errors at boot-time, ensuring your agent always has a reliable foundation.
+> **TL;DR:** CodeWeaver features a completely overhauled configuration system powered by Pydantic. Use it to define your providers, server settings, and performance limits. It catches setup errors at boot-time, ensuring your agent always has a reliable foundation.
 
 The configuration system is hierarchical, predictable, and strictly validated. Whether you use environment variables, a `.env` file, or a `codeweaver.toml`, the system ensures your settings are consistent before the application starts.
 
@@ -38,7 +38,7 @@ Specific to the CodeWeaver daemon and MCP integration.
 
 ## Validation & Reliability
 
-CodeWeaver Alpha 6 uses **Pydantic V2** to enforce strict validation. This means:
+CodeWeaver uses **Pydantic V2** to enforce strict validation. This means:
 
 1.  **Boot-time Failure:** If you provide an invalid URL or a missing API key, CodeWeaver will fail immediately with a clear error message instead of crashing later during a search.
 2.  **Type Safety:** Numbers, booleans, and nested objects are automatically converted and validated.

@@ -4,7 +4,7 @@ title: "Choosing a Profile"
 
 # Choosing a Profile
 
-> **TL;DR:** CodeWeaver Alpha 6 uses Profiles to simplify setup. Use `recommended` for production-grade search (Voyage AI) or `quickstart` for a free, local-only experience (FastEmbed). Profiles save you from manual configuration by bundling optimized provider settings.
+> **TL;DR:** CodeWeaver uses Profiles to simplify setup. Use `recommended` for production-grade search (Voyage AI) or `quickstart` for a free, local-only experience (FastEmbed). Profiles save you from manual configuration by bundling optimized provider settings.
 
 CodeWeaver offers three primary profiles to meet different cost, performance, and privacy requirements. You can select a profile during initialization with `cw init --profile <name>`.
 

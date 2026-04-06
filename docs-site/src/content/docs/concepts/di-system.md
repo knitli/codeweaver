@@ -6,7 +6,7 @@ title: "Universal Extensibility: The DI System"
 
 > **TL;DR:** This module handles Universal Extensibility via Dependency Injection (DI). Use it when you need to register services or inject them into functions. It decouples implementation from usage, allowing you to swap providers with zero code changes.
 
-CodeWeaver Alpha 6 uses a lightweight, FastAPI-inspired Dependency Injection (DI) system. This architecture makes the platform extremely extensible—you can swap an embedding provider, a vector store, or even core services by simply updating your configuration.
+CodeWeaver uses a lightweight, FastAPI-inspired Dependency Injection (DI) system. This architecture makes the platform extremely extensible—you can swap an embedding provider, a vector store, or even core services by simply updating your configuration.
 
 ---
 

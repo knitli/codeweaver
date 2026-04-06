@@ -7,8 +7,8 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # DI System Integration Progress Report
 
-**Date**: 2026-01-08  
-**Status**: Phases 1-5 Complete, Phase 6+ Pending  
+**Date**: 2026-01-08
+**Status**: Phases 1-5 Complete, Phase 6+ Pending
 **Plan Document**: `.claude/plans/imperative-waddling-manatee.md`
 
 ---
@@ -41,15 +41,15 @@ The dependency injection (DI) system foundation is now complete through Phase 5.
 @dependency_provider(BaseCodeWeaverSettings, scope="singleton")
 def bootstrap_settings() -> BaseCodeWeaverSettings:
     """Bootstrap global settings as DI root.
-    
+
     Auto-detects the appropriate settings class based on installed packages
     (server, engine, provider, or core) and returns it as BaseCodeWeaverSettings.
-    
+
     Returns:
         The appropriate settings instance for the current installation
     """
     from codeweaver.core.config.loader import get_settings
-    
+
     config_file = _resolve_config_file()
     return get_settings(config_file=config_file)
 ```
@@ -195,20 +195,20 @@ All factories follow this structure:
 def _create_[provider]_client() -> [ClientType]:
     """Factory for [Provider] client."""
     from codeweaver.core.di import INJECTED
-    
+
     # Inject primary config
     config: EmbeddingProviderSettingsType = INJECTED  # type: ignore[name-defined]
-    
+
     # Validation
     if not config or not config.client_options:
         raise ConfigurationError("Client factory requires config with client_options")
-    
+
     # Import SDK
     try:
         from [sdk_package] import [ClientClass]
     except ImportError as e:
         raise ConfigurationError('Install package: pip install "code-weaver[[extra]]"') from e
-    
+
     # Extract and apply client options
     client_options = config.client_options.as_settings()
     return [ClientClass](**client_options)
@@ -261,7 +261,7 @@ type SentenceTransformersSparseClientDep = Annotated[
 ```python
 def _get_provider_class_for_config(config: EmbeddingConfigT) -> type:
     """Map embedding config to its provider class.
-    
+
     Supports 15 provider types, including special handling for OpenAI-compatible
     providers (7 providers → 1 base class).
     """
@@ -282,7 +282,7 @@ def _get_provider_class_for_config(config: EmbeddingConfigT) -> type:
         Provider.FASTEMBED: FastEmbedProvider,
         Provider.SENTENCE_TRANSFORMERS: SentenceTransformersProvider,
     }
-    
+
     provider_cls = provider_map.get(config.provider)
     if not provider_cls:
         raise ConfigurationError(f"No provider class for {config.provider}")
@@ -293,7 +293,7 @@ def _get_provider_class_for_config(config: EmbeddingConfigT) -> type:
 ```python
 def _create_client_for_config(config: EmbeddingConfigT) -> Any:
     """Create SDK client for the given config.
-    
+
     Routes to appropriate client factory based on provider type.
     """
     client_factories = {
@@ -301,7 +301,7 @@ def _create_client_for_config(config: EmbeddingConfigT) -> Any:
         Provider.AZURE: _create_openai_client,
         # ... 13 more mappings
     }
-    
+
     factory = client_factories.get(config.provider)
     if not factory:
         raise ConfigurationError(f"No client factory for {config.provider}")
@@ -317,13 +317,13 @@ def _instantiate_provider(
     caps: EmbeddingCapabilities,
 ) -> Any:
     """Instantiate a provider with dependencies.
-    
+
     Args:
         provider_cls: Provider class (may be dynamically created backup class)
         config: Provider configuration
         client: SDK client instance
         caps: Model capabilities
-    
+
     Returns:
         Configured provider instance
     """
@@ -337,35 +337,35 @@ async def create_all_embedding_providers(
     caps_resolver: EmbeddingCapabilityResolverDep = INJECTED,
 ) -> tuple[Any, ...]:
     """Factory for creating ALL embedding providers (primary + backups).
-    
+
     Integrates with backup_factory for dynamic backup class generation.
     """
     from codeweaver.providers.backup_factory import create_backup_class
-    
+
     if not configs:
         return tuple()
-    
+
     providers = []
     for i, config in enumerate(configs):
         is_backup = i > 0
-        
+
         # Get provider class
         provider_cls = _get_provider_class_for_config(config)
-        
+
         # Apply backup wrapper if needed
         if is_backup:
             provider_cls = create_backup_class(provider_cls)
-        
+
         # Create client
         client = _create_client_for_config(config)
-        
+
         # Resolve capabilities
         caps = caps_resolver.resolve(config.model_name)
-        
+
         # Instantiate provider
         provider = _instantiate_provider(provider_cls, config, client, caps)
         providers.append(provider)
-    
+
     return tuple(providers)
 ```
 
@@ -414,7 +414,7 @@ def create_backup_class[T](provider_cls: type[T]) -> type[T]:
     """Create BackupXProvider dynamically."""
     if provider_cls in _backup_class_cache:
         return _backup_class_cache[provider_cls]
-    
+
     backup_base = get_backup_base_class(provider_cls)  # Returns BackupEmbeddingProvider
     backup_cls = type(
         f"Backup{provider_cls.__name__}",
@@ -446,15 +446,15 @@ def create_backup_class[T](provider_cls: type[T]) -> type[T]:
 ```python
 def _parse_config_reference(ref: str) -> tuple[str, int | None]:
     """Parse a config reference into base name and optional index.
-    
+
     Args:
         ref: Config reference string (e.g., "embedding", "embedding[0]", "embedding[*]")
-    
+
     Returns:
         Tuple of (base_name, index) where:
         - base_name: The config kind (e.g., "embedding")
         - index: The index number, -1 for "*" (all), or None for no index
-    
+
     Examples:
         >>> _parse_config_reference("embedding")
         ("embedding", None)
@@ -466,10 +466,10 @@ def _parse_config_reference(ref: str) -> tuple[str, int | None]:
     match = re.match(r"^([a-z_]+)(?:\[(\d+|\*)\])?$", ref)
     if not match:
         return ref, None
-    
+
     base_name = match.group(1)
     index_str = match.group(2)
-    
+
     if index_str is None:
         return base_name, None
     if index_str == "*":
@@ -485,15 +485,15 @@ async def _resolve_indexed_config(
     container: Any,
 ) -> Any | None:
     """Resolve a config dependency with optional indexing.
-    
+
     Args:
         dep_name: Dependency name (may include index like "embedding[0]")
         dep_type: Type to resolve from DI container
         container: DI container instance
-    
+
     Returns:
         Resolved config instance(s) or None if resolution fails
-    
+
     Examples:
         "embedding" → primary config (backward compatible)
         "embedding[0]" → primary config (explicit)
@@ -501,33 +501,33 @@ async def _resolve_indexed_config(
         "embedding[1]" → first backup config
     """
     base_name, index = _parse_config_reference(dep_name)
-    
+
     with contextlib.suppress(AttributeError, KeyError, TypeError, ValueError, ImportError):
         resolved = await container.resolve(dep_type)
-        
+
         # No indexing - return as-is (backward compatible)
         if index is None:
             return resolved
-        
+
         # All configs requested (embedding[*])
         if index == -1:
             if isinstance(resolved, tuple | list):
                 return resolved
             return (resolved,)
-        
+
         # Specific index requested
         if isinstance(resolved, tuple | list):
             try:
                 return resolved[index]
             except IndexError:
                 return None
-        
+
         # Non-collection but index 0 (primary)
         if index == 0:
             return resolved
-        
+
         return None
-    
+
     return None
 ```
 
@@ -535,41 +535,41 @@ async def _resolve_indexed_config(
 ```python
 async def resolve_all_configs() -> None:
     """Resolve all configurations across the application.
-    
+
     Extended in Phase 5 to support indexed config references:
     - "embedding" - resolves to primary config (backward compatible)
     - "embedding[0]" - resolves to primary config (explicit)
     - "embedding[*]" - resolves to all configs (tuple)
     - "embedding[1]" - resolves to first backup config
-    
+
     Example:
         class VectorStoreConfig:
             def config_dependencies(self):
                 return {"embedding[0]": EmbeddingProviderSettings}
-            
+
             async def apply_resolved_config(self, embedding=None, **resolved):
                 if embedding:
                     self._resolved_dimension = await embedding.get_dimension()
     """
     from codeweaver.core.config.registry import get_configurable_components
-    
+
     container = get_container()
-    configurables = get_configurable_components()
-    
-    for configurable in configurables:
+    configurable = get_configurable_components()
+
+    for configurable in configurable:
         deps = configurable.config_dependencies()
         resolved = {}
-        
+
         for dep_name, dep_type in deps.items():
             # Parse and resolve with indexing support
             resolved_config = await _resolve_indexed_config(dep_name, dep_type, container)
-            
+
             if resolved_config is not None:
                 # Strip index from key for apply_resolved_config()
                 # "embedding[0]" becomes "embedding"
                 base_name, _ = _parse_config_reference(dep_name)
                 resolved[base_name] = resolved_config
-        
+
         if resolved:
             await configurable.apply_resolved_config(**resolved)
 ```
@@ -578,25 +578,25 @@ async def resolve_all_configs() -> None:
 ```python
 class ConfigurableComponent(Protocol):
     """Protocol for components participating in config resolution.
-    
+
     Extended in Phase 5 to support indexed config references:
     - "embedding" - primary embedding config (backward compatible)
     - "embedding[0]" - primary embedding config (explicit)
     - "embedding[*]" - all embedding configs (primary + backups)
     - "embedding[1]" - first backup config
     """
-    
+
     def config_dependencies(self) -> dict[str, type]:
         """Return types this config needs to resolve against.
-        
+
         Examples:
             Simple reference (backward compatible):
                 {"embedding": EmbeddingProviderSettings}
-            
+
             Indexed reference (Phase 5):
                 {"embedding[0]": EmbeddingProviderSettings}  # Primary only
                 {"embedding[*]": EmbeddingProviderSettings}  # All configs
-            
+
             Multiple dependencies:
                 {
                     "embedding[0]": EmbeddingProviderSettings,
@@ -604,10 +604,10 @@ class ConfigurableComponent(Protocol):
                 }
         """
         ...
-    
+
     async def apply_resolved_config(self, **resolved: Any) -> None:
         """Apply resolved configuration from dependencies.
-        
+
         Note:
             Indexed references like "embedding[0]" will have the index
             stripped from the key, so you'll receive "embedding" as the key.
@@ -652,10 +652,10 @@ The primary use case is vector stores needing the embedding dimension:
 ```python
 class VectorStoreConfig(ConfigurableComponent):
     """Vector store configuration that depends on embedding dimension."""
-    
+
     def config_dependencies(self) -> dict[str, type]:
         return {"embedding[0]": EmbeddingProviderSettings}  # Primary embedding
-    
+
     async def apply_resolved_config(self, embedding: EmbeddingProviderSettings | None = None, **resolved):
         """Apply resolved embedding config."""
         if embedding:
@@ -786,11 +786,11 @@ __all__ = (
     "RerankingProviderSettingsDep",
     "SparseEmbeddingProviderSettingsDep",
     "VectorStoreProviderSettingsDep",
-    
+
     # Capability Resolver Type Aliases (Phase 2)
     "EmbeddingCapabilityResolverDep",
     "RerankingCapabilityResolverDep",
-    
+
     # Client Type Aliases (Phase 3)
     "BedrockClientDep",
     "ClientDep",
@@ -804,15 +804,15 @@ __all__ = (
     "SentenceTransformersClientDep",
     "SentenceTransformersSparseClientDep",
     "VoyageClientDep",
-    
+
     # Provider Type Aliases (Phase 4)
     "AllEmbeddingProvidersDep",
     "PrimaryEmbeddingProviderDep",
-    
+
     # Factory Functions (Phase 4)
     "create_all_embedding_providers",
     "get_primary_embedding_provider",
-    
+
     # Utilities
     "NoneDep",
 )
@@ -876,10 +876,10 @@ def _create_reranking_client_for_config(config) -> Any:
 async def create_all_reranking_providers() -> tuple[Any, ...]:
     """Factory for all reranking providers (primary + backups)."""
     from codeweaver.providers.backup_factory import create_backup_class
-    
+
     configs: AllRerankingConfigsDep = INJECTED
     caps_resolver: RerankingCapabilityResolverDep = INJECTED
-    
+
     # Similar loop to embedding providers
     # ... implementation
 
@@ -910,11 +910,11 @@ type PrimaryRerankingProviderDep = Annotated[Any, depends(get_primary_reranking_
 
 class BaseVectorStoreConfig(ConfigurableComponent):
     """Vector store config that needs embedding dimension."""
-    
+
     def config_dependencies(self) -> dict[str, type]:
         # Use indexed reference for primary embedding
         return {"embedding[0]": EmbeddingProviderSettings}
-    
+
     async def apply_resolved_config(
         self,
         embedding: EmbeddingProviderSettings | None = None,
@@ -942,14 +942,14 @@ def _get_vector_store_provider_class_for_config(config) -> type:
 async def create_vector_store_provider() -> Any:
     """Factory for vector store provider (single, not collection)."""
     config: VectorStoreProviderSettingsDep = INJECTED
-    
+
     # Vector stores are typically singular, not collections
     provider_cls = _get_vector_store_provider_class_for_config(config)
-    
+
     # Vector stores don't use SDK clients in the same way
     # They may need embedding dimension from config
     provider = provider_cls(config=config)
-    
+
     return provider
 
 type VectorStoreProviderDep = Annotated[Any, depends(create_vector_store_provider)]
@@ -1150,7 +1150,7 @@ Since runtime testing isn't feasible with ~250 broken references, focus on:
 
 ### Phase 8: Deprecate Registry System
 
-**Status**: Not started, planned for ~4th major alpha release
+**Status**: Not started, planned for ~0.4.0
 
 **Current State**:
 The codebase uses a registry system in `src/codeweaver/common/registry/` for provider registration and discovery. This was the pre-DI approach.
@@ -1372,10 +1372,10 @@ async def test_get_all_embedding_configs():
     """Test config collection factory."""
     mock_settings = Mock()
     mock_settings.provider.embedding = (config1, config2)
-    
+
     # Inject mock settings
     result = await get_all_embedding_configs(settings=mock_settings)
-    
+
     assert isinstance(result, tuple)
     assert len(result) == 2
     assert result[0] == config1
@@ -1383,9 +1383,9 @@ async def test_get_all_embedding_configs():
 async def test_get_primary_embedding_config():
     """Test primary config extraction."""
     configs = (config1, config2)
-    
+
     result = await get_primary_embedding_config(all_configs=configs)
-    
+
     assert result == config1
 ```
 
@@ -1398,11 +1398,11 @@ async def test_create_openai_client():
         "api_key": "test-key",
         "base_url": "https://api.openai.com",
     }
-    
+
     # This will need to mock the import
     with patch("openai.AsyncOpenAI") as mock_openai:
         client = _create_openai_client(config=mock_config)
-        
+
         mock_openai.assert_called_once_with(
             api_key="test-key",
             base_url="https://api.openai.com",
@@ -1414,30 +1414,30 @@ async def test_create_openai_client():
 async def test_get_provider_class_for_config():
     """Test provider class mapping."""
     from codeweaver.core import Provider
-    
+
     config = Mock()
     config.provider = Provider.OPENAI
-    
+
     cls = _get_provider_class_for_config(config)
-    
+
     assert cls == OpenAIEmbeddingBase
 
 async def test_create_all_embedding_providers_with_backup():
     """Test provider factory with backup integration."""
     # Mock configs
     configs = (primary_config, backup_config)
-    
+
     # Mock capability resolver
     mock_resolver = Mock()
     mock_resolver.resolve.return_value = mock_caps
-    
+
     # Mock backup factory
     with patch("codeweaver.providers.backup_factory.create_backup_class") as mock_backup:
         providers = await create_all_embedding_providers(
             configs=configs,
             caps_resolver=mock_resolver,
         )
-        
+
         # Verify backup class was created for second provider
         mock_backup.assert_called_once()
         assert len(providers) == 2
@@ -1456,11 +1456,11 @@ async def test_resolve_indexed_config_single():
     """Test indexed resolution with single config."""
     mock_container = Mock()
     mock_container.resolve.return_value = mock_config
-    
+
     # Test backward compatible (no index)
     result = await _resolve_indexed_config("embedding", EmbeddingConfig, mock_container)
     assert result == mock_config
-    
+
     # Test explicit primary
     result = await _resolve_indexed_config("embedding[0]", EmbeddingConfig, mock_container)
     assert result == mock_config
@@ -1469,11 +1469,11 @@ async def test_resolve_indexed_config_collection():
     """Test indexed resolution with config collection."""
     mock_container = Mock()
     mock_container.resolve.return_value = (config1, config2, config3)
-    
+
     # Test get all
     result = await _resolve_indexed_config("embedding[*]", EmbeddingConfig, mock_container)
     assert result == (config1, config2, config3)
-    
+
     # Test get specific backup
     result = await _resolve_indexed_config("embedding[1]", EmbeddingConfig, mock_container)
     assert result == config2
@@ -1486,12 +1486,12 @@ async def test_resolve_indexed_config_collection():
 async def test_full_embedding_provider_chain():
     """Test complete DI resolution: Settings → Config → Client → Provider."""
     from codeweaver.core.di import get_container
-    
+
     container = get_container()
-    
+
     # Should resolve through full chain
     provider = await container.resolve(PrimaryEmbeddingProviderDep)
-    
+
     assert provider is not None
     assert hasattr(provider, "embed")
     assert not provider.is_provider_backup
@@ -1499,22 +1499,22 @@ async def test_full_embedding_provider_chain():
 async def test_backup_provider_creation():
     """Test backup provider discrimination."""
     container = get_container()
-    
+
     all_providers = await container.resolve(AllEmbeddingProvidersDep)
-    
+
     assert len(all_providers) >= 1
     assert not all_providers[0].is_provider_backup
-    
+
     if len(all_providers) > 1:
         assert all_providers[1].is_provider_backup
 
 async def test_cross_config_resolution():
     """Test vector store gets embedding dimension."""
     container = get_container()
-    
+
     # Trigger cross-config resolution
     await resolve_all_configs()
-    
+
     # Verify vector store has dimension
     vs_config = await container.resolve(VectorStoreConfig)
     assert hasattr(vs_config, "_resolved_dimension")
@@ -1554,9 +1554,9 @@ class NewProviderConfig(BaseEmbeddingConfig):
 def _create_newprovider_client() -> Any:
     """Factory for NewProvider SDK client."""
     from codeweaver.core.di import INJECTED
-    
+
     config: EmbeddingProviderSettingsDep = INJECTED
-    
+
     try:
         from newprovider import Client
         return Client(**config.client_options.as_settings())
@@ -1573,7 +1573,7 @@ type NewProviderClientDep = Annotated[Any, depends(_create_newprovider_client)]
 # In src/codeweaver/providers/embedding/providers/newprovider.py
 class NewProviderEmbeddingProvider(EmbeddingProvider):
     """Provider implementation."""
-    
+
     def __init__(
         self,
         config: EmbeddingConfigDep = INJECTED,
@@ -1583,7 +1583,7 @@ class NewProviderEmbeddingProvider(EmbeddingProvider):
         self.config = config
         self.client = client
         self.caps = caps
-    
+
     async def embed(self, texts: list[str]) -> list[list[float]]:
         return await self.client.embed(texts)
 ```

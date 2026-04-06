@@ -20,7 +20,7 @@ CodeWeaver is an extensible MCP (Model Context Protocol) server for semantic cod
 - 26 languages with full AST support, 170+ with heuristic chunking
 
 ## Current Status
-**Version**: v0.1 Alpha Release - Early development phase
+**Version**: 0.x early release
 
 **What Works (v0.1)**:
 - Core hybrid search (dense + sparse vectors)
