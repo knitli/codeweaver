@@ -86,89 +86,92 @@ jobs:
     steps:
       - name: Check test results
         id: check-results
+        env:
+          INTEGRATION_RESULT: ${{ needs.nightly-integration-tests.result }}
+          PROVIDER_RESULT: ${{ needs.nightly-real-provider-tests.result }}
+          BENCHMARK_RESULT: ${{ needs.nightly-benchmark-tests.result }}
         run: |
-          integration_result="${{ needs.nightly-integration-tests.result }}"
-          provider_result="${{ needs.nightly-real-provider-tests.result }}"
-          benchmark_result="${{ needs.nightly-benchmark-tests.result }}"
-
-          echo "Integration Tests: $integration_result"
-          echo "Real Provider Tests: $provider_result"
-          echo "Benchmark Tests: $benchmark_result"
+          echo "Integration Tests: $INTEGRATION_RESULT"
+          echo "Real Provider Tests: $PROVIDER_RESULT"
+          echo "Benchmark Tests: $BENCHMARK_RESULT"
 
           # Determine overall status
-          if [ "$integration_result" == "failure" ] || [ "$provider_result" == "failure" ]; then
-            echo "status=failure" >> $GITHUB_OUTPUT
+          if [ "$INTEGRATION_RESULT" == "failure" ] || [ "$PROVIDER_RESULT" == "failure" ]; then
+            echo "status=failure" >> "$GITHUB_OUTPUT"
             echo "Overall Status: FAILURE ❌"
-          elif [ "$benchmark_result" == "failure" ]; then
-            echo "status=warning" >> $GITHUB_OUTPUT
+          elif [ "$BENCHMARK_RESULT" == "failure" ]; then
+            echo "status=warning" >> "$GITHUB_OUTPUT"
             echo "Overall Status: WARNING ⚠️ (Benchmarks Failed)"
-          elif [ "$integration_result" == "success" ] && [ "$provider_result" == "success" ]; then
-            echo "status=success" >> $GITHUB_OUTPUT
+          elif [ "$INTEGRATION_RESULT" == "success" ] && [ "$PROVIDER_RESULT" == "success" ]; then
+            echo "status=success" >> "$GITHUB_OUTPUT"
             echo "Overall Status: SUCCESS ✅"
           else
-            echo "status=unknown" >> $GITHUB_OUTPUT
+            echo "status=unknown" >> "$GITHUB_OUTPUT"
             echo "Overall Status: UNKNOWN ❓"
           fi
 
       - name: Generate summary
+        env:
+          INTEGRATION: ${{ needs.nightly-integration-tests.result }}
+          PROVIDER: ${{ needs.nightly-real-provider-tests.result }}
+          BENCHMARK: ${{ needs.nightly-benchmark-tests.result }}
+          STATUS: ${{ steps.check-results.outputs.status }}
+          COMMIT_SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          echo "# Nightly Test Results 🌙" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Date**: $(date -u +"%Y-%m-%d %H:%M UTC")" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "# Nightly Test Results 🌙"
+            echo ""
+            echo "**Date**: $(date -u +"%Y-%m-%d %H:%M UTC")"
+            echo "**Commit**: $COMMIT_SHA"
+            echo ""
+            echo "## Test Suite Results"
+            echo ""
 
-          echo "## Test Suite Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+            # Integration Tests
+            if [ "$INTEGRATION" == "success" ]; then
+              echo "- ✅ **Integration Tests**: PASSED"
+            elif [ "$INTEGRATION" == "failure" ]; then
+              echo "- ❌ **Integration Tests**: FAILED"
+            else
+              echo "- ⚠️ **Integration Tests**: $INTEGRATION"
+            fi
 
-          integration="${{ needs.nightly-integration-tests.result }}"
-          provider="${{ needs.nightly-real-provider-tests.result }}"
-          benchmark="${{ needs.nightly-benchmark-tests.result }}"
+            # Real Provider Tests
+            if [ "$PROVIDER" == "success" ]; then
+              echo "- ✅ **Real Provider Tests**: PASSED"
+            elif [ "$PROVIDER" == "failure" ]; then
+              echo "- ❌ **Real Provider Tests**: FAILED"
+            else
+              echo "- ⚠️ **Real Provider Tests**: $PROVIDER"
+            fi
 
-          # Integration Tests
-          if [ "$integration" == "success" ]; then
-            echo "- ✅ **Integration Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
-          elif [ "$integration" == "failure" ]; then
-            echo "- ❌ **Integration Tests**: FAILED" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- ⚠️ **Integration Tests**: $integration" >> $GITHUB_STEP_SUMMARY
-          fi
+            # Benchmark Tests
+            if [ "$BENCHMARK" == "success" ]; then
+              echo "- ✅ **Benchmark Tests**: PASSED"
+            elif [ "$BENCHMARK" == "failure" ]; then
+              echo "- ⚠️ **Benchmark Tests**: FAILED (Non-blocking)"
+            else
+              echo "- ⚠️ **Benchmark Tests**: $BENCHMARK"
+            fi
 
-          # Real Provider Tests
-          if [ "$provider" == "success" ]; then
-            echo "- ✅ **Real Provider Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
-          elif [ "$provider" == "failure" ]; then
-            echo "- ❌ **Real Provider Tests**: FAILED" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- ⚠️ **Real Provider Tests**: $provider" >> $GITHUB_STEP_SUMMARY
-          fi
+            echo ""
+            echo "## Overall Status"
+            echo ""
 
-          # Benchmark Tests
-          if [ "$benchmark" == "success" ]; then
-            echo "- ✅ **Benchmark Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
-          elif [ "$benchmark" == "failure" ]; then
-            echo "- ⚠️ **Benchmark Tests**: FAILED (Non-blocking)" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- ⚠️ **Benchmark Tests**: $benchmark" >> $GITHUB_STEP_SUMMARY
-          fi
+            if [ "$STATUS" == "success" ]; then
+              echo "✅ **All critical tests passed**"
+            elif [ "$STATUS" == "warning" ]; then
+              echo "⚠️ **Critical tests passed, but benchmarks failed**"
+            elif [ "$STATUS" == "failure" ]; then
+              echo "❌ **Critical test failures detected**"
+            else
+              echo "❓ **Unknown status**"
+            fi
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Overall Status" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          status="${{ steps.check-results.outputs.status }}"
-          if [ "$status" == "success" ]; then
-            echo "✅ **All critical tests passed**" >> $GITHUB_STEP_SUMMARY
-          elif [ "$status" == "warning" ]; then
-            echo "⚠️ **Critical tests passed, but benchmarks failed**" >> $GITHUB_STEP_SUMMARY
-          elif [ "$status" == "failure" ]; then
-            echo "❌ **Critical test failures detected**" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❓ **Unknown status**" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "View full results: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+            echo ""
+            echo "View full results: $RUN_URL"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create issue on failure
         if: steps.check-results.outputs.status == 'failure'

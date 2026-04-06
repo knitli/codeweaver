@@ -129,8 +129,7 @@ jobs:
 
   review:
     needs: "dispatch"
-    if: |-
-      ${{ needs.dispatch.outputs.command == 'review' && secrets.GEMINI_API_KEY != '' }}
+    if: needs.dispatch.outputs.command == 'review'
     uses: "./.github/workflows/gemini-review.yml"
     permissions:
       contents: "read"
@@ -143,8 +142,7 @@ jobs:
 
   triage:
     needs: "dispatch"
-    if: |-
-      ${{ needs.dispatch.outputs.command == 'triage' && secrets.GEMINI_API_KEY != '' }}
+    if: needs.dispatch.outputs.command == 'triage'
     uses: "./.github/workflows/gemini-triage.yml"
     permissions:
       contents: "read"
@@ -157,8 +155,7 @@ jobs:
 
   invoke:
     needs: "dispatch"
-    if: |-
-      ${{ needs.dispatch.outputs.command == 'invoke' && secrets.GEMINI_API_KEY != '' }}
+    if: needs.dispatch.outputs.command == 'invoke'
     uses: "./.github/workflows/gemini-invoke.yml"
     permissions:
       contents: "read"

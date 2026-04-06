@@ -47,6 +47,7 @@ jobs:
           fetch-depth: 2
 
       - name: Setup Mise Environment
+        id: setup-mise
         uses: ./.github/actions/setup-mise-env
         with:
           python-version: "3.13"
