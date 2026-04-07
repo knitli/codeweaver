@@ -21,7 +21,7 @@
   "folders": [
     "docs-site/src/pages",
     "src/codeweaver",
-    "packages/",
+    "packages",
     "schemas",
     "tests"
   ],
