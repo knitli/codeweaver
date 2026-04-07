@@ -52,11 +52,12 @@ OPTIONAL_SDK_PREFIXES: tuple[str, ...] = (
 def test_base_import_does_not_pull_optional_provider_sdks() -> None:
     """Importing `codeweaver` must not pull any optional provider SDK.
 
-    Optional provider SDKs (boto3, cohere, google-genai, huggingface-hub, mistralai,
-    openai) live in per-provider extras, not base `[project.dependencies]`. A top-level
-    `import openai` anywhere in `src/codeweaver/` would crash base installs. This test
-    runs `import codeweaver` in a clean subprocess and asserts none of those SDKs ended
-    up in `sys.modules` as a side effect.
+    Optional provider SDKs (boto3, botocore, cohere, google-genai, huggingface-hub,
+    mistralai, openai) live in per-provider extras, not base
+    `[project.dependencies]`. A top-level `import openai` anywhere in
+    `src/codeweaver/` would crash base installs. This test runs `import codeweaver` in
+    a clean subprocess and asserts none of those SDKs ended up in `sys.modules` as a
+    side effect.
 
     If this test fails: find the offending module with `grep -rn "^import <sdk>\\|^from
     <sdk>" src/codeweaver/` and route the import through `lateimport` (see
