@@ -11,14 +11,19 @@
     "scripts",
     ".github",
     "claudedocs",
+    ".gemini",
+    ".vscode",
+    "scripts",
     "specs",
     ".specify",
     ".roo",
     ".claude"
   ],
   "folders": [
-    "docs",
-    "src",
+    "docs-site/src/pages",
+    "src/codeweaver",
+    "packages/",
+    "schemas",
     "tests"
   ],
   "previousVersions": [

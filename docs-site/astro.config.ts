@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 import createConfig from "@knitli/astro-docs-template/config";
-import { DocsAssets } from "@knitli/docs-components"
+import { DocsAssets } from "@knitli/-components"
 import type { DocsTemplateOptions } from "@knitli/astro-docs-template/config";
 import { remarkVersion } from "./src/plugins/remark-version";
 
@@ -29,10 +29,11 @@ const configOptions: DocsTemplateOptions = {
     bundledLangs: [
       "ansi",
       "bash",
+      "git-commit",
       "json",
-      "toml",
       "markdown",
       "python",
+      "toml",
       "yaml"
     ]
   },
