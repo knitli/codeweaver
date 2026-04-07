@@ -756,8 +756,17 @@ invalid-argument-type = "ignore"
 unresolved-attribute = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/codeweaver/providers/vector_stores/qdrant_base.py"]
+include = [
+  "src/codeweaver/providers/config/clients/multi.py",
+  "src/codeweaver/providers/vector_stores/qdrant_base.py",
+]
 
+# Both files use `try: import X; except ImportError: X = Any` fallbacks to
+# gate optional dependencies (fastembed, torch, sentence-transformers, etc.)
+# Ty flags the `X = Any` reassignment as invalid because it narrows the
+# previously-declared type. The pattern is intentional and correct — it lets
+# pydantic models with `field: X | None = None` work whether or not the
+# optional package is installed.
 [tool.ty.overrides.rules]
 invalid-assignment = "ignore"
 

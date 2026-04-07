@@ -27,19 +27,33 @@ import textwrap
 import pytest
 
 
-# Every optional SDK that was moved out of base dependencies by the pyproject
-# refactor. If any of these show up in sys.modules after `import codeweaver`,
-# something in the package is importing them at module top level instead of
-# lazily, which will break bare-base installs.
+# Every optional SDK (and SDK transitive) that was moved out of base
+# dependencies by the pyproject refactor. If any of these show up in
+# sys.modules after `import codeweaver`, something in the package is
+# importing them at module top level instead of lazily, which will break
+# bare-base installs.
 #
 # Match both the top-level package name and any submodule (e.g. `boto3` AND
-# `boto3.session`). `google.genai` is the submodule path used by the
-# `google-genai` PyPI package; matching on `google` alone would be wrong
-# because `google` is a namespace package used by many unrelated libraries.
+# `boto3.session`). Matching on the bare `google` prefix would be wrong
+# because `google` is a namespace package shared by many unrelated libraries
+# (protobuf, grpcio, googleapis-common-protos, ...). We list the specific
+# `google.*` submodules we know come from the `google` extra instead:
+#
+#   - google.genai: top-level API of the google-genai package
+#   - google.auth:  dependency of google-genai, brought in by google-auth.
+#                   Previously missed here because the production code relied
+#                   on `has_package("google")` which returns True whenever
+#                   ANY namespace sibling is installed, not only when
+#                   google-auth itself is. That let a top-level runtime
+#                   import slip past the regression test in dev envs where
+#                   google-auth happened to be installed, and broke in CI
+#                   when it wasn't. See the fix in providers/config/clients/
+#                   multi.py that ships with this same commit.
 OPTIONAL_SDK_PREFIXES: tuple[str, ...] = (
     "boto3",
     "botocore",
     "cohere",
+    "google.auth",
     "google.genai",
     "huggingface_hub",
     "mistralai",
