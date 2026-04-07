@@ -824,6 +824,30 @@ include = [
 [tool.ty.overrides.rules]
 unresolved-attribute = "ignore"
 
+# fastembed.py has two pre-existing ty issues that surface whenever any
+# line in the file is touched:
+#
+#   invalid-return-type (sparse _embed_documents/_embed_query): ty can't
+#     narrow `loop.run_in_executor(None, lambda: self._process_output(...))`
+#     through the executor/lambda hop into the declared
+#     `list[CodeWeaverSparseEmbedding]` return type. The conversion happens
+#     inside `_process_output` but ty's flow analysis doesn't trace it.
+#
+#   invalid-assignment (FastEmbedSparseProvider.client default): the default
+#     value `_SparseTextEmbedding` is read from a TYPE_CHECKING-guarded
+#     lateimport that resolves to `Unknown | None` statically; the real
+#     value is set via pydantic default_factory at runtime. ty sees the
+#     static Unknown and flags the class-level default.
+#
+# Both are pre-existing false positives. Scoping the suppressions to this
+# one file keeps the rest of the providers strict.
+[[tool.ty.overrides]]
+include = ["src/codeweaver/providers/embedding/providers/fastembed.py"]
+
+[tool.ty.overrides.rules]
+invalid-return-type = "ignore"
+invalid-assignment = "ignore"
+
 [[tool.ty.overrides]]
 include = [
   "src/codeweaver/*/dependencies.py",
