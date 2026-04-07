@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 import createConfig from "@knitli/astro-docs-template/config";
-import { DocsAssets } from "@knitli/-components"
+import { DocsAssets } from "@knitli/docs-components";
 import type { DocsTemplateOptions } from "@knitli/astro-docs-template/config";
 import { remarkVersion } from "./src/plugins/remark-version";
 
