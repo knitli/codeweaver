@@ -140,10 +140,13 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
                 )
             )
         else:
+            effective_profile = (
+                profile_config
+                if profile_config is not UNSET and profile_config
+                else ProviderProfile.RECOMMENDED
+            )
             provider = ProviderSettings.model_construct(
-                **(
-                    cast(ProviderProfile, profile_config or ProviderProfile.RECOMMENDED)
-                ).as_provider_settings()
+                **cast(ProviderProfile, effective_profile).as_provider_settings()
             )
         self.provider = provider
         await super()._initialize(**kwargs)
