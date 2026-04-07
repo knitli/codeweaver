@@ -229,37 +229,37 @@ fastembed = ["fastembed; python_version < '3.14'", "py-cpuinfo"]
 # Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
 fastembed-gpu = ["fastembed-gpu; python_version < '3.14'", "py-cpuinfo"]
 
-full = [
+# Internal extra: the lines shared by both `full` and `full-gpu`. Defined once,
+# referenced by both bundles via PEP 621 self-reference. Bumping any version
+# here updates both bundles atomically.
+#
+# Note on the markered pydantic-settings pair:
+#   azure-key-vault → azure-identity → cryptography → cffi. On 3.13t
+#   (free-threaded), cryptography has no pre-built wheel and building from
+#   source requires Rust + cffi<2.0. No PEP 508 marker distinguishes 3.13t
+#   from 3.13, so we exclude azure-key-vault on all 3.13. Standard 3.13 users
+#   can install azure-identity manually. The _special-dependencies task
+#   handles this for non-free-threaded 3.13 builds.
+#   permit-fastmcp depends on cffi — same 3.13t issue as azure-key-vault.
+common-extras = [
   "ddgs",
   "eunomia-mcp",
   "exa-py",
   "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,retries,xai]",
-  # azure-key-vault → azure-identity → cryptography → cffi. On 3.13t (free-threaded),
-  # cryptography has no pre-built wheel and building from source requires Rust + cffi<2.0.
-  # No PEP 508 marker distinguishes 3.13t from 3.13, so we exclude azure-key-vault on all 3.13.
-  # Standard 3.13 users can install azure-identity manually. The _special-dependencies task
-  # handles this for non-free-threaded 3.13 builds.
   "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager]; python_version == '3.13'",
   "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]; python_version != '3.13'",
-  # permit-fastmcp depends on cffi — same 3.13t issue as azure-key-vault
   "permit-fastmcp; python_version != '3.13'",
   "sentence-transformers",
   "tavily-python",
 ]
+full = ["code-weaver[common-extras]"]
+# full-gpu adds fastembed-gpu, which is mutually exclusive with the base
+# `fastembed` dep via [tool.uv].conflicts — uv resolves only one.
 full-gpu = [
-  "ddgs",
-  "eunomia-mcp",
+  "code-weaver[common-extras]",
   "fastembed-gpu; python_version < '3.14'",
-  "exa-py",
-  "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,retries,xai]",
-  # see full extra comments about cffi/cryptography and free-threaded python 3.13
-  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager]; python_version == '3.13'",
-  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]; python_version != '3.13'",
-  "permit-fastmcp; python_version != '3.13'",
-  "sentence-transformers",
-  # see note below about why this is commented out
+  # see note below about why sentence-transformers[onnx-gpu] is commented out
   #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
-  "tavily-python",
 ]
 gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
 google = ["pydantic-ai-slim[google]"]

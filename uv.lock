@@ -743,6 +743,17 @@ bedrock = [
 cohere = [
     { name = "pydantic-ai-slim", extra = ["cohere"] },
 ]
+common-extras = [
+    { name = "ddgs" },
+    { name = "eunomia-mcp" },
+    { name = "exa-py" },
+    { name = "permit-fastmcp", marker = "python_full_version != '3.13.*' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
+    { name = "pydantic-ai-slim", extra = ["anthropic", "bedrock", "cohere", "google", "groq", "huggingface", "mistral", "openai", "retries", "xai"] },
+    { name = "pydantic-settings", extra = ["aws-secrets-manager", "gcp-secret-manager", "toml", "yaml"] },
+    { name = "pydantic-settings", extra = ["azure-key-vault"], marker = "python_full_version != '3.13.*' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
+    { name = "sentence-transformers" },
+    { name = "tavily-python" },
+]
 duckduckgo = [
     { name = "ddgs" },
 ]
@@ -910,13 +921,16 @@ requires-dist = [
     { name = "code-weaver-tokenizers", editable = "packages/codeweaver-tokenizers" },
     { name = "cohere", specifier = "==5.20.7" },
     { name = "cyclopts", specifier = ">=4.10.0" },
+    { name = "ddgs", marker = "extra == 'common-extras'" },
     { name = "ddgs", marker = "extra == 'duckduckgo'" },
     { name = "ddgs", marker = "extra == 'full'" },
     { name = "ddgs", marker = "extra == 'full-gpu'" },
     { name = "ddgs", marker = "extra == 'recommended-local-only'" },
     { name = "eunomia-mcp", marker = "extra == 'auth-eunomia'" },
+    { name = "eunomia-mcp", marker = "extra == 'common-extras'" },
     { name = "eunomia-mcp", marker = "extra == 'full'" },
     { name = "eunomia-mcp", marker = "extra == 'full-gpu'" },
+    { name = "exa-py", marker = "extra == 'common-extras'" },
     { name = "exa-py", marker = "extra == 'exa'" },
     { name = "exa-py", marker = "extra == 'full'" },
     { name = "exa-py", marker = "extra == 'full-gpu'" },
@@ -935,6 +949,7 @@ requires-dist = [
     { name = "mistralai", specifier = "==1.10.0" },
     { name = "numpy", specifier = ">=2.4.2" },
     { name = "openai", specifier = "==2.28.0" },
+    { name = "permit-fastmcp", marker = "python_full_version != '3.13.*' and extra == 'common-extras'" },
     { name = "permit-fastmcp", marker = "python_full_version != '3.13.*' and extra == 'full'" },
     { name = "permit-fastmcp", marker = "python_full_version != '3.13.*' and extra == 'full-gpu'" },
     { name = "permit-fastmcp", marker = "extra == 'auth-permitio'" },
@@ -950,6 +965,7 @@ requires-dist = [
     { name = "pydantic", specifier = "==2.12.5" },
     { name = "pydantic-ai-slim", specifier = ">=1.68.0" },
     { name = "pydantic-ai-slim", extras = ["anthropic"], marker = "extra == 'anthropic'" },
+    { name = "pydantic-ai-slim", extras = ["anthropic", "bedrock", "cohere", "google", "groq", "huggingface", "mistral", "openai", "retries", "xai"], marker = "extra == 'common-extras'" },
     { name = "pydantic-ai-slim", extras = ["anthropic", "bedrock", "cohere", "google", "groq", "huggingface", "mistral", "openai", "retries", "xai"], marker = "extra == 'full'" },
     { name = "pydantic-ai-slim", extras = ["anthropic", "bedrock", "cohere", "google", "groq", "huggingface", "mistral", "openai", "retries", "xai"], marker = "extra == 'full-gpu'" },
     { name = "pydantic-ai-slim", extras = ["bedrock"], marker = "extra == 'bedrock'" },
@@ -961,8 +977,10 @@ requires-dist = [
     { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'openai'" },
     { name = "pydantic-ai-slim", extras = ["openai", "retries"], marker = "extra == 'recommended-local-only'" },
     { name = "pydantic-ai-slim", extras = ["xai"], marker = "extra == 'xai'" },
+    { name = "pydantic-settings", extras = ["aws-secrets-manager", "azure-key-vault", "gcp-secret-manager", "toml", "yaml"], marker = "python_full_version != '3.13.*' and extra == 'common-extras'" },
     { name = "pydantic-settings", extras = ["aws-secrets-manager", "azure-key-vault", "gcp-secret-manager", "toml", "yaml"], marker = "python_full_version != '3.13.*' and extra == 'full'" },
     { name = "pydantic-settings", extras = ["aws-secrets-manager", "azure-key-vault", "gcp-secret-manager", "toml", "yaml"], marker = "python_full_version != '3.13.*' and extra == 'full-gpu'" },
+    { name = "pydantic-settings", extras = ["aws-secrets-manager", "gcp-secret-manager", "toml", "yaml"], marker = "python_full_version == '3.13.*' and extra == 'common-extras'" },
     { name = "pydantic-settings", extras = ["aws-secrets-manager", "gcp-secret-manager", "toml", "yaml"], marker = "python_full_version == '3.13.*' and extra == 'full'" },
     { name = "pydantic-settings", extras = ["aws-secrets-manager", "gcp-secret-manager", "toml", "yaml"], marker = "python_full_version == '3.13.*' and extra == 'full-gpu'" },
     { name = "pydantic-settings", extras = ["aws-secrets-manager", "toml", "yaml"], marker = "extra == 'aws-secrets-manager'" },
@@ -975,6 +993,7 @@ requires-dist = [
     { name = "rich", specifier = ">=14.3.3" },
     { name = "rignore", specifier = ">=0.7.6" },
     { name = "sentence-transformers", marker = "python_full_version < '3.15'", specifier = "==5.2.0" },
+    { name = "sentence-transformers", marker = "extra == 'common-extras'" },
     { name = "sentence-transformers", marker = "extra == 'full'" },
     { name = "sentence-transformers", marker = "extra == 'full-gpu'" },
     { name = "sentence-transformers", marker = "extra == 'recommended'" },
@@ -982,6 +1001,7 @@ requires-dist = [
     { name = "sentence-transformers", marker = "extra == 'sentence-transformers'" },
     { name = "tavily", marker = "extra == 'recommended'" },
     { name = "tavily", marker = "extra == 'tavily'" },
+    { name = "tavily-python", marker = "extra == 'common-extras'" },
     { name = "tavily-python", marker = "extra == 'full'" },
     { name = "tavily-python", marker = "extra == 'full-gpu'" },
     { name = "tenacity", specifier = ">=9.1.4" },
@@ -999,7 +1019,7 @@ requires-dist = [
     { name = "voyageai", marker = "python_full_version < '3.14' and extra == 'voyageai'" },
     { name = "watchfiles", specifier = ">=1.1.1" },
 ]
-provides-extras = ["anthropic", "auth-eunomia", "auth-permitio", "aws-secrets-manager", "azure-key-vault", "bedrock", "cohere", "duckduckgo", "exa", "fastembed", "fastembed-gpu", "full", "full-gpu", "gcp-secret-manager", "google", "gpu-support", "groq", "huggingface", "in-memory", "mistral", "openai", "qdrant", "recommended", "recommended-local-only", "sentence-transformers", "tavily", "voyageai", "xai"]
+provides-extras = ["anthropic", "auth-eunomia", "auth-permitio", "aws-secrets-manager", "azure-key-vault", "bedrock", "cohere", "common-extras", "duckduckgo", "exa", "fastembed", "fastembed-gpu", "full", "full-gpu", "gcp-secret-manager", "google", "gpu-support", "groq", "huggingface", "in-memory", "mistral", "openai", "qdrant", "recommended", "recommended-local-only", "sentence-transformers", "tavily", "voyageai", "xai"]
 
 [package.metadata.requires-dev]
 build = [
@@ -5219,9 +5239,9 @@ name = "tavily-python"
 version = "0.7.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "httpx", marker = "extra == 'extra-11-code-weaver-full' or extra == 'extra-11-code-weaver-full-gpu' or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
-    { name = "requests", marker = "extra == 'extra-11-code-weaver-full' or extra == 'extra-11-code-weaver-full-gpu' or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
-    { name = "tiktoken", marker = "extra == 'extra-11-code-weaver-full' or extra == 'extra-11-code-weaver-full-gpu' or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
+    { name = "httpx" },
+    { name = "requests" },
+    { name = "tiktoken" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/54/fb/b6d6327a78b9107681701d56b3a2dda48dc5420a6ee8b33a147d87bfba60/tavily_python-0.7.13.tar.gz", hash = "sha256:347f92402331d071557f6dd6680f813a7d484b4ba7240905cc397cd192d1355c", size = 17237, upload-time = "2025-11-13T18:53:03.998Z" }
 wheels = [
