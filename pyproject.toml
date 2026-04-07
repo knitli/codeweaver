@@ -134,14 +134,18 @@ cw = "codeweaver.cli.__main__:main"
 # Use `uv sync --group dev` to get everything needed for local development.
 dev = [
   "serena>=0.9.1",
-  "uv>=0.11.1",
+  "uv>=0.11.3",
   { include-group = "dev-helpers" },
   { include-group = "lint" },
   { include-group = "test" },
 ]
-build = ["hatchling>=1.28.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.14.0"]
+build = [
+  "hatchling>=1.29.0",
+  "uv-dynamic-versioning>=0.14.0",
+  { include-group = "docs" },
+]
 dev-helpers = [
-  "ipython>=9.11.0",
+  "ipython>=9.12.0",
   "jsonlines>=4.0.0",
   "memory-profiler>=0.61.0",
   "pdbpp>=0.12.1",
@@ -149,22 +153,22 @@ dev-helpers = [
   "superclaude>=4.3.0",
 ]
 docs = [
-  "griffe>=2.0.0",
-  "griffe-pydantic>=1.1.0",
+  "griffe>=2.0.2",
+  "griffe-pydantic>=1.3.1",
   "griffe2md>=1.5.0",
 ]
 # Linting/formatting/typecheck — the minimum a contributor needs to pass `mise run check`.
 lint = [
   # black is used to format generated code
   "black>=26.3.1",
-  "ruff>=0.15.6",
-  "ty>=0.0.25",
+  "ruff>=0.15.9",
+  "ty>=0.0.29",
 ]
 # Baseline test dependencies. Workspace members inherit this group via `uv sync --group test`
 # from the workspace root, so daemon/tokenizers no longer redeclare pytest et al.
 test = [
   "dirty-equals>=0.11.0",
-  "hypothesis>=6.151.9",
+  "hypothesis>=6.151.11",
   "pytest>=9.0.2",
   "pytest-asyncio>=1.3.0",
   "pytest-cov>=7.1.0",
@@ -248,8 +252,8 @@ exclude_also = [
 # In dev, `[tool.uv.sources]` further down still routes those names to the
 # workspace, so editable installs are unaffected.
 #
-# tombi: format.rules.array-values-order.disabled = true
 [tool.hatch.metadata.hooks.uv-dynamic-versioning]
+# tombi: format.rules.array-values-order.disabled = true
 dependencies = [
   # * ================ Core Dependencies ==================*
   "anyio>4.12.0",
@@ -270,15 +274,15 @@ dependencies = [
   # no easy way to currently separate out stats-only usage from embedding/rerank usage
   "code-weaver-tokenizers=={{ version }}",
   # numpy needed for all embedding providers
-  "numpy>=2.4.2",
+  "numpy>=2.4.4",
   # lazy import handling; spun off from core/utils/lazy_importer into its own package
-  "lateimport>=0.1.0",
+  "lateimport>=1.0.1",
   # retries
   "tenacity>=9.1.4",
   # for local providers (sentence-transformers, fastembed) to detect CPU/GPU features
   "py-cpuinfo>=9.0.0",
   # * ================ CLI Dependencies ==================*
-  "cyclopts>=4.10.0",
+  "cyclopts>=4.10.1",
   "rich>=14.3.3",
   # * ================ Provider Clients ==================*
   # we must pin these to specific versions to ensure compatibility with our ClientOptions subclasses
