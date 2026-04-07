@@ -113,7 +113,7 @@ classifiers = [
 # the workspace sibling lines (`code-weaver-daemon`, `code-weaver-tokenizers`)
 # with `=={{ version }}` keeps every published wheel pinned to the same VCS-
 # derived version with zero hand-maintained version strings.
-dynamic = ["version", "dependencies", "optional-dependencies"]
+dynamic = ["dependencies", "optional-dependencies", "version"]
 
 [project.urls]
 Changelog = "https://github.com/knitli/codeweaver/blob/main/CHANGELOG.md"
