@@ -565,12 +565,28 @@ depends = ["sync"]  # ensure test dependencies are installed
 run = '''
 echo "running test-cov task"
 echo "${CW_PREFIX} Running tests with coverage..."
-uv run --group test pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v "$@"
+# Run tests with parallel coverage (generates .coverage.* files)
+uv run --group test pytest tests/ --cov=codeweaver --cov-report= --junit-xml=test-results.xml -v "$@"
+# Combine parallel coverage files into single .coverage file
+echo "${CW_PREFIX} Combining coverage data..."
+uv run --group test coverage combine
+# Generate coverage reports from combined data
+echo "${CW_PREFIX} Generating coverage reports..."
+uv run --group test coverage xml
+uv run --group test coverage report
 '''
 run_windows = '''
 echo "running test-cov task"
 echo [codeweaver] Running tests with coverage...
-uv run --group test pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v %*
+REM Run tests with parallel coverage (generates .coverage.* files)
+uv run --group test pytest tests/ --cov=codeweaver --cov-report= --junit-xml=test-results.xml -v %*
+REM Combine parallel coverage files into single .coverage file
+echo [codeweaver] Combining coverage data...
+uv run --group test coverage combine
+REM Generate coverage reports from combined data
+echo [codeweaver] Generating coverage reports...
+uv run --group test coverage xml
+uv run --group test coverage report
 '''
 
 [tasks.test-categories]
