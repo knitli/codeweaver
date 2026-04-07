@@ -584,6 +584,7 @@ markers = [
   # Stability & reliability
   "flaky: Tests that may occasionally fail due to timing or external factors",
   "indexing: Tests related to code indexing",
+  "install_smoke: Minimal smoke tests that must pass on any valid install profile (base, recommended, full, full-gpu, etc.) — used by the install-profile matrix workflow to validate wheel installs across python × extras combinations without requiring the full test suite's optional dependencies",
   "integration: Integration tests that test component interactions",
   # Platform-specific
   "linux_only: Tests that only run on Linux platforms",
