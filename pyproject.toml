@@ -759,6 +759,8 @@ unresolved-attribute = "ignore"
 include = [
   "src/codeweaver/providers/config/clients/multi.py",
   "src/codeweaver/providers/vector_stores/qdrant_base.py",
+  "src/codeweaver/providers/config/categories/embedding.py",
+  "src/codeweaver/providers/config/categories/sparse_embedding.py",
 ]
 
 # Both files use `try: import X; except ImportError: X = Any` fallbacks to

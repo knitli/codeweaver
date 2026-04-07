@@ -78,11 +78,20 @@ if has_package("sentence_transformers"):
     # - model: SentenceTransformer | None
     # So if the configured settings are SentenceTransformersClientOptions
     # Then we need to have these in the namespace for pydantic to resolve
-    from sentence_transformers import SentenceTransformer as SentenceTransformer
-    from sentence_transformers.evaluation import SentenceEvaluator as SentenceEvaluator
-    from sentence_transformers.model_card import (
-        SentenceTransformerModelCardData as SentenceTransformerModelCardData,
-    )
+    try:
+        from sentence_transformers import SentenceTransformer as SentenceTransformer
+        from sentence_transformers.evaluation import SentenceEvaluator as SentenceEvaluator
+        from sentence_transformers.model_card import (
+            SentenceTransformerModelCardData as SentenceTransformerModelCardData,
+        )
+    except ImportError:
+        SentenceTransformer = Any  # type: ignore[assignment, misc]
+        SentenceEvaluator = Any  # type: ignore[assignment, misc]
+        SentenceTransformerModelCardData = Any  # type: ignore[assignment, misc]
+else:
+    SentenceTransformer = Any
+    SentenceEvaluator = Any
+    SentenceTransformerModelCardData = Any
 
 
 class CohereClientOptions(ClientOptions):
