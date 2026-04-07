@@ -949,6 +949,20 @@ async def _start_instance_in_thread(
     return await asyncio.to_thread(cls, *args, **kwargs)
 
 
+async def _start_factory_cls_in_thread(
+    get_cls_fn: Any, card: ServiceCard, *args: Any, **kwargs: Any
+) -> Any:
+    """Handler for fastembed factory client_cls: call factory first, then instantiate.
+
+    The fastembed embedding/sparse service cards use `get_text_embedder` /
+    `get_sparse_embedder` (zero-arg factory functions) as client_cls. This
+    handler calls the factory to resolve the enhanced TextEmbedding /
+    SparseTextEmbedding class, then instantiates it with the provided kwargs.
+    """
+    cls = get_cls_fn()
+    return await asyncio.to_thread(cls, *args, **kwargs)
+
+
 async def _start_cross_encoder_in_thread(
     get_cls_fn: Any, card: ServiceCard, *args: Any, **kwargs: Any
 ) -> Any:
@@ -982,7 +996,7 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             ),
             lateimport("codeweaver.providers.embedding.fastembed_extensions", "get_text_embedder"),
             "fastembed",
-            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
+            metadata=ServiceMetadata(client_handler=_start_factory_cls_in_thread),
         ),
         service_card_factory(
             "fastembed",
@@ -994,7 +1008,7 @@ def _build_local_provider_cards() -> list[ServiceCard]:
                 "codeweaver.providers.embedding.fastembed_extensions", "get_sparse_embedder"
             ),
             "fastembed",
-            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
+            metadata=ServiceMetadata(client_handler=_start_factory_cls_in_thread),
         ),
         service_card_factory(
             "fastembed",
