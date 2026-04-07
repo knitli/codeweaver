@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 # Instincts generated from https://github.com/knitli/codeweaver
 # Generated: 2026-04-07T17:38:08.681Z
 # Version: 2.0
@@ -37,12 +42,12 @@ source_repo: https://github.com/knitli/codeweaver
 
 ## Action
 
-Use camelCase naming convention
+Use snake_case naming convention
 
 ## Evidence
 
 - Analyzed file naming patterns in repository
-- Dominant pattern: camelCase
+- Dominant pattern: snake_case (PEP 8 standard, confirmed by repo files)
 
 ---
 id: codeweaver-import-relative
@@ -62,7 +67,7 @@ Use relative imports for project files
 ## Evidence
 
 - Import analysis shows relative import pattern
-- Example: import { x } from '../lib/x'
+- Example: from .module import ClassName
 
 ---
 id: codeweaver-export-style
@@ -216,11 +221,11 @@ source_repo: knitli/codeweaver
 
 ## Action
 
-Name the file using camelCase (e.g., myModule.py)
+Name the file using snake_case (e.g., my_module.py)
 
 ## Evidence
 
-- Pattern in namingConventions.files: camelCase
+- Pattern in namingConventions.files: snake_case (PEP 8 standard, confirmed by repo files)
 
 ---
 id: codeweaver-instinct-function-naming-camelcase
@@ -235,11 +240,11 @@ source_repo: knitli/codeweaver
 
 ## Action
 
-Name the function using camelCase (e.g., processData)
+Name the function using snake_case (e.g., process_data)
 
 ## Evidence
 
-- Pattern in namingConventions.functions: camelCase
+- Pattern in namingConventions.functions: snake_case (PEP 8 standard, confirmed by repo codebase)
 
 ---
 id: codeweaver-instinct-class-naming-pascalcase

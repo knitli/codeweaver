@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 ```markdown
 # codeweaver Development Patterns
 
@@ -11,12 +18,12 @@ This skill teaches the development conventions and workflows used in the `codewe
 
 - **Language:** Python
 - **Framework:** None detected
-- **File Naming:** Uses camelCase for filenames.
-  - Example: `codeWeaverCore.py`, `tokenizerUtils.py`
+- **File Naming:** Uses snake_case for filenames.
+  - Example: `code_weaver_core.py`, `tokenizer_utils.py`
 - **Import Style:** Relative imports are preferred.
   - Example:
     ```python
-    from .utils import parseConfig
+    from .utils import parse_config
     ```
 - **Export Style:** Default exports (no explicit `__all__` unless necessary).
   - Example:
@@ -99,7 +106,7 @@ This skill teaches the development conventions and workflows used in the `codewe
 ## Testing Patterns
 
 - **Framework:** Unknown (likely pytest based on file patterns and markers).
-- **Test File Pattern:** Files named `*.test.*` (e.g., `test_lazy_imports.py`, `test_install_smoke.py`).
+- **Test File Pattern:** Files named `test_*.py` (e.g., `test_lazy_imports.py`, `test_install_smoke.py`).
 - **Best Practices:**
   - Use subprocesses to verify import behavior under different install profiles.
   - Tag install-profile tests with custom markers for selective running.
