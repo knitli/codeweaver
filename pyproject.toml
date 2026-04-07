@@ -321,13 +321,14 @@ voyageai = ["voyageai; python_version < '3.14'"]
 xai = ["pydantic-ai-slim[xai]"]
 
 [dependency-groups]
+# `dev` is the composed contributor group: lint + test + helpers + a couple of dev-only tools.
+# Use `uv sync --group dev` to get everything needed for local development.
 dev = [
-  # black is used to format generated code
-  "black>=26.3.1",
-  "ruff>=0.15.6",
   "serena>=0.9.1",
-  "ty>=0.0.25",
   "uv>=0.11.1",
+  { include-group = "dev-helpers" },
+  { include-group = "lint" },
+  { include-group = "test" },
 ]
 build = ["hatchling>=1.28.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.14.0"]
 dev-helpers = [
@@ -343,6 +344,15 @@ docs = [
   "griffe-pydantic>=1.1.0",
   "griffe2md>=1.5.0",
 ]
+# Linting/formatting/typecheck — the minimum a contributor needs to pass `mise run check`.
+lint = [
+  # black is used to format generated code
+  "black>=26.3.1",
+  "ruff>=0.15.6",
+  "ty>=0.0.25",
+]
+# Baseline test dependencies. Workspace members inherit this group via `uv sync --group test`
+# from the workspace root, so daemon/tokenizers no longer redeclare pytest et al.
 test = [
   "dirty-equals>=0.11.0",
   "hypothesis>=6.151.9",

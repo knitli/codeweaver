@@ -35,12 +35,11 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://knitli.com"
-Repository = "https://github.com/knitli/codeweaver"
 Issues = "https://github.com/knitli/codeweaver/issues"
+Repository = "https://github.com/knitli/codeweaver"
 
 [project.optional-dependencies]
 build = ["hatchling"]
-test = ["pytest", "pytest-asyncio", "pytest-cov"]
 
 [build-system]
 requires = ["hatchling"]
