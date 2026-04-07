@@ -60,8 +60,9 @@ def test_base_import_does_not_pull_optional_provider_sdks() -> None:
     side effect.
 
     If this test fails: find the offending module with `grep -rn "^import <sdk>\\|^from
-    <sdk>" src/codeweaver/` and route the import through `lateimport` (see
-    `codeweaver/core/utils/lazy_importer` history or `lateimport` package docs).
+    <sdk>" src/codeweaver/` and route the import through `lateimport` (for examples in
+    this repo, search `src/codeweaver/` for `lateimport`; also see the `lateimport`
+    package docs).
     """
     probe = textwrap.dedent(
         f"""
