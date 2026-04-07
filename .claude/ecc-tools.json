@@ -1,0 +1,240 @@
+{
+  "version": "1.3",
+  "schemaVersion": "1.0",
+  "generatedBy": "ecc-tools",
+  "generatedAt": "2026-04-07T17:37:25.656Z",
+  "repo": "https://github.com/knitli/codeweaver",
+  "profiles": {
+    "requested": "research",
+    "recommended": "research",
+    "effective": "developer",
+    "requestedAlias": "research",
+    "recommendedAlias": "research",
+    "effectiveAlias": "developer"
+  },
+  "requestedProfile": "research",
+  "profile": "developer",
+  "recommendedProfile": "research",
+  "effectiveProfile": "developer",
+  "tier": "free",
+  "requestedComponents": [
+    "repo-baseline",
+    "workflow-automation",
+    "research-tooling"
+  ],
+  "selectedComponents": [
+    "repo-baseline",
+    "workflow-automation"
+  ],
+  "requestedAddComponents": [],
+  "requestedRemoveComponents": [],
+  "blockedRemovalComponents": [],
+  "tierFilteredComponents": [
+    "research-tooling"
+  ],
+  "requestedRootPackages": [
+    "runtime-core",
+    "workflow-pack",
+    "research-pack"
+  ],
+  "selectedRootPackages": [
+    "runtime-core",
+    "workflow-pack"
+  ],
+  "requestedPackages": [
+    "runtime-core",
+    "workflow-pack",
+    "research-pack"
+  ],
+  "requestedAddPackages": [],
+  "requestedRemovePackages": [],
+  "selectedPackages": [
+    "runtime-core",
+    "workflow-pack"
+  ],
+  "packages": [
+    "runtime-core",
+    "workflow-pack"
+  ],
+  "blockedRemovalPackages": [],
+  "tierFilteredRootPackages": [
+    "research-pack"
+  ],
+  "tierFilteredPackages": [
+    "research-pack"
+  ],
+  "conflictingPackages": [],
+  "dependencyGraph": {
+    "runtime-core": [],
+    "workflow-pack": [
+      "runtime-core"
+    ]
+  },
+  "resolutionOrder": [
+    "runtime-core",
+    "workflow-pack"
+  ],
+  "requestedModules": [
+    "runtime-core",
+    "workflow-pack",
+    "research-pack"
+  ],
+  "selectedModules": [
+    "runtime-core",
+    "workflow-pack"
+  ],
+  "modules": [
+    "runtime-core",
+    "workflow-pack"
+  ],
+  "managedFiles": [
+    ".claude/skills/codeweaver/SKILL.md",
+    ".agents/skills/codeweaver/SKILL.md",
+    ".agents/skills/codeweaver/agents/openai.yaml",
+    ".claude/identity.json",
+    ".codex/config.toml",
+    ".codex/AGENTS.md",
+    ".codex/agents/explorer.toml",
+    ".codex/agents/reviewer.toml",
+    ".codex/agents/docs-researcher.toml",
+    ".claude/homunculus/instincts/inherited/codeweaver-instincts.yaml",
+    ".claude/commands/python-dependency-metadata-refactor.md",
+    ".claude/commands/dependency-group-maintenance.md",
+    ".claude/commands/dependency-formatting-standardization.md"
+  ],
+  "packageFiles": {
+    "runtime-core": [
+      ".claude/skills/codeweaver/SKILL.md",
+      ".agents/skills/codeweaver/SKILL.md",
+      ".agents/skills/codeweaver/agents/openai.yaml",
+      ".claude/identity.json",
+      ".codex/config.toml",
+      ".codex/AGENTS.md",
+      ".codex/agents/explorer.toml",
+      ".codex/agents/reviewer.toml",
+      ".codex/agents/docs-researcher.toml",
+      ".claude/homunculus/instincts/inherited/codeweaver-instincts.yaml"
+    ],
+    "workflow-pack": [
+      ".claude/commands/python-dependency-metadata-refactor.md",
+      ".claude/commands/dependency-group-maintenance.md",
+      ".claude/commands/dependency-formatting-standardization.md"
+    ]
+  },
+  "moduleFiles": {
+    "runtime-core": [
+      ".claude/skills/codeweaver/SKILL.md",
+      ".agents/skills/codeweaver/SKILL.md",
+      ".agents/skills/codeweaver/agents/openai.yaml",
+      ".claude/identity.json",
+      ".codex/config.toml",
+      ".codex/AGENTS.md",
+      ".codex/agents/explorer.toml",
+      ".codex/agents/reviewer.toml",
+      ".codex/agents/docs-researcher.toml",
+      ".claude/homunculus/instincts/inherited/codeweaver-instincts.yaml"
+    ],
+    "workflow-pack": [
+      ".claude/commands/python-dependency-metadata-refactor.md",
+      ".claude/commands/dependency-group-maintenance.md",
+      ".claude/commands/dependency-formatting-standardization.md"
+    ]
+  },
+  "files": [
+    {
+      "moduleId": "runtime-core",
+      "path": ".claude/skills/codeweaver/SKILL.md",
+      "description": "Repository-specific Claude Code skill generated from git history."
+    },
+    {
+      "moduleId": "runtime-core",
+      "path": ".agents/skills/codeweaver/SKILL.md",
+      "description": "Codex-facing copy of the generated repository skill."
+    },
+    {
+      "moduleId": "runtime-core",
+      "path": ".agents/skills/codeweaver/agents/openai.yaml",
+      "description": "Codex skill metadata so the repo skill appears cleanly in the skill interface."
+    },
+    {
+      "moduleId": "runtime-core",
+      "path": ".claude/identity.json",
+      "description": "Suggested identity.json baseline derived from repository conventions."
+    },
+    {
+      "moduleId": "runtime-core",
+      "path": ".codex/config.toml",
+      "description": "Repo-local Codex MCP and multi-agent baseline aligned with ECC defaults."
+    },
+    {
+      "moduleId": "runtime-core",
+      "path": ".codex/AGENTS.md",
+      "description": "Codex usage guide that points at the generated repo skill and workflow bundle."
+    },
+    {
+      "moduleId": "runtime-core",
+      "path": ".codex/agents/explorer.toml",
+      "description": "Read-only explorer role config for Codex multi-agent work."
+    },
+    {
+      "moduleId": "runtime-core",
+      "path": ".codex/agents/reviewer.toml",
+      "description": "Read-only reviewer role config focused on correctness and security."
+    },
+    {
+      "moduleId": "runtime-core",
+      "path": ".codex/agents/docs-researcher.toml",
+      "description": "Read-only docs researcher role config for API verification."
+    },
+    {
+      "moduleId": "runtime-core",
+      "path": ".claude/homunculus/instincts/inherited/codeweaver-instincts.yaml",
+      "description": "Continuous-learning instincts derived from repository patterns."
+    },
+    {
+      "moduleId": "workflow-pack",
+      "path": ".claude/commands/python-dependency-metadata-refactor.md",
+      "description": "Workflow command scaffold for python-dependency-metadata-refactor."
+    },
+    {
+      "moduleId": "workflow-pack",
+      "path": ".claude/commands/dependency-group-maintenance.md",
+      "description": "Workflow command scaffold for dependency-group-maintenance."
+    },
+    {
+      "moduleId": "workflow-pack",
+      "path": ".claude/commands/dependency-formatting-standardization.md",
+      "description": "Workflow command scaffold for dependency-formatting-standardization."
+    }
+  ],
+  "workflows": [
+    {
+      "command": "python-dependency-metadata-refactor",
+      "path": ".claude/commands/python-dependency-metadata-refactor.md"
+    },
+    {
+      "command": "dependency-group-maintenance",
+      "path": ".claude/commands/dependency-group-maintenance.md"
+    },
+    {
+      "command": "dependency-formatting-standardization",
+      "path": ".claude/commands/dependency-formatting-standardization.md"
+    }
+  ],
+  "adapters": {
+    "claudeCode": {
+      "skillPath": ".claude/skills/codeweaver/SKILL.md",
+      "identityPath": ".claude/identity.json",
+      "commandPaths": [
+        ".claude/commands/python-dependency-metadata-refactor.md",
+        ".claude/commands/dependency-group-maintenance.md",
+        ".claude/commands/dependency-formatting-standardization.md"
+      ]
+    },
+    "codex": {
+      "configPath": ".codex/config.toml",
+      "agentsGuidePath": ".codex/AGENTS.md",
+      "skillPath": ".agents/skills/codeweaver/SKILL.md"
+    }
+  }
+}
