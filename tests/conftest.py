@@ -246,7 +246,7 @@ def mock_tokenizer_for_unit_tests(
         clean_container.override(Tokenizer, MockTokenizer())
 
         # 2. Monkeypatch fallback for legacy non-DI code
-        modules_to_patch = ["codeweaver_tokenizers.get_tokenizer", "codeweaver.providers"]
+        modules_to_patch = ["codeweaver_tokenizers.get_tokenizer"]
         for module_path in modules_to_patch:
             with contextlib.suppress(AttributeError):
                 monkeypatch.setattr(module_path, _mock_get_tokenizer)

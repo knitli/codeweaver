@@ -62,9 +62,11 @@ from codeweaver.providers.config.categories import (
     AsymmetricEmbeddingProviderSettings,
     DuckDuckGoProviderSettings,
     EmbeddingProviderSettings,
+    FastEmbedEmbeddingProviderSettings,
     FastEmbedRerankingProviderSettings,
     FastEmbedSparseEmbeddingProviderSettings,
     QdrantVectorStoreProviderSettings,
+    SentenceTransformersEmbeddingProviderSettings,
     SentenceTransformersRerankingProviderSettings,
     SparseEmbeddingProviderSettings,
     TavilyProviderSettings,
@@ -306,12 +308,16 @@ def _quickstart_default(
     reranking_model = ModelName(ULTRALIGHT_RERANKING_MODEL)
     return ProviderSettingsDict(
         embedding=(
-            EmbeddingProviderSettings(
+            SentenceTransformersEmbeddingProviderSettings(
                 model_name=embedding_model,
-                embedding_config=SentenceTransformersEmbeddingConfig(model_name=embedding_model)
-                if HAS_ST
-                else FastEmbedEmbeddingConfig(model_name=embedding_model),
-                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
+                embedding_config=SentenceTransformersEmbeddingConfig(model_name=embedding_model),
+                provider=Provider.SENTENCE_TRANSFORMERS,
+            )
+            if HAS_ST
+            else FastEmbedEmbeddingProviderSettings(
+                model_name=embedding_model,
+                embedding_config=FastEmbedEmbeddingConfig(model_name=embedding_model),
+                provider=Provider.FASTEMBED,
             ),
         ),
         sparse_embedding=(
@@ -394,14 +400,20 @@ def _testing_profile(
                 model_name=ModelName(ULTRALIGHT_SPARSE_EMBEDDING_MODEL)
             ),
         ),
-        "embedding": EmbeddingProviderSettings(
-            provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
-            model_name=ModelName(embedding_model),
-            embedding_config=SentenceTransformersEmbeddingConfig(
-                model_name=ModelName(embedding_model)
+        "embedding": (
+            SentenceTransformersEmbeddingProviderSettings(
+                provider=Provider.SENTENCE_TRANSFORMERS,
+                model_name=ModelName(embedding_model),
+                embedding_config=SentenceTransformersEmbeddingConfig(
+                    model_name=ModelName(embedding_model)
+                ),
             )
             if HAS_ST
-            else FastEmbedEmbeddingConfig(model_name=ModelName(embedding_model)),
+            else FastEmbedEmbeddingProviderSettings(
+                provider=Provider.FASTEMBED,
+                model_name=ModelName(embedding_model),
+                embedding_config=FastEmbedEmbeddingConfig(model_name=ModelName(embedding_model)),
+            )
         ),
         # Testing profile runs entirely locally — no agent provider requiring external API keys.
         "agent": (),
