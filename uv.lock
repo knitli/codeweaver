@@ -1085,7 +1085,6 @@ test = [
 
 [[package]]
 name = "code-weaver-daemon"
-version = "0.1.0"
 source = { editable = "packages/codeweaver-daemon" }
 dependencies = [
     { name = "httpx", extra = ["http2"] },
@@ -1105,7 +1104,6 @@ provides-extras = ["build"]
 
 [[package]]
 name = "code-weaver-tokenizers"
-version = "0.1.0"
 source = { editable = "packages/codeweaver-tokenizers" }
 dependencies = [
     { name = "tiktoken" },

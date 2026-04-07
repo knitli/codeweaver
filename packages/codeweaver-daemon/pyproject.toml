@@ -7,7 +7,11 @@
 
 [project]
 name = "code-weaver-daemon"
-version = "0.1.0"
+# Version is derived from the same git tag as the root code-weaver package
+# via uv-dynamic-versioning, so all three workspace packages always ship with
+# matching versions and the root can pin them with `=={{ version }}` in its
+# metadata hook.
+dynamic = ["version"]
 description = "Daemon utilities for CodeWeaver — process management, health checks, and lifecycle coordination"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -42,8 +46,18 @@ Repository = "https://github.com/knitli/codeweaver"
 build = ["hatchling"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "uv-dynamic-versioning>=0.14.0"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+bump = true
+dirty = false
+commit-prefix = "g"
 
 [tool.hatch.build.targets.wheel]
 packages = ["./src/codeweaver_daemon"]
