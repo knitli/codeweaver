@@ -285,17 +285,21 @@ dependencies = [
   "cyclopts>=4.10.1",
   "rich>=14.3.3",
   # * ================ Provider Clients ==================*
-  # we must pin these to specific versions to ensure compatibility with our ClientOptions subclasses
-  "boto3==1.42.19",
-  "cohere==5.20.7",
-  "fastembed==0.7.4; python_version < '3.14'",
-  "google-genai==1.56.0",
-  "huggingface-hub>=1.0.0",
-  "mistralai==1.10.0",
-  "openai==2.28.0",
+  # Provider SDK pins live in their corresponding optional-dependency extras
+  # (bedrock, cohere, google, huggingface, mistral, openai). They are pinned
+  # there — not here — because their ClientOptions subclasses only need to
+  # resolve when the provider itself is selected, not for a base install.
+  #
+  # Base install ships two clients unconditionally: qdrant (vector store) and
+  # pydantic-ai-slim (agent plumbing). Default local embedder is version-gated
+  # so exactly one resolves per interpreter:
+  #   - fastembed on 3.12/3.13 (blocked on 3.14 by py-rust-stemmers)
+  #   - sentence-transformers on 3.14 (no fastembed wheel)
+  # Default remote embedder is voyageai on 3.12/3.13 (upstream caps at <3.14).
   "qdrant-client==1.17.1",
   "pydantic-ai-slim>=1.68.0",
-  "sentence-transformers==5.2.0; python_version <= '3.14'",
+  "fastembed==0.7.4; python_version < '3.14'",
+  "sentence-transformers==5.2.0; python_version >= '3.14'",
   # voyageai declares requires_python: <3.14 — uv respects this automatically,
   # but pip does not filter by requires_python during install, so we must gate it here.
   "voyageai==0.3.7; python_version < '3.14'",
@@ -349,8 +353,10 @@ auth-permitio = ["permit-fastmcp"]
 aws-secrets-manager = ["pydantic-settings[yaml,toml,aws-secrets-manager]"]
 # does NOT support free-threaded python 3.13 (3.14 is OK) due to cffi dependency in azure-identity
 azure-key-vault = ["pydantic-settings[yaml,toml,azure-key-vault]"]
-bedrock = ["pydantic-ai-slim[bedrock]"]
-cohere = ["pydantic-ai-slim[cohere]"]
+# bedrock carries the raw boto3 pin because our BedrockClientOptions subclass
+# depends on boto3's ClientOptions internals staying byte-compatible.
+bedrock = ["boto3==1.42.19", "pydantic-ai-slim[bedrock]"]
+cohere = ["cohere==5.20.7", "pydantic-ai-slim[cohere]"]
 # ==== Data Sources ====
 duckduckgo = ["ddgs"]
 exa = ["exa-py"]
@@ -372,10 +378,15 @@ fastembed-gpu = ["fastembed-gpu; python_version < '3.14'", "py-cpuinfo"]
 #   handles this for non-free-threaded 3.13 builds.
 #   permit-fastmcp depends on cffi — same 3.13t issue as azure-key-vault.
 common-extras = [
+  # Self-reference the per-provider extras so `full` users get the pinned raw
+  # SDKs (boto3, cohere, google-genai, huggingface-hub, mistralai, openai)
+  # plus the pydantic-ai-slim adapters. Each provider's pin lives exactly once
+  # in its own extra.
+  "code-weaver[anthropic,bedrock,cohere,google,groq,huggingface,mistral,openai,xai]=={{ version }}",
   "ddgs",
   "eunomia-mcp",
   "exa-py",
-  "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,retries,xai]",
+  "pydantic-ai-slim[retries]",
   "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager]; python_version == '3.13'",
   "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]; python_version != '3.13'",
   "permit-fastmcp; python_version != '3.13'",
@@ -392,7 +403,7 @@ full-gpu = [
   #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
 ]
 gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
-google = ["pydantic-ai-slim[google]"]
+google = ["google-genai==1.56.0", "pydantic-ai-slim[google]"]
 gpu-support = [
   "fastembed-gpu; python_version < '3.14'",
   # see note below about why this is commented out
@@ -400,15 +411,15 @@ gpu-support = [
 ]
 groq = ["pydantic-ai-slim[groq]"]
 # --- Embedding and Agent Providers --- (no rerank)
-huggingface = ["pydantic-ai-slim[huggingface]"]
+huggingface = ["huggingface-hub>=1.0.0", "pydantic-ai-slim[huggingface]"]
 # ==== Vector Stores ====
 in-memory = ["qdrant-client", "tokenizers"]
-mistral = ["pydantic-ai-slim[mistral]"]
+mistral = ["mistralai==1.10.0", "pydantic-ai-slim[mistral]"]
 # OpenAI includes support for:
 #   Cerebras, DeekSeek, Ollama, OpenRouter, Vercel, Perplexity, Moonshot, FireworksAI,
 #   TogetherAI, Azure AI Foundry, Heroku, and Github Models
 # which all use the OpenAI API
-openai = ["pydantic-ai-slim[openai]"]
+openai = ["openai==2.28.0", "pydantic-ai-slim[openai]"]
 qdrant = ["qdrant-client"]
 recommended = [
   "fastembed; python_version < '3.14'",
