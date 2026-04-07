@@ -1,0 +1,515 @@
+# Instincts generated from https://github.com/knitli/codeweaver
+# Generated: 2026-04-07T20:59:17.475Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: codeweaver-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/knitli/codeweaver
+---
+
+# Codeweaver Commit Length
+
+## Action
+
+Write moderate-length commit messages (~78 characters)
+
+## Evidence
+
+- Average commit message length: 78 chars
+- Based on 19 commits
+
+---
+id: codeweaver-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/knitli/codeweaver
+---
+
+# Codeweaver Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: codeweaver-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/knitli/codeweaver
+---
+
+# Codeweaver Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: codeweaver-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/knitli/codeweaver
+---
+
+# Codeweaver Export Style
+
+## Action
+
+Prefer default exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: default
+
+---
+id: codeweaver-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/knitli/codeweaver
+---
+
+# Codeweaver Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: codeweaver-test-naming
+trigger: "when creating a test file"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/knitli/codeweaver
+---
+
+# Codeweaver Test Naming
+
+## Action
+
+Name test files using the pattern: *.test.ts
+
+## Evidence
+
+- File pattern: *.test.ts
+- Consistent across test files
+
+---
+id: codeweaver-workflow-dependency-group-refactor-and-lock-update
+trigger: "when doing dependency group refactor and lock update"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/knitli/codeweaver
+---
+
+# Codeweaver Workflow Dependency Group Refactor And Lock Update
+
+## Action
+
+Follow the dependency-group-refactor-and-lock-update workflow:
+1. Edit pyproject.toml (root and/or packages/*/pyproject.toml) to change dependency groups, extras, or dynamic metadata.
+2. Update uv.lock to reflect new dependency structure.
+3. Optionally update related test markers or comments.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: pyproject.toml, uv.lock, packages/*/pyproject.toml
+
+---
+id: codeweaver-workflow-test-suite-expansion-or-regression-test-addition
+trigger: "when doing test suite expansion or regression test addition"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/knitli/codeweaver
+---
+
+# Codeweaver Workflow Test Suite Expansion Or Regression Test Addition
+
+## Action
+
+Follow the test-suite-expansion-or-regression-test-addition workflow:
+1. Create or update test files under tests/unit/ (e.g., test_lazy_imports.py, test_install_smoke.py) to add new checks.
+2. Optionally update pyproject.toml to register new pytest markers or test config.
+3. Verify tests pass locally and in CI.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: tests/unit/test_lazy_imports.py, tests/unit/test_install_smoke.py, pyproject.toml
+
+---
+id: codeweaver-workflow-optional-dependency-import-guard-fix
+trigger: "when doing optional dependency import guard fix"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/knitli/codeweaver
+---
+
+# Codeweaver Workflow Optional Dependency Import Guard Fix
+
+## Action
+
+Follow the optional-dependency-import-guard-fix workflow:
+1. Identify files where optional dependency imports are not properly guarded.
+2. Update those files to wrap imports in has_package checks, TYPE_CHECKING, or try/except ImportError blocks, providing fallback types (Any) as needed.
+3. Update pyproject.toml to suppress type checker warnings for intentional fallbacks.
+4. Verify test suite passes in both full and minimal dependency environments.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/codeweaver/providers/config/clients/multi.py, src/codeweaver/providers/config/categories/embedding.py, src/codeweaver/providers/config/categories/sparse_embedding.py
+
+---
+id: codeweaver-workflow-pyproject-toml-formatting-across-workspace
+trigger: "when doing pyproject toml formatting across workspace"
+confidence: 0.55
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/knitli/codeweaver
+---
+
+# Codeweaver Workflow Pyproject Toml Formatting Across Workspace
+
+## Action
+
+Follow the pyproject-toml-formatting-across-workspace workflow:
+1. Run formatting tool (e.g., tombi) on pyproject.toml files at root and in packages.
+2. Commit the reordered/cleaned files.
+3. No semantic changes are made.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~1x per month
+- Files: pyproject.toml, packages/*/pyproject.toml
+
+---
+id: codeweaver-instinct-file-naming-camelCase
+trigger: "When creating a new Python file in the repository"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct File Naming CamelCase
+
+## Action
+
+Name the file using camelCase (e.g., myModule.py)
+
+## Evidence
+
+- Pattern in namingConventions.files: camelCase
+
+---
+id: codeweaver-instinct-function-naming-camelCase
+trigger: "When defining a new function in Python code"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct Function Naming CamelCase
+
+## Action
+
+Name the function using camelCase (e.g., processData)
+
+## Evidence
+
+- Pattern in namingConventions.functions: camelCase
+
+---
+id: codeweaver-instinct-class-naming-PascalCase
+trigger: "When defining a new class in Python code"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct Class Naming PascalCase
+
+## Action
+
+Name the class using PascalCase (e.g., DataProcessor)
+
+## Evidence
+
+- Pattern in namingConventions.classes: PascalCase
+
+---
+id: codeweaver-instinct-constant-naming-SCREAMING_SNAKE_CASE
+trigger: "When defining a constant in Python code"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct Constant Naming SCREAMING_SNAKE_CASE
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE (e.g., MAX_SIZE)
+
+## Evidence
+
+- Pattern in namingConventions.constants: SCREAMING_SNAKE_CASE
+
+---
+id: codeweaver-instinct-relative-imports
+trigger: "When importing modules within the codebase"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct Relative Imports
+
+## Action
+
+Use relative import style
+
+## Evidence
+
+- Pattern in importStyle: relative
+
+---
+id: codeweaver-instinct-default-export-style
+trigger: "When exporting modules or objects"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct Default Export Style
+
+## Action
+
+Use default export style
+
+## Evidence
+
+- Pattern in exportStyle: default
+
+---
+id: codeweaver-instinct-unit-test-location
+trigger: "When adding new unit tests"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct Unit Test Location
+
+## Action
+
+Place test files in the tests/unit/ directory
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation: separate
+- Examples: tests/unit/test_lazy_imports.py
+
+---
+id: codeweaver-instinct-test-file-pattern
+trigger: "When naming a test file for TypeScript tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct Test File Pattern
+
+## Action
+
+Use the *.test.ts pattern
+
+## Evidence
+
+- Pattern in testing.filePattern: *.test.ts
+
+---
+id: codeweaver-instinct-add-regression-test-for-deps
+trigger: "When new or refactored dependency logic is introduced"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct Add Regression Test For Deps
+
+## Action
+
+Add regression or smoke tests in tests/unit/ to verify import, dependency, or installation behavior
+
+## Evidence
+
+- Workflow: test-suite-expansion-or-regression-test-addition
+- Files: tests/unit/test_lazy_imports.py, tests/unit/test_install_smoke.py
+
+---
+id: codeweaver-instinct-guard-optional-imports
+trigger: "When a test or runtime failure is due to missing optional dependencies"
+confidence: 0.95
+domain: code-style
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct Guard Optional Imports
+
+## Action
+
+Wrap imports in has_package checks, TYPE_CHECKING, or try/except ImportError blocks, and provide fallback types (Any) as needed
+
+## Evidence
+
+- Workflow: optional-dependency-import-guard-fix
+- Files: src/codeweaver/providers/config/clients/multi.py, src/codeweaver/providers/config/categories/embedding.py
+
+---
+id: codeweaver-instinct-update-pyproject-for-fallbacks
+trigger: "When adding import guards or fallbacks for optional dependencies"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct Update Pyproject For Fallbacks
+
+## Action
+
+Update pyproject.toml to suppress type checker warnings for intentional fallbacks
+
+## Evidence
+
+- Workflow: optional-dependency-import-guard-fix
+- File: pyproject.toml
+
+---
+id: codeweaver-instinct-format-pyproject-toml
+trigger: "When dependency or metadata changes are made to pyproject.toml files"
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct Format Pyproject Toml
+
+## Action
+
+Run a formatting tool (e.g., tombi) on all pyproject.toml files at root and in packages to ensure consistency
+
+## Evidence
+
+- Workflow: pyproject-toml-formatting-across-workspace
+- Files: pyproject.toml, packages/*/pyproject.toml
+
+---
+id: codeweaver-instinct-refactor-deps-update-lock
+trigger: "When reorganizing, deduplicating, or restructuring dependency groups/extras"
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct Refactor Deps Update Lock
+
+## Action
+
+Edit pyproject.toml (root and/or packages/*/pyproject.toml), then update uv.lock to match the new dependency structure
+
+## Evidence
+
+- Workflow: dependency-group-refactor-and-lock-update
+- Files: pyproject.toml, uv.lock, packages/*/pyproject.toml
+
+---
+id: codeweaver-instinct-git-commit-update-prefix
+trigger: "When making a commit that updates a file"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct Git Commit Update Prefix
+
+## Action
+
+Use 'Update' as the commit message prefix (e.g., 'Update docs-site/astro.config.ts')
+
+## Evidence
+
+- Seen in commit: Update docs-site/astro.config.ts
+- Pattern in commit examples
+
+---
+id: codeweaver-instinct-git-commit-average-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: knitli/codeweaver
+---
+
+# Codeweaver Instinct Git Commit Average Length
+
+## Action
+
+Keep the commit message concise, around 78 characters on average
+
+## Evidence
+
+- Pattern in commits.averageLength: 78
+
