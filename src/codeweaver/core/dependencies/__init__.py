@@ -45,7 +45,10 @@ if TYPE_CHECKING:
         StatisticsDep,
         TelemetryServiceDep,
     )
-    from codeweaver.core.dependencies.utils import ensure_settings_initialized
+    from codeweaver.core.dependencies.utils import (
+        ensure_settings_initialized,
+        ensure_settings_initialized_async,
+    )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CodeWeaverSettingsType": (__spec__.parent, "core_settings"),
@@ -64,6 +67,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "TelemetrySettingsDep": (__spec__.parent, "component_settings"),
     "bootstrap_settings": (__spec__.parent, "core_settings"),
     "ensure_settings_initialized": (__spec__.parent, "utils"),
+    "ensure_settings_initialized_async": (__spec__.parent, "utils"),
 })
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
@@ -86,6 +90,7 @@ __all__ = (
     "bootstrap_settings",
     "ensure_container_initialized",
     "ensure_settings_initialized",
+    "ensure_settings_initialized_async",
 )
 
 
