@@ -9,9 +9,12 @@ from __future__ import annotations
 import asyncio
 
 from collections.abc import Sequence
-from typing import Any, ClassVar, Literal, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
-from cohere import EmbedByTypeResponse
+
+if TYPE_CHECKING:
+    from cohere import EmbedByTypeResponse
+
 from pydantic import SkipValidation
 
 from codeweaver.core import CodeChunk, ConfigurationError, Provider
