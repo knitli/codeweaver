@@ -21,7 +21,7 @@ concurrency = ["multiprocessing", "thread"]
 parallel = true
 ```
 
-Coverage.py writes separate `.coverage.*` files for each subprocess/thread instead of a single `.coverage` file. These parallel files **must be combined** using `coverage combine` before generating reports.
+Coverage.py writes separate `.coverage.*` files for each process instead of a single `.coverage` file. These parallel files **must be combined** using `coverage combine` before generating reports.
 
 ## Solution
 
