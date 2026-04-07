@@ -958,9 +958,20 @@ async def _start_factory_cls_in_thread(
     `get_sparse_embedder` (zero-arg factory functions) as client_cls. This
     handler calls the factory to resolve the enhanced TextEmbedding /
     SparseTextEmbedding class, then instantiates it with the provided kwargs.
+
+    Filters out empty list values before passing kwargs through (same as
+    `_start_cross_encoder_in_thread`). Fastembed's internal constructors for
+    TextEmbedding, SparseTextEmbedding, and TextCrossEncoder all do
+    `device_ids[0]` unconditionally when the key is present, so passing
+    `device_ids=[]` (which `FastEmbedClientOptions._resolve_device_settings`
+    emits when CUDA is unavailable) raises `IndexError: list index out of
+    range` inside the fastembed ONNX setup — well before any of our code
+    sees the exception. Dropping the empty list from kwargs lets fastembed
+    fall through to its CPU default.
     """
     cls = get_cls_fn()
-    return await asyncio.to_thread(cls, *args, **kwargs)
+    filtered_kwargs = {k: v for k, v in kwargs.items() if not (isinstance(v, list) and len(v) == 0)}
+    return await asyncio.to_thread(cls, *args, **filtered_kwargs)
 
 
 async def _start_cross_encoder_in_thread(
