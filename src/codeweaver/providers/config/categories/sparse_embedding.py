@@ -123,7 +123,7 @@ class SparseEmbeddingProviderSettings(BaseSparseEmbeddingProviderSettings):
         provider = (
             raw_provider
             if isinstance(raw_provider, Provider)
-            else Provider(raw_provider)
+            else Provider.from_string(raw_provider)
             if raw_provider
             else None
         )
