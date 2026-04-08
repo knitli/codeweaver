@@ -45,7 +45,7 @@ SPDX-License-Identifier = "MIT"
 # Python: tree-sitter/tree-sitter-python (MIT - Max Brunsfeld 2016)
 [[annotations]]
 path = [
-  "data/node_types/python-node-types.json",
+  "data/grammars/python-grammar.js",
   "src/codeweaver/semantic/data/node_types/python-node-types.json"
 ]
 precedence = "override"
@@ -55,7 +55,7 @@ SPDX-License-Identifier = "MIT"
 # JavaScript: tree-sitter/tree-sitter-javascript (MIT - Max Brunsfeld 2014)
 [[annotations]]
 path = [
-  "data/node_types/javascript-node-types.json",
+  "data/grammars/javascript-grammar.js",
   "src/codeweaver/semantic/data/node_types/javascript-node-types.json"
 ]
 precedence = "override"
@@ -65,8 +65,8 @@ SPDX-License-Identifier = "MIT"
 # TypeScript: tree-sitter/tree-sitter-typescript (MIT - Max Brunsfeld)
 [[annotations]]
 path = [
-  "data/node_types/typescript-node-types.json",
-  "data/node_types/tsx-node-types.json",
+  "data/grammars/typescript-grammar.js",
+  "data/grammars/tsx-grammar.js",
   "src/codeweaver/semantic/data/node_types/typescript-node-types.json",
   "src/codeweaver/semantic/data/node_types/tsx-node-types.json",
 ]
@@ -77,7 +77,7 @@ SPDX-License-Identifier = "MIT"
 # Go: tree-sitter/tree-sitter-go (MIT - Max Brunsfeld 2014)
 [[annotations]]
 path = [
-  "data/node_types/go-node-types.json",
+  "data/grammars/go-grammar.js",
   "src/codeweaver/semantic/data/node_types/go-node-types.json"
 ]
 precedence = "override"
@@ -87,7 +87,7 @@ SPDX-License-Identifier = "MIT"
 # Rust: tree-sitter/tree-sitter-rust (MIT - Maxim Sokolov 2017)
 [[annotations]]
 path = [
-  "data/node_types/rust-node-types.json",
+  "data/grammars/rust-grammar.js",
   "src/codeweaver/semantic/data/node_types/rust-node-types.json"
 ]
 precedence = "override"
@@ -97,7 +97,7 @@ SPDX-License-Identifier = "MIT"
 # C: tree-sitter/tree-sitter-c (MIT - Max Brunsfeld 2014)
 [[annotations]]
 path = [
-  "data/node_types/c-node-types.json",
+  "data/grammars/c-grammar.js",
   "src/codeweaver/semantic/data/node_types/c-node-types.json"
 ]
 precedence = "override"
@@ -107,7 +107,7 @@ SPDX-License-Identifier = "MIT"
 # C++: tree-sitter/tree-sitter-cpp (MIT - Max Brunsfeld)
 [[annotations]]
 path = [
-  "data/node_types/cpp-node-types.json",
+  "data/grammars/cpp-grammar.js",
   "src/codeweaver/semantic/data/node_types/cpp-node-types.json"
 ]
 precedence = "override"
@@ -117,7 +117,7 @@ SPDX-License-Identifier = "MIT"
 # C#: tree-sitter/tree-sitter-c-sharp (MIT - Max Brunsfeld)
 [[annotations]]
 path = [
-  "data/node_types/csharp-node-types.json",
+  "data/grammars/csharp-grammar.js",
   "src/codeweaver/semantic/data/node_types/csharp-node-types.json"
 ]
 precedence = "override"
@@ -127,7 +127,7 @@ SPDX-License-Identifier = "MIT"
 # Java: tree-sitter/tree-sitter-java (MIT - Max Brunsfeld)
 [[annotations]]
 path = [
-  "data/node_types/java-node-types.json",
+  "data/grammars/java-grammar.js",
   "src/codeweaver/semantic/data/node_types/java-node-types.json"
 ]
 precedence = "override"
@@ -137,7 +137,7 @@ SPDX-License-Identifier = "MIT"
 # Ruby: tree-sitter/tree-sitter-ruby (MIT - Rob Rix 2016)
 [[annotations]]
 path = [
-  "data/node_types/ruby-node-types.json",
+  "data/grammars/ruby-grammar.js",
   "src/codeweaver/semantic/data/node_types/ruby-node-types.json"
 ]
 precedence = "override"
@@ -147,8 +147,8 @@ SPDX-License-Identifier = "MIT"
 # PHP: tree-sitter/tree-sitter-php (MIT - Josh Vera, Max Brunsfeld et al 2017-2019)
 [[annotations]]
 path = [
-  "data/node_types/php-node-types.json",
-  "data/node_types/php_sparse-node-types.json",
+  "data/grammars/php-grammar.js",
+  "data/grammars/php_sparse-grammar.js",
   "src/codeweaver/semantic/data/node_types/php-node-types.json",
   "src/codeweaver/semantic/data/node_types/php_sparse-node-types.json"
 ]
@@ -162,7 +162,7 @@ SPDX-License-Identifier = "MIT"
 # Bash: tree-sitter/tree-sitter-bash (MIT - Max Brunsfeld 2017)
 [[annotations]]
 path = [
-  "data/node_types/bash-node-types.json",
+  "data/grammars/bash-grammar.js",
   "src/codeweaver/semantic/data/node_types/bash-node-types.json"
 ]
 precedence = "override"
@@ -172,7 +172,7 @@ SPDX-License-Identifier = "MIT"
 # HTML: tree-sitter/tree-sitter-html (MIT - Max Brunsfeld)
 [[annotations]]
 path = [
-  "data/node_types/html-node-types.json",
+  "data/grammars/html-grammar.js",
   "src/codeweaver/semantic/data/node_types/html-node-types.json"
 ]
 precedence = "override"
@@ -182,7 +182,7 @@ SPDX-License-Identifier = "MIT"
 # CSS: tree-sitter/tree-sitter-css (MIT - Max Brunsfeld)
 [[annotations]]
 path = [
-  "data/node_types/css-node-types.json",
+  "data/grammars/css-grammar.js",
   "src/codeweaver/semantic/data/node_types/css-node-types.json"
 ]
 precedence = "override"
@@ -192,7 +192,7 @@ SPDX-License-Identifier = "MIT"
 # JSON: tree-sitter/tree-sitter-json (MIT - Max Brunsfeld)
 [[annotations]]
 path = [
-  "data/node_types/json-node-types.json",
+  "data/grammars/json-grammar.js",
   "src/codeweaver/semantic/data/node_types/json-node-types.json"
 ]
 precedence = "override"
@@ -202,7 +202,7 @@ SPDX-License-Identifier = "MIT"
 # YAML: tree-sitter/tree-sitter-yaml (MIT)
 [[annotations]]
 path = [
-  "data/node_types/yaml-node-types.json",
+  "data/grammars/yaml-grammar.js",
   "src/codeweaver/semantic/data/node_types/yaml-node-types.json"
 ]
 precedence = "override"
@@ -212,7 +212,7 @@ SPDX-License-Identifier = "MIT"
 # Haskell: tree-sitter/tree-sitter-haskell (MIT - Max Brunsfeld 2014)
 [[annotations]]
 path = [
-  "data/node_types/haskell-node-types.json",
+  "data/grammars/haskell-grammar.js",
   "src/codeweaver/semantic/data/node_types/haskell-node-types.json"
 ]
 precedence = "override"
@@ -222,7 +222,7 @@ SPDX-License-Identifier = "MIT"
 # Scala: tree-sitter/tree-sitter-scala (MIT - Max Brunsfeld and GitHub 2018)
 [[annotations]]
 path = [
-  "data/node_types/scala-node-types.json",
+  "data/grammars/scala-grammar.js",
   "src/codeweaver/semantic/data/node_types/scala-node-types.json"
 ]
 precedence = "override"
@@ -232,7 +232,7 @@ SPDX-License-Identifier = "MIT"
 # Kotlin: fwcd/tree-sitter-kotlin (MIT - fwcd 2019)
 [[annotations]]
 path = [
-  "data/node_types/kotlin-node-types.json",
+  "data/grammars/kotlin-grammar.js",
   "src/codeweaver/semantic/data/node_types/kotlin-node-types.json"
 ]
 precedence = "override"
@@ -242,7 +242,7 @@ SPDX-License-Identifier = "MIT"
 # Swift: alex-pinkus/tree-sitter-swift (MIT - alex-pinkus 2021)
 [[annotations]]
 path = [
-  "data/node_types/swift-node-types.json",
+  "data/grammars/swift-grammar.js",
   "src/codeweaver/semantic/data/node_types/swift-node-types.json"
 ]
 precedence = "override"
@@ -252,7 +252,7 @@ SPDX-License-Identifier = "MIT"
 # Elixir: elixir-lang/tree-sitter-elixir (Apache-2.0 - Elixir team)
 [[annotations]]
 path = [
-  "data/node_types/elixir-node-types.json",
+  "data/grammars/elixir-grammar.js",
   "src/codeweaver/semantic/data/node_types/elixir-node-types.json"
 ]
 precedence = "override"
@@ -262,7 +262,7 @@ SPDX-License-Identifier = "Apache-2.0"
 # Lua: tree-sitter-grammars/tree-sitter-lua (MIT - Munif Tanjim 2021)
 [[annotations]]
 path = [
-  "data/node_types/lua-node-types.json",
+  "data/grammars/lua-grammar.js",
   "src/codeweaver/semantic/data/node_types/lua-node-types.json"
 ]
 precedence = "override"
@@ -272,7 +272,7 @@ SPDX-License-Identifier = "MIT"
 # Nix: nix-community/tree-sitter-nix (MIT - Charles Strahan 2019)
 [[annotations]]
 path = [
-  "data/node_types/nix-node-types.json",
+  "data/grammars/nix-grammar.js",
   "src/codeweaver/semantic/data/node_types/nix-node-types.json"
 ]
 precedence = "override"
@@ -282,7 +282,7 @@ SPDX-License-Identifier = "MIT"
 # Solidity: JoranHonig/tree-sitter-solidity (MIT - Joran Honig 2020)
 [[annotations]]
 path = [
-  "data/node_types/solidity-node-types.json",
+  "data/grammars/solidity-grammar.js",
   "src/codeweaver/semantic/data/node_types/solidity-node-types.json"
 ]
 precedence = "override"
@@ -292,7 +292,7 @@ SPDX-License-Identifier = "MIT"
 # HCL: tree-sitter-grammars/tree-sitter-hcl (Apache-2.0 - Michael Hoffman 2021)
 [[annotations]]
 path = [
-  "data/node_types/hcl-node-types.json",
+  "data/grammars/hcl-grammar.js",
   "src/codeweaver/semantic/data/node_types/hcl-node-types.json"
 ]
 precedence = "override"
