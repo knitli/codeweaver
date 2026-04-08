@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, overload
 from codeweaver.core.di import dependency_provider
 from codeweaver.core.utils import has_package
 
+
 _FASTEMBED_AVAILABLE = has_package("fastembed") or has_package("fastembed-gpu")
 
 if TYPE_CHECKING:
