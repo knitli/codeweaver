@@ -111,7 +111,7 @@ class TestExaServiceCardResolution:
         # Capture what config the handler passes to the provider factory.
         captured: dict[str, object] = {}
 
-        def mock_exa_toolset(client: object, *, config: object = None, **kwargs: object) -> list:
+        def mock_exa_toolset(client: object, *, config: object = None, **kwargs: object) -> list[object]:
             captured["config"] = config
             return []
 

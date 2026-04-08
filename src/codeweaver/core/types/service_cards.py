@@ -1287,6 +1287,8 @@ def _build_data_provider_cards() -> list[ServiceCard]:
             metadata=ServiceMetadata(
                 # provider_cls is exa_toolset; config may be ExaProviderSettings from DI,
                 # so extract .tool_config (ExaToolConfig) before passing to exa_toolset.
+                # Safe fallback: if config has no .tool_config (e.g. already an ExaToolConfig
+                # or None), it is passed through unchanged—both are valid for exa_toolset.
                 provider_handler=lambda provider_cls, card, client=None, config=None, **kwargs: provider_cls(
                     client, config=getattr(config, "tool_config", config), **kwargs
                 )
