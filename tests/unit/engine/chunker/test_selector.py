@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Tests for ChunkerSelector intelligent routing."""
 
+import logging
+
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -140,13 +142,21 @@ def test_selector_handles_oserror_on_stat(
     # Force stat() to raise OSError
     file.absolute_path.stat.side_effect = OSError("Permission denied")
 
-    # Should not raise an exception, but proceed and return the chunker
-    chunker = selector.select_for_file(file)
+    # Capture only WARNING+ logs from the selector logger; clear any pre-existing records
+    with caplog.at_level(logging.WARNING, logger="codeweaver.engine.chunker.selector"):
+        caplog.clear()
+        # Should not raise an exception, but proceed and return the chunker
+        chunker = selector.select_for_file(file)
 
     # Returns SemanticChunker wrapped in GracefulChunker because it's a Python file
     assert isinstance(chunker, GracefulChunker)
     assert isinstance(chunker.primary, SemanticChunker)
 
-    # Verify warning was logged
-    assert "Could not stat file" in caplog.text
-    assert "Permission denied" in caplog.text
+    # Verify warning was logged using records for precise matching
+    warning_records = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("Could not stat file" in r.message for r in warning_records), (
+        "Expected 'Could not stat file' warning to be logged"
+    )
+    assert any("Permission denied" in r.message for r in warning_records), (
+        "Expected 'Permission denied' to appear in the logged warning"
+    )
