@@ -10,6 +10,7 @@ Statistics tracking for CodeWeaver, including file indexing, retrieval, and sess
 from __future__ import annotations
 
 import contextlib
+import functools
 import statistics
 import time
 
@@ -24,6 +25,7 @@ from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, NamedTuple,
 
 from fastmcp import Context
 from pydantic import (
+    ConfigDict,
     Field,
     FieldSerializationInfo,
     NonNegativeFloat,
@@ -621,7 +623,9 @@ class _CategoryStatistics(BasedModel):
             all_files.update(lang_stats.unique_files)
         return frozenset(all_files)
 
-    @property
+    model_config = ConfigDict(ignored_types=(functools.cached_property,))
+
+    @functools.cached_property
     def total_operations(self) -> NonNegativeInt:
         """Get the total operations across all languages in this category."""
         return sum(lang_stats.total_operations for lang_stats in self.languages.values())
@@ -635,6 +639,7 @@ class _CategoryStatistics(BasedModel):
         """Add an operation for a specific language in this category."""
         lang_stats = self.get_language_stats(language)
         lang_stats.add_operation(operation, path)
+        self.__dict__.pop("total_operations", None)
 
     @classmethod
     def from_ext_category(cls, ext_category: ExtCategory) -> _CategoryStatistics:
@@ -753,6 +758,7 @@ class FileStatistics(BasedModel):
 
         # Track the chunk
         lang_stats.add_chunk(chunk, operation)
+        self.categories[kind].__dict__.pop("total_operations", None)
 
     def add_other_files(self, *files: Path) -> None:
         """Add files to the 'other' category."""
