@@ -1539,11 +1539,12 @@ def language_from_path(
     if (
         (all_exts := tuple(ext_pair.ext for ext_pair in all_languages)) and FileExt(ext) in all_exts
     ) or FileExt(file_path.name) in all_exts:
+        target_exts = (FileExt(ext), FileExt(file_path.name))
         return next(
             (
                 ext_pair.language
                 for ext_pair in all_languages
-                if ext_pair.ext in [FileExt(ext), FileExt(file_path.name)]
+                if ext_pair.ext in target_exts
             ),
             None,
         )
