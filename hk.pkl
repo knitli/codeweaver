@@ -1,8 +1,8 @@
 /// The hk.pkl is the configuration for `hk` <https://hk.jdx.dev>
 /// `hk` provides commit and push hooks, but is many times faster than pre-commit and similar tools
 /// If you're new to `pkl` see <https://pkl-lang.org/main/current/language-reference/index.html>
-amends "package://github.com/jdx/hk/releases/download/v1.2.0/hk@1.2.0#/Config.pkl"
-import "package://github.com/jdx/hk/releases/download/v1.2.0/hk@1.2.0#/Builtins.pkl"
+amends "package://github.com/jdx/hk/releases/download/v1.41.0/hk@1.41.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.41.0/hk@1.41.0#/Builtins.pkl"
 
 local function isCI() = (read?("env:CI")?.toBoolean() ?? false) || (read?("env:GITHUB_ACTIONS")?.toBoolean() ?? false)
 
@@ -28,7 +28,7 @@ local linters = new Mapping<String, Step> {
         // yaml
 
         ["yq"] = new Step {
-        glob = List("*.{yaml,yml,json}")
+        glob = Regex(#"(^|/)[^w].+\\.(json|yaml|yml)$"#)
         batch = false
         check  = "printf '%s\\n' {{ files }} | xargs -n1 yq -P eval '.' >/dev/null"
         fix = "printf '%s\\n' {{ files }} | xargs -n1 yq -iP --indent=2 '.'"
