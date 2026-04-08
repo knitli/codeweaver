@@ -161,7 +161,7 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
                 collection_name = self.collection.get("collection_name")
             elif hasattr(self.collection, "collection_name"):
                 collection_name = self.collection.collection_name
-            self.in_memory_config = self.in_memory_config or getattr(
+            self.in_memory_config = self.in_memory_config or getattr(  # ty:ignore[invalid-assignment]
                 self,
                 "_default_memory_config",
                 lambda _x: {"collection_name": generate_collection_name()},
