@@ -183,6 +183,37 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
         # We'll initialize it asynchronously in initialize_async
         super().__init__(client=client, caps=caps, kwargs=kwargs)  # type: ignore
 
+    def _initialize(
+        self,
+        impl_deps: Any = None,
+        custom_deps: Any = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the SparseEncoder client.
+
+        Mirrors `SentenceTransformersEmbeddingProvider._initialize` — the
+        client is instantiated upstream by the service card's
+        `_start_filtered_instance_in_thread` handler (which resolves
+        `lateimport("sentence_transformers", "SparseEncoder")` and
+        instantiates it with the ST client options), then passed into
+        this provider via `__init__`. By the time `_initialize` runs
+        during the base-class async init chain, `self.client` is already
+        a valid `SparseEncoder` instance and there's nothing left to do
+        here. If base-class or sibling providers grow real init logic in
+        the future, mirror it here too.
+
+        This override exists only so the class isn't abstract. Prior to
+        this method, `SparseEmbeddingProvider.__abstractmethods__`
+        contained `_initialize` (inherited from the abstract base), and
+        Python refused to instantiate the class with
+        `TypeError: Can't instantiate abstract class
+        SentenceTransformersSparseProvider without an implementation for
+        abstract method '_initialize'`.
+        """
+        # Nothing to initialize here — the SparseEncoder instance was
+        # supplied to __init__ via the service card dispatch chain, and
+        # client_options are set on self from the base class's __init__.
+
     @property
     def base_url(self) -> str | None:
         """Get the base URL for the provider, if applicable."""
