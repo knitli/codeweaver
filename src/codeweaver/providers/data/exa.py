@@ -676,14 +676,15 @@ async def exa_toolset(
 
     Args:
         client: The Exa async client.
-        config: Tool configuration. If None, uses defaults (only answer tool enabled).
+        config: Tool configuration. If None, uses `ExaToolConfig()` defaults
+            (both answer and get-contents tools enabled by default).
         register: Whether to register the tools. Defaults to True.
 
     Returns:
         List of created Tool instances.
     """
     if config is None:
-        # Default config: enable answer tool only (per ExaToolConfig defaults)
+        # Default config: uses ExaToolConfig defaults (answer + get-contents enabled)
         config = ExaToolConfig()
 
     tools = await register_exa_tools(

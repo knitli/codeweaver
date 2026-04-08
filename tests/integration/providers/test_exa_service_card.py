@@ -84,3 +84,42 @@ class TestExaServiceCardResolution:
         assert callable(card.metadata.provider_handler), (
             "provider_handler should be callable"
         )
+
+    def test_exa_service_card_provider_handler_extracts_tool_config(self):
+        """Test that the provider_handler extracts tool_config from DI-shaped config.
+
+        The DI system passes ExaProviderSettings as `config`, but exa_toolset()
+        expects ExaToolConfig | None. The handler must extract .tool_config from
+        the settings object before forwarding to exa_toolset, avoiding a runtime
+        type error when providers are instantiated through DI.
+        """
+        from types import SimpleNamespace
+
+        from codeweaver.core.types.service_cards import get_service_cards
+        from codeweaver.providers.config.sdk.data import ExaToolConfig
+
+        cards = get_service_cards(provider="exa", category="data")
+        assert len(cards) == 1, "Expected exactly one Exa data provider service card"
+        card = cards[0]
+
+        # Build a settings-shaped object that mirrors ExaProviderSettings.
+        # The DI factory sets provider_kwargs["config"] = settings (the full settings
+        # object), so the handler must extract settings.tool_config for exa_toolset.
+        tool_config = ExaToolConfig()
+        di_config = SimpleNamespace(tool_config=tool_config)
+
+        # Capture what config the handler passes to the provider factory.
+        captured: dict[str, object] = {}
+
+        def mock_exa_toolset(client: object, *, config: object = None, **kwargs: object) -> list:
+            captured["config"] = config
+            return []
+
+        handler = card.metadata.provider_handler
+        handler(mock_exa_toolset, card, client=None, config=di_config)
+
+        # The handler must extract .tool_config, not pass the whole settings object.
+        assert captured.get("config") is tool_config, (
+            "provider_handler must extract ExaProviderSettings.tool_config and pass it "
+            "to exa_toolset, not the whole settings object"
+        )

@@ -1285,8 +1285,10 @@ def _build_data_provider_cards() -> list[ServiceCard]:
             lateimport("exa_py", "AsyncExa"),
             "exa",
             metadata=ServiceMetadata(
-                provider_handler=lambda provider_cls, card, client=None, **kwargs: provider_cls(
-                    client, **kwargs
+                # provider_cls is exa_toolset; config may be ExaProviderSettings from DI,
+                # so extract .tool_config (ExaToolConfig) before passing to exa_toolset.
+                provider_handler=lambda provider_cls, card, client=None, config=None, **kwargs: provider_cls(
+                    client, config=getattr(config, "tool_config", config), **kwargs
                 )
             ),
         ),
