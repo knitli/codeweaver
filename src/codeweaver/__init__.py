@@ -309,6 +309,7 @@ if TYPE_CHECKING:
     from codeweaver.core.dependencies.utils import (
         ensure_container_initialized,
         ensure_settings_initialized,
+        ensure_settings_initialized_async,
     )
     from codeweaver.core.di.container import (
         Container,
@@ -2911,6 +2912,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ensure_endpoint_version": (__spec__.parent, "providers.config.clients.utils"),
     "ensure_iterable": (__spec__.parent, "core.utils.general"),
     "ensure_settings_initialized": (__spec__.parent, "core.dependencies.utils"),
+    "ensure_settings_initialized_async": (__spec__.parent, "core.dependencies.utils"),
     "env_var_config_to_info": (__spec__.parent, "providers.env_registry.conversion"),
     "exa_answer_tool": (__spec__.parent, "providers.data.exa"),
     "exa_find_similar_tool": (__spec__.parent, "providers.data.exa"),
@@ -4354,6 +4356,7 @@ __all__ = (
     "ensure_endpoint_version",
     "ensure_iterable",
     "ensure_settings_initialized",
+    "ensure_settings_initialized_async",
     "env_var_config_to_info",
     "exa_answer_tool",
     "exa_find_similar_tool",

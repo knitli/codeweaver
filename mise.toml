@@ -260,22 +260,43 @@ MISE_YES = "1"
 
 [tasks.fix-python]
 tools.uv = "latest"
-tools.ast-grep = "latest"
 usage = '''
 arg "[dir]" help="directory to fix (default: current directory)" default="."
 '''
 run = [
   "echo \"running fix-python task\"",
   "uvx ruff format \"${usage_dir}\"",
-  "uvx ruff check --fix --unsafe-fixes \"${usage_dir}\"",
+  "uvx ruff check --fix \"${usage_dir}\"",
 ]
 run_windows = [
   "echo \"running fix-python task\"",
-  "uvx ruff format .",
-  "uvx ruff check --fix --unsafe-fixes ."
+  "uvx ruff format \"%usage_dir%\"",
+  "uvx ruff check --fix \"%usage_dir%\""
 ]
-file = "scripts/code-quality/fix-ruff-patterns.sh"
-sources = ["{src,scripts,tests,mise-tasks}/*.py"]
+sources = ["{src,scripts,tests,mise-tasks}/**/*.py"]
+
+[tasks.fix-python-unsafe]
+description = "Fix Python code with unsafe fixes and pattern transformations (may make unintended changes)"
+tools.uv = "latest"
+tools.ast-grep = "latest"
+usage = '''
+arg "[dir]" help="directory to fix (default: current directory)" default="."
+'''
+run = [
+  "echo \"running fix-python-unsafe task\"",
+  "echo \"⚠️  WARNING: This task applies aggressive transformations. Review changes carefully!\"",
+  "uvx ruff format \"${usage_dir}\"",
+  "uvx ruff check --fix --unsafe-fixes \"${usage_dir}\"",
+  "bash scripts/code-quality/fix-ruff-patterns.sh \"${usage_dir}\"",
+]
+run_windows = [
+  "echo \"running fix-python-unsafe task\"",
+  "echo \"WARNING: This task applies aggressive transformations. Review changes carefully!\"",
+  "uvx ruff format \"%usage_dir%\"",
+  "uvx ruff check --fix --unsafe-fixes \"%usage_dir%\"",
+  "bash scripts/code-quality/fix-ruff-patterns.sh \"%usage_dir%\""
+]
+sources = ["{src,scripts,tests,mise-tasks}/**/*.py"]
 
 [tasks.check]
 tools.hk = "latest"

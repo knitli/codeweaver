@@ -82,9 +82,9 @@ def _assemble_configured_capabilities(
 @dependency_provider(ConfiguredCapability, scope="singleton", collection=True)
 async def _create_all_configured_capabilities() -> tuple[ConfiguredCapability, ...]:
     """Get all configured capabilities for providers."""
-    from codeweaver.core.dependencies.utils import ensure_settings_initialized
+    from codeweaver.core.dependencies.utils import ensure_settings_initialized_async
 
-    ensure_settings_initialized()
+    await ensure_settings_initialized_async()
     from codeweaver.providers.config.providers import ProviderSettings
 
     settings = await _resolve_type_from_container(ProviderSettings)
