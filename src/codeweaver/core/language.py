@@ -762,7 +762,7 @@ class SemanticSearchLanguage(str, BaseEnum):
         return self.value in ConfigLanguage.values() and self is not SemanticSearchLanguage.KOTLIN
 
     @classmethod
-    def config_language_exts(cls) -> Generator[str]:
+    def config_language_exts(cls) -> Generator[FileExt]:
         """
         Returns all file extensions associated with the configuration languages.
         """
@@ -804,7 +804,7 @@ class SemanticSearchLanguage(str, BaseEnum):
             )
 
     @classmethod
-    def all_extensions(cls) -> Generator[LiteralStringT]:
+    def all_extensions(cls) -> Generator[FileExt]:
         """
         Returns all file extensions for all languages.
         """
@@ -831,7 +831,7 @@ class SemanticSearchLanguage(str, BaseEnum):
                 )
 
     @classmethod
-    def code_extensions(cls) -> Generator[str]:
+    def code_extensions(cls) -> Generator[FileExt]:
         """
         Returns all file extensions associated with programming languages (excluding configuration languages).
         """

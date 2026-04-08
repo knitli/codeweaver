@@ -101,8 +101,8 @@ class FileWatchingService:
             args=kwargs.pop("args", ()) if kwargs else (),
             kwargs=kwargs.pop("kwargs", {}) if kwargs else {},
             target_type="function",
-            callback=self._handle_changes,  # type: ignore[invalid-argument-type]
-            watch_filter=self.file_filter,  # type: ignore[invalid-argument-type]
+            callback=self._handle_changes,  # ty: ignore[invalid-argument-type]
+            watch_filter=self.file_filter,  # ty: ignore[invalid-argument-type]
             grace_period=DEFAULT_WATCHER_GRACE_PERIOD,
             debounce=DEFAULT_WATCHER_DEBOUNCE_MILLISECONDS,
             step=DEFAULT_WATCHER_STEP_MILLISECONDS,

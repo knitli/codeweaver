@@ -342,29 +342,3 @@ path = ["docs-site/src/**"]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Knitli Inc."
 SPDX-License-Identifier = "MIT OR Apache-2.0"
-
-# =============================================================================
-# data/grammars - Tree-sitter grammar.js source files
-# =============================================================================
-# Vendored grammar.js files from upstream tree-sitter grammar projects.
-# The vast majority of tree-sitter grammars are MIT-licensed by their
-# respective authors (Max Brunsfeld and contributors for the core set,
-# various community maintainers for the rest). The Elixir and HCL grammars
-# are Apache-2.0; we annotate them individually below.
-[[annotations]]
-path = ["data/grammars/*.js"]
-precedence = "aggregate"
-SPDX-FileCopyrightText = "2014-2021 Tree-sitter grammar contributors"
-SPDX-License-Identifier = "MIT"
-
-[[annotations]]
-path = ["data/grammars/elixir-grammar.js"]
-precedence = "override"
-SPDX-FileCopyrightText = "2021 The Elixir Team"
-SPDX-License-Identifier = "Apache-2.0"
-
-[[annotations]]
-path = ["data/grammars/hcl-grammar.js"]
-precedence = "override"
-SPDX-FileCopyrightText = "2021 Michael Hoffman"
-SPDX-License-Identifier = "Apache-2.0"

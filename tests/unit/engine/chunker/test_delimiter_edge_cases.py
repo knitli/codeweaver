@@ -229,12 +229,18 @@ class TestUnusualPatterns:
                 end="",
                 kind=DelimiterKind.STRUCT,
                 priority=DelimiterKind.STRUCT.default_priority,
+                inclusive=True,
+                take_whole_lines=True,
+                nestable=False,
             ),
             Delimiter(
                 start="type",
                 end="",
                 kind=DelimiterKind.TYPE_ALIAS,
                 priority=DelimiterKind.TYPE_ALIAS.default_priority,
+                inclusive=True,
+                take_whole_lines=True,
+                nestable=False,
             ),
         ]
 

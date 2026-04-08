@@ -234,6 +234,8 @@ exclude_also = [
   "raise AssertionError",
   "raise NotImplementedError",
   '\s*def .*\)\s*->\s*TypeIs\[.+\]:[\n\sA-za-z0-9_-]+?\n\n',
+  # bracket/syntax only lines:
+  '''\s*[\[\]{}()]+\s*''',
 ]
 
 # --------------------------------------------------------------------------- #
@@ -626,7 +628,6 @@ markers = [
   # Stability & reliability
   "flaky: Tests that may occasionally fail due to timing or external factors",
   "indexing: Tests related to code indexing",
-  "install_smoke: Minimal smoke tests that must pass on any valid install profile (base, recommended, full, full-gpu, etc.) — used by the install-profile matrix workflow to validate wheel installs across python × extras combinations without requiring the full test suite's optional dependencies",
   "integration: Integration tests that test component interactions",
   # Platform-specific
   "linux_only: Tests that only run on Linux platforms",
@@ -798,19 +799,8 @@ invalid-argument-type = "ignore"
 unresolved-attribute = "ignore"
 
 [[tool.ty.overrides]]
-include = [
-  "src/codeweaver/providers/config/clients/multi.py",
-  "src/codeweaver/providers/vector_stores/qdrant_base.py",
-  "src/codeweaver/providers/config/categories/embedding.py",
-  "src/codeweaver/providers/config/categories/sparse_embedding.py",
-]
+include = ["src/codeweaver/providers/vector_stores/qdrant_base.py"]
 
-# Both files use `try: import X; except ImportError: X = Any` fallbacks to
-# gate optional dependencies (fastembed, torch, sentence-transformers, etc.)
-# Ty flags the `X = Any` reassignment as invalid because it narrows the
-# previously-declared type. The pattern is intentional and correct — it lets
-# pydantic models with `field: X | None = None` work whether or not the
-# optional package is installed.
 [tool.ty.overrides.rules]
 invalid-assignment = "ignore"
 
@@ -866,30 +856,6 @@ include = [
 [tool.ty.overrides.rules]
 unresolved-attribute = "ignore"
 
-# fastembed.py has two pre-existing ty issues that surface whenever any
-# line in the file is touched:
-#
-#   invalid-return-type (sparse _embed_documents/_embed_query): ty can't
-#     narrow `loop.run_in_executor(None, lambda: self._process_output(...))`
-#     through the executor/lambda hop into the declared
-#     `list[CodeWeaverSparseEmbedding]` return type. The conversion happens
-#     inside `_process_output` but ty's flow analysis doesn't trace it.
-#
-#   invalid-assignment (FastEmbedSparseProvider.client default): the default
-#     value `_SparseTextEmbedding` is read from a TYPE_CHECKING-guarded
-#     lateimport that resolves to `Unknown | None` statically; the real
-#     value is set via pydantic default_factory at runtime. ty sees the
-#     static Unknown and flags the class-level default.
-#
-# Both are pre-existing false positives. Scoping the suppressions to this
-# one file keeps the rest of the providers strict.
-[[tool.ty.overrides]]
-include = ["src/codeweaver/providers/embedding/providers/fastembed.py"]
-
-[tool.ty.overrides.rules]
-invalid-return-type = "ignore"
-invalid-assignment = "ignore"
-
 [[tool.ty.overrides]]
 include = [
   "src/codeweaver/*/dependencies.py",
@@ -912,6 +878,12 @@ invalid-argument-type = "ignore"
 invalid-return-type = "ignore"
 unsupported-operator = "ignore"
 no-matching-overload = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/providers/embedding/capabilities/*.py"]
+
+[tool.ty.overrides.rules]
+missing-typed-dict-key = "ignore"
 
 [[tool.ty.overrides]]
 include = [
@@ -984,12 +956,6 @@ override-dependencies = [
   # On 3.14+, cryptography 46+ resolves naturally (has pre-built wheels + cffi 2.0 works).
   "cryptography==45.0.7; python_version == '3.13'",
 ]
-# Constrain cffi in build isolation environments. override-dependencies only affects
-# runtime resolution; when cryptography builds from source on 3.13t, its build env
-# pulls cffi>=1.12 independently. This prevents cffi 2.0 from entering build envs.
-build-constraint-dependencies = [
-  "cffi<2.0; python_version == '3.13'",
-]
 prerelease = "allow"
 
 [tool.uv.workspace]
@@ -1007,6 +973,3 @@ bump = true
 dirty = false  # Disabled .dirty suffix to maintain PEP 440 compliance
 # tag-branch = "main"  # Commented out to allow building on feature branches
 commit-prefix = "g"
-# Enable the metadata hook plugin so [tool.hatch.metadata.hooks.uv-dynamic-versioning]
-# templates `{{ version }}` into dependencies/optional-dependencies at build time.
-metadata = true

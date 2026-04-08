@@ -72,7 +72,7 @@ def fetch_cla_signatures() -> dict[str, list[dict[str, str]]]:
 
 def aggregate_contributors(
     signatures_by_repo: dict[str, list[dict[str, str]]],
-) -> dict[str, dict[str, str | list | set | None]]:
+) -> dict[str, dict[str, str | list[str] | list[dict[str, str | None]] | None]]:
     """Aggregate contributors across all repos."""
     contributors = defaultdict(
         lambda: {
@@ -100,19 +100,18 @@ def aggregate_contributors(
                 "date": sig.get("created_at"),
             })
 
-            # Track first contribution
-            created_at = sig.get("created_at")
-            if created_at and (
-                not contributor["first_contribution"]
-                or created_at < contributor["first_contribution"]
-            ):
-                contributor["first_contribution"] = created_at
+            if created_at := sig.get("created_at"):
+                first = contributor["first_contribution"]
+                if not first or (
+                    isinstance(created_at, str) and isinstance(first, str) and created_at < first
+                ):
+                    contributor["first_contribution"] = created_at
 
     # Convert sets to lists for JSON serialization
     for contributor in contributors.values():
         contributor["repos"] = sorted(contributor["repos"])
 
-    return dict(contributors)
+    return dict(contributors)  # ty:ignore[invalid-return-type]
 
 
 def generate_markdown(contributors: dict[str, dict[str, str | list | set | None]]) -> str:
