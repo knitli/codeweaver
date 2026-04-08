@@ -13,6 +13,13 @@ Here is what we've been working on!
 >The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 >and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+<!-- git-cliff prepends new release sections above this marker. Do not move or delete. -->
+<!-- BEGIN-CURATED-HISTORY -->
+
+## [0.1.1] - 2026-04-07
+
+Minor documentation and metadata fixes
+
 ## [0.1.0] - 2026-04-06
 
 CodeWeaver's first stable release. This release represents 4 months of development since alpha.5, spanning 300+ commits across architecture, performance, security, testing, and developer experience.
