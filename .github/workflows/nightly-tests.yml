@@ -75,6 +75,20 @@ jobs:
       upload-coverage: false
       run-quality-checks: false
 
+  nightly-install-smoke:
+    name: Nightly Install-Profile Smoke Tests
+    uses: ./.github/workflows/_reusable-install-smoke.yml
+    # Nightly runs a reduced 3x3 matrix (base / recommended / full
+    # x py 3.12-3.14). Weekly-tests.yml calls the same reusable workflow
+    # with a wider profiles list (adds `recommended-local-only`) for more
+    # coverage. `full-gpu` is deferred entirely for now because GH runners
+    # don't have GPUs and the delta over `full` is wheel-packaging only —
+    # a rare failure mode that doesn't warrant the cost at any cadence.
+    # Revisit if a `full-gpu`-specific regression ever ships.
+    with:
+      python-versions: ${{ inputs.python-versions || '["3.12", "3.13", "3.14"]' }}
+      profiles: '["base", "recommended", "full"]'
+
   nightly-summary:
     name: Nightly Test Summary
     runs-on: ubuntu-latest
@@ -82,6 +96,7 @@ jobs:
       - nightly-integration-tests
       - nightly-real-provider-tests
       - nightly-benchmark-tests
+      - nightly-install-smoke
     if: always()
     permissions:
       contents: read
@@ -93,19 +108,23 @@ jobs:
           INTEGRATION_RESULT: ${{ needs.nightly-integration-tests.result }}
           PROVIDER_RESULT: ${{ needs.nightly-real-provider-tests.result }}
           BENCHMARK_RESULT: ${{ needs.nightly-benchmark-tests.result }}
+          SMOKE_RESULT: ${{ needs.nightly-install-smoke.result }}
         run: |
           echo "Integration Tests: $INTEGRATION_RESULT"
           echo "Real Provider Tests: $PROVIDER_RESULT"
           echo "Benchmark Tests: $BENCHMARK_RESULT"
+          echo "Install-Profile Smoke Tests: $SMOKE_RESULT"
 
-          # Determine overall status
-          if [ "$INTEGRATION_RESULT" == "failure" ] || [ "$PROVIDER_RESULT" == "failure" ]; then
+          # Determine overall status — smoke failures are treated as critical
+          # alongside integration and real-provider failures because a broken
+          # install profile means published wheels are unusable on that cell.
+          if [ "$INTEGRATION_RESULT" == "failure" ] || [ "$PROVIDER_RESULT" == "failure" ] || [ "$SMOKE_RESULT" == "failure" ]; then
             echo "status=failure" >> "$GITHUB_OUTPUT"
             echo "Overall Status: FAILURE ❌"
           elif [ "$BENCHMARK_RESULT" == "failure" ]; then
             echo "status=warning" >> "$GITHUB_OUTPUT"
             echo "Overall Status: WARNING ⚠️ (Benchmarks Failed)"
-          elif [ "$INTEGRATION_RESULT" == "success" ] && [ "$PROVIDER_RESULT" == "success" ]; then
+          elif [ "$INTEGRATION_RESULT" == "success" ] && [ "$PROVIDER_RESULT" == "success" ] && [ "$SMOKE_RESULT" == "success" ]; then
             echo "status=success" >> "$GITHUB_OUTPUT"
             echo "Overall Status: SUCCESS ✅"
           else
@@ -118,6 +137,7 @@ jobs:
           INTEGRATION: ${{ needs.nightly-integration-tests.result }}
           PROVIDER: ${{ needs.nightly-real-provider-tests.result }}
           BENCHMARK: ${{ needs.nightly-benchmark-tests.result }}
+          SMOKE: ${{ needs.nightly-install-smoke.result }}
           STATUS: ${{ steps.check-results.outputs.status }}
           COMMIT_SHA: ${{ github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -158,6 +178,15 @@ jobs:
               echo "- ⚠️ **Benchmark Tests**: $BENCHMARK"
             fi
 
+            # Install-Profile Smoke Tests
+            if [ "$SMOKE" == "success" ]; then
+              echo "- ✅ **Install-Profile Smoke Tests**: PASSED"
+            elif [ "$SMOKE" == "failure" ]; then
+              echo "- ❌ **Install-Profile Smoke Tests**: FAILED"
+            else
+              echo "- ⚠️ **Install-Profile Smoke Tests**: $SMOKE"
+            fi
+
             echo ""
             echo "## Overall Status"
             echo ""
@@ -193,6 +222,7 @@ jobs:
             - Integration Tests: ${{ needs.nightly-integration-tests.result }}
             - Real Provider Tests: ${{ needs.nightly-real-provider-tests.result }}
             - Benchmark Tests: ${{ needs.nightly-benchmark-tests.result }}
+            - Install-Profile Smoke Tests: ${{ needs.nightly-install-smoke.result }}
 
             ### Action Required
 
