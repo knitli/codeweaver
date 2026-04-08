@@ -50,14 +50,11 @@ def _try_to_resolve_settings() -> bool:
 def ensure_settings_initialized() -> None:
     """Ensure settings are initialized in the DI container (sync version).
 
-    This checks if settings are already initialized. If not, it raises an error
-    directing the caller to use the async version or bootstrap settings properly.
+    This checks if settings exist in the container but does NOT attempt async bootstrap.
+    Safe to call at module import time — returns silently if settings are not yet available.
 
-    Use this in sync contexts where settings should already be initialized
-    (e.g., after async bootstrap has run during application startup).
-
-    Raises:
-        RuntimeError: If settings are not initialized
+    Settings will be bootstrapped later via the async startup path. Use this in sync contexts
+    where the goal is to initialize the container and mark settings ready if they already exist.
 
     Note:
         For async contexts or initial bootstrap, use ensure_settings_initialized_async()
@@ -65,20 +62,9 @@ def ensure_settings_initialized() -> None:
     """
     if globals()["_container_initialized"] is False:
         ensure_container_initialized()
-    if globals()["_settings_initialized"] is False:
-        if not _try_to_resolve_settings():
-            raise RuntimeError(
-                "Settings are not initialized. Settings must be initialized from an async "
-                "context using ensure_settings_initialized_async() or bootstrap_settings() "
-                "before accessing them from sync code.\n\n"
-                "Common causes:\n"
-                "  - Importing a module that depends on settings before bootstrapping\n"
-                "  - Calling settings-dependent code outside an async context\n\n"
-                "Solutions:\n"
-                "  - Call await ensure_settings_initialized_async() from an async function\n"
-                "  - Use the server/CLI startup paths that handle bootstrap automatically"
-            )
-        # If _try_to_resolve_settings() returned True, settings exist in container
+    # If settings aren't found yet, that's OK — they'll be bootstrapped later
+    # in an async context via ensure_settings_initialized_async()
+    if globals()["_settings_initialized"] is False and _try_to_resolve_settings():
         globals()["_settings_initialized"] = True
 
 
