@@ -19,3 +19,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 ## 2026-04-01 - Fast generation of line pos lengths in Chunker with itertools
 **Learning:** itertools.accumulate(map(len, lines)) is significantly faster (~2-3x) than using a generator expression like (line_offsets[-1] + len(line) for line in lines) because it pushes the entire loop down to C level instead of creating generator overhead for each element.
 **Action:** Prefer using itertools.accumulate and map for sequential aggregations of large list strings instead of list generator expressions.
+
+## 2026-04-10 - Preventing List Allocations in Generators
+**Learning:** Instantiating a list inside a generator expression for membership checks (e.g., `item in [a, b]`) forces Python to allocate and garbage-collect a new list object for every iteration of the generator. This can severely degrade performance in tight loops or large collections. Hoisting the check to a pre-computed tuple outside the generator (e.g., `targets = (a, b)` and then `item in targets`) prevents these repeated allocations and can improve performance by 2x or more.
+**Action:** Pre-compute tuples for static membership checks outside of generators to eliminate redundant list allocation overhead.
