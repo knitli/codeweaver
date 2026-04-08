@@ -141,14 +141,17 @@ jobs:
             ~/.cache/huggingface/
             ~/.cache/sentence_transformers/
             ~/.cache/fastembed/
-          # Hash only the file that actually determines which models are
+          # Hash only the files that actually determine which models are
           # used by tests — NOT pyproject.toml/uv.lock which change on
           # every dep tweak and were cold-invalidating this cache on
-          # every commit. Model selection lives in codeweaver.test.toml.
-          # Version bumped v1->v2 to force one clean build past any
-          # partially-populated v1 cache from previous PR iterations.
-          key: embedding-models-v2-${{ runner.os }}-${{ hashFiles('codeweaver.test.toml') }}
+          # every commit. Model selection lives in
+          # src/codeweaver/providers/config/profiles.py and
+          # src/codeweaver/core/constants.py.
+          # Version bumped v2->v3 to force one clean build past caches
+          # created with the previous broken key.
+          key: embedding-models-v3-${{ runner.os }}-${{ hashFiles('src/codeweaver/providers/config/profiles.py', 'src/codeweaver/core/constants.py') }}
           restore-keys: |
+            embedding-models-v3-${{ runner.os }}-
             embedding-models-v2-${{ runner.os }}-
             embedding-models-v1-${{ runner.os }}-
 
