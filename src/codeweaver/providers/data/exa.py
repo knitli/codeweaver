@@ -661,6 +661,40 @@ async def register_exa_tools(
 
 type ExaToolType = ExaSearchTool | ExaFindSimilarTool | ExaGetContentsTool | ExaAnswerTool
 
+
+async def exa_toolset(
+    client: AsyncExa,
+    *,
+    config: ExaToolConfig | None = None,
+    register: bool = True,
+) -> list[Tool]:
+    """Create and optionally register Exa tools based on configuration.
+
+    This is the main entry point for the Exa data provider, used by the
+    service card system. It creates all configured Exa tools based on the
+    provided configuration.
+
+    Args:
+        client: The Exa async client.
+        config: Tool configuration. If None, uses defaults (only answer tool enabled).
+        register: Whether to register the tools. Defaults to True.
+
+    Returns:
+        List of created Tool instances.
+    """
+    if config is None:
+        # Default config: enable answer tool only (per ExaToolConfig defaults)
+        config = ExaToolConfig()
+
+    tools = await register_exa_tools(
+        client=client,
+        config=config,
+        register=register,
+        return_tools=True,
+    )
+    return tools or []
+
+
 __all__ = (
     "ExaAnswerResult",
     "ExaAnswerTool",
@@ -674,5 +708,6 @@ __all__ = (
     "exa_find_similar_tool",
     "exa_get_contents_tool",
     "exa_search_tool",
+    "exa_toolset",
     "register_exa_tools",
 )

@@ -1281,9 +1281,14 @@ def _build_data_provider_cards() -> list[ServiceCard]:
         service_card_factory(
             "exa",
             "data",
-            lateimport("codeweaver.providers.data.exa", "ExaToolset"),
+            lateimport("codeweaver.providers.data.exa", "exa_toolset"),
             lateimport("exa_py", "AsyncExa"),
             "exa",
+            metadata=ServiceMetadata(
+                provider_handler=lambda provider_cls, card, client=None, **kwargs: provider_cls(
+                    client, **kwargs
+                )
+            ),
         ),
     ]
 
