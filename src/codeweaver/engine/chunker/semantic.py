@@ -691,7 +691,7 @@ class SemanticChunker(BaseChunker):
             # Values are already NonNegativeFloat from ImportanceScoresDict
             # Type checker loses this info through .values(), so we help it with a cast
             scores = node.importance.as_dict().values()
-            return any(score >= self._importance_threshold for score in scores)  # type: ignore[operator]
+            return any(float(score) >= self._importance_threshold for score in scores)  # ty:ignore[invalid-argument-type]
 
         # Include if we have classification but no importance scores
         return True

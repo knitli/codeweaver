@@ -260,22 +260,43 @@ MISE_YES = "1"
 
 [tasks.fix-python]
 tools.uv = "latest"
-tools.ast-grep = "latest"
 usage = '''
 arg "[dir]" help="directory to fix (default: current directory)" default="."
 '''
 run = [
   "echo \"running fix-python task\"",
   "uvx ruff format \"${usage_dir}\"",
-  "uvx ruff check --fix --unsafe-fixes \"${usage_dir}\"",
+  "uvx ruff check --fix \"${usage_dir}\"",
 ]
 run_windows = [
   "echo \"running fix-python task\"",
-  "uvx ruff format .",
-  "uvx ruff check --fix --unsafe-fixes ."
+  "uvx ruff format \"%usage_dir%\"",
+  "uvx ruff check --fix \"%usage_dir%\""
 ]
-file = "scripts/code-quality/fix-ruff-patterns.sh"
-sources = ["{src,scripts,tests,mise-tasks}/*.py"]
+sources = ["{src,scripts,tests,mise-tasks}/**/*.py"]
+
+[tasks.fix-python-unsafe]
+description = "Fix Python code with unsafe fixes and pattern transformations (may make unintended changes)"
+tools.uv = "latest"
+tools.ast-grep = "latest"
+usage = '''
+arg "[dir]" help="directory to fix (default: current directory)" default="."
+'''
+run = [
+  "echo \"running fix-python-unsafe task\"",
+  "echo \"⚠️  WARNING: This task applies aggressive transformations. Review changes carefully!\"",
+  "uvx ruff format \"${usage_dir}\"",
+  "uvx ruff check --fix --unsafe-fixes \"${usage_dir}\"",
+  "bash scripts/code-quality/fix-ruff-patterns.sh \"${usage_dir}\"",
+]
+run_windows = [
+  "echo \"running fix-python-unsafe task\"",
+  "echo \"WARNING: This task applies aggressive transformations. Review changes carefully!\"",
+  "uvx ruff format \"%usage_dir%\"",
+  "uvx ruff check --fix --unsafe-fixes \"%usage_dir%\"",
+  "bash scripts/code-quality/fix-ruff-patterns.sh \"%usage_dir%\""
+]
+sources = ["{src,scripts,tests,mise-tasks}/**/*.py"]
 
 [tasks.check]
 tools.hk = "latest"
@@ -565,12 +586,28 @@ depends = ["sync"]  # ensure test dependencies are installed
 run = '''
 echo "running test-cov task"
 echo "${CW_PREFIX} Running tests with coverage..."
-uv run --group test pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v "$@"
+# Run tests with parallel coverage (generates .coverage.* files)
+uv run --group test pytest tests/ --cov=codeweaver --cov-report= --junit-xml=test-results.xml -v "$@"
+# Combine parallel coverage files into single .coverage file
+echo "${CW_PREFIX} Combining coverage data..."
+uv run --group test coverage combine
+# Generate coverage reports from combined data
+echo "${CW_PREFIX} Generating coverage reports..."
+uv run --group test coverage xml
+uv run --group test coverage report
 '''
 run_windows = '''
 echo "running test-cov task"
 echo [codeweaver] Running tests with coverage...
-uv run --group test pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v %*
+REM Run tests with parallel coverage (generates .coverage.* files)
+uv run --group test pytest tests/ --cov=codeweaver --cov-report= --junit-xml=test-results.xml -v %*
+REM Combine parallel coverage files into single .coverage file
+echo [codeweaver] Combining coverage data...
+uv run --group test coverage combine
+REM Generate coverage reports from combined data
+echo [codeweaver] Generating coverage reports...
+uv run --group test coverage xml
+uv run --group test coverage report
 '''
 
 [tasks.test-categories]
@@ -876,3 +913,87 @@ mise activate cmd --shims
 '''
 hide = true
 env.ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo bash') }}'''
+
+[tasks.test-profiles]
+description = "Build wheels and run install_smoke tests against each extras profile in an isolated venv"
+tools.uv = "latest"
+tools.python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
+usage = '''
+flag "-p --profiles <list>" help="Space-separated profiles to test (default: base recommended full)"
+flag "--py <version>" help="Python version for the isolated venvs (default: current)"
+flag "--keep-dist" help="Keep dist/ after the run instead of cleaning up"
+'''
+# Not yet cross-platform: this task shells out a bunch of POSIX stuff (mktemp,
+# trap) and isn't worth porting to PowerShell until the pattern stabilizes.
+# Contributors on Windows should run the install-profile smoke tests via CI
+# (nightly / weekly workflow integration already ships the same matrix).
+#
+# The per-profile install + pytest body lives in scripts/testing/install-smoke.sh
+# so that behavior stays identical between this local runner and the
+# `_reusable-install-smoke.yml` matrix workflow.
+run = '''
+set -e
+
+PROFILES="${usage_profiles:-base recommended full}"
+PY="${usage_py:-${MISE_PYTHON_VERSION:-3.13}}"
+KEEP_DIST="${usage_keep_dist:-false}"
+
+echo "${CW_PREFIX} Install-profile smoke runner"
+echo "${CW_PREFIX}   python:   ${PY}"
+echo "${CW_PREFIX}   profiles: ${PROFILES}"
+echo ""
+
+# Temp scratch dir for venvs. `trap` on EXIT cleans up regardless of how we
+# leave — success, failure, or Ctrl-C.
+SCRATCH="$(mktemp -d -t cw-test-profiles.XXXXXXXX)"
+cleanup() {
+  rm -rf "${SCRATCH}"
+  if [ "${KEEP_DIST}" != "true" ]; then
+    rm -rf dist/
+  fi
+}
+trap cleanup EXIT
+
+# Build all three workspace wheels once. The smoke suite runs against these,
+# not against the editable source tree — that's the whole point of the
+# isolation: we want to know the PUBLISHED ARTIFACT resolves and imports
+# cleanly on a minimal profile, not the developer's workstation.
+echo "${CW_PREFIX} Building workspace wheels..."
+rm -rf dist/
+uv build --wheel --all-packages --quiet
+
+FAILED_PROFILES=""
+PASSED_PROFILES=""
+
+for profile in ${PROFILES}; do
+  echo "${CW_PREFIX} =========================================================="
+  echo "${CW_PREFIX} profile: ${profile}  (python ${PY})"
+  echo "${CW_PREFIX} =========================================================="
+
+  VENV_DIR="${SCRATCH}/venv-${profile}"
+  uv venv --python "${PY}" --quiet "${VENV_DIR}"
+  VENV_PY="${VENV_DIR}/bin/python"
+
+  echo "${CW_PREFIX}   running ${profile}..."
+  if scripts/testing/install-smoke.sh "${VENV_PY}" dist "${profile}"; then
+    echo "${CW_PREFIX}   ${profile}: PASS"
+    PASSED_PROFILES="${PASSED_PROFILES} ${profile}"
+  else
+    echo "${CW_PREFIX}   ${profile}: FAIL"
+    FAILED_PROFILES="${FAILED_PROFILES} ${profile}"
+  fi
+  echo ""
+done
+
+echo "${CW_PREFIX} =========================================================="
+echo "${CW_PREFIX} Summary"
+echo "${CW_PREFIX} =========================================================="
+if [ -n "${PASSED_PROFILES}" ]; then
+  echo "${CW_PREFIX}   passed:${PASSED_PROFILES}"
+fi
+if [ -n "${FAILED_PROFILES}" ]; then
+  echo "${CW_PREFIX}   FAILED:${FAILED_PROFILES}"
+  exit 1
+fi
+echo "${CW_PREFIX}   all profiles green"
+'''

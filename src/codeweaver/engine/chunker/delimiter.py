@@ -486,9 +486,7 @@ class DelimiterChunker(BaseChunker):
             for delimiter in delimiter_map[matched_text]:
                 # Find the next structural opening after the keyword
                 struct_start, struct_char = self._find_next_structural_with_char(
-                    content,
-                    start=keyword_pos + len(delimiter.start),
-                    allowed=allowed_keys,
+                    content, start=keyword_pos + len(delimiter.start), allowed=allowed_keys
                 )
 
                 if struct_start is None:
@@ -570,7 +568,7 @@ class DelimiterChunker(BaseChunker):
         return brace_depth
 
     def _find_next_structural_with_char(
-        self, content: str, start: int, allowed: set[str]
+        self, content: str, start: int, allowed: frozenset[str]
     ) -> tuple[int | None, str | None]:
         """Find the next structural delimiter and return its position and character.
 
@@ -692,7 +690,7 @@ class DelimiterChunker(BaseChunker):
         return paren_depth - 1 if char == ")" else paren_depth
 
     def _check_structural_delimiter(
-        self, content: str, pos: int, allowed: set[str]
+        self, content: str, pos: int, allowed: frozenset[str]
     ) -> tuple[int, str] | None:
         """Check if current position has a structural delimiter.
 
@@ -1052,7 +1050,7 @@ class DelimiterChunker(BaseChunker):
             try:
                 boundary = Boundary(
                     start=match.start_pos,
-                    end=match.end_pos,  # type: ignore[arg-type]
+                    end=match.end_pos if match.end_pos is not None else match.start_pos,
                     delimiter=delimiter,
                     nesting_level=match.nesting_level,  # Use the calculated nesting level from matching
                 )
@@ -1284,11 +1282,7 @@ class DelimiterChunker(BaseChunker):
 
         return metadata
 
-    def _load_custom_delimiters(
-        self,
-        normalized_language: str,
-        language: str,
-    ) -> list[Delimiter]:
+    def _load_custom_delimiters(self, normalized_language: str, language: str) -> list[Delimiter]:
         """Load custom delimiter patterns from settings that match the given language.
 
         Custom delimiters are returned first so they override built-in family
@@ -1360,9 +1354,7 @@ class DelimiterChunker(BaseChunker):
 
         # Custom entries are prepended so they override the built-in family
         # patterns for known languages and are the sole source for new languages.
-        delimiters: list[Delimiter] = self._load_custom_delimiters(
-            normalized_language, language
-        )
+        delimiters: list[Delimiter] = self._load_custom_delimiters(normalized_language, language)
 
         # Load from delimiter families system
         family = LanguageFamily.from_known_language(language)

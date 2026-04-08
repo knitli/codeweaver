@@ -486,8 +486,8 @@ class BaseEnum(Enum):
         return f"{self.as_title})"
 
 
-type FilteredCallable = Callable[[Any], bool] | Callable[[Any], int] | Callable[[], None]
 type FilteredReturn = bool | int | dict[Any, int] | None
+type FilteredCallable = Callable[[Any], FilteredReturn]
 
 
 def _hash_it(value: Any) -> int:

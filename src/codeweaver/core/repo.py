@@ -380,7 +380,7 @@ class RepoChecklist(BasedModel):
         """
         # TODO: Use rignore.walker as a category of inverted ignore to efficiently scan the root only
         # ensure the dict can hold mixed value types (Path|False and tuples)
-        attrs: RepoChecklistDict = RepoChecklistDict(**{  # type: ignore[missing-typed-dict-key]
+        attrs: RepoChecklistDict = RepoChecklistDict(**{  # ty: ignore[missing-typed-dict-key]
             key: False if key.startswith("has_") else () for key in cls.__dataclass_fields__
         })
         for name in dir_checks:

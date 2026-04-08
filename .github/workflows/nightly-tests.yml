@@ -75,16 +75,16 @@ jobs:
       upload-coverage: false
       run-quality-checks: false
 
-
   nightly-install-smoke:
     name: Nightly Install-Profile Smoke Tests
     uses: ./.github/workflows/_reusable-install-smoke.yml
     # Nightly runs a reduced 3x3 matrix (base / recommended / full
-    # x py 3.12-3.14). Weekly-tests.yml should call the same reusable
-    # workflow with a wider profiles list (recommended-local-only, full-gpu)
-    # for comprehensive coverage. full-gpu is deferred to weekly because GH
-    # runners don't have GPUs and the delta over `full` is wheel-packaging
-    # only - rare failure mode, doesn't warrant nightly cost.
+    # x py 3.12-3.14). Weekly-tests.yml calls the same reusable workflow
+    # with a wider profiles list (adds `recommended-local-only`) for more
+    # coverage. `full-gpu` is deferred entirely for now because GH runners
+    # don't have GPUs and the delta over `full` is wheel-packaging only —
+    # a rare failure mode that doesn't warrant the cost at any cadence.
+    # Revisit if a `full-gpu`-specific regression ever ships.
     with:
       python-versions: ${{ inputs.python-versions || '["3.12", "3.13", "3.14"]' }}
       profiles: '["base", "recommended", "full"]'

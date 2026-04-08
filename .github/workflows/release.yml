@@ -90,6 +90,24 @@ jobs:
       - name: Generate release notes
         id: release_notes
         run: "# Get the latest release tag (before current)\nPREVIOUS_TAG=\"$(git tag --sort=-version:refname | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+([ab]|rc|-alpha|-beta)?[0-9]*(\\.[0-9]+)?$' | head -2 | tail -1 || echo \"\")\"\nCURRENT_TAG=\"${{ steps.version.outputs.tag }}\"\nVERSION=\"${{ steps.version.outputs.version }}\"\n\necho \"Previous tag: $PREVIOUS_TAG\"\necho \"Current tag: $CURRENT_TAG\"\n\n# Generate changelog using git-cliff.\n# Note: We use '--strip header' to intentionally remove the changelog header (as defined in cliff.toml),\n# so that only the changes section is extracted for embedding in the release notes.\nif [ -n \"$PREVIOUS_TAG\" ] && [ \"$PREVIOUS_TAG\" != \"$CURRENT_TAG\" ]; then\n  # Generate changelog for the range between previous and current tag\n  git-cliff --strip header --tag \"$CURRENT_TAG\" \"$PREVIOUS_TAG..$CURRENT_TAG\" > changelog_section.md\nelse\n  # First release - get all commits\n  git-cliff --strip header --tag \"$CURRENT_TAG\" > changelog_section.md\nfi\n\n# Build complete release notes with installation instructions\ncat > release_notes.md << 'EOF'\n## What's Changed\n\nEOF\n\ncat changelog_section.md >> release_notes.md\n\ncat >> release_notes.md << 'EOF'\n\n## Installation\n\nEOF\n\n# Add pre-release specific installation instructions\nif [[ \"$VERSION\" == *\"a\"* ]] || [[ \"$VERSION\" == *\"b\"* ]] || [[ \"$VERSION\" == *\"rc\"* ]]; then\n  cat >> release_notes.md << EOF\n**This is a pre-release version.** Install with:\n\\`\\`\\`bash\npip install --pre code-weaver\n# Or specific version:\npip install code-weaver==$VERSION\n\\`\\`\\`\nEOF\nelse\n  cat >> release_notes.md << 'EOF'\nInstall from PyPI:\n```bash\npip install code-weaver\n```\nEOF\nfi\n\ncat >> release_notes.md << 'EOF'\n\nOr download the wheel/source distribution from the assets below.\n\n## Verification\n\nAll release artifacts are built from source and include:\n- \U0001F4E6 Wheel distribution (.whl)\n- \U0001F4E6 Source distribution (.tar.gz)\n\nEOF\n\nif [ -n \"$PREVIOUS_TAG\" ]; then\n  echo \"**Full Changelog**: https://github.com/knitli/codeweaver/compare/$PREVIOUS_TAG...$CURRENT_TAG\" >> release_notes.md\nelse\n  echo \"**Full Changelog**: https://github.com/knitli/codeweaver/commits/$CURRENT_TAG\" >> release_notes.md\nfi\n"
+      - name: Prepend release section to CHANGELOG.md
+        # Non-destructive: git-cliff --prepend only inserts the new release
+        # section above existing content. The curated v0.1.0 history (and any
+        # later manual edits) below the BEGIN-CURATED-HISTORY marker is preserved.
+        # Skipped on prereleases to keep CHANGELOG.md focused on stable releases.
+        if: ${{ !(contains(steps.version.outputs.version, 'a') || contains(steps.version.outputs.version, 'b') || contains(steps.version.outputs.version, 'rc')) }}
+        run: |
+          git-cliff --tag "${{ steps.version.outputs.tag }}" --prepend CHANGELOG.md
+          if git diff --quiet -- CHANGELOG.md; then
+            echo "CHANGELOG.md already up to date"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add CHANGELOG.md
+            git commit -m "docs(changelog): prepend ${{ steps.version.outputs.tag }} [skip ci]"
+            # Push to default branch; tag pushes are detached so target main explicitly
+            git push origin HEAD:main
+          fi
       - name: Create GitHub Release
         uses: softprops/action-gh-release@5be0e66d93ac7ed76da52eca8bb058f665c3a5fe
         with:

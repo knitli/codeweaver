@@ -241,6 +241,7 @@ if TYPE_CHECKING:
     from codeweaver.core.dependencies.utils import (
         ensure_container_initialized,
         ensure_settings_initialized,
+        ensure_settings_initialized_async,
     )
     from codeweaver.core.di.container import (
         Container,
@@ -1065,6 +1066,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ensure_container_initialized": (__spec__.parent, "dependencies.utils"),
     "ensure_iterable": (__spec__.parent, "utils.general"),
     "ensure_settings_initialized": (__spec__.parent, "dependencies.utils"),
+    "ensure_settings_initialized_async": (__spec__.parent, "dependencies.utils"),
     "file_is_binary": (__spec__.parent, "utils.checks"),
     "FilterID": (__spec__.parent, "config._logging"),
     "find_config_paths": (__spec__.parent, "language"),
@@ -1635,6 +1637,7 @@ __all__ = (
     "ensure_container_initialized",
     "ensure_iterable",
     "ensure_settings_initialized",
+    "ensure_settings_initialized_async",
     "file_is_binary",
     "find_config_paths",
     "find_identifiable_info",

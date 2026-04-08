@@ -1267,7 +1267,7 @@ _LANG_PATTERNS_COMPILED: dict[
 _generic_patterns_compiled: tuple[tuple[SemanticClass, re.Pattern[str]], ...] | None = None
 
 
-@lru_cache(maxsize=32)
+# Performance: Removed redundant @lru_cache(maxsize=32) as caching is natively handled via _LANG_PATTERNS_COMPILED
 def _get_lang_patterns(
     language: SemanticSearchLanguage,
 ) -> tuple[tuple[SemanticClass, re.Pattern[str]], ...]:

@@ -154,7 +154,7 @@ def validate_conversion(
                 return False
             inputs = tokenizer(
                 text, padding=True, truncation=True, return_tensors="pt", max_length=32768
-            )  # ty:ignore[call-non-callable]
+            )
             print(f"    Tokenizer outputs: {list(inputs.keys())}")
             print(f"    Tokenized input_ids shape: {inputs['input_ids'].shape}")
             for input_name in onnx_model.input_names:

@@ -8,7 +8,8 @@
 # It seems 'codeweaver' is too similar to 'codeweave' on PyPI, so we use 'code-weaver' as the package name
 name = "code-weaver"
 description = "Extensible MCP server for semantic code search with plugin architecture supporting multiple embedding providers, vector databases, and data sources."
-readme = { file = "README.md", content-type = "text/markdown" }
+# readme is dynamic; see [tool.hatch.metadata.hooks.fancy-pypi-readme] and the
+# `dynamic` declaration further down in this [project] table.
 requires-python = ">=3.12"
 license = "MIT OR Apache-2.0"
 license-files = [
@@ -113,7 +114,7 @@ classifiers = [
 # the workspace sibling lines (`code-weaver-daemon`, `code-weaver-tokenizers`)
 # with `=={{ version }}` keeps every published wheel pinned to the same VCS-
 # derived version with zero hand-maintained version strings.
-dynamic = ["dependencies", "optional-dependencies", "version"]
+dynamic = ["dependencies", "optional-dependencies", "readme", "version"]
 
 [project.urls]
 Changelog = "https://github.com/knitli/codeweaver/blob/main/CHANGELOG.md"
@@ -140,6 +141,7 @@ dev = [
   { include-group = "test" },
 ]
 build = [
+  "hatch-fancy-pypi-readme>=24.1.0",
   "hatchling>=1.29.0",
   "uv-dynamic-versioning>=0.14.0",
   { include-group = "docs" },
@@ -182,13 +184,11 @@ test = [
 
 [build-system]
 requires = [
+  "hatch-fancy-pypi-readme>=24.1.0",
   "hatchling>=1.29.0",
   "uv-dynamic-versioning>=0.14.0",
 ]
 build-backend = "hatchling.build"
-
-# TODO: Integrate hatch plugins for:
-#  - readme: https://github.com/hynek/hatch-fancy-pypi-readme
 
 [tool.coverage.run]
 concurrency = ["multiprocessing", "thread"]
@@ -234,7 +234,51 @@ exclude_also = [
   "raise AssertionError",
   "raise NotImplementedError",
   '\s*def .*\)\s*->\s*TypeIs\[.+\]:[\n\sA-za-z0-9_-]+?\n\n',
+  # bracket/syntax only lines:
+  '''\s*[\[\]{}()]+\s*''',
 ]
+
+# --------------------------------------------------------------------------- #
+# README rewriting for PyPI
+# --------------------------------------------------------------------------- #
+# PyPI renders the README in isolation, so any relative links/images in
+# README.md break (e.g. the logo and any in-repo doc links). hatch-fancy-pypi-
+# readme rewrites those relative paths to absolute GitHub URLs at build time,
+# while leaving README.md itself untouched for GitHub rendering.
+#
+# Images use raw.githubusercontent.com so they render inline; doc links use
+# github.com/blob/main so they navigate to the rendered file. Both are pinned
+# to `main` rather than the release tag — slightly less precise but avoids a
+# circular dep between version resolution and build metadata.
+#
+# Docs: https://github.com/hynek/hatch-fancy-pypi-readme
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+# 1. <img src="relative/path"> → raw.githubusercontent absolute URL
+#    Matches any HTML <img> whose src is not already absolute (http(s)/data:/#).
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '(<img\b[^>]*?\bsrc=")(?!https?://|data:|#)([^"]+)(")'
+replacement = '\g<1>https://raw.githubusercontent.com/knitli/codeweaver/main/\g<2>\g<3>'
+
+# 2. Reference-style link defs: `[label]: <relative/path>` or `[label]: relative/path`
+#    Rewrites only the relative ones; leaves http(s)/mailto/anchor targets alone.
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '(?m)^(\[[^\]]+\]:\s*)<(?!https?://|mailto:|#)([^>]+)>'
+replacement = '\g<1><https://github.com/knitli/codeweaver/blob/main/\g<2>>'
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '(?m)^(\[[^\]]+\]:\s*)(?!<|https?://|mailto:|#)(\S+)'
+replacement = '\g<1>https://github.com/knitli/codeweaver/blob/main/\g<2>'
+
+# 3. Inline markdown links `](relative/path)` (defensive — README currently
+#    uses reference style, but inline links may sneak in later).
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '\]\((?!https?://|mailto:|#)([^)]+)\)'
+replacement = '](https://github.com/knitli/codeweaver/blob/main/\g<1>)'
 
 # =============================================================================
 # uv-dynamic-versioning metadata hook
@@ -872,6 +916,12 @@ unsupported-operator = "ignore"
 no-matching-overload = "ignore"
 
 [[tool.ty.overrides]]
+include = ["src/codeweaver/providers/embedding/capabilities/*.py"]
+
+[tool.ty.overrides.rules]
+missing-typed-dict-key = "ignore"
+
+[[tool.ty.overrides]]
 include = [
   "src/codeweaver/__init__.py",
   "src/codeweaver/semantic/classifications.py"
@@ -941,12 +991,6 @@ override-dependencies = [
   # which conflicts with the cffi<2.0 build constraint needed for 3.13t.
   # On 3.14+, cryptography 46+ resolves naturally (has pre-built wheels + cffi 2.0 works).
   "cryptography==45.0.7; python_version == '3.13'",
-]
-# Constrain cffi in build isolation environments. override-dependencies only affects
-# runtime resolution; when cryptography builds from source on 3.13t, its build env
-# pulls cffi>=1.12 independently. This prevents cffi 2.0 from entering build envs.
-build-constraint-dependencies = [
-  "cffi<2.0; python_version == '3.13'",
 ]
 prerelease = "allow"
 

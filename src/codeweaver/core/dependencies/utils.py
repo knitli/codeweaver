@@ -48,11 +48,37 @@ def _try_to_resolve_settings() -> bool:
 
 
 def ensure_settings_initialized() -> None:
-    """Ensure settings are initialized in the DI container.
+    """Ensure settings are initialized in the DI container (sync version).
 
-    This is necessary before importing any modules that depend on settings, to avoid
-    circular import issues. It can be called at the top of any module that needs to
-    use settings.
+    This checks if settings exist in the container but does NOT attempt async bootstrap.
+    Safe to call at module import time — returns silently if settings are not yet available.
+
+    Settings will be bootstrapped later via the async startup path. Use this in sync contexts
+    where the goal is to initialize the container and mark settings ready if they already exist.
+
+    Note:
+        For async contexts or initial bootstrap, use ensure_settings_initialized_async()
+        instead, which properly awaits the bootstrap process.
+    """
+    if globals()["_container_initialized"] is False:
+        ensure_container_initialized()
+    # If settings aren't found yet, that's OK — they'll be bootstrapped later
+    # in an async context via ensure_settings_initialized_async()
+    if globals()["_settings_initialized"] is False and _try_to_resolve_settings():
+        globals()["_settings_initialized"] = True
+
+
+async def ensure_settings_initialized_async() -> None:
+    """Ensure settings are initialized in the DI container (async version).
+
+    This should be called from async contexts to properly bootstrap settings.
+    It will await the async bootstrap_settings() if needed.
+
+    This is the preferred way to initialize settings during application startup,
+    as it properly handles the async nature of the bootstrap process.
+
+    Raises:
+        Exception: If settings initialization fails
     """
     if globals()["_container_initialized"] is False:
         ensure_container_initialized()
@@ -60,8 +86,12 @@ def ensure_settings_initialized() -> None:
         if not _try_to_resolve_settings():
             from codeweaver.core.dependencies.core_settings import bootstrap_settings
 
-            bootstrap_settings()
+            await bootstrap_settings()
         globals()["_settings_initialized"] = True
 
 
-__all__ = ("ensure_container_initialized", "ensure_settings_initialized")
+__all__ = (
+    "ensure_container_initialized",
+    "ensure_settings_initialized",
+    "ensure_settings_initialized_async",
+)

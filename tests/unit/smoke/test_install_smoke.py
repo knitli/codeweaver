@@ -35,18 +35,22 @@ import sys
 import pytest
 
 
-def _run_probe(code: str, timeout: float = 30.0) -> subprocess.CompletedProcess[str]:
+def _run_probe(code: str, timeout: float = 15.0) -> subprocess.CompletedProcess[str]:
     """Execute a short Python probe in a fresh subprocess and return the result.
 
     Uses `sys.executable` so the subprocess runs in the same venv as pytest.
     Tests are responsible for asserting on returncode, stdout, and stderr.
+
+    Timeout note: the module docstring's "~2 seconds per test" target reflects
+    what a successful probe should take on a lean install profile; the 15s
+    timeout is a deadlock/hang backstop, not the expected budget. Cold-start
+    `import codeweaver` in a full-gpu dev env can take 8-10s because
+    transitive imports pull in torch, transformers, and onnxruntime, so
+    dropping below ~15s would produce false positives locally. Lean matrix
+    cells finish in well under 2 seconds.
     """
     return subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=timeout,
+        [sys.executable, "-c", code], capture_output=True, text=True, check=False, timeout=timeout
     )
 
 
@@ -93,16 +97,21 @@ def test_public_api_importable() -> None:
     are selected. This test catches top-level import failures in the package
     root and the `find_code` re-export chain.
     """
+    # The contract is "callable", not "plain function". find_code could
+    # legitimately become a `functools.partial`, a class with __call__, or
+    # a decorator-wrapped function in the future — any of those still
+    # satisfies `from codeweaver import find_code; find_code(...)`. Assert
+    # on behavior (callable), not on `type(find_code).__name__`.
     result = _run_probe(
         "from codeweaver import find_code\n"
         "assert callable(find_code), f'find_code is not callable: {type(find_code).__name__}'\n"
-        "print('PROBE_RESULT:' + type(find_code).__name__)"
+        "print('PROBE_RESULT:callable')"
     )
     _assert_clean(result, "`from codeweaver import find_code`")
     last_line = _last_nonempty_line(result.stdout)
-    assert last_line == "PROBE_RESULT:function", (
-        f"Expected `find_code` to be a function (last stdout line "
-        f"'PROBE_RESULT:function'), got: {last_line!r}\n"
+    assert last_line == "PROBE_RESULT:callable", (
+        f"Expected `find_code` to be callable (last stdout line "
+        f"'PROBE_RESULT:callable'), got: {last_line!r}\n"
         f"full stdout:\n{result.stdout}"
     )
 
