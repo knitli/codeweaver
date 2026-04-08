@@ -18,8 +18,9 @@ ARG VCS_REF
 
 # Install uv for workspace-aware package building
 # uv-dynamic-versioning derives a single VCS version for all workspace packages;
-# pip alone cannot replicate this because the workspace member pyproject.toml files
-# do not individually configure the versioning hook.
+# uv build ensures all workspace members resolve the same git-derived version
+# consistently, which is critical for the root package's exact-version pins
+# on code-weaver-daemon and code-weaver-tokenizers.
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 # Install system dependencies required for building Python packages
