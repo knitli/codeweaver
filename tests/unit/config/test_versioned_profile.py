@@ -263,7 +263,7 @@ class TestVersionedProfileIntegrationWithCollectionMetadata:
         """Test that profile detects incompatible collection version."""
         is_valid, error = sample_profile.validate_against_collection("recommended", "1.0.0")
         assert not is_valid
-        assert "Incompatible versions" in error  # type: ignore[operator]
+        assert "Incompatible versions" in str(error)
 
     def test_profile_validation_detects_name_mismatch(
         self, sample_profile: VersionedProfile
@@ -271,4 +271,4 @@ class TestVersionedProfileIntegrationWithCollectionMetadata:
         """Test that profile detects profile name mismatch."""
         is_valid, error = sample_profile.validate_against_collection("quickstart", "0.1.0")
         assert not is_valid
-        assert "Profile name mismatch" in error  # type: ignore[operator]
+        assert "Profile name mismatch" in str(error)

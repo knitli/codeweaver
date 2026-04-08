@@ -315,7 +315,7 @@ def _setup_server[TransportT: Literal["stdio", "streamable-http"]](
         run_args = setup_runargs(run_args, host, port, verbose=verbose, debug=debug)
     app = FastMCP(
         "CodeWeaver",
-        **(mutable_args | {"icons": [lateimport("codeweaver.server", "CODEWEAVER_SVG_ICON")]}),
+        **(mutable_args | {"icons": [lateimport("codeweaver.server", "CODEWEAVER_SVG_ICON")]}),  # ty:ignore[invalid-argument-type]
     )
     app = register_tools(app)
     app = register_middleware(app, cast(list[type[McpMiddleware]], middleware), middleware_opts)

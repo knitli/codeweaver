@@ -3,11 +3,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 import createConfig from "@knitli/astro-docs-template/config";
-import { DocsAssets } from "@knitli/docs-components";
 import type { DocsTemplateOptions } from "@knitli/astro-docs-template/config";
 import { remarkVersion } from "./src/plugins/remark-version";
-
-const { codeweaverPrimary, codeweaverReverse } = DocsAssets;
 
 const configOptions: DocsTemplateOptions = {
   appName: "CodeWeaver",
@@ -37,8 +34,6 @@ const configOptions: DocsTemplateOptions = {
       "yaml"
     ]
   },
-  logoDark: codeweaverReverse,
-  logoLight: codeweaverPrimary,
   siderbarConfig: [
     {
       label: 'Getting Started',

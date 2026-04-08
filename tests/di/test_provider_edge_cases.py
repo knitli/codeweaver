@@ -230,7 +230,7 @@ def test_provider_generator_that_yields_none(clean_registry):
     """Test generator that yields None."""
 
     @dependency_provider(ServiceA, scope="singleton")
-    def create_none() -> Iterator[ServiceA]:
+    def create_none() -> Iterator[ServiceA | None]:
         yield None
 
     # Should register and allow resolution
