@@ -230,7 +230,7 @@ async def start_cw_services(
             )
 
         try:
-            if tasks_to_wait := [t for t in [management_server.server_task, mcp_server_task] if t]:
+            if tasks_to_wait := [t for t in (management_server.server_task, mcp_server_task) if t]:
                 # Create a task that monitors the shutdown event
                 async def wait_for_shutdown() -> None:
                     """Wait for shutdown signal from management API."""
