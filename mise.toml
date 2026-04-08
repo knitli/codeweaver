@@ -273,7 +273,7 @@ run_windows = [
   "uvx ruff format .",
   "uvx ruff check --fix ."
 ]
-sources = ["{src,scripts,tests,mise-tasks}/*.py"]
+sources = ["{src,scripts,tests,mise-tasks}/**/*.py"]
 
 [tasks.fix-python-unsafe]
 description = "Fix Python code with unsafe fixes and pattern transformations (may make unintended changes)"
