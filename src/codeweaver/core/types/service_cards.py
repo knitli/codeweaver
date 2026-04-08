@@ -13,6 +13,7 @@ To allow for lazy loading and prevent circular imports, we put the mappings in t
 from __future__ import annotations
 
 import asyncio
+import inspect
 import re
 
 from collections import defaultdict
@@ -974,6 +975,55 @@ async def _start_factory_cls_in_thread(
     return await asyncio.to_thread(cls, *args, **filtered_kwargs)
 
 
+async def _start_filtered_instance_in_thread(
+    cls: type[Any], card: ServiceCard, *args: Any, **kwargs: Any
+) -> Any:
+    """Handler that inspects `cls.__init__` and drops kwargs the target doesn't accept.
+
+    Used for SDK clients whose constructor signature is narrower than the
+    shared ClientOptions pydantic model that configures them, so that
+    `ClientOptions.as_settings()` can over-dump safely without crashing
+    the target. Concrete example:
+
+      - `SentenceTransformersClientOptions` has `truncate_dim` and
+        `use_auth_token` fields (inherited from `SentenceTransformer`'s
+        superset of ST-family kwargs).
+      - `SparseEncoder.__init__` (new-in-ST-5.x class) accepts neither
+        and raises `TypeError: SparseEncoder.__init__() got an unexpected
+        keyword argument 'truncate_dim'`.
+      - `CrossEncoder.__init__` also rejects several of the same fields
+        (`modules`, `prompts`, `default_prompt_name`, `similarity_fn_name`,
+        `truncate_dim`).
+
+    Rather than maintaining per-target ClientOptions subclasses that
+    mirror every SDK class's exact signature (and needing to update them
+    whenever the SDK narrows or widens), inspect the target class at
+    handler-invocation time and drop any kwarg it doesn't declare. If
+    the target's `__init__` accepts `**kwargs`, pass everything through
+    unchanged — that preserves current behavior for lenient SDKs.
+
+    Filter is idempotent and safe to apply to any target; if the target's
+    signature matches the passed kwargs exactly, it's a no-op.
+    """
+    try:
+        sig = inspect.signature(cls.__init__)
+    except (ValueError, TypeError):
+        # Signature not introspectable (e.g. C extension class) — bail
+        # out to no-filtering. Same behavior as plain cls(**kwargs).
+        filtered = kwargs
+    else:
+        params = sig.parameters
+        accepts_var_kw = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()
+        )
+        if accepts_var_kw:
+            filtered = kwargs
+        else:
+            accepted = {name for name in params if name != "self"}
+            filtered = {k: v for k, v in kwargs.items() if k in accepted}
+    return await asyncio.to_thread(cls, *args, **filtered)
+
+
 async def _start_cross_encoder_in_thread(
     get_cls_fn: Any, card: ServiceCard, *args: Any, **kwargs: Any
 ) -> Any:
@@ -1052,7 +1102,14 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             ),
             lateimport("sentence_transformers", "SparseEncoder"),
             "sentence_transformers",
-            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
+            # SparseEncoder.__init__ has a narrower signature than the
+            # shared SentenceTransformersClientOptions pydantic model that
+            # configures it — notably it doesn't accept `truncate_dim` or
+            # `use_auth_token`, both of which ClientOptions.as_settings()
+            # dumps unconditionally. Use the filtered handler so those get
+            # dropped at call time instead of blowing up with
+            # `TypeError: got an unexpected keyword argument 'truncate_dim'`.
+            metadata=ServiceMetadata(client_handler=_start_filtered_instance_in_thread),
         ),
         service_card_factory(
             "sentence_transformers",
@@ -1063,7 +1120,11 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             ),
             lateimport("sentence_transformers", "CrossEncoder"),
             "sentence_transformers",
-            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
+            # CrossEncoder also has a narrower signature than the ST
+            # client_options (missing `modules`, `prompts`,
+            # `default_prompt_name`, `similarity_fn_name`, `truncate_dim`).
+            # Use the same filtered handler as the sparse card.
+            metadata=ServiceMetadata(client_handler=_start_filtered_instance_in_thread),
         ),
     ]
 

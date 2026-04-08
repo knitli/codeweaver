@@ -54,6 +54,8 @@ on:
         required: false
       VOYAGE_API_KEY:
         required: false
+      HF_TOKEN:
+        required: false
     outputs:
       benchmark-available:
         description: Whether benchmark results were generated
@@ -95,6 +97,7 @@ jobs:
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
       MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:

@@ -40,6 +40,7 @@ jobs:
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     with:
       python-versions: '["3.12", "3.13", "3.14"]'
       # Run everything except docker, qdrant, skip_ci, and flaky tests
@@ -56,6 +57,7 @@ jobs:
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     with:
       python-versions: '["3.12", "3.13", "3.14"]'
       # Run everything except docker, qdrant, skip_ci, and flaky tests
@@ -73,6 +75,7 @@ jobs:
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     with:
       python-versions: '["3.12", "3.13", "3.14"]'
       # Run everything except docker, qdrant, skip_ci, and flaky tests
@@ -90,6 +93,7 @@ jobs:
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     with:
       benchmark-tests: true
       python-versions: '["3.12"]'
