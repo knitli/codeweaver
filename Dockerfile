@@ -16,6 +16,12 @@ ARG VERSION
 ARG BUILD_DATE
 ARG VCS_REF
 
+# Install uv for workspace-aware package building
+# uv-dynamic-versioning derives a single VCS version for all workspace packages;
+# pip alone cannot replicate this because the workspace member pyproject.toml files
+# do not individually configure the versioning hook.
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+
 # Install system dependencies required for building Python packages
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -30,7 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy dependency files first for better layer caching
-COPY pyproject.toml README.md SECURITY.md sbom.spdx ./
+COPY pyproject.toml uv.lock README.md SECURITY.md sbom.spdx ./
 COPY LICENSE* ./
 COPY LICENSES/ LICENSES/
 COPY packages/ packages/
@@ -42,19 +48,24 @@ COPY typings/ typings/
 RUN mkdir -p src/codeweaver && \
     echo "# Placeholder for initial build" > src/codeweaver/__init__.py
 
-# Install dependencies BEFORE copying source code and .git
-# This layer is cached unless pyproject.toml changes
-# Note: In some CI environments, you may need to skip SSL verification
-# If you encounter SSL errors, you can add --trusted-host pypi.org --trusted-host files.pythonhosted.org
+# Build all workspace wheels with consistent VCS-derived versions.
+# uv-dynamic-versioning ensures code-weaver, code-weaver-daemon, and
+# code-weaver-tokenizers all share the same git-tag-derived version, so
+# the root wheel's `code-weaver-daemon=={{ version }}` pin resolves.
+RUN uv build --wheel --all-packages --out-dir /tmp/wheels
+
+# Install the pre-built wheels and their PyPI dependencies
 # hadolint ignore=DL3013
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    python -m pip install --no-cache-dir ./packages/codeweaver-daemon ./packages/codeweaver-tokenizers .
+    python -m pip install --no-cache-dir /tmp/wheels/*.whl
 
 # NOW copy source code (frequent changes don't trigger dependency reinstall)
 COPY src/ src/
 
-# Reinstall package with actual source code (fast, dependencies already installed)
-RUN python -m pip install --no-cache-dir --no-deps --force-reinstall ./packages/codeweaver-daemon ./packages/codeweaver-tokenizers .
+# Rebuild root package with actual source code (workspace members already have
+# real source from the packages/ COPY above) and reinstall without re-resolving deps
+RUN uv build --wheel --out-dir /tmp/wheels-final && \
+    python -m pip install --no-cache-dir --no-deps --force-reinstall /tmp/wheels-final/code_weaver-*.whl
 
 # =============================================================================
 # Stage 2: Runtime - Minimal production image
