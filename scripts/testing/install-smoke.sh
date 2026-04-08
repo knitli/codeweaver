@@ -31,8 +31,8 @@
 set -e
 
 if [ "$#" -lt 3 ]; then
-  echo "usage: install-smoke.sh VENV_PY DIST_DIR PROFILE [JUNIT_OUT]" >&2
-  exit 2
+	echo "usage: install-smoke.sh VENV_PY DIST_DIR PROFILE [JUNIT_OUT]" >&2
+	exit 2
 fi
 
 VENV_PY="$1"
@@ -48,15 +48,15 @@ DAEMON_WHEEL=$(find "$DIST_DIR" -maxdepth 1 -type f -name 'code_weaver_daemon-*.
 TOKENIZERS_WHEEL=$(find "$DIST_DIR" -maxdepth 1 -type f -name 'code_weaver_tokenizers-*.whl' -print -quit)
 
 if [ -z "$ROOT_WHEEL" ] || [ -z "$DAEMON_WHEEL" ] || [ -z "$TOKENIZERS_WHEEL" ]; then
-  echo "ERROR: one or more workspace wheels missing from ${DIST_DIR}" >&2
-  ls -la "$DIST_DIR" >&2 || true
-  exit 1
+	echo "ERROR: one or more workspace wheels missing from ${DIST_DIR}" >&2
+	ls -la "$DIST_DIR" >&2 || true
+	exit 1
 fi
 
 if [ "$PROFILE" = "base" ]; then
-  ROOT_SPEC="$ROOT_WHEEL"
+	ROOT_SPEC="$ROOT_WHEEL"
 else
-  ROOT_SPEC="${ROOT_WHEEL}[${PROFILE}]"
+	ROOT_SPEC="${ROOT_WHEEL}[${PROFILE}]"
 fi
 
 # Install the root wheel with its profile's extras plus the two workspace
@@ -65,14 +65,14 @@ fi
 # pytest + plugins are installed because the smoke suite needs a test runner
 # but the wheel itself (correctly) doesn't ship dev dependencies.
 uv pip install \
-  --python "$VENV_PY" \
-  --find-links "$DIST_DIR" \
-  "$ROOT_SPEC" \
-  "$DAEMON_WHEEL" \
-  "$TOKENIZERS_WHEEL" \
-  "pytest>=9" \
-  "pytest-asyncio>=1" \
-  "pytest-timeout>=2"
+	--python "$VENV_PY" \
+	--find-links "$DIST_DIR" \
+	"$ROOT_SPEC" \
+	"$DAEMON_WHEEL" \
+	"$TOKENIZERS_WHEEL" \
+	"pytest>=9" \
+	"pytest-asyncio>=1" \
+	"pytest-timeout>=2"
 
 # Pytest invocation notes:
 #   -o "addopts=" clears the project's --cov-fail-under / --cov=codeweaver
@@ -85,20 +85,20 @@ uv pip install \
 #     wheel, defeating the entire isolation.
 #   --import-mode=importlib matches the rest of the project's test runner.
 if [ -n "$JUNIT_OUT" ]; then
-  "$VENV_PY" -m pytest \
-    tests/unit/smoke \
-    -m install_smoke \
-    -o "addopts=" \
-    -o "pythonpath=" \
-    --import-mode=importlib \
-    --junit-xml="$JUNIT_OUT" \
-    -v
+	"$VENV_PY" -m pytest \
+		tests/unit/smoke \
+		-m install_smoke \
+		-o "addopts=" \
+		-o "pythonpath=" \
+		--import-mode=importlib \
+		--junit-xml="$JUNIT_OUT" \
+		-v
 else
-  "$VENV_PY" -m pytest \
-    tests/unit/smoke \
-    -m install_smoke \
-    -o "addopts=" \
-    -o "pythonpath=" \
-    --import-mode=importlib \
-    -v
+	"$VENV_PY" -m pytest \
+		tests/unit/smoke \
+		-m install_smoke \
+		-o "addopts=" \
+		-o "pythonpath=" \
+		--import-mode=importlib \
+		-v
 fi

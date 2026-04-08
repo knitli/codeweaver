@@ -863,4 +863,3 @@ if [ -n "${FAILED_PROFILES}" ]; then
 fi
 echo "${CW_PREFIX}   all profiles green"
 '''
-
