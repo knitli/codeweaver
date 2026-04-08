@@ -7,6 +7,7 @@
 
 [project]
 name = "code-weaver-tokenizers"
+version = "0.1.0"
 description = "Ready-to-use tokenizers for CodeWeaver — tiktoken and HuggingFace tokenizers with a unified interface"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -15,7 +16,7 @@ authors = [
   { name = "Knitli Inc." },
   { name = "Adam Poulemanos", email = "adam@knit.li" },
 ]
-keywords = ["codeweaver", "embeddings", "nlp", "tiktoken", "tokenizers"]
+keywords = ["codeweaver", "tokenizers", "tiktoken", "embeddings", "nlp"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
@@ -33,23 +34,18 @@ dependencies = [
   "tokenizers>=0.22.1",
   "typing_extensions>=4.15.0",
 ]
-# Version is derived from the same git tag as the root code-weaver package
-# via uv-dynamic-versioning, so all three workspace packages always ship with
-# matching versions and the root can pin them with `=={{ version }}` in its
-# metadata hook.
-dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://knitli.com"
-Issues = "https://github.com/knitli/codeweaver/issues"
 Repository = "https://github.com/knitli/codeweaver"
+Issues = "https://github.com/knitli/codeweaver/issues"
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-cov"]
 
 [build-system]
-requires = ["hatchling", "uv-dynamic-versioning>=0.14.0"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.hatch.version]
-source = "uv-dynamic-versioning"
 
 [tool.hatch.build.targets.wheel]
 packages = ["./src/codeweaver_tokenizers"]
@@ -72,10 +68,3 @@ asyncio_mode = "auto"
 
 [tool.ruff.lint]
 per-file-ignores = { "tests/*" = ["S101"] }
-
-[tool.uv-dynamic-versioning]
-vcs = "git"
-style = "pep440"
-bump = true
-dirty = false
-commit-prefix = "g"

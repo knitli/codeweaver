@@ -13,7 +13,6 @@ To allow for lazy loading and prevent circular imports, we put the mappings in t
 from __future__ import annotations
 
 import asyncio
-import inspect
 import re
 
 from collections import defaultdict
@@ -950,80 +949,6 @@ async def _start_instance_in_thread(
     return await asyncio.to_thread(cls, *args, **kwargs)
 
 
-async def _start_factory_cls_in_thread(
-    get_cls_fn: Any, card: ServiceCard, *args: Any, **kwargs: Any
-) -> Any:
-    """Handler for fastembed factory client_cls: call factory first, then instantiate.
-
-    The fastembed embedding/sparse service cards use `get_text_embedder` /
-    `get_sparse_embedder` (zero-arg factory functions) as client_cls. This
-    handler calls the factory to resolve the enhanced TextEmbedding /
-    SparseTextEmbedding class, then instantiates it with the provided kwargs.
-
-    Filters out empty list values before passing kwargs through (same as
-    `_start_cross_encoder_in_thread`). Fastembed's internal constructors for
-    TextEmbedding, SparseTextEmbedding, and TextCrossEncoder all do
-    `device_ids[0]` unconditionally when the key is present, so passing
-    `device_ids=[]` (which `FastEmbedClientOptions._resolve_device_settings`
-    emits when CUDA is unavailable) raises `IndexError: list index out of
-    range` inside the fastembed ONNX setup — well before any of our code
-    sees the exception. Dropping the empty list from kwargs lets fastembed
-    fall through to its CPU default.
-    """
-    cls = get_cls_fn()
-    filtered_kwargs = {k: v for k, v in kwargs.items() if not (isinstance(v, list) and len(v) == 0)}
-    return await asyncio.to_thread(cls, *args, **filtered_kwargs)
-
-
-async def _start_filtered_instance_in_thread(
-    cls: type[Any], card: ServiceCard, *args: Any, **kwargs: Any
-) -> Any:
-    """Handler that inspects `cls.__init__` and drops kwargs the target doesn't accept.
-
-    Used for SDK clients whose constructor signature is narrower than the
-    shared ClientOptions pydantic model that configures them, so that
-    `ClientOptions.as_settings()` can over-dump safely without crashing
-    the target. Concrete example:
-
-      - `SentenceTransformersClientOptions` has `truncate_dim` and
-        `use_auth_token` fields (inherited from `SentenceTransformer`'s
-        superset of ST-family kwargs).
-      - `SparseEncoder.__init__` (new-in-ST-5.x class) accepts neither
-        and raises `TypeError: SparseEncoder.__init__() got an unexpected
-        keyword argument 'truncate_dim'`.
-      - `CrossEncoder.__init__` also rejects several of the same fields
-        (`modules`, `prompts`, `default_prompt_name`, `similarity_fn_name`,
-        `truncate_dim`).
-
-    Rather than maintaining per-target ClientOptions subclasses that
-    mirror every SDK class's exact signature (and needing to update them
-    whenever the SDK narrows or widens), inspect the target class at
-    handler-invocation time and drop any kwarg it doesn't declare. If
-    the target's `__init__` accepts `**kwargs`, pass everything through
-    unchanged — that preserves current behavior for lenient SDKs.
-
-    Filter is idempotent and safe to apply to any target; if the target's
-    signature matches the passed kwargs exactly, it's a no-op.
-    """
-    try:
-        sig = inspect.signature(cls.__init__)
-    except (ValueError, TypeError):
-        # Signature not introspectable (e.g. C extension class) — bail
-        # out to no-filtering. Same behavior as plain cls(**kwargs).
-        filtered = kwargs
-    else:
-        params = sig.parameters
-        accepts_var_kw = any(
-            p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()
-        )
-        if accepts_var_kw:
-            filtered = kwargs
-        else:
-            accepted = {name for name in params if name != "self"}
-            filtered = {k: v for k, v in kwargs.items() if k in accepted}
-    return await asyncio.to_thread(cls, *args, **filtered)
-
-
 async def _start_cross_encoder_in_thread(
     get_cls_fn: Any, card: ServiceCard, *args: Any, **kwargs: Any
 ) -> Any:
@@ -1057,7 +982,7 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             ),
             lateimport("codeweaver.providers.embedding.fastembed_extensions", "get_text_embedder"),
             "fastembed",
-            metadata=ServiceMetadata(client_handler=_start_factory_cls_in_thread),
+            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
         service_card_factory(
             "fastembed",
@@ -1069,7 +994,7 @@ def _build_local_provider_cards() -> list[ServiceCard]:
                 "codeweaver.providers.embedding.fastembed_extensions", "get_sparse_embedder"
             ),
             "fastembed",
-            metadata=ServiceMetadata(client_handler=_start_factory_cls_in_thread),
+            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
         service_card_factory(
             "fastembed",
@@ -1098,28 +1023,11 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             "sparse_embedding",
             lateimport(
                 "codeweaver.providers.embedding.providers.sentence_transformers",
-                # NOTE: class is named `SentenceTransformersSparseProvider`
-                # (no `Embedding` in the middle), matching the
-                # `SparseEmbeddingProvider` generic base. Earlier code in
-                # this card had `SentenceTransformersSparseEmbeddingProvider`
-                # which never existed on disk — lateimport silently failed
-                # at resolution time and raised ValueError from
-                # `create_instance`'s `_resolve()` catch. The latent bug
-                # only surfaced once the testing profile actually routed
-                # sparse through ST on 3.14 (previously it always used
-                # FastEmbed, which hit a different card).
-                "SentenceTransformersSparseProvider",
+                "SentenceTransformersSparseEmbeddingProvider",
             ),
             lateimport("sentence_transformers", "SparseEncoder"),
             "sentence_transformers",
-            # SparseEncoder.__init__ has a narrower signature than the
-            # shared SentenceTransformersClientOptions pydantic model that
-            # configures it — notably it doesn't accept `truncate_dim` or
-            # `use_auth_token`, both of which ClientOptions.as_settings()
-            # dumps unconditionally. Use the filtered handler so those get
-            # dropped at call time instead of blowing up with
-            # `TypeError: got an unexpected keyword argument 'truncate_dim'`.
-            metadata=ServiceMetadata(client_handler=_start_filtered_instance_in_thread),
+            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
         service_card_factory(
             "sentence_transformers",
@@ -1130,11 +1038,7 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             ),
             lateimport("sentence_transformers", "CrossEncoder"),
             "sentence_transformers",
-            # CrossEncoder also has a narrower signature than the ST
-            # client_options (missing `modules`, `prompts`,
-            # `default_prompt_name`, `similarity_fn_name`, `truncate_dim`).
-            # Use the same filtered handler as the sparse card.
-            metadata=ServiceMetadata(client_handler=_start_filtered_instance_in_thread),
+            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
     ]
 

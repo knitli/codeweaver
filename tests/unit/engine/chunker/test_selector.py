@@ -4,8 +4,6 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Tests for ChunkerSelector intelligent routing."""
 
-import logging
-
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -134,7 +132,9 @@ def test_selector_handles_oserror_on_stat(
     chunk_governor: ChunkGovernor, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Verify selector handles OSError gracefully when checking file size."""
-    from codeweaver.engine import GracefulChunker
+    import logging
+
+    from codeweaver.engine import GracefulChunker, SemanticChunker
 
     selector = ChunkerSelector(chunk_governor)
     file = _create_mock_file(Path("test.py"))
@@ -142,21 +142,16 @@ def test_selector_handles_oserror_on_stat(
     # Force stat() to raise OSError
     file.absolute_path.stat.side_effect = OSError("Permission denied")
 
-    # Capture only WARNING+ logs from the selector logger; clear any pre-existing records
-    with caplog.at_level(logging.WARNING, logger="codeweaver.engine.chunker.selector"):
-        caplog.clear()
-        # Should not raise an exception, but proceed and return the chunker
+    caplog.clear()
+
+    # Should not raise an exception, but proceed and return the chunker
+    with caplog.at_level(logging.WARNING):
         chunker = selector.select_for_file(file)
 
     # Returns SemanticChunker wrapped in GracefulChunker because it's a Python file
     assert isinstance(chunker, GracefulChunker)
     assert isinstance(chunker.primary, SemanticChunker)
 
-    # Verify warning was logged using records for precise matching
+    # Verify warning was logged
     warning_records = [r for r in caplog.records if r.levelno == logging.WARNING]
-    assert any("Could not stat file" in r.message for r in warning_records), (
-        "Expected 'Could not stat file' warning to be logged"
-    )
-    assert any("Permission denied" in r.message for r in warning_records), (
-        "Expected 'Permission denied' to appear in the logged warning"
-    )
+    assert any("Could not stat file" in r.message and "Permission denied" in r.message for r in warning_records)

@@ -10,7 +10,7 @@ import contextlib
 
 from collections.abc import Awaitable, Callable, Hashable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, Self, TypedDict, cast
+from typing import Annotated, Any, ClassVar, Literal, Self, TypedDict, cast
 
 import httpx
 
@@ -43,16 +43,7 @@ from codeweaver.providers.config.clients.utils import (
 )
 
 
-# `google` is a namespace package shared by many unrelated libraries
-# (protobuf, grpcio, googleapis-common-protos, google-genai, google-auth, ...),
-# so `has_package("google")` returns True whenever ANY of them is installed,
-# not only when `google-auth` specifically is. Combined with a runtime import,
-# that caused ModuleNotFoundError in environments where a namespace sibling
-# was installed but `google-auth` itself was not (e.g. base installs without
-# the `google` extra that still transitively pulled protobuf). Guarding the
-# import with TYPE_CHECKING makes GoogleCredentials a type-only reference at
-# runtime, matching the pattern used in `clients/agent.py`.
-if TYPE_CHECKING and has_package("google"):
+if has_package("google"):
     from google.auth.credentials import Credentials as GoogleCredentials
 else:
     GoogleCredentials = Any
@@ -78,20 +69,11 @@ if has_package("sentence_transformers"):
     # - model: SentenceTransformer | None
     # So if the configured settings are SentenceTransformersClientOptions
     # Then we need to have these in the namespace for pydantic to resolve
-    try:
-        from sentence_transformers import SentenceTransformer as SentenceTransformer
-        from sentence_transformers.evaluation import SentenceEvaluator as SentenceEvaluator
-        from sentence_transformers.model_card import (
-            SentenceTransformerModelCardData as SentenceTransformerModelCardData,
-        )
-    except ImportError:
-        SentenceTransformer = Any  # type: ignore[assignment, misc]
-        SentenceEvaluator = Any  # type: ignore[assignment, misc]
-        SentenceTransformerModelCardData = Any  # type: ignore[assignment, misc]
-else:
-    SentenceTransformer = Any
-    SentenceEvaluator = Any
-    SentenceTransformerModelCardData = Any
+    from sentence_transformers import SentenceTransformer as SentenceTransformer
+    from sentence_transformers.evaluation import SentenceEvaluator as SentenceEvaluator
+    from sentence_transformers.model_card import (
+        SentenceTransformerModelCardData as SentenceTransformerModelCardData,
+    )
 
 
 class CohereClientOptions(ClientOptions):

@@ -46,8 +46,6 @@ from codeweaver.core.constants import (
     ULTRALIGHT_EMBEDDING_MODEL,
     ULTRALIGHT_RERANKING_MODEL,
     ULTRALIGHT_SPARSE_EMBEDDING_MODEL,
-    ULTRALIGHT_ST_RERANKING_MODEL,
-    ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL,
 )
 from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 from codeweaver.core.types.dataclasses import DataclassSerializationMixin
@@ -64,11 +62,9 @@ from codeweaver.providers.config.categories import (
     AsymmetricEmbeddingProviderSettings,
     DuckDuckGoProviderSettings,
     EmbeddingProviderSettings,
-    FastEmbedEmbeddingProviderSettings,
     FastEmbedRerankingProviderSettings,
     FastEmbedSparseEmbeddingProviderSettings,
     QdrantVectorStoreProviderSettings,
-    SentenceTransformersEmbeddingProviderSettings,
     SentenceTransformersRerankingProviderSettings,
     SparseEmbeddingProviderSettings,
     TavilyProviderSettings,
@@ -310,16 +306,12 @@ def _quickstart_default(
     reranking_model = ModelName(ULTRALIGHT_RERANKING_MODEL)
     return ProviderSettingsDict(
         embedding=(
-            SentenceTransformersEmbeddingProviderSettings(
+            EmbeddingProviderSettings(
                 model_name=embedding_model,
-                embedding_config=SentenceTransformersEmbeddingConfig(model_name=embedding_model),
-                provider=Provider.SENTENCE_TRANSFORMERS,
-            )
-            if HAS_ST
-            else FastEmbedEmbeddingProviderSettings(
-                model_name=embedding_model,
-                embedding_config=FastEmbedEmbeddingConfig(model_name=embedding_model),
-                provider=Provider.FASTEMBED,
+                embedding_config=SentenceTransformersEmbeddingConfig(model_name=embedding_model)
+                if HAS_ST
+                else FastEmbedEmbeddingConfig(model_name=embedding_model),
+                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
             ),
         ),
         sparse_embedding=(
@@ -390,64 +382,26 @@ def _testing_profile(
     from codeweaver.providers.config.providers import ProviderSettingsDict
 
     embedding_model = ULTRALIGHT_EMBEDDING_MODEL if HAS_ST else BACKUP_EMBEDDING_MODEL_FALLBACK
-    # Reranker model depends on the loader backend. FastEmbed loads
-    # jinaai/jina-reranker-v1-tiny-en via its own ONNX path which works
-    # fine; SentenceTransformers CrossEncoder goes through
-    # `AutoConfig.from_pretrained(trust_remote_code=True)` and blows up
-    # because the model's remote configuration_bert.py still imports
-    # `transformers.onnx.OnnxConfig`, which was removed in transformers
-    # 5.x. Pick a different model per backend — cross-encoder/ms-marco-
-    # MiniLM-L6-v2 is a standard BERT-MiniLM architecture with no remote
-    # code trickery and works with sentence-transformers CrossEncoder.
-    reranking_model = (
-        ULTRALIGHT_RERANKING_MODEL if HAS_FASTEMBED else ULTRALIGHT_ST_RERANKING_MODEL
-    )
+    reranking_model = ULTRALIGHT_RERANKING_MODEL
     default_collection = _default_collection_options(
         project_name=project_name, project_path=project_path
     )
-    # Sparse embedder is gated on fastembed availability: FastEmbed uses
-    # qdrant/bm25 on 3.12/3.13, SentenceTransformers SparseEncoder uses
-    # ibm-granite/granite-embedding-30m-sparse on 3.14 where fastembed is
-    # unavailable (py-rust-stemmers has no cp314/cp314t wheels). Every
-    # profile carries dense + sparse + reranking by design — 3.14 should
-    # not regress to a dense-only profile just because fastembed doesn't
-    # build there. SparseEncoder is available in sentence-transformers>=4;
-    # we pin major 5.
-    sparse_embedding_settings: (
-        FastEmbedSparseEmbeddingProviderSettings | SparseEmbeddingProviderSettings
-    ) = (
-        FastEmbedSparseEmbeddingProviderSettings(
+    backup_settings = _quickstart_default("local") | {
+        "sparse_embedding": FastEmbedSparseEmbeddingProviderSettings(
             provider=Provider.FASTEMBED,
             model_name=ModelName(ULTRALIGHT_SPARSE_EMBEDDING_MODEL),
             sparse_embedding_config=FastEmbedSparseEmbeddingConfig(
                 model_name=ModelName(ULTRALIGHT_SPARSE_EMBEDDING_MODEL)
             ),
-        )
-        if HAS_FASTEMBED
-        else SparseEmbeddingProviderSettings(
-            provider=Provider.SENTENCE_TRANSFORMERS,
-            model_name=ModelName(ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL),
-            sparse_embedding_config=SentenceTransformersSparseEmbeddingConfig(
-                model_name=ModelName(ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL)
-            ),
-        )
-    )
-    backup_settings = _quickstart_default("local") | {
-        "sparse_embedding": sparse_embedding_settings,
-        "embedding": (
-            SentenceTransformersEmbeddingProviderSettings(
-                provider=Provider.SENTENCE_TRANSFORMERS,
-                model_name=ModelName(embedding_model),
-                embedding_config=SentenceTransformersEmbeddingConfig(
-                    model_name=ModelName(embedding_model)
-                ),
+        ),
+        "embedding": EmbeddingProviderSettings(
+            provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
+            model_name=ModelName(embedding_model),
+            embedding_config=SentenceTransformersEmbeddingConfig(
+                model_name=ModelName(embedding_model)
             )
             if HAS_ST
-            else FastEmbedEmbeddingProviderSettings(
-                provider=Provider.FASTEMBED,
-                model_name=ModelName(embedding_model),
-                embedding_config=FastEmbedEmbeddingConfig(model_name=ModelName(embedding_model)),
-            )
+            else FastEmbedEmbeddingConfig(model_name=ModelName(embedding_model)),
         ),
         # Testing profile runs entirely locally — no agent provider requiring external API keys.
         "agent": (),
