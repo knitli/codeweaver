@@ -33,6 +33,7 @@ if has_package("sentence_transformers"):
     # So if the configured settings uses SentenceTransformersClientOptions
     # Then we need to have these in the namespace for pydantic to resolve
     try:
+        #! **All three of these must stay in the runtime namespace in order for pydantic to resolve the models**
         from sentence_transformers import SentenceTransformer as SentenceTransformer
         from sentence_transformers.evaluation import SentenceEvaluator as SentenceEvaluator
         from sentence_transformers.model_card import (
