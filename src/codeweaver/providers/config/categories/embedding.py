@@ -86,6 +86,8 @@ from codeweaver.providers.data.utils import get_provider_names_for_category
 logger = logging.getLogger(__name__)
 if has_package("sentence_transformers"):
     try:
+        #! NOTE: **All three of these types MUST be in the runtime namespace** for pydantic to resolve the models.
+        # DO NOT REMOVE.
         from sentence_transformers import SentenceTransformer as SentenceTransformer
         from sentence_transformers.evaluation import SentenceEvaluator as SentenceEvaluator
         from sentence_transformers.model_card import (
