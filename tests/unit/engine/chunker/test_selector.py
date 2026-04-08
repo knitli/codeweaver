@@ -126,3 +126,27 @@ def test_selector_raises_error_for_oversized_file(chunk_governor: ChunkGovernor)
     assert error.max_size_mb == max_size_mb
     assert error.file_path == str(file.absolute_path)
     assert f"{oversized_mb:.2f} MB > {max_size_mb} MB" in str(error)
+
+
+def test_selector_handles_oserror_on_stat(
+    chunk_governor: ChunkGovernor, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Verify selector handles OSError gracefully when checking file size."""
+    from codeweaver.engine import GracefulChunker
+
+    selector = ChunkerSelector(chunk_governor)
+    file = _create_mock_file(Path("test.py"))
+
+    # Force stat() to raise OSError
+    file.absolute_path.stat.side_effect = OSError("Permission denied")
+
+    # Should not raise an exception, but proceed and return the chunker
+    chunker = selector.select_for_file(file)
+
+    # Returns SemanticChunker wrapped in GracefulChunker because it's a Python file
+    assert isinstance(chunker, GracefulChunker)
+    assert isinstance(chunker.primary, SemanticChunker)
+
+    # Verify warning was logged
+    assert "Could not stat file" in caplog.text
+    assert "Permission denied" in caplog.text
