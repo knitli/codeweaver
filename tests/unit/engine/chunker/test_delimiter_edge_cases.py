@@ -19,6 +19,7 @@ import pytest
 from codeweaver.core.types import DelimiterKind
 from codeweaver.engine import ChunkGovernor, DelimiterChunker
 from codeweaver.engine.chunker.delimiter_model import Delimiter
+from codeweaver.engine.chunker.exceptions import BinaryFileError
 
 
 pytestmark = [pytest.mark.unit]
@@ -228,12 +229,18 @@ class TestUnusualPatterns:
                 end="",
                 kind=DelimiterKind.STRUCT,
                 priority=DelimiterKind.STRUCT.default_priority,
+                inclusive=True,
+                take_whole_lines=True,
+                nestable=False,
             ),
             Delimiter(
                 start="type",
                 end="",
                 kind=DelimiterKind.TYPE_ALIAS,
                 priority=DelimiterKind.TYPE_ALIAS.default_priority,
+                inclusive=True,
+                take_whole_lines=True,
+                nestable=False,
             ),
         ]
 
@@ -390,3 +397,12 @@ function another() {
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
 
         assert len(chunks) >= 0, "Should handle unmatched delimiters gracefully"
+
+    def test_binary_file_error(self, delimiter_chunker: DelimiterChunker) -> None:
+        """Verify that a UnicodeEncodeError raises a BinaryFileError.
+
+        This occurs when the content cannot be encoded using utf-8.
+        """
+        invalid_content = "\ud800"
+        with pytest.raises(BinaryFileError):
+            delimiter_chunker.chunk(invalid_content)

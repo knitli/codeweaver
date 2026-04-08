@@ -191,7 +191,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
     @property
     def base_url(self) -> str:
         """Get the base URL for the OpenAI client."""
-        return (
+        return str(
             self.client._base_url  # type: ignore[attr-defined]
             if hasattr(self.client, "_base_url") and self.client._base_url
             else os.getenv("OPENAI_API_BASE_URL", "https://api.openai.com/v1")

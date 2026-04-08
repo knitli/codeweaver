@@ -101,7 +101,7 @@ CodeFilter = DefaultExtensionFilter(
         for pair in CODE_FILES_EXTENSIONS
         if pair.language not in CONFIG_FILE_LANGUAGES
     )
-    + tuple(SemanticSearchLanguage.code_extensions())
+    + tuple(str(ext) for ext in SemanticSearchLanguage.code_extensions())
 )
 
 ConfigFilter = DefaultExtensionFilter(

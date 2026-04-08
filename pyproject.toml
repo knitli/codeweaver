@@ -8,7 +8,8 @@
 # It seems 'codeweaver' is too similar to 'codeweave' on PyPI, so we use 'code-weaver' as the package name
 name = "code-weaver"
 description = "Extensible MCP server for semantic code search with plugin architecture supporting multiple embedding providers, vector databases, and data sources."
-readme = { file = "README.md", content-type = "text/markdown" }
+# readme is dynamic; see [tool.hatch.metadata.hooks.fancy-pypi-readme] and the
+# `dynamic` declaration further down in this [project] table.
 requires-python = ">=3.12"
 license = "MIT OR Apache-2.0"
 license-files = [
@@ -107,89 +108,13 @@ classifiers = [
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
-# Some notes:
-#   - We pin client versions to ensure our `ClientOptions` subclasses work correctly.
-#   - We like to stay toward the edge, so we'll update these regularly but ensure they work first.
-#   -
-# tombi: format.rules.array-values-order.disabled = true
-dependencies = [
-  # * ================ Core Dependencies ==================*
-  "anyio>4.12.0",
-  "blake3>=1.0.8",
-  # We use some pydantic internal/private utilities in dependency resolution
-  # So we pin it to make sure we don't break on minor releases
-  "pydantic==2.12.5",
-  # for, you know, platform dirs
-  "platformdirs>=4.9.4",
-  # psutil used for resource governance/limiting by engine
-  "psutil>=7.2.2",
-  "textcase>=0.4.5",
-  "typing_extensions>=4.15.0; python_version < '3.13'",
-  "uuid7>=0.1.0; python_version < '3.14'",
-  "uvloop>=0.22.1; python_implementation == 'CPython' and platform_system != 'Windows'",
-  # * ================ Core Provider Dependencies ==================*
-  # tokenizers used by stats, telemetry, and all embed/rerank providers (for stats)
-  # no easy way to currently separate out stats-only usage from embedding/rerank usage
-  "code-weaver-tokenizers",
-  # numpy needed for all embedding providers
-  "numpy>=2.4.2",
-  # lazy import handling; spun off from core/utils/lazy_importer into its own package
-  "lateimport>=0.1.0",
-  # retries
-  "tenacity>=9.1.4",
-  # for local providers (sentence-transformers, fastembed) to detect CPU/GPU features
-  "py-cpuinfo>=9.0.0",
-  # * ================ CLI Dependencies ==================*
-  "cyclopts>=4.10.0",
-  "rich>=14.3.3",
-  # * ================ Provider Clients ==================*
-  # we must pin these to specific versions to ensure compatibility with our ClientOptions subclasses
-  "boto3==1.42.19",
-  "cohere==5.20.7",
-  "fastembed==0.7.4; python_version < '3.14'",
-  "google-genai==1.56.0",
-  "huggingface-hub>=1.0.0",
-  "mistralai==1.10.0",
-  "openai==2.28.0",
-  "qdrant-client==1.17.1",
-  "pydantic-ai-slim>=1.68.0",
-  "sentence-transformers==5.2.0; python_version <= '3.14'",
-  # voyageai declares requires_python: <3.14 — uv respects this automatically,
-  # but pip does not filter by requires_python during install, so we must gate it here.
-  "voyageai==0.3.7; python_version < '3.14'",
-  # * ================ Indexing and Engine ==================*
-  # Also known as: the land of python rust extensions
-  # the core code-weaver-daemon package that keeps indexing continuously updated
-  "code-weaver-daemon",
-  # performant rust-based file walker with .gitignore support (pyO3 extensions for `ignore` crate)
-  "rignore>=0.7.6",
-  # performant rust-based file watcher
-  "watchfiles>=1.1.1",
-  # for semantic indexing, but also required for the Semantic package, unsurprisingly
-  # also rust-based.
-  "ast-grep-py>=0.40.3",
-  # * ================ Server and MCP Server Framework ==================*
-  # fastmcp is the core MCP server framework
-  "fastmcp>=3.0.0,<4.0.0",
-  # just used for types but we need them at runtime for Pydantic models
-  "mcp>=1.23.3",
-  # Runs the core admin/management server
-  "uvicorn[standard]>=0.40.0",
-  # * ================ Configuration and Settings ==================*
-  # pydantic-settings with toml and yaml support for config files
-  "pydantic-settings[toml,yaml]>=2.13.1",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
-  # For writing toml config files
-  "tomli-w>=1.2.0",
-  # * ================ Telemetry and Observability ==================*
-  # It's telemetry. Our implementation is lightweight and privacy-focused.
-  "posthog>=7.9.12",
-
-  #! Not yet used, but planned for future releases
-  # * ================ Future Dependencies ==================*
-  # for advanced pipeline management and orchestration
-  # "pydantic-graph>=1.39.0",
-]
-dynamic = ["version"]
+# `dependencies` and `optional-dependencies` are populated at build time by
+# the uv-dynamic-versioning metadata hook (see
+# [tool.hatch.metadata.hooks.uv-dynamic-versioning] below). Templating only
+# the workspace sibling lines (`code-weaver-daemon`, `code-weaver-tokenizers`)
+# with `=={{ version }}` keeps every published wheel pinned to the same VCS-
+# derived version with zero hand-maintained version strings.
+dynamic = ["dependencies", "optional-dependencies", "readme", "version"]
 
 [project.urls]
 Changelog = "https://github.com/knitli/codeweaver/blob/main/CHANGELOG.md"
@@ -202,136 +127,27 @@ Repository = "https://github.com/knitli/codeweaver"
 codeweaver = "codeweaver.cli.__main__:main"
 cw = "codeweaver.cli.__main__:main"
 
-[project.optional-dependencies]
-# ==== Providers ====
-anthropic = ["pydantic-ai-slim[anthropic]"]
-# eunomia middleware - see https://gofastmcp.com/integrations/eunomia-authorization
-auth-eunomia = ["eunomia-mcp"]
-# ==== Authentication and Authorization Middleware ====
-# Optional middleware to add authentication and authorization capabilities to the CodeWeaver server.
-# This allows you to secure your CodeWeaver instance with various authentication providers and authorization policies.
-# The middleware can be used to enforce access control policies, authenticate users, and manage permissions.
-# TODO: Implement authentication and authorization middleware -- should be simple to add
-# permit.io middleware - see https://gofastmcp.com/integrations/permit
-auth-permitio = ["permit-fastmcp"]
-# ==== Authentication and Authorization Middleware/Addons ====
-# Settings/Config Secrets
-aws-secrets-manager = ["pydantic-settings[yaml,toml,aws-secrets-manager]"]
-# does NOT support free-threaded python 3.13 (3.14 is OK) due to cffi dependency in azure-identity
-azure-key-vault = ["pydantic-settings[yaml,toml,azure-key-vault]"]
-bedrock = ["pydantic-ai-slim[bedrock]"]
-cohere = ["pydantic-ai-slim[cohere]"]
-# ==== Data Sources ====
-duckduckgo = ["ddgs"]
-exa = ["exa-py"]
-# fastembed blocked on 3.14 by py-rust-stemmers (no cp314/cp314t wheels)
-fastembed = ["fastembed; python_version < '3.14'", "py-cpuinfo"]
-# Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
-fastembed-gpu = ["fastembed-gpu; python_version < '3.14'", "py-cpuinfo"]
-
-full = [
-  "ddgs",
-  "eunomia-mcp",
-  "exa-py",
-  "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,retries,xai]",
-  # azure-key-vault → azure-identity → cryptography → cffi. On 3.13t (free-threaded),
-  # cryptography has no pre-built wheel and building from source requires Rust + cffi<2.0.
-  # No PEP 508 marker distinguishes 3.13t from 3.13, so we exclude azure-key-vault on all 3.13.
-  # Standard 3.13 users can install azure-identity manually. The _special-dependencies task
-  # handles this for non-free-threaded 3.13 builds.
-  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager]; python_version == '3.13'",
-  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]; python_version != '3.13'",
-  # permit-fastmcp depends on cffi — same 3.13t issue as azure-key-vault
-  "permit-fastmcp; python_version != '3.13'",
-  "sentence-transformers",
-  "tavily-python",
-]
-full-gpu = [
-  "ddgs",
-  "eunomia-mcp",
-  "fastembed-gpu; python_version < '3.14'",
-  "exa-py",
-  "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,retries,xai]",
-  # see full extra comments about cffi/cryptography and free-threaded python 3.13
-  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager]; python_version == '3.13'",
-  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]; python_version != '3.13'",
-  "permit-fastmcp; python_version != '3.13'",
-  "sentence-transformers",
-  # see note below about why this is commented out
-  #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
-  "tavily-python",
-]
-gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
-google = ["pydantic-ai-slim[google]"]
-gpu-support = [
-  "fastembed-gpu; python_version < '3.14'",
-  # see note below about why this is commented out
-  #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
-]
-groq = ["pydantic-ai-slim[groq]"]
-# --- Embedding and Agent Providers --- (no rerank)
-huggingface = ["pydantic-ai-slim[huggingface]"]
-# ==== Vector Stores ====
-in-memory = ["qdrant-client", "tokenizers"]
-mistral = ["pydantic-ai-slim[mistral]"]
-# OpenAI includes support for:
-#   Cerebras, DeekSeek, Ollama, OpenRouter, Vercel, Perplexity, Moonshot, FireworksAI,
-#   TogetherAI, Azure AI Foundry, Heroku, and Github Models
-# which all use the OpenAI API
-openai = ["pydantic-ai-slim[openai]"]
-qdrant = ["qdrant-client"]
-recommended = [
-  "fastembed; python_version < '3.14'",
-  "sentence-transformers",
-  "tokenizers",
-  "py-cpuinfo",
-  "voyageai; python_version < '3.14'",
-  "tavily",
-]
-recommended-local-only = [
-  "fastembed; python_version < '3.14'",
-  "sentence-transformers",
-  "tokenizers",
-  "ddgs",
-  "py-cpuinfo",
-  # openai for ollama local models
-  "pydantic-ai-slim[openai,retries]",
-]
-sentence-transformers = ["sentence-transformers", "py-cpuinfo"]
-tavily = ["tavily"]
-# NOTE: Why not GPU or OpenVino support for sentence-transformers?
-# The underlying runtimes for these packages, when resolved against our other dependencies,
-# essentially require us to choose between support for Python 3.14 and these packages.
-# When python 3.14 is included, then the only compatible build results in transformers version 3.x
-# Which does not have the `SparseEncoder` class required for sparse-encodings.
-# We think the sparse-encoding use case is much broader than GPU or OpenVino acceleration for most users (in fact we always use sparse encodings),
-# so we are leaving these out of the official optional dependencies for now.
-# If you need GPU or OpenVino support, you can install these packages manually in your environment.
-# sentence-transformers-gpu = [
-# GPU requires additional setup
-#  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
-# ]
-# sentence-transformers-openvino = [
-#     "sentence-transformers[openvino]",
-#     "py-cpuinfo",
-# ]
-# voyageai self-excludes on 3.14+ via its own requires_python: <3.14,
-# but pip doesn't filter on requires_python during install, so we gate here too.
-voyageai = ["voyageai; python_version < '3.14'"]
-xai = ["pydantic-ai-slim[xai]"]
+# [project.optional-dependencies] is populated dynamically — see
+# [tool.hatch.metadata.hooks.uv-dynamic-versioning.optional-dependencies] below.
 
 [dependency-groups]
+# `dev` is the composed contributor group: lint + test + helpers + a couple of dev-only tools.
+# Use `uv sync --group dev` to get everything needed for local development.
 dev = [
-  # black is used to format generated code
-  "black>=26.3.1",
-  "ruff>=0.15.6",
   "serena>=0.9.1",
-  "ty>=0.0.25",
-  "uv>=0.11.1",
+  "uv>=0.11.3",
+  { include-group = "dev-helpers" },
+  { include-group = "lint" },
+  { include-group = "test" },
 ]
-build = ["hatchling>=1.28.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.14.0"]
+build = [
+  "hatch-fancy-pypi-readme>=24.1.0",
+  "hatchling>=1.29.0",
+  "uv-dynamic-versioning>=0.14.0",
+  { include-group = "docs" },
+]
 dev-helpers = [
-  "ipython>=9.11.0",
+  "ipython>=9.12.0",
   "jsonlines>=4.0.0",
   "memory-profiler>=0.61.0",
   "pdbpp>=0.12.1",
@@ -339,13 +155,22 @@ dev-helpers = [
   "superclaude>=4.3.0",
 ]
 docs = [
-  "griffe>=2.0.0",
-  "griffe-pydantic>=1.1.0",
+  "griffe>=2.0.2",
+  "griffe-pydantic>=1.3.1",
   "griffe2md>=1.5.0",
 ]
+# Linting/formatting/typecheck — the minimum a contributor needs to pass `mise run check`.
+lint = [
+  # black is used to format generated code
+  "black>=26.3.1",
+  "ruff>=0.15.9",
+  "ty>=0.0.29",
+]
+# Baseline test dependencies. Workspace members inherit this group via `uv sync --group test`
+# from the workspace root, so daemon/tokenizers no longer redeclare pytest et al.
 test = [
   "dirty-equals>=0.11.0",
-  "hypothesis>=6.151.9",
+  "hypothesis>=6.151.11",
   "pytest>=9.0.2",
   "pytest-asyncio>=1.3.0",
   "pytest-cov>=7.1.0",
@@ -359,13 +184,11 @@ test = [
 
 [build-system]
 requires = [
+  "hatch-fancy-pypi-readme>=24.1.0",
   "hatchling>=1.29.0",
   "uv-dynamic-versioning>=0.14.0",
 ]
 build-backend = "hatchling.build"
-
-# TODO: Integrate hatch plugins for:
-#  - readme: https://github.com/hynek/hatch-fancy-pypi-readme
 
 [tool.coverage.run]
 concurrency = ["multiprocessing", "thread"]
@@ -411,7 +234,276 @@ exclude_also = [
   "raise AssertionError",
   "raise NotImplementedError",
   '\s*def .*\)\s*->\s*TypeIs\[.+\]:[\n\sA-za-z0-9_-]+?\n\n',
+  # bracket/syntax only lines:
+  '''\s*[\[\]{}()]+\s*''',
 ]
+
+# --------------------------------------------------------------------------- #
+# README rewriting for PyPI
+# --------------------------------------------------------------------------- #
+# PyPI renders the README in isolation, so any relative links/images in
+# README.md break (e.g. the logo and any in-repo doc links). hatch-fancy-pypi-
+# readme rewrites those relative paths to absolute GitHub URLs at build time,
+# while leaving README.md itself untouched for GitHub rendering.
+#
+# Images use raw.githubusercontent.com so they render inline; doc links use
+# github.com/blob/main so they navigate to the rendered file. Both are pinned
+# to `main` rather than the release tag — slightly less precise but avoids a
+# circular dep between version resolution and build metadata.
+#
+# Docs: https://github.com/hynek/hatch-fancy-pypi-readme
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+# 1. <img src="relative/path"> → raw.githubusercontent absolute URL
+#    Matches any HTML <img> whose src is not already absolute (http(s)/data:/#).
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '(<img\b[^>]*?\bsrc=")(?!https?://|data:|#)([^"]+)(")'
+replacement = '\g<1>https://raw.githubusercontent.com/knitli/codeweaver/main/\g<2>\g<3>'
+
+# 2. Reference-style link defs: `[label]: <relative/path>` or `[label]: relative/path`
+#    Rewrites only the relative ones; leaves http(s)/mailto/anchor targets alone.
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '(?m)^(\[[^\]]+\]:\s*)<(?!https?://|mailto:|#)([^>]+)>'
+replacement = '\g<1><https://github.com/knitli/codeweaver/blob/main/\g<2>>'
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '(?m)^(\[[^\]]+\]:\s*)(?!<|https?://|mailto:|#)(\S+)'
+replacement = '\g<1>https://github.com/knitli/codeweaver/blob/main/\g<2>'
+
+# 3. Inline markdown links `](relative/path)` (defensive — README currently
+#    uses reference style, but inline links may sneak in later).
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '\]\((?!https?://|mailto:|#)([^)]+)\)'
+replacement = '](https://github.com/knitli/codeweaver/blob/main/\g<1>)'
+
+# =============================================================================
+# uv-dynamic-versioning metadata hook
+# =============================================================================
+# This block is the SINGLE SOURCE OF TRUTH for runtime dependencies and
+# optional-dependencies. At wheel build time, hatch invokes the
+# uv-dynamic-versioning metadata hook, which:
+#
+#   1. Resolves the project version from git via [tool.uv-dynamic-versioning]
+#   2. Substitutes `{{ version }}` (and other Jinja vars) into any line below
+#   3. Writes the rendered lists into the wheel METADATA
+#
+# Only the workspace sibling lines (`code-weaver-daemon`, `code-weaver-tokenizers`)
+# are templated. Every other line is plain PEP 508 and passes through unchanged.
+# In dev, `[tool.uv.sources]` further down still routes those names to the
+# workspace, so editable installs are unaffected.
+#
+[tool.hatch.metadata.hooks.uv-dynamic-versioning]
+# tombi: format.rules.array-values-order.disabled = true
+dependencies = [
+  # * ================ Core Dependencies ==================*
+  "anyio>4.12.0",
+  "blake3>=1.0.8",
+  # We use some pydantic internal/private utilities in dependency resolution
+  # So we pin it to make sure we don't break on minor releases
+  "pydantic==2.12.5",
+  # for, you know, platform dirs
+  "platformdirs>=4.9.4",
+  # psutil used for resource governance/limiting by engine
+  "psutil>=7.2.2",
+  "textcase>=0.4.5",
+  "typing_extensions>=4.15.0; python_version < '3.13'",
+  "uuid7>=0.1.0; python_version < '3.14'",
+  "uvloop>=0.22.1; python_implementation == 'CPython' and platform_system != 'Windows'",
+  # * ================ Core Provider Dependencies ==================*
+  # tokenizers used by stats, telemetry, and all embed/rerank providers (for stats)
+  # no easy way to currently separate out stats-only usage from embedding/rerank usage
+  "code-weaver-tokenizers=={{ version }}",
+  # numpy needed for all embedding providers
+  "numpy>=2.4.4",
+  # lazy import handling; spun off from core/utils/lazy_importer into its own package
+  "lateimport>=1.0.1",
+  # retries
+  "tenacity>=9.1.4",
+  # for local providers (sentence-transformers, fastembed) to detect CPU/GPU features
+  "py-cpuinfo>=9.0.0",
+  # * ================ CLI Dependencies ==================*
+  "cyclopts>=4.10.1",
+  "rich>=14.3.3",
+  # * ================ Provider Clients ==================*
+  # Provider SDK pins live in their corresponding optional-dependency extras
+  # (bedrock, cohere, google, huggingface, mistral, openai). They are pinned
+  # there — not here — because their ClientOptions subclasses only need to
+  # resolve when the provider itself is selected, not for a base install.
+  #
+  # Base install ships two clients unconditionally: qdrant (vector store) and
+  # pydantic-ai-slim (agent plumbing). Default local embedder is version-gated
+  # so exactly one resolves per interpreter:
+  #   - fastembed on 3.12/3.13 (blocked on 3.14 by py-rust-stemmers)
+  #   - sentence-transformers on 3.14 (no fastembed wheel)
+  # Default remote embedder is voyageai on 3.12/3.13 (upstream caps at <3.14).
+  "qdrant-client==1.17.1",
+  "pydantic-ai-slim>=1.68.0",
+  "fastembed==0.7.4; python_version < '3.14'",
+  "sentence-transformers==5.2.0; python_version >= '3.14'",
+  # voyageai declares requires_python: <3.14 — uv respects this automatically,
+  # but pip does not filter by requires_python during install, so we must gate it here.
+  "voyageai==0.3.7; python_version < '3.14'",
+  # * ================ Indexing and Engine ==================*
+  # Also known as: the land of python rust extensions
+  # the core code-weaver-daemon package that keeps indexing continuously updated
+  "code-weaver-daemon=={{ version }}",
+  # performant rust-based file walker with .gitignore support (pyO3 extensions for `ignore` crate)
+  "rignore>=0.7.6",
+  # performant rust-based file watcher
+  "watchfiles>=1.1.1",
+  # for semantic indexing, but also required for the Semantic package, unsurprisingly
+  # also rust-based.
+  "ast-grep-py>=0.40.3",
+  # * ================ Server and MCP Server Framework ==================*
+  # fastmcp is the core MCP server framework
+  "fastmcp>=3.0.0,<4.0.0",
+  # just used for types but we need them at runtime for Pydantic models
+  "mcp>=1.23.3",
+  # Runs the core admin/management server
+  "uvicorn[standard]>=0.40.0",
+  # * ================ Configuration and Settings ==================*
+  # pydantic-settings with toml and yaml support for config files
+  "pydantic-settings[toml,yaml]>=2.13.1",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
+  # For writing toml config files
+  "tomli-w>=1.2.0",
+  # * ================ Telemetry and Observability ==================*
+  # It's telemetry. Our implementation is lightweight and privacy-focused.
+  "posthog>=7.9.12",
+
+  #! Not yet used, but planned for future releases
+  # * ================ Future Dependencies ==================*
+  # for advanced pipeline management and orchestration
+  # "pydantic-graph>=1.39.0",
+]
+
+[tool.hatch.metadata.hooks.uv-dynamic-versioning.optional-dependencies]
+# ==== Providers ====
+anthropic = ["pydantic-ai-slim[anthropic]"]
+# eunomia middleware - see https://gofastmcp.com/integrations/eunomia-authorization
+auth-eunomia = ["eunomia-mcp"]
+# ==== Authentication and Authorization Middleware ====
+# Optional middleware to add authentication and authorization capabilities to the CodeWeaver server.
+# This allows you to secure your CodeWeaver instance with various authentication providers and authorization policies.
+# The middleware can be used to enforce access control policies, authenticate users, and manage permissions.
+# TODO: Implement authentication and authorization middleware -- should be simple to add
+# permit.io middleware - see https://gofastmcp.com/integrations/permit
+auth-permitio = ["permit-fastmcp"]
+# ==== Authentication and Authorization Middleware/Addons ====
+# Settings/Config Secrets
+aws-secrets-manager = ["pydantic-settings[yaml,toml,aws-secrets-manager]"]
+# does NOT support free-threaded python 3.13 (3.14 is OK) due to cffi dependency in azure-identity
+azure-key-vault = ["pydantic-settings[yaml,toml,azure-key-vault]"]
+# bedrock carries the raw boto3 pin because our BedrockClientOptions subclass
+# depends on boto3's ClientOptions internals staying byte-compatible.
+bedrock = ["boto3==1.42.19", "pydantic-ai-slim[bedrock]"]
+cohere = ["cohere==5.20.7", "pydantic-ai-slim[cohere]"]
+# ==== Data Sources ====
+duckduckgo = ["ddgs"]
+exa = ["exa-py"]
+# fastembed blocked on 3.14 by py-rust-stemmers (no cp314/cp314t wheels)
+fastembed = ["fastembed; python_version < '3.14'", "py-cpuinfo"]
+# Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
+fastembed-gpu = ["fastembed-gpu; python_version < '3.14'", "py-cpuinfo"]
+
+# Internal extra: the lines shared by both `full` and `full-gpu`. Defined once,
+# referenced by both bundles via PEP 621 self-reference. Bumping any version
+# here updates both bundles atomically.
+#
+# Note on the markered pydantic-settings pair:
+#   azure-key-vault → azure-identity → cryptography → cffi. On 3.13t
+#   (free-threaded), cryptography has no pre-built wheel and building from
+#   source requires Rust + cffi<2.0. No PEP 508 marker distinguishes 3.13t
+#   from 3.13, so we exclude azure-key-vault on all 3.13. Standard 3.13 users
+#   can install azure-identity manually. The _special-dependencies task
+#   handles this for non-free-threaded 3.13 builds.
+#   permit-fastmcp depends on cffi — same 3.13t issue as azure-key-vault.
+common-extras = [
+  # Self-reference the per-provider extras so `full` users get the pinned raw
+  # SDKs (boto3, cohere, google-genai, huggingface-hub, mistralai, openai)
+  # plus the pydantic-ai-slim adapters. Each provider's pin lives exactly once
+  # in its own extra.
+  "code-weaver[anthropic,bedrock,cohere,google,groq,huggingface,mistral,openai,xai]=={{ version }}",
+  "ddgs",
+  "eunomia-mcp",
+  "exa-py",
+  "pydantic-ai-slim[retries]",
+  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager]; python_version == '3.13'",
+  "pydantic-settings[yaml,toml,aws-secrets-manager,gcp-secret-manager,azure-key-vault]; python_version != '3.13'",
+  "permit-fastmcp; python_version != '3.13'",
+  "sentence-transformers",
+  "tavily-python",
+]
+full = ["code-weaver[common-extras]=={{ version }}"]
+# full-gpu adds fastembed-gpu, which is mutually exclusive with the base
+# `fastembed` dep via [tool.uv].conflicts — uv resolves only one.
+full-gpu = [
+  "code-weaver[common-extras]=={{ version }}",
+  "fastembed-gpu; python_version < '3.14'",
+  # see note below about why sentence-transformers[onnx-gpu] is commented out
+  #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
+]
+gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
+google = ["google-genai==1.56.0", "pydantic-ai-slim[google]"]
+gpu-support = [
+  "fastembed-gpu; python_version < '3.14'",
+  # see note below about why this is commented out
+  #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
+]
+groq = ["pydantic-ai-slim[groq]"]
+# --- Embedding and Agent Providers --- (no rerank)
+huggingface = ["huggingface-hub>=1.0.0", "pydantic-ai-slim[huggingface]"]
+# ==== Vector Stores ====
+in-memory = ["qdrant-client", "tokenizers"]
+mistral = ["mistralai==1.10.0", "pydantic-ai-slim[mistral]"]
+# OpenAI includes support for:
+#   Cerebras, DeekSeek, Ollama, OpenRouter, Vercel, Perplexity, Moonshot, FireworksAI,
+#   TogetherAI, Azure AI Foundry, Heroku, and Github Models
+# which all use the OpenAI API
+openai = ["openai==2.28.0", "pydantic-ai-slim[openai]"]
+qdrant = ["qdrant-client"]
+recommended = [
+  "fastembed; python_version < '3.14'",
+  "sentence-transformers",
+  "tokenizers",
+  "py-cpuinfo",
+  "voyageai; python_version < '3.14'",
+  "tavily",
+]
+recommended-local-only = [
+  "fastembed; python_version < '3.14'",
+  "sentence-transformers",
+  "tokenizers",
+  "ddgs",
+  "py-cpuinfo",
+  # openai for ollama local models
+  "pydantic-ai-slim[openai,retries]",
+]
+sentence-transformers = ["sentence-transformers", "py-cpuinfo"]
+tavily = ["tavily"]
+# NOTE: Why not GPU or OpenVino support for sentence-transformers?
+# The underlying runtimes for these packages, when resolved against our other dependencies,
+# essentially require us to choose between support for Python 3.14 and these packages.
+# When python 3.14 is included, then the only compatible build results in transformers version 3.x
+# Which does not have the `SparseEncoder` class required for sparse-encodings.
+# We think the sparse-encoding use case is much broader than GPU or OpenVino acceleration for most users (in fact we always use sparse encodings),
+# so we are leaving these out of the official optional dependencies for now.
+# If you need GPU or OpenVino support, you can install these packages manually in your environment.
+# sentence-transformers-gpu = [
+# GPU requires additional setup
+#  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
+# ]
+# sentence-transformers-openvino = [
+#     "sentence-transformers[openvino]",
+#     "py-cpuinfo",
+# ]
+# voyageai self-excludes on 3.14+ via its own requires_python: <3.14,
+# but pip doesn't filter on requires_python during install, so we gate here too.
+voyageai = ["voyageai; python_version < '3.14'"]
+xai = ["pydantic-ai-slim[xai]"]
 
 [tool.hatch.build.hooks.version]
 additionalProperties = true
@@ -788,6 +880,12 @@ unsupported-operator = "ignore"
 no-matching-overload = "ignore"
 
 [[tool.ty.overrides]]
+include = ["src/codeweaver/providers/embedding/capabilities/*.py"]
+
+[tool.ty.overrides.rules]
+missing-typed-dict-key = "ignore"
+
+[[tool.ty.overrides]]
 include = [
   "src/codeweaver/__init__.py",
   "src/codeweaver/semantic/classifications.py"
@@ -857,12 +955,6 @@ override-dependencies = [
   # which conflicts with the cffi<2.0 build constraint needed for 3.13t.
   # On 3.14+, cryptography 46+ resolves naturally (has pre-built wheels + cffi 2.0 works).
   "cryptography==45.0.7; python_version == '3.13'",
-]
-# Constrain cffi in build isolation environments. override-dependencies only affects
-# runtime resolution; when cryptography builds from source on 3.13t, its build env
-# pulls cffi>=1.12 independently. This prevents cffi 2.0 from entering build envs.
-build-constraint-dependencies = [
-  "cffi<2.0; python_version == '3.13'",
 ]
 prerelease = "allow"
 

@@ -127,7 +127,7 @@ def get_whereisai_embedding_capabilities() -> tuple[WhereisaiEmbeddingCapabiliti
     capabilities: list[EmbeddingCapabilitiesDict] = []
     for cap in ALL_CAPABILITIES:
         capabilities.extend([
-            EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore
+            EmbeddingCapabilitiesDict({**cap, "provider": provider})
             for provider in CAP_MAP[cap["name"]]
         ])
     return tuple(WhereisaiEmbeddingCapabilities.model_validate(cap) for cap in capabilities)

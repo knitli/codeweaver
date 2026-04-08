@@ -81,9 +81,7 @@ class TestExaServiceCardResolution:
         assert hasattr(card.metadata, "provider_handler"), (
             "Exa service card metadata should have a provider_handler"
         )
-        assert callable(card.metadata.provider_handler), (
-            "provider_handler should be callable"
-        )
+        assert callable(card.metadata.provider_handler), "provider_handler should be callable"
 
     def test_exa_service_card_provider_handler_extracts_tool_config(self):
         """Test that the provider_handler extracts tool_config from DI-shaped config.
@@ -111,12 +109,19 @@ class TestExaServiceCardResolution:
         # Capture what config the handler passes to the provider factory.
         captured: dict[str, object] = {}
 
-        def mock_exa_toolset(client: object, *, config: object = None, **kwargs: object) -> list[object]:
+        def mock_exa_toolset(
+            client: object, *, config: object = None, **kwargs: object
+        ) -> list[object]:
             captured["config"] = config
             return []
 
         handler = card.metadata.provider_handler
-        handler(mock_exa_toolset, card, client=None, config=di_config)
+        assert handler is not None, "provider_handler should not be None"
+        assert callable(handler), "provider_handler should be callable"
+        result = handler(mock_exa_toolset, card, client=None, config=di_config)
+        assert result == [], (
+            "Expected provider handler to return the result of the provider factory"
+        )
 
         # The handler must extract .tool_config, not pass the whole settings object.
         assert captured.get("config") is tool_config, (

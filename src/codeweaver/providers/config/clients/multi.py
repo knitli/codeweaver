@@ -52,7 +52,7 @@ if has_package("fastembed") or has_package("fastembed_gpu"):
     try:
         from fastembed.common.types import OnnxProvider
     except ImportError:
-        OnnxProvider = Any  # type: ignore[assignment, misc]
+        OnnxProvider = Any  # ty:ignore[invalid-assignment]
 else:
     OnnxProvider = Any
 
@@ -60,7 +60,7 @@ if has_package("torch"):
     try:
         from torch.nn import Module
     except ImportError:
-        Module = Any  # type: ignore[assignment, misc]
+        Module = Any  # ty:ignore[invalid-assignment]
 else:
     Module = Any
 if has_package("sentence_transformers"):

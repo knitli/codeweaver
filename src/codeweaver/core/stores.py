@@ -217,7 +217,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
                 return "constructor"
         if hasattr(item, "__iter__") and callable(type(item)):
             with contextlib.suppress(Exception):
-                if type(item)(iter(item)):  # type: ignore[call-arg]
+                if type(item)(iter(item)):  # ty: ignore[no-matching-overload]
                     return "iter"
         return None
 
@@ -255,8 +255,8 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     def get(self, key: KeyT, default: Any = None) -> T | None:
         """Get a value from the store."""
         if item := self.store.get(key):
-            if (strategy := self._get_copy_strategy) is not None:
-                return strategy(item)
+            if (strategy := self._get_copy_strategy) is not None and callable(strategy):
+                return strategy(item)  # ty: ignore[call-top-callable]
             return item
         # Try to recover from trash first, then return default
         return self.store.get(key, default) if self.recover(key) else default

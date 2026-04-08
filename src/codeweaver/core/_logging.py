@@ -105,7 +105,7 @@ def _setup_config_logger(
 ) -> logging.Logger:
     """Set up a logger with optional rich formatting."""
     if logging_kwargs:
-        dictConfig({**logging_kwargs})  # ty: ignore[missing-typed-dict-key]
+        dictConfig({**logging_kwargs})
     if use_rich and IS_TTY and not IS_CI:
         logger = _setup_logger_with_rich_handler(rich_options, name, level)
     else:

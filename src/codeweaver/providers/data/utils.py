@@ -102,7 +102,7 @@ def get_serializer_for_type[T](
         if type_ is None or module is None:
             raise ValueError("Either adapter or both type_ and module must be provided")
         adapter = get_type_adapter(type_, module=module)
-    return lambda data: adapter.dump_json(data, round_trip=True)
+    return lambda data: adapter.dump_json(data, round_trip=True).decode("utf-8")
 
 
 def get_provider_names_for_category(

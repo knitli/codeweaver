@@ -95,6 +95,21 @@ jobs:
       python-versions: '["3.12"]'
       run-quality-checks: true
       upload-benchmark-results: true
+
+  weekly-install-smoke:
+    name: Weekly Install-Profile Smoke Tests
+    uses: ./.github/workflows/_reusable-install-smoke.yml
+    # Weekly runs the fuller matrix: adds `recommended-local-only` to the
+    # three profiles the nightly already covers. `full-gpu` is still
+    # deferred because GitHub runners don't have GPUs — it would only
+    # validate the wheel install itself, and the install delta over `full`
+    # is just the fastembed/fastembed-gpu swap which is rare enough that
+    # the weekly cost isn't justified. Revisit if we ever see a
+    # `full-gpu`-specific wheel-packaging regression in the wild.
+    with:
+      python-versions: '["3.12", "3.13", "3.14"]'
+      profiles: '["base", "recommended", "recommended-local-only", "full"]'
+
   weekly-coverage-report:
     name: Weekly Coverage Report
     runs-on: ubuntu-latest
@@ -164,6 +179,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - weekly-comprehensive-linux
+      - weekly-install-smoke
       - weekly-comprehensive-windows
       - weekly-comprehensive-macos
       - weekly-benchmarks
@@ -193,12 +209,14 @@ jobs:
         id: check-results
         env:
           linux_result: ${{ needs.weekly-comprehensive-linux.result }}
+          smoke_result: ${{ needs.weekly-install-smoke.result }}
           windows_result: ${{ needs.weekly-comprehensive-windows.result }}
           macos_result: ${{ needs.weekly-comprehensive-macos.result }}
           benchmark_result: ${{ needs.weekly-benchmarks.result }}
           coverage_result: ${{ needs.weekly-coverage-report.result }}
         run: |
           echo "Linux Tests: ${linux_result}"
+          echo "Install-Profile Smoke Tests: ${smoke_result}"
           echo "Windows Tests: ${windows_result}"
           echo "macOS Tests: ${macos_result}"
           echo "Benchmarks: ${benchmark_result}"
@@ -208,7 +226,10 @@ jobs:
           critical_failure=false
           platform_warnings=false
 
-          if [ "$linux_result" == "failure" ]; then
+          # Linux and install-smoke are both critical: a broken install
+          # profile means published wheels are unusable on an officially
+          # supported cell, which is as severe as a Linux test failure.
+          if [ "$linux_result" == "failure" ] || [ "$smoke_result" == "failure" ]; then
             critical_failure=true
           fi
 
@@ -315,6 +336,16 @@ jobs:
             echo "- ⚠️ **Coverage Report**: ${coverage}" >> "${GITHUB_STEP_SUMMARY}"
           fi
 
+          # Install-Profile Smoke Tests
+          smoke="${{ needs.weekly-install-smoke.result }}"
+          if [ "${smoke}" == "success" ]; then
+            echo "- ✅ **Install-Profile Smoke Tests**: PASSED (base, recommended, recommended-local-only, full x py 3.12-3.14)" >> "${GITHUB_STEP_SUMMARY}"
+          elif [ "${smoke}" == "failure" ]; then
+            echo "- ❌ **Install-Profile Smoke Tests**: FAILED" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "- ⚠️ **Install-Profile Smoke Tests**: ${smoke}" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
           {
             echo ""
             echo "## Overall Status"
@@ -327,7 +358,7 @@ jobs:
           elif [ "${status}" == "warning" ]; then
             echo "⚠️ **Linux tests passed, but some platform-specific failures detected**" >> "${GITHUB_STEP_SUMMARY}"
           elif [ "${status}" == "failure" ]; then
-            echo "❌ **Critical test failures detected on Linux**" >> "${GITHUB_STEP_SUMMARY}"
+            echo "❌ **Critical test failures detected on Linux or in the install-profile smoke matrix**" >> "${GITHUB_STEP_SUMMARY}"
           else
             echo "❓ **Unknown status**" >> "${GITHUB_STEP_SUMMARY}"
           fi
@@ -372,6 +403,7 @@ jobs:
             ### Test Results
 
             - Linux Tests: ${{ needs.weekly-comprehensive-linux.result }}
+            - Install-Profile Smoke Tests: ${{ needs.weekly-install-smoke.result }}
             - Windows Tests: ${{ needs.weekly-comprehensive-windows.result }}
             - macOS Tests: ${{ needs.weekly-comprehensive-macos.result }}
             - Benchmarks: ${{ needs.weekly-benchmarks.result }}
@@ -428,5 +460,5 @@ jobs:
       - name: Fail workflow if critical tests failed
         if: steps.check-results.outputs.status == 'failure'
         run: |
-          echo "Critical tests failed on Linux - failing workflow"
+          echo "Critical tests failed on Linux or in the install-profile smoke matrix - failing workflow"
           exit 1

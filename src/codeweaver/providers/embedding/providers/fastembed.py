@@ -23,12 +23,7 @@ import numpy as np
 
 from pydantic import SkipValidation
 
-from codeweaver.core import (
-    CodeChunk,
-    CodeWeaverSparseEmbedding,
-    Provider,
-    rpartial,
-)
+from codeweaver.core import CodeChunk, CodeWeaverSparseEmbedding, Provider, rpartial
 from codeweaver.core.utils import has_package
 from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import (
@@ -37,6 +32,7 @@ from codeweaver.providers.embedding.providers.base import (
     EmbeddingProvider,
     SparseEmbeddingProvider,
 )
+
 
 _FASTEMBED_AVAILABLE = has_package("fastembed") or has_package("fastembed-gpu")
 
@@ -189,7 +185,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
     FastEmbed implementation for sparse embeddings.
     """
 
-    client: type[SparseTextEmbedding] | SparseTextEmbedding = _SparseTextEmbedding
+    client: type[SparseTextEmbedding] | SparseTextEmbedding | None = _SparseTextEmbedding
     caps: SparseEmbeddingModelCapabilities | None = None
     _output_transformer: Callable[[Any], list[CodeWeaverSparseEmbedding]] = (
         fastembed_sparse_output_transformer
@@ -255,7 +251,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         )
         features = sum(len(emb.indices) for emb in embeddings)
         self._update_token_stats(token_count=features, sparse=True)
-        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
+        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # ty:ignore[invalid-return-type]
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
@@ -267,7 +263,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         )
         features = sum(len(emb.indices) for emb in embeddings)
         self._update_token_stats(token_count=features, sparse=True)
-        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
+        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # ty:ignore[invalid-return-type]
 
 
 __all__ = (

@@ -568,7 +568,7 @@ class AstGrepSupportedLanguage(Enum):
         """Yields TreeSitterRepo items only (never tuples)."""
         for lang in cls.members():
             yield from (
-                lang.repo_tuple if isinstance(lang.repo_tuple, tuple) else (lang.repo_tuple,)
+                lang.repo_tuple if isinstance(lang.repo_tuple, tuple) else (lang.repo_tuple,)  # ty:ignore[invalid-yield]
             )
 
 

@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# Ad-hoc install-profile smoke runner.
+#
+# Thin dispatch-only wrapper around _reusable-install-smoke.yml. Purpose:
+#
+#   1. Validate the reusable workflow on feature branches before the
+#      nightly/weekly integration goes live (or after changes to the
+#      smoke suite, pyproject.toml, or the reusable workflow itself),
+#      without having to wait for scheduled cron or run the full
+#      nightly/weekly test suite for 90% irrelevant work.
+#
+#   2. Reproduce a failing smoke cell on demand when the nightly/weekly
+#      auto-issue points at a specific (python x profile) combination.
+#
+# Dispatch with a narrow matrix for quick iteration:
+#
+#   gh workflow run install-smoke-dispatch.yml \
+#     --ref feat/my-branch \
+#     -f python-versions='["3.12"]' \
+#     -f profiles='["base"]'
+#
+# Leave inputs empty to run the full default matrix (3 pythons x 3 profiles
+# = 9 cells, matching the nightly default).
+
+name: Install Smoke Dispatch
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      python-versions:
+        description: JSON array of Python versions (default = full nightly matrix)
+        required: false
+        type: string
+        default: '["3.12", "3.13", "3.14"]'
+      profiles:
+        description: JSON array of extras profiles (default = nightly 3-profile set)
+        required: false
+        type: string
+        default: '["base", "recommended", "full"]'
+
+jobs:
+  smoke:
+    name: Ad-hoc install smoke
+    uses: ./.github/workflows/_reusable-install-smoke.yml
+    with:
+      python-versions: ${{ inputs.python-versions }}
+      profiles: ${{ inputs.profiles }}
