@@ -16,6 +16,7 @@ import logging
 
 from typing import Annotated, Any, Literal, TypedDict
 
+from fastmcp.server.middleware.middleware import Middleware as McpMiddleware
 from fastmcp.server.server import DuplicateBehavior
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.lowlevel.server import LifespanResultT
@@ -95,7 +96,7 @@ class BaseFastMcpServerSettings(BasedModel):
     resource_prefix_format: Literal["protocol", "path"] | None = None
     auth: AuthSettings | None = None
 
-    middleware: list[str] = Field(
+    middleware: list[type[McpMiddleware]] = Field(
         default_factory=lambda: sorted(
             DEFAULT_BASE_MIDDLEWARE,
             key=lambda mw: _sort_order.index(mw.split(".")[-1].removeprefix("mcp")),
@@ -185,7 +186,7 @@ class FastMcpHttpServerSettings(BaseFastMcpServerSettings):
 
     lifespan: LifespanResultT | None = None  # ty:ignore[unbound-type-variable]
 
-    middleware: list[str] = Field(
+    middleware: list[type[McpMiddleware]] = Field(
         default_factory=lambda: sorted(
             DEFAULT_HTTP_MIDDLEWARE,
             key=lambda mw: _sort_order.index(mw.split(".")[-1].removeprefix("mcp")),

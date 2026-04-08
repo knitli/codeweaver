@@ -22,13 +22,6 @@ from fastmcp.server.providers.proxy import FastMCPProxy, ProxyClient
 from fastmcp.tools import Tool
 from lateimport import lateimport
 
-from codeweaver import (
-    ErrorHandlingMiddlewareSettings,
-    LoggingMiddlewareSettings,
-    RateLimitingMiddlewareSettings,
-    ResponseCachingMiddlewareSettings,
-    RetryMiddlewareSettings,
-)
 from codeweaver.core import UNSET, DictView, SettingsMapDep, StatisticsDep
 from codeweaver.core.constants import DEFAULT_MCP_PORT, LOCALHOST, MCP_ENDPOINT
 from codeweaver.core.di.dependency import INJECTED
@@ -209,37 +202,26 @@ def setup_middleware(
         mw_name = _get_mw_name(mw)
         match mw_name:
             case "ErrorHandlingMiddleware":
-                settings = ErrorHandlingMiddlewareSettings(
-                    **cast(dict, middleware_settings.get("error_handling", {})).copy()
+                instance = mw(
+                    **(
+                        middleware_settings.get("error_handling", {})
+                        | {"logger": logging.getLogger("codeweaver.middleware.error_handling")}  # type: ignore[reportCallIssue]
+                    )
                 )
-                settings["logger"] = logging.getLogger("codeweaver.middleware.error_handling")
-                instance = mw(**settings)
             case "RetryMiddleware":
                 instance = mw(
-                    RetryMiddlewareSettings(
-                        **(cast(dict, middleware_settings.get("retry", {})))
-                        | {"logger": logging.getLogger("codeweaver.middleware.retry")}
-                    )
+                    **(middleware_settings.get("retry", {}))
+                    | {"logger": logging.getLogger("codeweaver.middleware.retry")}  # type: ignore[reportCallIssue]
                 )
             case "RateLimitingMiddleware":
-                instance = mw(
-                    RateLimitingMiddlewareSettings(
-                        **cast(dict, middleware_settings.get("rate_limiting", {}))
-                    )
-                )
+                instance = mw(**middleware_settings.get("rate_limiting", {}))  # type: ignore[reportCallIssue]
             case "LoggingMiddleware" | "StructuredLoggingMiddleware":
                 instance = mw(
-                    LoggingMiddlewareSettings(
-                        **(cast(dict, middleware_settings.get("logging", {})))
-                        | {"logger": logging.getLogger("codeweaver.middleware._logging")}
-                    )
+                    **(middleware_settings.get("logging", {}))
+                    | {"logger": logging.getLogger("codeweaver.middleware._logging")}  # type: ignore[reportCallIssue]
                 )
             case "ResponseCachingMiddleware":
-                instance = mw(
-                    ResponseCachingMiddlewareSettings(
-                        **cast(dict, middleware_settings.get("caching", {}))
-                    )
-                )
+                instance = mw(**middleware_settings.get("caching", {}))  # type: ignore
             case _:
                 if any_settings := middleware_settings.get(mw_name.lower()):
                     instance = mw(**any_settings)
@@ -331,13 +313,11 @@ def _setup_server[TransportT: Literal["stdio", "streamable-http"]](
 
     if is_http:
         run_args = setup_runargs(run_args, host, port, verbose=verbose, debug=debug)
-    icons = [lateimport("codeweaver.server", "CODEWEAVER_SVG_ICON")]
     app = FastMCP(
         "CodeWeaver",
-        icons=icons,  # ty:ignore[invalid-argument-type]
-        **mutable_args,
+        **(mutable_args | {"icons": [lateimport("codeweaver.server", "CODEWEAVER_SVG_ICON")]}),
     )
-    app = register_tools(cast(FastMCP[StdioClientLifespan] | FastMCP["CwMcpHttpState"], app))
+    app = register_tools(app)
     app = register_middleware(app, cast(list[type[McpMiddleware]], middleware), middleware_opts)
     # FastMCP v3: Apply tag-based visibility filtering using the new enable()/disable() API
     if exclude_tags:

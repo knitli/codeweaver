@@ -804,7 +804,10 @@ RECOMMENDED_SPARSE_EMBEDDING_MODEL = "prithivida/Splade_PP_en_v1"
 """An open source splade model. Relatively slow on embedding generation, but fast and efficient at inference."""
 
 ULTRALIGHT_SPARSE_EMBEDDING_MODEL = "qdrant/bm25"
-"""Not technically a model; sparse representation of a traditional bm25 search index. Fast but offers no semantic benefits."""
+"""Not technically a model; sparse representation of a traditional bm25 search index. Fast but offers no semantic benefits. Used with FastEmbed on Python <3.14."""
+
+ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL = "ibm-granite/granite-embedding-30m-sparse"
+"""Lightweight (30M param) SparseEncoder-compatible model from IBM. Used as the testing profile's sparse embedder on Python 3.14 where FastEmbed is unavailable (py-rust-stemmers has no cp314/cp314t wheels). Requires sentence-transformers>=4 for SparseEncoder support; we pin major 5."""
 
 # ===========================
 # *    Reranking
@@ -826,7 +829,10 @@ RECOMMENDED_LOCAL_RERANKING_MODEL = "Alibaba-NLP/gte-reranker-modernbert-base"
 """Recommended local reranker; works with both SentenceTransformers and FastEmbed."""
 
 ULTRALIGHT_RERANKING_MODEL = "jinaai/jina-reranker-v1-tiny-en"
-"""A very light model with an ample context window (8092). Works with Sentence Transformers and FastEmbed."""
+"""A very light model with an ample context window (8092). Used with FastEmbed's cross-encoder loader, which bypasses the transformers library entirely and loads the ONNX weights directly — the reason this model is FastEmbed-only despite a prior claim in this docstring that it worked with Sentence Transformers too. It actually doesn't: the model's remote `configuration_bert.py` imports `transformers.onnx.OnnxConfig`, which was removed in transformers 5.x, so loading via `sentence_transformers.CrossEncoder` (which goes through `AutoConfig.from_pretrained(trust_remote_code=True)`) raises `ModuleNotFoundError: No module named 'transformers.onnx'`. For the SentenceTransformers path, use `ULTRALIGHT_ST_RERANKING_MODEL` below."""
+
+ULTRALIGHT_ST_RERANKING_MODEL = "cross-encoder/ms-marco-MiniLM-L6-v2"
+"""Lightweight reranker for the SentenceTransformers CrossEncoder path. Standard BERT-MiniLM architecture, no trust_remote_code, fully compatible with transformers 5.x. Used as the testing profile's reranking model on Python 3.14 (where FastEmbed is unavailable) and any future codepath that needs a ST-backed ultralight reranker."""
 
 
 __all__ = (

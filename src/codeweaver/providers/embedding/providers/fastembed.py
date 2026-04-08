@@ -156,7 +156,11 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None,
-            lambda: list(self.client.embed(texts=cast(Iterable[str], ready_documents), **kwargs)),
+            lambda: list(
+                self.client.embed(
+                    documents=cast(Iterable[str], ready_documents), **kwargs
+                )
+            ),
         )
         partial_tokens = rpartial(self._update_token_stats, from_docs=ready_documents)
         self._fire_and_forget(partial_tokens, loop=loop)
@@ -185,7 +189,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
     FastEmbed implementation for sparse embeddings.
     """
 
-    client: type[SparseTextEmbedding] | SparseTextEmbedding | None = _SparseTextEmbedding
+    client: type[SparseTextEmbedding] | SparseTextEmbedding = _SparseTextEmbedding
     caps: SparseEmbeddingModelCapabilities | None = None
     _output_transformer: Callable[[Any], list[CodeWeaverSparseEmbedding]] = (
         fastembed_sparse_output_transformer
@@ -251,7 +255,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         )
         features = sum(len(emb.indices) for emb in embeddings)
         self._update_token_stats(token_count=features, sparse=True)
-        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # ty:ignore[invalid-return-type]
+        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
@@ -263,7 +267,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         )
         features = sum(len(emb.indices) for emb in embeddings)
         self._update_token_stats(token_count=features, sparse=True)
-        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # ty:ignore[invalid-return-type]
+        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
 
 
 __all__ = (

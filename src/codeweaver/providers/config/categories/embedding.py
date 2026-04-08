@@ -85,11 +85,20 @@ from codeweaver.providers.data.utils import get_provider_names_for_category
 
 logger = logging.getLogger(__name__)
 if has_package("sentence_transformers"):
-    from sentence_transformers import SentenceTransformer as SentenceTransformer
-    from sentence_transformers.evaluation import SentenceEvaluator as SentenceEvaluator
-    from sentence_transformers.model_card import (
-        SentenceTransformerModelCardData as SentenceTransformerModelCardData,
-    )
+    try:
+        from sentence_transformers import SentenceTransformer as SentenceTransformer
+        from sentence_transformers.evaluation import SentenceEvaluator as SentenceEvaluator
+        from sentence_transformers.model_card import (
+            SentenceTransformerModelCardData as SentenceTransformerModelCardData,
+        )
+    except ImportError:
+        SentenceTransformer = Any  # ty:ignore[invalid-assignment]
+        SentenceEvaluator = Any  # ty:ignore[invalid-assignment]
+        SentenceTransformerModelCardData = Any  # ty:ignore[invalid-assignment]
+else:
+    SentenceTransformer = Any
+    SentenceEvaluator = Any
+    SentenceTransformerModelCardData = Any
 possible_tags = get_provider_names_for_category("embedding")
 
 
