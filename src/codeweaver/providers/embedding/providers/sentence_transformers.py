@@ -160,28 +160,19 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
     provider: Provider = Provider.SENTENCE_TRANSFORMERS
     caps: SparseEmbeddingModelCapabilities | None = None
 
-    def __init__(
-        self,
-        client: _SparseEncoderType,
-        caps: SparseEmbeddingModelCapabilities | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """Initialize the Sentence Transformers sparse embedding provider.
-
-        Args:
-            caps: Model capabilities (matches base class parameter name)
-            client: Optional pre-initialized SparseEncoder client
-            **kwargs: Additional keyword arguments
-        """
-        if not HAS_SPARSE_ENCODER:
-            raise ConfigurationError(
-                "SparseEncoder is not available in the installed version of sentence-transformers. "
-                "Sparse embedding support may require a different version or additional dependencies."
-            )
-
-        # Call super().__init__ with None for client if not provided
-        # We'll initialize it asynchronously in initialize_async
-        super().__init__(client=client, caps=caps, kwargs=kwargs)  # type: ignore
+    # No custom __init__ — inherit from `SparseEmbeddingProvider` which takes
+    # `client, config, registry, cache_manager, caps, impl_deps, custom_deps,
+    # **kwargs`. The previous override only declared `(client, caps, **kwargs)`
+    # and then called `super().__init__(client=client, caps=caps, kwargs=kwargs)`
+    # (literal `kwargs=` arg, not splat), both of which were broken:
+    #   - Dropped required base-class args (config/registry/cache_manager)
+    #     into **kwargs where the base init couldn't see them as named args.
+    #   - Passed `kwargs=kwargs` instead of `**kwargs`, so even the drained
+    #     kwargs never reached the base init.
+    # The sibling `SentenceTransformersEmbeddingProvider` at line 71 has no
+    # custom __init__ either and works fine through the base class's init
+    # path, which calls `self._initialize(impl_deps, custom_deps, **kwargs)`
+    # at line 307 of providers/embedding/providers/base.py. Same pattern here.
 
     def _initialize(
         self,
@@ -189,30 +180,45 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
         custom_deps: Any = None,
         **kwargs: Any,
     ) -> None:
-        """Initialize the SparseEncoder client.
+        """Initialize the SparseEncoder-backed sparse provider.
 
-        Mirrors `SentenceTransformersEmbeddingProvider._initialize` — the
-        client is instantiated upstream by the service card's
-        `_start_filtered_instance_in_thread` handler (which resolves
-        `lateimport("sentence_transformers", "SparseEncoder")` and
-        instantiates it with the ST client options), then passed into
-        this provider via `__init__`. By the time `_initialize` runs
-        during the base-class async init chain, `self.client` is already
-        a valid `SparseEncoder` instance and there's nothing left to do
-        here. If base-class or sibling providers grow real init logic in
-        the future, mirror it here too.
+        Called from `EmbeddingProvider.__init__` at line 307 after required
+        fields (client, config, registry, cache_manager, embed/query options,
+        namespace) have been set but before the pydantic `super().__init__`
+        finalizes the model.
 
-        This override exists only so the class isn't abstract. Prior to
-        this method, `SparseEmbeddingProvider.__abstractmethods__`
-        contained `_initialize` (inherited from the abstract base), and
-        Python refused to instantiate the class with
-        `TypeError: Can't instantiate abstract class
-        SentenceTransformersSparseProvider without an implementation for
-        abstract method '_initialize'`.
+        Two responsibilities:
+
+          1. Guard against a sentence-transformers version that doesn't ship
+             `SparseEncoder`. In practice the `_SparseEncoderType` class-level
+             alias would already resolve to `Any` (via the `HAS_SPARSE_ENCODER`
+             check at module import), and the service card's lateimport of
+             `SparseEncoder` would fail before we got here — but keep the
+             defensive check so the failure message is specific and
+             actionable instead of a confusing downstream `AttributeError`.
+
+          2. Everything else is a no-op. The SparseEncoder instance is
+             instantiated upstream by the service card's
+             `_start_filtered_instance_in_thread` handler (which calls
+             `SparseEncoder(**filtered_client_options)`) and passed into the
+             base class's `__init__` as the `client` parameter. By the time
+             `_initialize` runs, `self.client` is already a valid
+             SparseEncoder instance and there's nothing left to do.
+
+        Required by `SparseEmbeddingProvider.__abstractmethods__`; without
+        this override the class can't be instantiated.
         """
-        # Nothing to initialize here — the SparseEncoder instance was
-        # supplied to __init__ via the service card dispatch chain, and
-        # client_options are set on self from the base class's __init__.
+        if not HAS_SPARSE_ENCODER:
+            raise ConfigurationError(
+                "SparseEncoder is not available in the installed version of "
+                "sentence-transformers. CodeWeaver requires "
+                "sentence-transformers>=4 for SparseEncoder support; we pin "
+                "major 5."
+            )
+        # Nothing further to initialize — the SparseEncoder instance was
+        # supplied to the base-class __init__ via the service card dispatch
+        # chain, and embed/query options are set on self by the base init
+        # before this method runs.
 
     @property
     def base_url(self) -> str | None:
