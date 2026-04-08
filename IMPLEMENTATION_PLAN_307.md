@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Implementation Plan: Issue #307 - Fix bootstrap_settings Coroutine Never Awaited
 
 ## Summary

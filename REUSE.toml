@@ -342,3 +342,57 @@ path = ["docs-site/src/**"]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Knitli Inc."
 SPDX-License-Identifier = "MIT OR Apache-2.0"
+
+# =============================================================================
+# data/grammars - Tree-sitter grammar definition files (JavaScript)
+# =============================================================================
+# These are tree-sitter grammar JS files vendored for ast-grep integration.
+# Most tree-sitter grammars are MIT-licensed.
+
+[[annotations]]
+path = [
+  "data/grammars/bash-grammar.js",
+  "data/grammars/c-grammar.js",
+  "data/grammars/cpp-grammar.js",
+  "data/grammars/csharp-grammar.js",
+  "data/grammars/css-grammar.js",
+  "data/grammars/elixir-grammar.js",
+  "data/grammars/go-grammar.js",
+  "data/grammars/haskell-grammar.js",
+  "data/grammars/html-grammar.js",
+  "data/grammars/java-grammar.js",
+  "data/grammars/javascript-grammar.js",
+  "data/grammars/json-grammar.js",
+  "data/grammars/kotlin-grammar.js",
+  "data/grammars/lua-grammar.js",
+  "data/grammars/nix-grammar.js",
+  "data/grammars/php-grammar.js",
+  "data/grammars/php_sparse-grammar.js",
+  "data/grammars/python-grammar.js",
+  "data/grammars/ruby-grammar.js",
+  "data/grammars/rust-grammar.js",
+  "data/grammars/scala-grammar.js",
+  "data/grammars/solidity-grammar.js",
+  "data/grammars/swift-grammar.js",
+  "data/grammars/tsx-grammar.js",
+  "data/grammars/typescript-grammar.js",
+  "data/grammars/yaml-grammar.js",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "tree-sitter contributors"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = ["data/grammars/hcl-grammar.js"]
+precedence = "override"
+SPDX-FileCopyrightText = "2021 Michael Hoffman"
+SPDX-License-Identifier = "Apache-2.0"
+
+# =============================================================================
+# .claude/settings.json - Claude Code agent settings
+# =============================================================================
+[[annotations]]
+path = [".claude/settings.json"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Knitli Inc."
+SPDX-License-Identifier = "MIT OR Apache-2.0"

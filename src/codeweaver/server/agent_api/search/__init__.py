@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """# Implementation of the find_code tool.
 
 CodeWeaver differentiates between *internal* and *external* tools. External tools -- and there is only one, this one, the **`find_code`** tool -- are exposed to the user and user's AI agents. `find_code` is intentionally very simple. This module contains the back-end, execution-side, of the `find_code` tool. The entry-point exposed to users and agents is in `codeweaver.server.mcp`.
@@ -150,12 +154,12 @@ async def _resolve_indexer_from_container() -> IndexingService | None:
     try:
         from codeweaver.core.di.container import get_container
         from codeweaver.engine import IndexingService
+
         container = get_container()
-    except Exception as e:
-        logger.warning('Failed to resolve IndexingService from container: %s', e, exc_info=True)
-        return None
-    else:
         return await container.resolve(IndexingService)
+    except Exception as e:
+        logger.warning("Failed to resolve IndexingService from container: %s", e, exc_info=True)
+        return None
 
 async def _ensure_index_ready(context: Context | None=None, vector_store: VectorStoreProvider | None=None, indexer: IndexingService | None=None) -> None:
     """Ensure that the codebase is indexed before performing a search.
@@ -163,6 +167,8 @@ async def _ensure_index_ready(context: Context | None=None, vector_store: Vector
     If indexing is already complete or in progress, this is a no-op.
     """
     indexer = indexer or await _resolve_indexer_from_container()
+    if indexer is None:
+        return
     if indexer._vector_store:
         try:
             await indexer.index_project(add_dense=True, add_sparse=True)
