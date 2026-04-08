@@ -172,6 +172,13 @@ jobs:
           uv run python -c "from sentence_transformers import SentenceTransformer; print('Downloading Potion 8M...'); SentenceTransformer('minishlab/potion-base-8M')"
           uv run python -c "from sentence_transformers import CrossEncoder; print('Downloading MS MARCO...'); CrossEncoder('cross-encoder/ms-marco-MiniLM-L6-v2')"
 
+          # On 3.14 the testing profile falls back to a SentenceTransformers
+          # SparseEncoder for sparse embedding because fastembed isn't
+          # installable. Pre-warm the granite sparse model there.
+          if [[ "$PY_VERSION" == "3.14" ]]; then
+            uv run python -c "from sentence_transformers.sparse_encoder import SparseEncoder; print('Downloading granite-embedding-30m-sparse...'); SparseEncoder('ibm-granite/granite-embedding-30m-sparse')"
+          fi
+
           # fastembed path: only available on 3.12/3.13. Pre-warms the
           # sparse and rerank models the testing profile uses.
           if [[ "$PY_VERSION" != "3.14" ]]; then

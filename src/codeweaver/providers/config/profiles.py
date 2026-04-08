@@ -46,6 +46,7 @@ from codeweaver.core.constants import (
     ULTRALIGHT_EMBEDDING_MODEL,
     ULTRALIGHT_RERANKING_MODEL,
     ULTRALIGHT_SPARSE_EMBEDDING_MODEL,
+    ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL,
 )
 from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 from codeweaver.core.types.dataclasses import DataclassSerializationMixin
@@ -392,14 +393,35 @@ def _testing_profile(
     default_collection = _default_collection_options(
         project_name=project_name, project_path=project_path
     )
-    backup_settings = _quickstart_default("local") | {
-        "sparse_embedding": FastEmbedSparseEmbeddingProviderSettings(
+    # Sparse embedder is gated on fastembed availability: FastEmbed uses
+    # qdrant/bm25 on 3.12/3.13, SentenceTransformers SparseEncoder uses
+    # ibm-granite/granite-embedding-30m-sparse on 3.14 where fastembed is
+    # unavailable (py-rust-stemmers has no cp314/cp314t wheels). Every
+    # profile carries dense + sparse + reranking by design — 3.14 should
+    # not regress to a dense-only profile just because fastembed doesn't
+    # build there. SparseEncoder is available in sentence-transformers>=4;
+    # we pin major 5.
+    sparse_embedding_settings: (
+        FastEmbedSparseEmbeddingProviderSettings | SparseEmbeddingProviderSettings
+    ) = (
+        FastEmbedSparseEmbeddingProviderSettings(
             provider=Provider.FASTEMBED,
             model_name=ModelName(ULTRALIGHT_SPARSE_EMBEDDING_MODEL),
             sparse_embedding_config=FastEmbedSparseEmbeddingConfig(
                 model_name=ModelName(ULTRALIGHT_SPARSE_EMBEDDING_MODEL)
             ),
-        ),
+        )
+        if HAS_FASTEMBED
+        else SparseEmbeddingProviderSettings(
+            provider=Provider.SENTENCE_TRANSFORMERS,
+            model_name=ModelName(ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL),
+            sparse_embedding_config=SentenceTransformersSparseEmbeddingConfig(
+                model_name=ModelName(ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL)
+            ),
+        )
+    )
+    backup_settings = _quickstart_default("local") | {
+        "sparse_embedding": sparse_embedding_settings,
         "embedding": (
             SentenceTransformersEmbeddingProviderSettings(
                 provider=Provider.SENTENCE_TRANSFORMERS,

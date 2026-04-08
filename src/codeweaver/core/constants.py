@@ -804,7 +804,10 @@ RECOMMENDED_SPARSE_EMBEDDING_MODEL = "prithivida/Splade_PP_en_v1"
 """An open source splade model. Relatively slow on embedding generation, but fast and efficient at inference."""
 
 ULTRALIGHT_SPARSE_EMBEDDING_MODEL = "qdrant/bm25"
-"""Not technically a model; sparse representation of a traditional bm25 search index. Fast but offers no semantic benefits."""
+"""Not technically a model; sparse representation of a traditional bm25 search index. Fast but offers no semantic benefits. Used with FastEmbed on Python <3.14."""
+
+ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL = "ibm-granite/granite-embedding-30m-sparse"
+"""Lightweight (30M param) SparseEncoder-compatible model from IBM. Used as the testing profile's sparse embedder on Python 3.14 where FastEmbed is unavailable (py-rust-stemmers has no cp314/cp314t wheels). Requires sentence-transformers>=4 for SparseEncoder support; we pin major 5."""
 
 # ===========================
 # *    Reranking
