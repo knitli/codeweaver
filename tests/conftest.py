@@ -7,6 +7,7 @@
 """Global pytest configuration and fixtures for CodeWeaver tests."""
 
 import contextlib
+import os
 import warnings
 
 
@@ -246,7 +247,7 @@ def mock_tokenizer_for_unit_tests(
         clean_container.override(Tokenizer, MockTokenizer())
 
         # 2. Monkeypatch fallback for legacy non-DI code
-        modules_to_patch = ["codeweaver_tokenizers.get_tokenizer", "codeweaver.providers"]
+        modules_to_patch = ["codeweaver_tokenizers.get_tokenizer"]
         for module_path in modules_to_patch:
             with contextlib.suppress(AttributeError):
                 monkeypatch.setattr(module_path, _mock_get_tokenizer)
@@ -900,6 +901,13 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     skip_free_threaded = pytest.mark.skip(
         reason="Test skipped on free-threaded Python builds due to package compatibility issues"
     )
+    # Honor `skip_ci` marker: tests so marked use real providers and/or shared
+    # local state that conflicts under pytest-xdist parallelism. Skip them
+    # whenever running under a CI runner (GitHub Actions sets CI=true).
+    in_ci = os.environ.get("CI", "").lower() in {"1", "true", "yes"}
+    skip_ci_marker = pytest.mark.skip(
+        reason="Test marked skip_ci: uses real providers or shared local state unsuitable for CI"
+    )
 
     for item in items:
         # Get all markers for this item
@@ -924,6 +932,10 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             else:
                 reason = "voyageai not installed"
             item.add_marker(pytest.mark.skip(reason=reason))
+
+        # Honor skip_ci in CI environments
+        if "skip_ci" in markers and in_ci:
+            item.add_marker(skip_ci_marker)
 
         # Skip tests marked for Python 3.14+
         if "skip_on_python_314" in markers and is_python_314_plus:

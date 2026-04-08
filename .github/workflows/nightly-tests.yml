@@ -34,6 +34,7 @@ jobs:
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     with:
       python-versions: ${{ inputs.python-versions || '["3.12", "3.13", "3.14"]' }}
       # Run integration tests, expensive tests, and tests requiring models
@@ -50,6 +51,7 @@ jobs:
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     with:
       python-versions: '["3.12"]'
       # Run only real provider tests (with model downloads)
@@ -65,6 +67,7 @@ jobs:
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     with:
       python-versions: '["3.12"]'
       # Run benchmark and performance tests

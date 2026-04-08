@@ -333,9 +333,24 @@ class SentenceTransformersRerankingConfig(BaseRerankingConfig):
 
     def _as_options(self) -> SerializedRerankingOptionsDict:
         """Convert the Sentence Transformers reranking configuration to a dictionary of options."""
+        # `_defaults` is a @classmethod — must be called via
+        # `type(self)._defaults()` to get the default dict, not
+        # `self._defaults` which returns the bound method. Every other
+        # call site in this file uses the correct form (e.g. line 280
+        # in `FastEmbedRerankingConfig._as_options`). This one was
+        # written with `self._defaults` and a `ty:ignore[unsupported-
+        # operator]` comment suppressing the type checker's complaint
+        # about `method | dict`. That silenced ty at edit time but the
+        # runtime TypeError was latent until this code path got
+        # exercised — which happened for the first time when the
+        # testing profile's reranking branch started routing through
+        # ST on Python 3.14 (see commit 7b735d2a). Dead code from the
+        # moment it was written.
         return SerializedRerankingOptionsDict(
             model_name=self.model_name,
-            rerank=cast(dict[str, Any], (self._defaults | (self.rerank or {}))),  # ty:ignore[unsupported-operator]
+            rerank=cast(
+                dict[str, Any], (type(self)._defaults()["rerank"] | (self.rerank or {}))
+            ),
             model={},
         )
 

@@ -55,7 +55,9 @@ jobs:
           fetch-depth: 2
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Setup Environment for Review
-        if: github.event_name == 'pull_request_review'
+        if: |
+          github.event_name == 'pull_request_review' &&
+          github.event.sender.type != 'Bot'
         uses: ./.github/actions/setup-mise-env
         with:
           python-version: "3.13"
@@ -64,7 +66,9 @@ jobs:
           skip-checkout: "true"
 
       - name: PR Review
-        if: github.event_name == 'pull_request_review'
+        if: |
+          github.event_name == 'pull_request_review' &&
+          github.event.sender.type != 'Bot'
         uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -81,8 +85,12 @@ jobs:
             --allowedTools Bash,TaskOutput,Batch,Glob,Grep,MCPSearch,Read,Skill,TaskCreate,TaskGet,TaskList,TaskUpdate,WebFetch,WebSearch,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,mcp__tavily__tavily_search,
             --mcp-config .mcp.json
           prompt: |
+            AGENT IDENTITY: You are **Claude Assistant** (🤖 Claude).
+            TRIGGER: pull_request_review submitted by ${{ github.event.sender.login }}
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
+
+            **IMPORTANT**: Begin your response with "## 🤖 Claude Assistant — PR Review" as a header so readers can identify which agent produced this review.
 
             Please review this pull request and identify:
               - bugs
@@ -118,8 +126,13 @@ jobs:
             --allowedTools Bash,TaskOutput,Edit,Glob,Grep,KillShell,MCPSearch,Read,Skill,Agent,TaskCreate,TaskGet,TaskList,TaskUpdate,WebFetch,WebSearch,Write,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,WebFetch,WebSearch,mcp__tavily__tavily_search
             --mcp-config .mcp.json
           prompt: |
+            AGENT IDENTITY: You are **Claude Assistant** (🤖 Claude).
+            TRIGGER: issue opened by ${{ github.event.sender.login }}
             REPO: ${{ github.repository }}
             ISSUE NUMBER: ${{ github.event.issue.number }}
+
+            **IMPORTANT**: Begin your response with "## 🤖 Claude Assistant — Issue Triage" as a header so readers can identify which agent produced this analysis.
+
             When a new issue is opened:
               - Review and summarize the issue.
               - Include any relevant context or background.
@@ -129,7 +142,9 @@ jobs:
               - Identify potential fixes and briefly describe them with links to relevant code.
               - If it's a feature request, estimate the difficulty of implementing the feature and potential impact on existing functionality and API.
       - name: Setup Environment for PR Review Comments
-        if: github.event_name == 'pull_request_review_comment'
+        if: |
+          github.event_name == 'pull_request_review_comment' &&
+          github.event.sender.type != 'Bot'
         uses: ./.github/actions/setup-mise-env
         with:
           python-version: "3.13"
@@ -137,7 +152,9 @@ jobs:
           profile: minimal
           skip-checkout: "true"
       - name: PR Review Comment
-        if: github.event_name == 'pull_request_review_comment'
+        if: |
+          github.event_name == 'pull_request_review_comment' &&
+          github.event.sender.type != 'Bot'
         uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -154,9 +171,14 @@ jobs:
             --allowedTools Bash,TaskOutput,Glob,Grep,KillShell,MCPSearch,Read,Skill,Agent,TaskCreate,TaskGet,TaskList,TaskUpdate,WebFetch,WebSearch,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,mcp__tavily__tavily_search,WebFetch,WebSearch
             --mcp-config .mcp.json
           prompt: |
+            AGENT IDENTITY: You are **Claude Assistant** (🤖 Claude).
+            TRIGGER: pull_request_review_comment by ${{ github.event.sender.login }}
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
             COMMENT ID: ${{ github.event.comment.id }}
+
+            **IMPORTANT**: Begin your response with "## 🤖 Claude Assistant — Review Comment Response" as a header so readers can identify which agent produced this response.
+
             When you are asked to review a pull request:
               - Review the changes made in the PR.
               - Provide feedback on the code quality, functionality, and adherence to best practices.
@@ -194,8 +216,13 @@ jobs:
             --allowedTools Bash,TaskOutput,Edit,ExitPlanMode,Glob,Grep,KillShell,MCPSearch,Read,Skill,Agent,TaskCreate,TaskGet,TaskList,TaskUpdate,WebFetch,WebSearch,Write,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,WebFetch,WebSearch
             --mcp-config .mcp.json
           prompt: |
+            AGENT IDENTITY: You are **Claude Assistant** (🤖 Claude).
+            TRIGGER: ${{ github.event_name }}.${{ github.event.action }} by ${{ github.event.sender.login }}
             REPO: ${{ github.repository }}
             ISSUE/PR NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+
+            **IMPORTANT**: Begin your response with "## 🤖 Claude Assistant — Task" as a header so readers can identify which agent produced this response.
+
             When you are assigned an issue or it's labeled 'claude':
               - Your job is to resolve it.
               - Gather all necessary information about the issue from discussions and comments and the codebase.

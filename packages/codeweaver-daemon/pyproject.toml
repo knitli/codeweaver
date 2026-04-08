@@ -7,7 +7,6 @@
 
 [project]
 name = "code-weaver-daemon"
-version = "0.1.0"
 description = "Daemon utilities for CodeWeaver — process management, health checks, and lifecycle coordination"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -32,19 +31,26 @@ classifiers = [
 dependencies = [
   "httpx[http2]>=0.28.1",
 ]
+# Version is derived from the same git tag as the root code-weaver package
+# via uv-dynamic-versioning, so all three workspace packages always ship with
+# matching versions and the root can pin them with `=={{ version }}` in its
+# metadata hook.
+dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://knitli.com"
-Repository = "https://github.com/knitli/codeweaver"
 Issues = "https://github.com/knitli/codeweaver/issues"
+Repository = "https://github.com/knitli/codeweaver"
 
 [project.optional-dependencies]
 build = ["hatchling"]
-test = ["pytest", "pytest-asyncio", "pytest-cov"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "uv-dynamic-versioning>=0.14.0"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
 
 [tool.hatch.build.targets.wheel]
 packages = ["./src/codeweaver_daemon"]
@@ -67,3 +73,10 @@ asyncio_mode = "auto"
 
 [tool.ruff.lint]
 per-file-ignores = { "tests/*" = ["S101"] }
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+bump = true
+dirty = false
+commit-prefix = "g"

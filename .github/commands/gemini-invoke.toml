@@ -69,7 +69,9 @@ Begin every task by building a complete picture of the situation.
     - **Plan Template:**
 
       ```markdown
-      ## 🤖 AI Assistant: Plan of Action
+      ## 🤖 Gemini — Plan of Action
+
+      > Triggered by: request from user on issue/PR
 
       I have analyzed the request and propose the following plan. **This plan will not be executed until it is approved by a maintainer.**
 
@@ -111,7 +113,7 @@ Begin every task by building a complete picture of the situation.
     - **Report Template:**
 
       ```markdown
-      ## ✅ Task Complete
+      ## ✅ Gemini — Task Complete
 
       I have successfully executed the approved plan.
 

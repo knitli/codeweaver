@@ -23,12 +23,7 @@ import numpy as np
 
 from pydantic import SkipValidation
 
-from codeweaver.core import (
-    CodeChunk,
-    CodeWeaverSparseEmbedding,
-    Provider,
-    rpartial,
-)
+from codeweaver.core import CodeChunk, CodeWeaverSparseEmbedding, Provider, rpartial
 from codeweaver.core.utils import has_package
 from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import (
@@ -37,6 +32,7 @@ from codeweaver.providers.embedding.providers.base import (
     EmbeddingProvider,
     SparseEmbeddingProvider,
 )
+
 
 _FASTEMBED_AVAILABLE = has_package("fastembed") or has_package("fastembed-gpu")
 
@@ -160,7 +156,11 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None,
-            lambda: list(self.client.embed(texts=cast(Iterable[str], ready_documents), **kwargs)),
+            lambda: list(
+                self.client.embed(
+                    documents=cast(Iterable[str], ready_documents), **kwargs
+                )
+            ),
         )
         partial_tokens = rpartial(self._update_token_stats, from_docs=ready_documents)
         self._fire_and_forget(partial_tokens, loop=loop)
