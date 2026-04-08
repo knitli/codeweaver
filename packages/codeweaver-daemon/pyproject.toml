@@ -7,10 +7,10 @@
 
 [project]
 name = "code-weaver-daemon"
-version = "0.1.0"
 description = "Daemon utilities for CodeWeaver — process management, health checks, and lifecycle coordination"
 readme = "README.md"
 requires-python = ">=3.12"
+dynamic = ["version"]
 license = "MIT OR Apache-2.0"
 authors = [
   { name = "Knitli Inc." },
@@ -43,11 +43,21 @@ build = ["hatchling"]
 test = ["pytest", "pytest-asyncio", "pytest-cov"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "uv-dynamic-versioning>=0.14.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["./src/codeweaver_daemon"]
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+bump = true
+dirty = false
+commit-prefix = "g"
 
 [tool.pytest]
 addopts = ["--cov-report=term-missing", "--cov=codeweaver_daemon"]
