@@ -160,11 +160,21 @@ jobs:
           PY_VERSION: ${{ matrix.python-version }}
         run: |
           # Pre-warms the exact models the `_testing_profile` pins in
-          # src/codeweaver/providers/config/profiles.py:
+          # src/codeweaver/providers/config/profiles.py. Model selection
+          # depends on which backend is available:
           #
-          #   ULTRALIGHT_EMBEDDING_MODEL     = "minishlab/potion-base-8M"
-          #   ULTRALIGHT_SPARSE_EMBEDDING_MODEL = "qdrant/bm25"
-          #   ULTRALIGHT_RERANKING_MODEL     = "jinaai/jina-reranker-v1-tiny-en"
+          #   dense:  minishlab/potion-base-8M (ST, all python versions)
+          #   sparse: qdrant/bm25 (fastembed, 3.12/3.13)
+          #           ibm-granite/granite-embedding-30m-sparse (ST, 3.14)
+          #   rerank: jinaai/jina-reranker-v1-tiny-en (fastembed, 3.12/3.13)
+          #           cross-encoder/ms-marco-MiniLM-L6-v2 (ST, 3.14)
+          #
+          # The jinaai model ships remote code that imports
+          # `transformers.onnx.OnnxConfig` — removed in transformers 5.x —
+          # so it only works via fastembed's ONNX path, not via
+          # sentence_transformers.CrossEncoder. The ms-marco MiniLM model
+          # is a standard BERT-MiniLM architecture with no remote code
+          # trickery and works cleanly with CrossEncoder.
           #
           # sentence-transformers is always installed — Potion 8M is the
           # dense embedder on every python version the profile supports.
