@@ -154,7 +154,7 @@ def test_testing_profile_uses_ultralight_constants_st_sparse_branch(monkeypatch)
     """
     from codeweaver.core.constants import (
         ULTRALIGHT_EMBEDDING_MODEL,
-        ULTRALIGHT_RERANKING_MODEL,
+        ULTRALIGHT_ST_RERANKING_MODEL,
         ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL,
     )
 
@@ -177,4 +177,11 @@ def test_testing_profile_uses_ultralight_constants_st_sparse_branch(monkeypatch)
     reranking = result.get("reranking")
     assert reranking is not None
     rerank_first = reranking[0] if isinstance(reranking, tuple) else reranking
-    assert str(rerank_first.model_name) == ULTRALIGHT_RERANKING_MODEL
+    # On the ST branch (no fastembed), the profile gates to
+    # ULTRALIGHT_ST_RERANKING_MODEL because the original
+    # ULTRALIGHT_RERANKING_MODEL (jinaai/jina-reranker-v1-tiny-en) is
+    # only compatible with fastembed's ONNX loader — loading it via
+    # sentence_transformers.CrossEncoder crashes on transformers 5.x
+    # because the model's remote configuration_bert.py imports the
+    # removed `transformers.onnx` module. See commit 7b735d2a.
+    assert str(rerank_first.model_name) == ULTRALIGHT_ST_RERANKING_MODEL

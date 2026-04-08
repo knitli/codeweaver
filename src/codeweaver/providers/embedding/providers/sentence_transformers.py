@@ -240,7 +240,21 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
     ) -> list[CodeWeaverSparseEmbedding]:
         """Embed a sequence of documents into sparse vectors."""
         preprocessed = cast(list[str], self.chunks_to_strings(documents))
-        embed_partial = rpartial(self.client.encode, **(self.client_options | kwargs))
+        # Use `embed_options` (set by the base class's __init__ from
+        # config.sparse_embedding_config.embedding) rather than the
+        # nonexistent `client_options` attribute. Previously this line
+        # read `self.client_options | kwargs` which silently fell through
+        # to a bound method from the pydantic BaseModel (probably
+        # `model_copy` — every `foo_options` name happens to shadow
+        # nothing, but `client_options` didn't, so Python resolved the
+        # attribute via pydantic's __getattr__ which returns bound
+        # methods). `method | dict` raises TypeError at call time, not
+        # attribute-access time, so the bug was silent until the full
+        # search pipeline actually reached this method with real
+        # documents. Mirrors the dense sibling
+        # `SentenceTransformersEmbeddingProvider._embed_documents` which
+        # uses `self.embed_options` on line 100.
+        embed_partial = rpartial(self.client.encode, **(self.embed_options | kwargs))
         loop = asyncio.get_running_loop()
         results = await loop.run_in_executor(None, embed_partial, preprocessed)
         _ = self._fire_and_forget(lambda: self._update_token_stats(from_docs=preprocessed))
@@ -254,6 +268,10 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
     ) -> list[CodeWeaverSparseEmbedding]:
         """Embed a sequence of queries into sparse vectors."""
         preprocessed = cast(list[str], query)
+        # `self.query_options` IS a valid base-class attribute (set
+        # alongside `embed_options` in the parent __init__), so the
+        # query path worked even when the document path was broken.
+        # Kept explicit here for symmetry with `_embed_documents`.
         embed_partial = rpartial(self.client.encode, **(self.query_options | kwargs))
         loop = asyncio.get_running_loop()
         results = await loop.run_in_executor(None, embed_partial, preprocessed)
