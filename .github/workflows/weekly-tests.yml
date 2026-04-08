@@ -359,7 +359,7 @@ jobs:
             let benchmarkInfo = '';
             try {
               if (fs.existsSync('./benchmarks/benchmark-summary.md')) {
-                benchmarkInfo = '\n\n### Performance Benchmarks\n\n' + 
+                benchmarkInfo = '\n\n### Performance Benchmarks\n\n' +
                   fs.readFileSync('./benchmarks/benchmark-summary.md', 'utf8');
               }
             } catch (err) {
