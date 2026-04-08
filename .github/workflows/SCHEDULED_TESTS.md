@@ -34,8 +34,6 @@ This document describes the automated test workflows that run on a schedule to e
    - Includes: Performance benchmarks and dev-only tests
    - Non-blocking (failures don't fail the workflow)
 
-### Failure Handling
-
 4. **Nightly Install-Profile Smoke Tests**
    - Runs on: Python 3.12, 3.13, 3.14
    - Profiles: `base`, `recommended`, `full` (3x3 = 9 matrix cells)
@@ -52,6 +50,8 @@ This document describes the automated test workflows that run on a schedule to e
    - Critical: failures open the nightly-tests auto-issue alongside
      integration/real-provider failures, because a broken install profile
      means published wheels are unusable on an officially supported cell.
+
+### Failure Handling
 
 - **Critical Failures**: Integration, real provider, or install-smoke test failures
   - Creates/updates GitHub issue with label `nightly-tests`
@@ -110,8 +110,6 @@ gh workflow run nightly-tests.yml -f python-versions='["3.12"]'
    - Uploads to Codecov with `weekly` flag
    - 30-day artifact retention
 
-### Failure Handling
-
 6. **Weekly Install-Profile Smoke Tests**
    - Runs on: Python 3.12, 3.13, 3.14
    - Profiles: `base`, `recommended`, `recommended-local-only`, `full`
@@ -125,6 +123,8 @@ gh workflow run nightly-tests.yml -f python-versions='["3.12"]'
      extra cell. Revisit if a `full-gpu`-specific regression ships.
    - Critical: failures join Linux failures in the weekly-tests auto-issue
      path — a broken install profile is as severe as a Linux test failure.
+
+### Failure Handling
 
 - **Critical Failures**: Linux test failures or install-profile smoke matrix failures
   - Creates/updates GitHub issue with label `weekly-tests`

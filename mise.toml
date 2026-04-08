@@ -790,9 +790,13 @@ flag "--py <version>" help="Python version for the isolated venvs (default: curr
 flag "--keep-dist" help="Keep dist/ after the run instead of cleaning up"
 '''
 # Not yet cross-platform: this task shells out a bunch of POSIX stuff (mktemp,
-# trap, shell globs) and isn't worth porting to PowerShell until the pattern
-# stabilizes. Contributors on Windows should run the install-profile smoke
-# tests via CI (nightly / weekly workflow integration is the next phase).
+# trap) and isn't worth porting to PowerShell until the pattern stabilizes.
+# Contributors on Windows should run the install-profile smoke tests via CI
+# (nightly / weekly workflow integration already ships the same matrix).
+#
+# The per-profile install + pytest body lives in scripts/testing/install-smoke.sh
+# so that behavior stays identical between this local runner and the
+# `_reusable-install-smoke.yml` matrix workflow.
 run = '''
 set -e
 
@@ -823,17 +827,6 @@ trap cleanup EXIT
 echo "${CW_PREFIX} Building workspace wheels..."
 rm -rf dist/
 uv build --wheel --all-packages --quiet
-ROOT_WHEEL="$(ls dist/code_weaver-*.whl | head -n 1)"
-DAEMON_WHEEL="$(ls dist/code_weaver_daemon-*.whl | head -n 1)"
-TOKENIZERS_WHEEL="$(ls dist/code_weaver_tokenizers-*.whl | head -n 1)"
-if [ -z "${ROOT_WHEEL}" ] || [ -z "${DAEMON_WHEEL}" ] || [ -z "${TOKENIZERS_WHEEL}" ]; then
-  echo "${CW_PREFIX} ERROR: one or more workspace wheels missing from dist/ after build"
-  exit 1
-fi
-echo "${CW_PREFIX}   root:       $(basename "${ROOT_WHEEL}")"
-echo "${CW_PREFIX}   daemon:     $(basename "${DAEMON_WHEEL}")"
-echo "${CW_PREFIX}   tokenizers: $(basename "${TOKENIZERS_WHEEL}")"
-echo ""
 
 FAILED_PROFILES=""
 PASSED_PROFILES=""
@@ -847,51 +840,8 @@ for profile in ${PROFILES}; do
   uv venv --python "${PY}" --quiet "${VENV_DIR}"
   VENV_PY="${VENV_DIR}/bin/python"
 
-  # Install the wheel with the target profile's extras. `base` is the
-  # unadorned wheel; everything else appends `[profile]` to the main wheel
-  # spec. Passing all three wheels on the same install line lets uv resolve
-  # the workspace sibling pins (`code-weaver-daemon=={version}`) against the
-  # local files instead of PyPI, where they don't exist yet.
-  if [ "${profile}" = "base" ]; then
-    ROOT_SPEC="${ROOT_WHEEL}"
-  else
-    ROOT_SPEC="${ROOT_WHEEL}[${profile}]"
-  fi
-
-  echo "${CW_PREFIX}   installing ${profile}..."
-  if ! VIRTUAL_ENV="${VENV_DIR}" uv pip install \
-      --python "${VENV_PY}" \
-      --quiet \
-      --find-links dist/ \
-      "${ROOT_SPEC}" \
-      "${DAEMON_WHEEL}" \
-      "${TOKENIZERS_WHEEL}" \
-      "pytest>=9" \
-      "pytest-asyncio>=1" \
-      "pytest-timeout>=2"; then
-    echo "${CW_PREFIX}   INSTALL FAILED for ${profile}"
-    FAILED_PROFILES="${FAILED_PROFILES} ${profile}(install)"
-    continue
-  fi
-
-  # Pytest invocation notes:
-  #   -o "addopts=" clears the project's --cov-fail-under / --cov=codeweaver
-  #     defaults. Coverage doesn't work in isolation because the source tree
-  #     isn't on sys.path (which is the whole point — we're testing the
-  #     installed wheel, not `src/`).
-  #   -o "pythonpath=" clears the project's `pythonpath = ["src"]` setting.
-  #     If we left it, pytest would prepend the source tree to sys.path and
-  #     `import codeweaver` would resolve there instead of the installed
-  #     wheel, defeating the entire isolation.
-  #   --import-mode=importlib matches the rest of the project's test runner.
-  echo "${CW_PREFIX}   running smoke suite for ${profile}..."
-  if "${VENV_PY}" -m pytest \
-      tests/unit/smoke \
-      -m install_smoke \
-      -o "addopts=" \
-      -o "pythonpath=" \
-      --import-mode=importlib \
-      -v; then
+  echo "${CW_PREFIX}   running ${profile}..."
+  if scripts/testing/install-smoke.sh "${VENV_PY}" dist "${profile}"; then
     echo "${CW_PREFIX}   ${profile}: PASS"
     PASSED_PROFILES="${PASSED_PROFILES} ${profile}"
   else

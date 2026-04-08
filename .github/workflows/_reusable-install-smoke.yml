@@ -114,67 +114,20 @@ jobs:
           "$UV_PATH" venv --python "$PY_VERSION" .venv-smoke
           echo "VENV_PY=$PWD/.venv-smoke/bin/python" >> "$GITHUB_ENV"
 
-      - name: Install wheel with profile
-        env:
-          UV_PATH: ${{ steps.setup-uv.outputs.uv-path }}
-          VIRTUAL_ENV: .venv-smoke
-          PROFILE: ${{ matrix.profile }}
-        run: |
-          set -e
-          # Use `find` instead of `ls` (shellcheck SC2012) and -print -quit to
-          # bail after the first match. Empty output == no match, which the
-          # next block detects and fails loudly.
-          ROOT_WHEEL=$(find dist -maxdepth 1 -name 'code_weaver-*.whl' -print -quit)
-          DAEMON_WHEEL=$(find dist -maxdepth 1 -name 'code_weaver_daemon-*.whl' -print -quit)
-          TOKENIZERS_WHEEL=$(find dist -maxdepth 1 -name 'code_weaver_tokenizers-*.whl' -print -quit)
-
-          if [ -z "$ROOT_WHEEL" ] || [ -z "$DAEMON_WHEEL" ] || [ -z "$TOKENIZERS_WHEEL" ]; then
-            echo "::error::one or more workspace wheels missing from dist/" >&2
-            ls -la dist/ >&2
-            exit 1
-          fi
-
-          if [ "$PROFILE" = "base" ]; then
-            ROOT_SPEC="$ROOT_WHEEL"
-          else
-            ROOT_SPEC="${ROOT_WHEEL}[${PROFILE}]"
-          fi
-
-          # Install the root wheel with its profile's extras plus the two
-          # workspace siblings explicitly. --find-links lets uv resolve the
-          # sibling version pins against the local dist/ instead of PyPI
-          # (where they don't exist yet). pytest + plugins are installed
-          # because the smoke suite needs a test runner but the wheel itself
-          # (correctly) doesn't ship dev dependencies.
-          "$UV_PATH" pip install \
-            --python "$VENV_PY" \
-            --find-links dist/ \
-            "$ROOT_SPEC" \
-            "$DAEMON_WHEEL" \
-            "$TOKENIZERS_WHEEL" \
-            "pytest>=9" \
-            "pytest-asyncio>=1" \
-            "pytest-timeout>=2"
-
-      - name: Run install_smoke suite
+      - name: Install wheel with profile and run smoke suite
         env:
           PY_VERSION: ${{ matrix.python-version }}
           PROFILE: ${{ matrix.profile }}
+        # Delegates to scripts/testing/install-smoke.sh, which both this
+        # workflow and the local `mise run test-profiles` task call. Keeps
+        # wheel discovery, install flags, and pytest invocation identical
+        # across CI and local runs — changes only need to land in one place.
         run: |
-          # -o "addopts=" strips the workspace's --cov-fail-under and other
-          #   coverage defaults that don't apply to an isolated install test.
-          # -o "pythonpath=" strips `pythonpath = ["src"]`, which would
-          #   otherwise shadow the installed wheel with the source tree and
-          #   completely defeat the isolation.
-          # --import-mode=importlib matches the rest of the project.
-          "$VENV_PY" -m pytest \
-            tests/unit/smoke \
-            -m install_smoke \
-            -o "addopts=" \
-            -o "pythonpath=" \
-            --import-mode=importlib \
-            --junit-xml="smoke-py${PY_VERSION}-${PROFILE}.xml" \
-            -v
+          scripts/testing/install-smoke.sh \
+            "$VENV_PY" \
+            dist \
+            "$PROFILE" \
+            "smoke-py${PY_VERSION}-${PROFILE}.xml"
 
       - name: Upload smoke junit results
         if: always()
@@ -188,7 +141,7 @@ jobs:
   aggregate:
     name: Aggregate smoke matrix
     needs: smoke
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner-version }}
     if: always()
     outputs:
       result: ${{ steps.summary.outputs.result }}
