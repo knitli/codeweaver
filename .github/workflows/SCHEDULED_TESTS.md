@@ -36,7 +36,24 @@ This document describes the automated test workflows that run on a schedule to e
 
 ### Failure Handling
 
-- **Critical Failures**: Integration or real provider test failures
+4. **Nightly Install-Profile Smoke Tests**
+   - Runs on: Python 3.12, 3.13, 3.14
+   - Profiles: `base`, `recommended`, `full` (3x3 = 9 matrix cells)
+   - Calls the reusable `_reusable-install-smoke.yml` workflow
+   - Builds all three workspace wheels once (via `_reusable-build.yml`),
+     uploads as artifact, then each cell downloads the wheels, installs
+     the root wheel with its profile's extras into an isolated venv,
+     and runs `pytest tests/unit/smoke -m install_smoke` against it
+   - Catches install-time regressions invisible to the main test suite
+     (which always runs in a full dev environment). Typical failure modes:
+     a dependency missing from an extra, a provider module top-level-
+     importing an optional SDK unconditionally, or wheel metadata not
+     matching actual runtime requirements.
+   - Critical: failures open the nightly-tests auto-issue alongside
+     integration/real-provider failures, because a broken install profile
+     means published wheels are unusable on an officially supported cell.
+
+- **Critical Failures**: Integration, real provider, or install-smoke test failures
   - Creates/updates GitHub issue with label `nightly-tests`
   - Fails the workflow
   - Sends notification via GitHub Actions
@@ -95,7 +112,21 @@ gh workflow run nightly-tests.yml -f python-versions='["3.12"]'
 
 ### Failure Handling
 
-- **Critical Failures**: Linux test failures only
+6. **Weekly Install-Profile Smoke Tests**
+   - Runs on: Python 3.12, 3.13, 3.14
+   - Profiles: `base`, `recommended`, `recommended-local-only`, `full`
+     (4 profiles x 3 pythons = 12 matrix cells)
+   - Same reusable workflow as nightly, wider profiles list
+   - `recommended-local-only` is weekly-only because its failure mode
+     overlap with `recommended` is too high to justify the nightly cost
+   - `full-gpu` is deferred entirely; GitHub runners don't have GPUs, so
+     the only delta it would catch is wheel-packaging regressions from
+     the `fastembed`/`fastembed-gpu` swap. Rare enough to not warrant the
+     extra cell. Revisit if a `full-gpu`-specific regression ships.
+   - Critical: failures join Linux failures in the weekly-tests auto-issue
+     path — a broken install profile is as severe as a Linux test failure.
+
+- **Critical Failures**: Linux test failures or install-profile smoke matrix failures
   - Creates/updates GitHub issue with label `weekly-tests`
   - Fails the workflow
   - Comprehensive summary in GitHub Actions

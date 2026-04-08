@@ -1,0 +1,220 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# Install-profile smoke tests.
+#
+# Builds all three workspace wheels once, then runs the curated `install_smoke`
+# pytest suite against each (python x extras profile) cell in an isolated venv
+# created from the built wheels. Catches install-time regressions that the
+# main test suite misses because dev environments always have every extra
+# installed.
+#
+# The smoke suite lives in tests/unit/smoke/ and contains subprocess-isolated
+# tests that verify base package import, public API, and MCP server module
+# importability. Adding tests to that directory and tagging them with
+# @pytest.mark.install_smoke automatically pulls them into this matrix.
+#
+# Intended to be called from nightly-tests.yml (reduced matrix) and
+# weekly-tests.yml (full matrix). Not run on every PR — smoke results only
+# change when pyproject.toml, provider imports, or the smoke suite itself
+# change, and the full matrix is expensive to run continuously.
+#
+# Security note: every interpolation in run: blocks comes from either
+# workflow_call inputs (validated JSON), matrix values (constrained by those
+# inputs), composite-action outputs, or secrets.GITHUB_TOKEN. No
+# github.event.* untrusted input is used anywhere, and every matrix/input
+# value that reaches a shell is first assigned to an env: entry and accessed
+# via $VAR — the pattern the security_reminder_hook itself recommends.
+
+name: Reusable Install Smoke Tests
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      python-versions:
+        description: JSON array of Python versions to smoke-test
+        required: false
+        type: string
+        default: '["3.12", "3.13", "3.14"]'
+      profiles:
+        description: JSON array of extras profiles. "base" means no extras.
+        required: false
+        type: string
+        default: '["base", "recommended", "full"]'
+      runner-version:
+        description: GitHub Actions runner image
+        required: false
+        type: string
+        default: ubuntu-latest
+    outputs:
+      matrix-result:
+        description: Aggregated matrix result (success or failure)
+        value: ${{ jobs.aggregate.outputs.result }}
+
+env:
+  MISE_EXPERIMENTAL: 1
+  MISE_YES: 1
+
+jobs:
+  build:
+    name: Build wheels for smoke matrix
+    uses: ./.github/workflows/_reusable-build.yml
+    with:
+      artifact-name: install-smoke-wheels
+      python-version: "3.12"
+      upload-artifacts: true
+      clean-build: false
+
+  smoke:
+    name: Smoke ${{ matrix.profile }} on py${{ matrix.python-version }}
+    needs: build
+    runs-on: ${{ inputs.runner-version }}
+    strategy:
+      # Never cancel siblings — we want the full matrix result even if one
+      # cell fails, so the summary reflects every failure mode at once.
+      fail-fast: false
+      matrix:
+        python-version: ${{ fromJSON(inputs.python-versions) }}
+        profile: ${{ fromJSON(inputs.profiles) }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          fetch-depth: 1
+
+      - name: Setup UV + Python
+        uses: ./.github/actions/setup-uv-env
+        with:
+          python-version: ${{ matrix.python-version }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          activate-venv: "false"
+          skip-checkout: true
+        id: setup-uv
+
+      - name: Download wheels artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: install-smoke-wheels
+          path: dist/
+
+      - name: List wheels
+        run: ls -la dist/
+
+      - name: Create isolated venv for smoke run
+        env:
+          UV_PATH: ${{ steps.setup-uv.outputs.uv-path }}
+          PY_VERSION: ${{ matrix.python-version }}
+        run: |
+          "$UV_PATH" venv --python "$PY_VERSION" .venv-smoke
+          echo "VENV_PY=$PWD/.venv-smoke/bin/python" >> "$GITHUB_ENV"
+
+      - name: Install wheel with profile
+        env:
+          UV_PATH: ${{ steps.setup-uv.outputs.uv-path }}
+          VIRTUAL_ENV: .venv-smoke
+          PROFILE: ${{ matrix.profile }}
+        run: |
+          set -e
+          # Use `find` instead of `ls` (shellcheck SC2012) and -print -quit to
+          # bail after the first match. Empty output == no match, which the
+          # next block detects and fails loudly.
+          ROOT_WHEEL=$(find dist -maxdepth 1 -name 'code_weaver-*.whl' -print -quit)
+          DAEMON_WHEEL=$(find dist -maxdepth 1 -name 'code_weaver_daemon-*.whl' -print -quit)
+          TOKENIZERS_WHEEL=$(find dist -maxdepth 1 -name 'code_weaver_tokenizers-*.whl' -print -quit)
+
+          if [ -z "$ROOT_WHEEL" ] || [ -z "$DAEMON_WHEEL" ] || [ -z "$TOKENIZERS_WHEEL" ]; then
+            echo "::error::one or more workspace wheels missing from dist/" >&2
+            ls -la dist/ >&2
+            exit 1
+          fi
+
+          if [ "$PROFILE" = "base" ]; then
+            ROOT_SPEC="$ROOT_WHEEL"
+          else
+            ROOT_SPEC="${ROOT_WHEEL}[${PROFILE}]"
+          fi
+
+          # Install the root wheel with its profile's extras plus the two
+          # workspace siblings explicitly. --find-links lets uv resolve the
+          # sibling version pins against the local dist/ instead of PyPI
+          # (where they don't exist yet). pytest + plugins are installed
+          # because the smoke suite needs a test runner but the wheel itself
+          # (correctly) doesn't ship dev dependencies.
+          "$UV_PATH" pip install \
+            --python "$VENV_PY" \
+            --find-links dist/ \
+            "$ROOT_SPEC" \
+            "$DAEMON_WHEEL" \
+            "$TOKENIZERS_WHEEL" \
+            "pytest>=9" \
+            "pytest-asyncio>=1" \
+            "pytest-timeout>=2"
+
+      - name: Run install_smoke suite
+        env:
+          PY_VERSION: ${{ matrix.python-version }}
+          PROFILE: ${{ matrix.profile }}
+        run: |
+          # -o "addopts=" strips the workspace's --cov-fail-under and other
+          #   coverage defaults that don't apply to an isolated install test.
+          # -o "pythonpath=" strips `pythonpath = ["src"]`, which would
+          #   otherwise shadow the installed wheel with the source tree and
+          #   completely defeat the isolation.
+          # --import-mode=importlib matches the rest of the project.
+          "$VENV_PY" -m pytest \
+            tests/unit/smoke \
+            -m install_smoke \
+            -o "addopts=" \
+            -o "pythonpath=" \
+            --import-mode=importlib \
+            --junit-xml="smoke-py${PY_VERSION}-${PROFILE}.xml" \
+            -v
+
+      - name: Upload smoke junit results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: smoke-results-py${{ matrix.python-version }}-${{ matrix.profile }}
+          path: smoke-py${{ matrix.python-version }}-${{ matrix.profile }}.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+  aggregate:
+    name: Aggregate smoke matrix
+    needs: smoke
+    runs-on: ubuntu-latest
+    if: always()
+    outputs:
+      result: ${{ steps.summary.outputs.result }}
+    steps:
+      - name: Summarize matrix result
+        id: summary
+        env:
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+        run: |
+          {
+            echo "# Install-profile smoke matrix"
+            echo ""
+            echo "**Matrix overall**: \`$SMOKE_RESULT\`"
+            echo ""
+            echo "Per-cell results visible in the individual smoke jobs above."
+            echo ""
+            echo "Failures in this matrix indicate that a published wheel install with a"
+            echo "given (python x extras) combination cannot import the codeweaver public"
+            echo "API — because a dependency is missing from an extra, a provider module"
+            echo "top-level-imports an optional SDK unconditionally, or the wheel metadata"
+            echo "doesn't match actual runtime requirements. Check individual cell logs"
+            echo "for the exact failure mode."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$SMOKE_RESULT" = "success" ]; then
+            echo "result=success" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=failure" >> "$GITHUB_OUTPUT"
+          fi
