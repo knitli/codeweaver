@@ -1536,10 +1536,12 @@ def language_from_path(
 
     all_languages = CODE_FILES_EXTENSIONS + DATA_FILES_EXTENSIONS + DOC_FILES_EXTENSIONS
     # Check if the extension or filename matches any known language extensions
-    if (
-        (all_exts := tuple(ext_pair.ext for ext_pair in all_languages)) and FileExt(ext) in all_exts
-    ) or FileExt(file_path.name) in all_exts:
-        target_exts = (FileExt(ext), FileExt(file_path.name))
+    file_ext = FileExt(ext)
+    name_ext = FileExt(file_path.name)
+    all_exts = tuple(ext_pair.ext for ext_pair in all_languages)
+
+    if file_ext in all_exts or name_ext in all_exts:
+        target_exts = (file_ext, name_ext)
         return next(
             (
                 ext_pair.language
