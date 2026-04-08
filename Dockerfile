@@ -66,7 +66,7 @@ COPY src/ src/
 # Rebuild root package with actual source code (workspace members already have
 # real source from the packages/ COPY above) and reinstall without re-resolving deps
 RUN uv build --wheel --out-dir /tmp/wheels-final && \
-    python -m pip install --no-cache-dir --no-deps --force-reinstall /tmp/wheels-final/code_weaver-*.whl
+    python -m pip install --no-cache-dir --no-deps --force-reinstall /tmp/wheels-final/*.whl
 
 # =============================================================================
 # Stage 2: Runtime - Minimal production image
