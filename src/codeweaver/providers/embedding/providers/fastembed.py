@@ -156,7 +156,11 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None,
-            lambda: list(self.client.embed(texts=cast(Iterable[str], ready_documents), **kwargs)),
+            lambda: list(
+                self.client.embed(
+                    documents=cast(Iterable[str], ready_documents), **kwargs
+                )
+            ),
         )
         partial_tokens = rpartial(self._update_token_stats, from_docs=ready_documents)
         self._fire_and_forget(partial_tokens, loop=loop)
@@ -185,7 +189,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
     FastEmbed implementation for sparse embeddings.
     """
 
-    client: type[SparseTextEmbedding] | SparseTextEmbedding | None = _SparseTextEmbedding
+    client: type[SparseTextEmbedding] | SparseTextEmbedding = _SparseTextEmbedding  # ty:ignore[invalid-assignment]
     caps: SparseEmbeddingModelCapabilities | None = None
     _output_transformer: Callable[[Any], list[CodeWeaverSparseEmbedding]] = (
         fastembed_sparse_output_transformer
