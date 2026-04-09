@@ -5,13 +5,13 @@
   "type": "module",
   "scripts": {
     "astro": "bunx astro",
-    "prebuild": "bunx wrangler types; bunx astro sync",
+    "prebuild": "bunx wrangler -c ./wrangler.jsonc types; bunx astro sync",
     "build": "bunx astro build",
-    "deploy": "bun run build && bunx wrangler deploy",
+    "deploy": "bun run build && bunx wrangler -c ./wrangler.jsonc deploy",
     "dev": "bunx astro dev",
     "prepare": "test -f ./node_modules/bun/install.js && node ./node_modules/bun/install.js || true",
     "preview": "bunx astro preview",
-    "wrangler": "bunx wrangler"
+    "wrangler": "bunx wrangler -c ./wrangler.jsonc"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.38.2",
