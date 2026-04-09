@@ -338,7 +338,7 @@ SPDX-FileCopyrightText = "2025 GitHub Inc."
 SPDX-License-Identifier = "MIT"
 
 [[annotations]]
-path = ["docs-site/src/**"]
+path = ["docs-site/src/**", "docs-site/public/**"]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Knitli Inc."
 SPDX-License-Identifier = "MIT OR Apache-2.0"
