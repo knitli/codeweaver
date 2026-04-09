@@ -113,10 +113,14 @@ def test_testing_profile_uses_ultralight_constants(monkeypatch):
         ULTRALIGHT_EMBEDDING_MODEL,
         ULTRALIGHT_RERANKING_MODEL,
         ULTRALIGHT_SPARSE_EMBEDDING_MODEL,
+        ULTRALIGHT_ST_RERANKING_MODEL,
+        ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL,
     )
 
     pmod = _get_profiles_module(monkeypatch)
     monkeypatch.setattr(pmod, "HAS_ST", True)
+
+    has_fastembed = pmod.HAS_FASTEMBED
 
     result = pmod._testing_profile()
 
@@ -128,9 +132,11 @@ def test_testing_profile_uses_ultralight_constants(monkeypatch):
     sparse = result.get("sparse_embedding")
     assert sparse is not None
     sparse_first = sparse[0] if isinstance(sparse, tuple) else sparse
-    assert str(sparse_first.model_name) == ULTRALIGHT_SPARSE_EMBEDDING_MODEL
+    expected_sparse = ULTRALIGHT_SPARSE_EMBEDDING_MODEL if has_fastembed else ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL
+    assert str(sparse_first.model_name) == expected_sparse
 
     reranking = result.get("reranking")
     assert reranking is not None
     rerank_first = reranking[0] if isinstance(reranking, tuple) else reranking
-    assert str(rerank_first.model_name) == ULTRALIGHT_RERANKING_MODEL
+    expected_reranking = ULTRALIGHT_RERANKING_MODEL if has_fastembed else ULTRALIGHT_ST_RERANKING_MODEL
+    assert str(rerank_first.model_name) == expected_reranking
