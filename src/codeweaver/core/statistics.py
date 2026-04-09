@@ -610,14 +610,20 @@ class _CategoryStatistics(BasedModel):
         """Get the string values of all semantic search languages in this category."""
         return frozenset(lang.variable for lang in self.semantic_languages)
 
-    @property
+    @functools.cached_property
     def operations_with_semantic_support(self) -> NonNegativeInt:
-        """Get the total operations with semantic support across all languages in this category."""
+        """Get the total operations with semantic support across all languages in this category.
+
+        Cached for performance. Cache is invalidated when operations are added.
+        """
         return sum(lang_stats.total_operations for lang_stats in self.semantic_languages.values())
 
-    @property
+    @functools.cached_property
     def unique_files(self) -> frozenset[Path]:
-        """Get the unique files across all languages in this category."""
+        """Get the unique files across all languages in this category.
+
+        Cached for performance. Cache is invalidated when operations are added.
+        """
         all_files: set[Path] = set()
         for lang_stats in self.languages.values():
             all_files.update(lang_stats.unique_files)
@@ -627,8 +633,17 @@ class _CategoryStatistics(BasedModel):
 
     @functools.cached_property
     def total_operations(self) -> NonNegativeInt:
-        """Get the total operations across all languages in this category."""
+        """Get the total operations across all languages in this category.
+
+        Cached for performance. Cache is invalidated when operations are added.
+        """
         return sum(lang_stats.total_operations for lang_stats in self.languages.values())
+
+    def _invalidate_category_caches(self) -> None:
+        """Invalidate the cached values when underlying language stats are mutated."""
+        self.__dict__.pop("total_operations", None)
+        self.__dict__.pop("unique_files", None)
+        self.__dict__.pop("operations_with_semantic_support", None)
 
     def add_operation(
         self,
@@ -639,7 +654,7 @@ class _CategoryStatistics(BasedModel):
         """Add an operation for a specific language in this category."""
         lang_stats = self.get_language_stats(language)
         lang_stats.add_operation(operation, path)
-        self.__dict__.pop("total_operations", None)
+        self._invalidate_category_caches()
 
     @classmethod
     def from_ext_category(cls, ext_category: ExtCategory) -> _CategoryStatistics:
@@ -758,7 +773,7 @@ class FileStatistics(BasedModel):
 
         # Track the chunk
         lang_stats.add_chunk(chunk, operation)
-        self.categories[kind].__dict__.pop("total_operations", None)
+        self.categories[kind]._invalidate_category_caches()
 
     def add_other_files(self, *files: Path) -> None:
         """Add files to the 'other' category."""
