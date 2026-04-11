@@ -8,9 +8,9 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs-site/src/assets/codeweaver-reverse.webp">
-  <source media="(prefers-color-scheme: light)" srcset="docs-site/src/assets/codeweaver-primary.webp">
-  <img alt="CodeWeaver logo" src="docs-site/src/assets/codeweaver-primary.webp" height="150px" width="150px">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/knitli/codeweaver/refs/heads/main/docs-site/src/assets/codeweaver-reverse.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/knitli/codeweaver/refs/heads/main/docs-site/src/assets/codeweaver-primary.svg">
+  <img alt="CodeWeaver logo" src="https://raw.githubusercontent.com/knitli/codeweaver/refs/heads/main/docs-site/src/assets/codeweaver-primary.svg" height="150px" width="150px">
 </picture>
 
 # CodeWeaver
