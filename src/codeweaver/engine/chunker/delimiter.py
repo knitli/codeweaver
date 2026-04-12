@@ -482,17 +482,17 @@ class DelimiterChunker(BaseChunker):
         for delimiter in keyword_delimiters:
             delimiter_map.setdefault(delimiter.start, []).append(delimiter)
 
-        matches_iter = list(combined_pattern.finditer(content))
+        keyword_hits = [
+            (match.start(), match.group(0)) for match in combined_pattern.finditer(content)
+        ]
         # Precompute brace-nesting levels at all keyword positions in a single
         # O(n) forward pass.  The previous approach called _calculate_nesting_level
         # per keyword match, each scanning from position 0, resulting in O(n * m)
         # total work that caused timeouts on large files (especially Python 3.13).
-        keyword_positions = [match.start() for match in matches_iter]
+        keyword_positions = [pos for pos, _ in keyword_hits]
         nesting_at = self._precompute_nesting_levels(content, keyword_positions)
 
-        for match in matches_iter:
-            matched_text = match.group(0)
-            keyword_pos = match.start()
+        for keyword_pos, matched_text in keyword_hits:
 
             # Skip if keyword is inside a string or comment
             if self._is_inside_string_or_comment(content, keyword_pos):
@@ -553,7 +553,7 @@ class DelimiterChunker(BaseChunker):
             return {}
 
         result: dict[int, int] = {}
-        sorted_positions = sorted(set(positions))
+        sorted_positions = sorted(positions)
         pos_idx = 0
         brace_depth = 0
         content_len = len(content)
