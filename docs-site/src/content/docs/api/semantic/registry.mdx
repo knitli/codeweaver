@@ -1,0 +1,104 @@
+---
+title: registry
+description: API reference for codeweaver.semantic.registry
+---
+
+# `codeweaver.semantic.registry`
+
+ThingRegistry manages the registration and retrieval of grammar Things and Categories for programming languages.
+
+## Class: `ThingRegistry`
+
+Registry for managing Things and Categories for programming languages.
+
+Responsibilities:
+    - A simple store for constructed Things and Categories
+    - Along with ThingGenerator, provides lazy access to Things by name
+
+### Method: `get_category_by_name`
+
+```python
+get_category_by_name()
+```
+
+Get a Category by its name across all languages.
+
+### Method: `get_direct_connections_by_source`
+
+```python
+get_direct_connections_by_source()
+```
+
+Get DirectConnections by their source Thing name across all languages.
+
+### Method: `get_positional_connections_by_source`
+
+```python
+get_positional_connections_by_source()
+```
+
+Get PositionalConnectionss by their source Thing name across all languages.
+
+### Method: `get_thing_by_name`
+
+```python
+get_thing_by_name()
+```
+
+Get a Thing by its name across all languages.
+
+### Method: `has_language`
+
+```python
+has_language()
+```
+
+Check if the registry has any Things or Categories for the specified language.
+
+### Method: `is_registered`
+
+```python
+is_registered()
+```
+
+Check if a Thing or Category is already registered.
+
+### Method: `register_connection`
+
+```python
+register_connection()
+```
+
+Register a Connection in the appropriate category.
+
+### Method: `register_connections`
+
+```python
+register_connections()
+```
+
+Register multiple Connections.
+
+### Method: `register_thing`
+
+```python
+register_thing()
+```
+
+Register a Thing in the appropriate category.
+
+### Method: `register_things`
+
+```python
+register_things()
+```
+
+Register multiple Things.
+
+## Function: `build_models`
+
+```python
+build_models()
+```
+
+Build models to populate the registry.

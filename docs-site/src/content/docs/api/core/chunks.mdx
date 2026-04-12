@@ -1,0 +1,105 @@
+---
+title: chunks
+description: API reference for codeweaver.core.chunks
+---
+
+# `codeweaver.core.chunks`
+
+CodeWeaver Code Chunks and Search Results.
+
+`CodeChunk` are the core building block of all CodeWeaver operations. They are the result of code parsing
+and chunking operations, and they contain the actual code content along with metadata such as file path,
+language, line ranges, and more. `SearchResult` is the output of a vector search operation -- before it has been processed through CodeWeaver's multi-layered reranking system.
+
+## Class: `BatchKeys`
+
+Tuple representing batch keys for embedding operations.
+
+## Class: `CodeChunk`
+
+Represents a chunk of code or docs with metadata.
+
+### Method: `chunkify`
+
+```python
+chunkify()
+```
+
+Convert text to a CodeChunk.
+
+### Method: `dechunkify`
+
+```python
+dechunkify()
+```
+
+Convert a sequence of CodeChunks or mixed serialized and deserialized chunks back to json strings.
+
+### Method: `from_file`
+
+```python
+from_file()
+```
+
+Create a CodeChunk from a file. (This creates a chunk that consists of the entire file contents. To create smaller chunks, use a chunker.).
+
+### Method: `serialize`
+
+```python
+serialize()
+```
+
+Serialize the CodeChunk to a dictionary.
+
+### Method: `serialize_for_cli`
+
+```python
+serialize_for_cli()
+```
+
+Serialize the CodeChunk for CLI output.
+
+### Method: `serialize_for_embedding`
+
+```python
+serialize_for_embedding()
+```
+
+Serialize the CodeChunk for embedding.
+
+Returns a JSON string containing the most relevant fields for semantic search.
+
+### Method: `set_batch_keys`
+
+```python
+set_batch_keys()
+```
+
+Set the batch keys for the code chunk.
+
+Returns a new CodeChunk instance with updated batch keys.
+Explicitly copies metadata dict to prevent shared references between instances.
+
+Args:
+    batch_keys: The batch keys to set
+    intent: The intent/name for this embedding (e.g., "primary", "backup", "sparse").
+           If None, infers from sparse flag and secondary parameter.
+    secondary: Deprecated - use intent parameter instead. If True and intent is None,
+              uses "backup" as intent.
+
+Returns:
+    New CodeChunk instance with batch keys set
+
+### Method: `token_count`
+
+```python
+token_count()
+```
+
+Return the token count for the chunk content.
+
+## Class: `CodeChunkDict`
+
+A python dictionary of a CodeChunk.
+
+Primarily provides type hints and documentation for the expected structure of a CodeChunk when represented as a dictionary.

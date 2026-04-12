@@ -1,0 +1,18 @@
+---
+title: litellm
+description: API reference for codeweaver.providers.embedding.providers.litellm
+---
+
+# `codeweaver.providers.embedding.providers.litellm`
+
+LiteLLM embedding provider information.
+
+LiteLLM presents a difficult case, as it supports a wide range of providers itself, and each provider may have multiple models with different capabilities and using different APIs.
+
+From an authentication standpoint, you need to use the client's authentication environment variables, e.g., for OpenAI models, you need to set OPENAI_API_KEY.
+
+To keep things manageable, for now, we only support OpenAI-compatible models and endpoints via LiteLLM. Unlike other providers that only expose OpenAI models through the OpenAI API, LiteLLM actually supports a broad range of models through the OpenAI-compatible API. All models must be prefixed with "openai/" to tell LiteLLM to use the OpenAI-compatible endpoint.
+
+## Class: `LiteLLMModelSpec`
+
+Specification for a LiteLLM embedding model.

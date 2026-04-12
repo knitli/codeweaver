@@ -1,0 +1,110 @@
+---
+title: providers
+description: API reference for codeweaver.providers.config.providers
+---
+
+# `codeweaver.providers.config.providers`
+
+Models and TypedDict classes for provider and AI (embedding, sparse embedding, reranking, agent) model settings.
+
+The overall pattern:
+    - Each potential provider client (the actual client class, e.g., OpenAIClient) has a corresponding ClientOptions class (e.g., OpenAIClientOptions).
+    - There is a baseline provider settings model, `BaseProviderCategorySettings`. Each provider type (embedding, data, vector store, etc.) has a corresponding settings model that extends `BaseProviderCategorySettings` (e.g., `EmbeddingProviderSettings`). These are mostly almost identical, but the class distinctions make identification easier and improves clarity.
+    - Certain providers with unique settings requirements can define a mixin class that provides the additional required settings. Note that these should not overlap with the client options for the provider.
+    - A series of discriminators help with identifying the correct client options and provider settings classes based on the provider and other settings.
+
+## Class: `DeterminedDefaults`
+
+Tuple for determined default embedding settings.
+
+## Class: `ProviderNameMap`
+
+Configured providers by category.
+
+## Class: `ProviderSettings`
+
+Settings for provider configuration.
+
+### Method: `coerce_provider_fields_to_tuples`
+
+```python
+coerce_provider_fields_to_tuples()
+```
+
+Normalize provider category fields before field validation.
+
+When provider settings arrive from TOML configs or pydantic-settings
+source merging, they may be bare dicts instead of sequences and may
+lack discriminator fields needed by pydantic's tagged unions. This
+validator wraps non-sequences and injects missing discriminator fields.
+
+### Method: `has_auth_configured`
+
+```python
+has_auth_configured()
+```
+
+Check if API key or TLS certs are set for the provider through settings or environment.
+
+### Method: `has_setting`
+
+```python
+has_setting()
+```
+
+Check if a specific provider setting is configured.
+
+Args:
+    setting_name: The name of the setting or ProviderCategory to check.
+
+### Method: `settings_for_category`
+
+```python
+settings_for_category()
+```
+
+Get the settings for a specific provider category.
+
+Args:
+    category: The category of provider or ProviderCategory to get settings for.
+    primary: Whether to return the primary settings or all settings.
+    backup: Whether to return the backup settings instead of the primary.
+
+### Method: `settings_for_provider`
+
+```python
+settings_for_provider()
+```
+
+Get the settings for a specific provider.
+
+### Method: `validate_and_normalize_providers`
+
+```python
+validate_and_normalize_providers()
+```
+
+Validate and normalize provider settings after initialization.
+
+### Method: `validate_embedding_configuration`
+
+```python
+validate_embedding_configuration()
+```
+
+Validate embedding configuration and log the selected mode.
+
+Returns:
+    Self for method chaining.
+
+## Class: `ProviderSettingsDict`
+
+A dictionary representation of provider settings.
+
+## Function: `merge_agent_model_settings`
+
+```python
+merge_agent_model_settings()
+```
+
+A convenience re-export of `merge_model_settings` for agent model settings.

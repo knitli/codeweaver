@@ -1,0 +1,17 @@
+---
+title: dependencies
+description: API reference for codeweaver.engine.dependencies
+---
+
+# `codeweaver.engine.dependencies`
+
+Dependency injection setup for engine components.
+
+This module provides DI factories for engine services and managers.
+All construction logic lives here, keeping business logic clean.
+
+Architecture:
+- Services receive dependencies from other codeweaver packages via INJECTED markers
+- Inter-dependencies from within the engine package handled in dependencies.py
+- Managers are constructed here and injected into services
+- Configuration flows: Settings → Config → Dependencies → Services

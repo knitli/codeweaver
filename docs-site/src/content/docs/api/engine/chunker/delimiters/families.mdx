@@ -1,0 +1,91 @@
+---
+title: families
+description: API reference for codeweaver.engine.chunker.delimiters.families
+---
+
+# `codeweaver.engine.chunker.delimiters.families`
+
+Language family classification and delimiter grouping.
+
+This module provides language family definitions and detection logic for grouping
+languages with similar delimiter patterns. Families enable code reuse and provide
+reasonable defaults for unknown languages.
+
+Example:
+    &gt;&gt;&gt; detect_language_family("function foo() &#123; return 42; &#125;")
+    &lt;LanguageFamily.C_STYLE: 'c_style'&gt;
+
+    &gt;&gt;&gt; FAMILY_PATTERNS[LanguageFamily.C_STYLE]
+    [FUNCTION_PATTERN, CLASS_PATTERN, ...]
+
+## Function: `defined_languages`
+
+```python
+defined_languages()
+```
+
+Get a list of all languages with defined families.
+
+Returns:
+    List of language names with known family mappings
+
+Example:
+    &gt;&gt;&gt; "python" in defined_languages()
+    True
+
+    &gt;&gt;&gt; "unknownlang" in defined_languages()
+    False
+
+## Function: `detect_family_characteristics`
+
+```python
+detect_family_characteristics()
+```
+
+Analyze family characteristics in code sample.
+
+Provides detailed scoring breakdown for all families, useful for
+debugging classifier performance or understanding mixed-language files.
+
+Args:
+    content: Code sample to analyze
+
+Returns:
+    Dictionary mapping families to their characteristics:
+    - pattern_matches: Number of delimiter patterns found
+    - confidence: Normalized confidence score (0.0-1.0)
+    - weighted_score: Score weighted by pattern distinctiveness
+
+Example:
+    &gt;&gt;&gt; chars = detect_family_characteristics("function foo() &#123; &#125;")
+    &gt;&gt;&gt; chars[LanguageFamily.C_STYLE]["pattern_matches"]
+    4
+
+## Function: `detect_language_family`
+
+```python
+detect_language_family()
+```
+
+Detect language family from code sample asynchronously.
+
+Runs in a thread pool to avoid blocking the event loop.
+
+## Function: `get_family_patterns`
+
+```python
+get_family_patterns()
+```
+
+Get delimiter patterns for a language family.
+
+Args:
+    family: The language family to get patterns for
+
+Returns:
+    List of DelimiterPattern objects for the family
+
+Example:
+    &gt;&gt;&gt; patterns = get_family_patterns(LanguageFamily.C_STYLE)
+    &gt;&gt;&gt; len(patterns) &gt; 10
+    True

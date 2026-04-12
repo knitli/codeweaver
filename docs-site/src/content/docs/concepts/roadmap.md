@@ -10,7 +10,21 @@ CodeWeaver has completed a major infrastructure overhaul. With the Dependency In
 
 ---
 
-## Current Status: 0.1.0 (Stable Foundation)
+## Pre-1.0 Stability Contract
+
+CodeWeaver is currently in the **0.1.x series**, the first semi-stable foundation after the alpha line. Until we reach 1.0, version numbers follow a pre-1.0 SemVer convention:
+
+- **Patch releases (0.1.x):** Bug fixes and non-breaking improvements. Always safe to upgrade within a minor series.
+- **Minor releases (0.x.0):** New features and architectural improvements. **May include breaking changes** — we will document migration steps in the [changelog](/codeweaver/changelog/), but config formats, public Python APIs, and CLI flags can shift between minor versions until 1.0.
+- **1.0.0:** API stability guarantees kick in. Once we ship 1.0, we will follow strict SemVer.
+
+If you're integrating CodeWeaver into something that depends on stable interfaces, **pin the minor version** (e.g. `code-weaver>=0.1,<0.2`) and read the changelog before bumping.
+
+The jump from `0.1.0-alpha.5` → `0.1.0` was a hard reset: nearly every public surface changed. The alpha line is no longer supported and should not be used as a reference for current behavior.
+
+---
+
+## Current Status: {{VERSION}} (Pre-1.0 Foundation)
 
 The 0.1.x series represents **Industrial-Grade Context**. We have replaced fragmented registries with a unified, FastAPI-inspired DI system. CodeWeaver is no longer just a "search tool" — it is a professional infrastructure component for AI agents.
 
@@ -23,7 +37,7 @@ The 0.1.x series represents **Industrial-Grade Context**. We have replaced fragm
 
 ## Next: 0.2.0 (Extensibility)
 
-The primary goal of 0.2.0 is the **Monorepo Split**. We are reorganizing the codebase into independent, selectively installable packages.
+The primary goal of 0.2.0 is the **Monorepo Split**. We are reorganizing the codebase into independent, selectively installable packages. Expect breaking changes to import paths and `pyproject.toml` extras.
 
 ### 1. Package Separation
 Currently, CodeWeaver is a single large package. In 0.2.0, it will be split into:

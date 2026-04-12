@@ -1,0 +1,21 @@
+---
+title: resolver
+description: API reference for codeweaver.providers.embedding.capabilities.resolver
+---
+
+# `codeweaver.providers.embedding.capabilities.resolver`
+
+Dependency injection setup for embedding model capabilities.
+
+Provides lazy loading and resolution of embedding model capabilities by model name.
+
+## Class: `EmbeddingCapabilityResolver`
+
+Resolves embedding model capabilities by model name.
+
+Lazily loads all capability modules on first access to minimize startup overhead.
+Provides a singleton registry of all embedding model capabilities.
+
+## Class: `SparseEmbeddingCapabilityResolver`
+
+A capability resolver for sparse embedding models.

@@ -1,0 +1,29 @@
+---
+title: failover_service
+description: API reference for codeweaver.engine.services.failover_service
+---
+
+# `codeweaver.engine.services.failover_service`
+
+Failover service for coordinating primary/backup vector store transitions.
+
+## Class: `FailoverService`
+
+Coordinates failover between primary and backup vector stores.
+
+Responsibilities:
+- Monitor primary store health
+- Activate backup when primary fails
+- Sync backup periodically
+- Restore to primary when recovered
+
+### Method: `start_monitoring`
+
+```python
+start_monitoring()
+```
+
+Start health monitoring and automatic failover.
+
+Note: Backup maintenance removed in Phase 2 - new three-phase maintenance loop
+(in indexing service) handles vector reconciliation and snapshots.

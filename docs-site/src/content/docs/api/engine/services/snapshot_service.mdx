@@ -1,0 +1,163 @@
+---
+title: snapshot_service
+description: API reference for codeweaver.engine.services.snapshot_service
+---
+
+# `codeweaver.engine.services.snapshot_service`
+
+Snapshot backup service for Qdrant vector store disaster recovery.
+
+This service creates and manages periodic snapshots of the vector store for
+point-in-time recovery scenarios. It integrates with the failover maintenance
+loop and handles snapshot retention, cleanup, and storage management.
+
+## Class: `CleanupStatsDict`
+
+Dictionary for snapshot cleanup statistics.
+
+## Class: `QdrantSnapshotBackupService`
+
+Service for creating and managing Qdrant vector store snapshots.
+
+This service provides periodic snapshot creation for disaster recovery,
+with automatic retention management and support for local/cloud storage.
+
+Features:
+- Periodic snapshot creation
+- Automatic retention management (keep N most recent snapshots)
+- Local and cloud storage support
+- Graceful error handling
+- Integration with failover maintenance loop
+
+### Method: `cleanup_old_snapshots`
+
+```python
+cleanup_old_snapshots()
+```
+
+Delete old snapshots beyond retention count.
+
+Keeps the N most recent snapshots (configured by retention_count).
+
+Returns:
+    Dictionary with cleanup statistics:
+    - total: Total snapshots found
+    - kept: Number of snapshots retained
+    - deleted: Number of snapshots deleted
+    - failed: Number of deletion failures
+
+Example:
+    &gt;&gt;&gt; stats = await service.cleanup_old_snapshots()
+    &gt;&gt;&gt; print(f"Deleted &#123;stats['deleted']&#125; old snapshots")
+
+### Method: `create_snapshot`
+
+```python
+create_snapshot()
+```
+
+Create a new snapshot of the collection.
+
+Args:
+    wait: Whether to wait for snapshot creation to complete
+
+Returns:
+    Snapshot name if successful, None otherwise
+
+Example:
+    &gt;&gt;&gt; service = QdrantSnapshotBackupService(vector_store)
+    &gt;&gt;&gt; snapshot_name = await service.create_snapshot()
+    &gt;&gt;&gt; print(f"Created snapshot: &#123;snapshot_name&#125;")
+
+### Method: `delete_snapshot`
+
+```python
+delete_snapshot()
+```
+
+Delete a specific snapshot.
+
+Args:
+    snapshot_name: Name of the snapshot to delete
+
+Returns:
+    True if successfully deleted, False otherwise
+
+### Method: `get_latest_snapshot`
+
+```python
+get_latest_snapshot()
+```
+
+Get metadata for the most recent snapshot.
+
+Returns:
+    Snapshot metadata dictionary, or None if no snapshots exist
+
+### Method: `list_snapshots`
+
+```python
+list_snapshots()
+```
+
+List all available snapshots for the collection.
+
+Returns:
+    List of snapshot metadata dictionaries
+
+Example:
+    &gt;&gt;&gt; snapshots = await service.list_snapshots()
+    &gt;&gt;&gt; for snapshot in snapshots:
+    ...     print(f"&#123;snapshot['name']&#125;: &#123;snapshot['size']&#125; bytes")
+
+### Method: `restore_snapshot`
+
+```python
+restore_snapshot()
+```
+
+Restore the collection from a snapshot.
+
+WARNING: This operation replaces the entire collection with the snapshot state.
+
+Args:
+    snapshot_name: Name of the snapshot to restore
+    wait: Whether to wait for restore operation to complete
+
+Returns:
+    True if restore initiated successfully, False otherwise
+
+Example:
+    &gt;&gt;&gt; success = await service.restore_snapshot("snapshot_20250127_120000")
+    &gt;&gt;&gt; if success:
+    ...     print("Restore completed successfully")
+
+### Method: `snapshot_and_cleanup`
+
+```python
+snapshot_and_cleanup()
+```
+
+Create a new snapshot and clean up old ones.
+
+This is the main method for periodic snapshot maintenance.
+It combines snapshot creation and retention management.
+
+Args:
+    wait: Whether to wait for snapshot creation to complete
+
+Returns:
+    SnapshotCleanupResults: Dictionary with operation results:
+    - snapshot_created: Whether new snapshot was created successfully
+    - snapshot_name: Name of new snapshot (None if failed)
+    - cleanup_stats: Statistics from cleanup operation
+
+Example:
+    &gt;&gt;&gt; result = await service.snapshot_and_cleanup()
+    &gt;&gt;&gt; if result["snapshot_created"]:
+    ...     print(f"Created: &#123;result['snapshot_name']&#125;")
+    ...     print(f"Cleaned up: &#123;result['cleanup_stats']['deleted']&#125; old snapshots")
+
+## Class: `SnapshotMetaDict`
+
+Metadata dictionary for snapshot operations results.

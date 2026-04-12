@@ -1,0 +1,102 @@
+---
+title: qdrant_service
+description: API reference for codeweaver.providers.vector_stores.qdrant_service
+---
+
+# `codeweaver.providers.vector_stores.qdrant_service`
+
+Service layer for Qdrant vector store operations.
+
+This module separates behavior (DI-dependent operations) from configuration (pure data).
+The service uses QdrantVectorStoreProviderSettings (pure data) + injected dependencies
+to perform vector store operations.
+
+Architecture:
+    - QdrantVectorStoreProviderSettings: Pure configuration (data)
+    - QdrantVectorStoreService: Behavior + DI (service)
+    - This separation enables:
+        * Easy testing (instantiate service with mocks)
+        * Clear responsibilities (settings = data, service = operations)
+        * No pydantic issues with DI
+
+Usage:
+    # In tests (unit tests with mocks):
+    settings = QdrantVectorStoreProviderSettings(...)
+    mock_embedding = Mock(spec=EmbeddingCapabilityGroup)
+    service = QdrantVectorStoreService(settings, mock_embedding)
+
+    # In application (DI container resolves):
+    service = await container.resolve(QdrantVectorStoreService)
+
+## Class: `QdrantVectorStoreService`
+
+Service layer for Qdrant vector store operations.
+
+Responsibilities:
+    - Use settings (pure data) to perform operations
+    - Manage injected dependencies (embedding group, failover settings)
+    - Encapsulate business logic (WalConfig merging, collection configuration)
+
+This class separates behavior from configuration following SOLID principles:
+    - Single Responsibility: Settings hold data, Service performs operations
+    - Dependency Inversion: Service depends on abstractions (EmbeddingCapabilityGroup)
+    - Open/Closed: Settings can be used without service infrastructure
+
+The service is testable:
+    - Unit tests: Instantiate with mock dependencies
+    - Integration tests: Let DI container resolve dependencies
+
+### Method: `get_collection_config`
+
+```python
+get_collection_config()
+```
+
+Get collection configuration, merging failover WalConfig if backup system is enabled.
+
+When the backup system is active, failover WalConfig settings take precedence over
+user-configured settings to ensure proper snapshot and recovery functionality.
+
+Args:
+    metadata: Collection metadata
+
+Returns:
+    QdrantCollectionConfig with merged WalConfig settings
+
+Example:
+    # Unit test with mocks
+    service = QdrantVectorStoreService(
+        settings=test_settings,
+        embedding_group=mock_embedding_group,
+        failover_settings=mock_failover,
+    )
+    config = await service.get_collection_config(metadata)
+
+    # Integration test with DI
+    service = await container.resolve(QdrantVectorStoreService)
+    config = await service.get_collection_config(metadata)
+
+## Function: `create_qdrant_service`
+
+```python
+create_qdrant_service()
+```
+
+Factory function with DI for application startup.
+
+The DI container resolves all dependencies and creates the service.
+This is used in production code paths.
+
+Args:
+    settings_dep: Provider settings (DI resolves)
+    embedding_group: Embedding capability group (DI resolves)
+    failover_settings: Failover configuration (DI resolves)
+    failover_detector: Failover detector (DI resolves)
+
+Returns:
+    Configured QdrantVectorStoreService
+
+Example:
+    # In application startup or endpoint handlers
+    service = await container.resolve(QdrantVectorStoreService)
+    config = await service.get_collection_config(metadata)

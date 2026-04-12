@@ -1,0 +1,47 @@
+---
+title: fastembed
+description: API reference for codeweaver.providers.embedding.providers.fastembed
+---
+
+# `codeweaver.providers.embedding.providers.fastembed`
+
+FastEmbed embedding provider implementation.
+
+FastEmbed is a lightweight and efficient library for generating embeddings locally.
+
+## Class: `FastEmbedEmbeddingProvider`
+
+FastEmbed implementation of the embedding provider.
+
+model_name: The name of the FastEmbed model to use.
+
+## Class: `FastEmbedSparseProvider`
+
+FastEmbed implementation for sparse embeddings.
+
+### Method: `base_url`
+
+```python
+base_url()
+```
+
+FastEmbed does not use a base URL.
+
+## Function: `fastembed_output_transformer`
+
+```python
+fastembed_output_transformer()
+```
+
+Transform the output of FastEmbed into a more usable format.
+
+## Function: `fastembed_sparse_output_transformer`
+
+```python
+fastembed_sparse_output_transformer()
+```
+
+Transform the sparse output of FastEmbed into indices and values format.
+
+FastEmbed's SparseTextEmbedding returns SparseEmbedding objects with
+indices and values attributes. We transform them into CodeWeaver SparseEmbedding objects.

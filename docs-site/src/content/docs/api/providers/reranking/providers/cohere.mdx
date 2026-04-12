@@ -1,0 +1,23 @@
+---
+title: cohere
+description: API reference for codeweaver.providers.reranking.providers.cohere
+---
+
+# `codeweaver.providers.reranking.providers.cohere`
+
+Cohere reranking provider implementation.
+
+## Class: `CohereRerankingProvider`
+
+Cohere reranking provider.
+
+## Function: `cohere_reranking_output_transformer`
+
+```python
+cohere_reranking_output_transformer()
+```
+
+Transform the output of the Cohere reranking model.
+
+Cohere returns reranked results in order from highest score to lowest,
+with their original indices in the results.index field.

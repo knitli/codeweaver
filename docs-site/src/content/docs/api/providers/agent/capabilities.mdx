@@ -1,0 +1,26 @@
+---
+title: capabilities
+description: API reference for codeweaver.providers.agent.capabilities
+---
+
+# `codeweaver.providers.agent.capabilities`
+
+Agent model capabilities.
+
+To maintain consistent naming across CodeWeaver, we re-export `ModelProfile`s from `pydantic_ai.profiles` as `AgentModelCapabilities` and the `ModelProfileSpec` type alias as `AgentModelCapabilitiesT`.
+
+## Function: `get_agent_capabilities_for_model`
+
+```python
+get_agent_capabilities_for_model()
+```
+
+Get the profile for a specific model.
+
+## Function: `get_agent_model_capabilities`
+
+```python
+get_agent_model_capabilities()
+```
+
+Get all available model profiles.

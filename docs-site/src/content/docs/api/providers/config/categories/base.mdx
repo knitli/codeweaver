@@ -1,0 +1,42 @@
+---
+title: base
+description: API reference for codeweaver.providers.config.categories.base
+---
+
+# `codeweaver.providers.config.categories.base`
+
+Base settings class for provider categories (e.g. agent, embedding, etc.).
+
+The base class here defines the top-level settings for all provider categories, and is extended by the specific provider category settings classes (e.g. BaseAgentProviderSettings, EmbeddingProviderSettings, etc.).
+
+## Class: `BaseProviderCategorySettings`
+
+Base settings for all providers.
+
+### Method: `is_cloud`
+
+```python
+is_cloud()
+```
+
+Return True if the provider settings are for a cloud deployment.
+
+### Method: `is_local`
+
+```python
+is_local()
+```
+
+Return True if the provider settings are for a local deployment.
+
+## Class: `BaseProviderCategorySettingsDict`
+
+Base settings for all providers. Represents `BaseProviderCategorySettings` in a TypedDict form.
+
+## Class: `ConnectionConfiguration`
+
+Settings for connection configuration. You probably don't need to set these unless you're doing something special.
+
+## Class: `ConnectionRateLimitConfig`
+
+Settings for connection rate limiting.

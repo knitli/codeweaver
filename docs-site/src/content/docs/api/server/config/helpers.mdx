@@ -1,0 +1,55 @@
+---
+title: helpers
+description: API reference for codeweaver.server.config.helpers
+---
+
+# `codeweaver.server.config.helpers`
+
+Helper functions for server configuration.
+
+Re-exports configuration functions from core for convenience.
+
+## Function: `get_settings`
+
+```python
+get_settings()
+```
+
+Get CodeWeaver settings.
+
+This is a re-export of codeweaver.core.config.loader.get_settings
+for convenience when working with server configuration.
+
+Args:
+    **kwargs: Additional arguments to pass to settings constructor
+
+Returns:
+    The appropriate root settings instance for the current installation
+
+## Function: `get_settings_map`
+
+```python
+get_settings_map()
+```
+
+Get settings as a dictionary view.
+
+Args:
+    config_file: Optional path to configuration file
+
+Returns:
+    Dictionary view of settings
+
+## Function: `update_settings`
+
+```python
+update_settings()
+```
+
+Update settings with new values.
+
+Args:
+    **kwargs: Settings values to update
+
+Returns:
+    Updated settings instance

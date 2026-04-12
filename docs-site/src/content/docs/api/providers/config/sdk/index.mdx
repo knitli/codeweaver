@@ -1,0 +1,14 @@
+---
+title: sdk
+description: API reference for codeweaver.providers.config.sdk
+---
+
+# `codeweaver.providers.config.sdk`
+
+The `sdk` package provides method and function-level configuration for each provider category (e.g. embedding).
+
+This package contains submodules for different provider categories' SDKs, such as `agent` and `data`, each defining configuration models and utilities specific to their function type. For each configuration model, there is a field or fields that offer provider-specific configurations for the primary method/function calls (for example, `EmbeddingConfig` has `embed` and `query` fields for arguments to the embedding and query methods, respectively, for that provider). Each provider implements a `typing.TypedDict` for these parameters, and a corresponding method to convert the config into the format expected by the provider's SDK.
+
+The abstraction isn't perfect, as there's not always a clear function-level mapping for every provider, but think of it this way: it's SDK-level configuration for configurable details that aren't part of the SDK client's constructor (which are covered in `client_options` in the provider settings, see `codeweaver.providers.config.clients` package), but that are still relevant to how the provider is used in a function-level context.
+
+Data providers differ the most, as functionally in CodeWeaver, they are tools. So the `data` submodule contains configuration models for data provider tools, and the corresponding conversion methods to the provider's expected format for those tools (though we define the API for all current tools in `codeweaver.providers.data` package).

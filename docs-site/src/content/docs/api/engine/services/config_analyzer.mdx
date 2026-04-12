@@ -1,0 +1,82 @@
+---
+title: config_analyzer
+description: API reference for codeweaver.engine.services.config_analyzer
+---
+
+# `codeweaver.engine.services.config_analyzer`
+
+Configuration change analysis service.
+
+This service analyzes configuration changes for compatibility and impact.
+ARCHITECTURE: Plain class with no DI in constructor (factory handles DI).
+
+## Class: `ConfigChangeAnalysis`
+
+Results of configuration change analysis.
+
+## Class: `ConfigChangeAnalyzer`
+
+Analyzes configuration changes for compatibility with policy enforcement.
+
+Integrates with the collection policy system to enforce configuration change
+restrictions before analyzing compatibility. Policy validation happens before
+technical compatibility checks.
+
+ARCHITECTURE NOTE: This is a PLAIN CLASS with no DI in constructor.
+Factory function in engine/dependencies.py handles DI integration.
+
+### Method: `analyze_config_change`
+
+```python
+analyze_config_change()
+```
+
+Comprehensive config change analysis with policy enforcement and impact classification.
+
+Validates configuration changes against collection policy before performing
+technical compatibility analysis. Policy enforcement happens first to ensure
+changes are allowed before analyzing their technical impact.
+
+Args:
+    old_fingerprint: Existing checkpoint fingerprint
+    new_config: New embedding configuration
+    vector_count: Number of vectors in collection
+
+Returns:
+    Detailed analysis with impact classification and recommendations
+
+Note:
+    Policy validation occurs before compatibility checks. A STRICT policy
+    may block changes that would otherwise be technically compatible.
+
+### Method: `analyze_current_config`
+
+```python
+analyze_current_config()
+```
+
+Analyze current config against existing collection.
+
+Returns:
+    Analysis result, or None if no collection exists yet.
+
+### Method: `validate_config_change`
+
+```python
+validate_config_change()
+```
+
+Validate config change before applying (proactive validation).
+
+Called by `cw config set` command for early warning.
+
+Args:
+    key: Configuration key being changed (e.g., "provider.embedding.dimension")
+    value: New value for the key
+
+Returns:
+    Analysis result if change affects index validity, None otherwise
+
+## Class: `TransformationDetails`
+
+Strongly typed transformation metadata (not dict!).

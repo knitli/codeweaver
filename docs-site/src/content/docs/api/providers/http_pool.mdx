@@ -1,0 +1,244 @@
+---
+title: http_pool
+description: API reference for codeweaver.providers.http_pool
+---
+
+# `codeweaver.providers.http_pool`
+
+HTTP client connection pool manager for CodeWeaver providers.
+
+This module provides centralized HTTP client pooling for providers that use httpx,
+including Voyage AI, Cohere, and other HTTP-based API providers. Connection pooling
+reduces overhead from repeated TCP handshakes and TLS negotiations, improving
+performance and reliability during high-load operations like indexing.
+
+Usage:
+    from codeweaver.core.http_pool import HttpClientPool, get_http_pool
+
+    # Get singleton instance
+    pool = get_http_pool()
+
+    # Get a pooled client for a specific provider
+    client = await pool.get_client('voyage', read_timeout=90.0)
+
+    # Cleanup on shutdown
+    await pool.close_all()
+
+Thread Safety:
+    - Singleton initialization: Thread-safe via double-checked locking (threading.Lock)
+    - Async client creation (get_client): Coroutine-safe via asyncio.Lock
+    - Sync client creation (get_client_sync): Thread-safe via threading.Lock
+    - WARNING: Synchronous and asynchronous methods should NOT be mixed. The locking strategy does not protect against concurrent access from both threads and coroutines. Only use sync methods in a purely threaded context, and async methods in a purely async context.
+    - All methods can be called concurrently within their respective contexts (sync or async) without creating duplicate clients.
+
+## Class: `HttpClientPool`
+
+Singleton HTTP client pool manager for provider connections.
+
+Manages a collection of httpx.AsyncClient instances, one per provider,
+with configurable connection limits and timeouts. Clients are created
+lazily on first request and reused for subsequent requests.
+
+The pool supports HTTP/2 by default for better multiplexing on modern APIs.
+
+Thread Safety:
+    Client creation is protected by an asyncio.Lock to prevent race conditions
+    when multiple coroutines request the same client simultaneously.
+
+Example:
+    pool = HttpClientPool.get_instance()
+    client = await pool.get_client('voyage', max_connections=50, read_timeout=90.0)
+    # Use client for API calls...
+    await pool.close_all()  # Cleanup on shutdown
+
+### Method: `close_all`
+
+```python
+close_all()
+```
+
+Close all pooled clients concurrently (cleanup on shutdown).
+
+All clients are closed in parallel to minimize shutdown latency.
+Expected errors (HTTPError, OSError) are logged as warnings.
+Unexpected exceptions are re-raised after all close operations complete.
+
+This method should be called during application shutdown to properly
+close all HTTP connections and release resources.
+
+### Method: `close_client`
+
+```python
+close_client()
+```
+
+Close a specific provider's HTTP client.
+
+Args:
+    name: Provider name whose client to close.
+
+Returns:
+    True if client was closed, False if no client existed.
+
+### Method: `get_client`
+
+```python
+get_client()
+```
+
+Get or create a pooled HTTP client for a specific provider.
+
+Clients are cached by name and reused for subsequent requests.
+Override parameters allow per-provider customization of limits and timeouts.
+
+This method is coroutine-safe: concurrent calls for the same provider
+will not create duplicate clients.
+
+Note:
+    Clients are cached by name only, not by override parameters. If the same
+    provider name is requested multiple times with different overrides, the
+    client created on the first call will be returned for all subsequent calls.
+    This is intentional for connection pooling - each provider should use
+    consistent settings. The ProviderRegistry ensures consistent overrides
+    per provider type.
+
+Args:
+    name: Provider name (e.g., 'voyage', 'cohere', 'qdrant').
+    **overrides: Override default limits/timeouts for this client:
+        - max_connections: int
+        - max_keepalive_connections: int
+        - keepalive_expiry: float
+        - connect_timeout: float
+        - read_timeout: float
+        - write_timeout: float
+        - pool_timeout: float
+        - http2: bool (default True)
+
+Returns:
+    Configured httpx.AsyncClient with connection pooling.
+
+### Method: `get_client_sync`
+
+```python
+get_client_sync()
+```
+
+Synchronous version of get_client for non-async contexts.
+
+This method is thread-safe via double-checked locking pattern.
+It can be called concurrently from multiple threads during provider
+initialization without creating duplicate clients.
+
+Note:
+    Clients are cached by name only, not by override parameters. If the same
+    provider name is requested multiple times with different overrides, the
+    client created on the first call will be returned for all subsequent calls.
+    This is intentional for connection pooling - each provider should use
+    consistent settings.
+
+Warning:
+    Synchronous and asynchronous methods should NOT be mixed. The locking
+    strategy does not protect against concurrent access from both threads
+    and coroutines. Only use sync methods in a purely threaded context,
+    and async methods in a purely async context.
+
+Args:
+    name: Provider name (e.g., 'voyage', 'cohere', 'qdrant').
+    **overrides: Override default limits/timeouts for this client.
+
+Returns:
+    Configured httpx.AsyncClient with connection pooling.
+
+### Method: `get_instance`
+
+```python
+get_instance()
+```
+
+Get or create the singleton HttpClientPool instance.
+
+This method is thread-safe via double-checked locking pattern.
+
+Args:
+    limits: Optional connection pool limits (only used on first call).
+    timeouts: Optional timeout configuration (only used on first call).
+
+Returns:
+    The singleton HttpClientPool instance.
+
+### Method: `has_client`
+
+```python
+has_client()
+```
+
+Check if a client exists for the given provider name.
+
+Args:
+    name: Provider name to check.
+
+Returns:
+    True if a client exists for this provider.
+
+### Method: `reset_instance`
+
+```python
+reset_instance()
+```
+
+Reset the singleton instance (primarily for testing).
+
+## Class: `PoolLimits`
+
+HTTP connection pool limits configuration.
+
+Attributes:
+    max_connections: Maximum total connections across all hosts.
+    max_keepalive_connections: Maximum persistent connections to keep alive.
+    keepalive_expiry: Seconds to keep idle connections alive.
+
+## Class: `PoolTimeouts`
+
+HTTP timeout configuration for pooled clients.
+
+Attributes:
+    connect: Connection establishment timeout in seconds.
+    read: Read timeout in seconds (longer for embedding/vector operations).
+    write: Write timeout in seconds.
+    pool: Pool acquire timeout in seconds.
+
+## Function: `get_http_pool`
+
+```python
+get_http_pool()
+```
+
+Get the global HTTP client pool instance.
+
+This is the recommended way to access the HTTP client pool throughout
+the application. It returns the singleton instance, creating it if needed.
+
+Returns:
+    The singleton HttpClientPool instance.
+
+## Function: `reset_http_pool`
+
+```python
+reset_http_pool()
+```
+
+Reset the global HTTP client pool (primarily for testing).
+
+This async function properly closes all existing clients before resetting
+the singleton instance to prevent resource leaks.
+
+## Function: `reset_http_pool_sync`
+
+```python
+reset_http_pool_sync()
+```
+
+Synchronous reset for testing fixtures (no cleanup).
+
+Warning: This does NOT close existing clients. Use reset_http_pool()
+if you need to clean up resources properly.

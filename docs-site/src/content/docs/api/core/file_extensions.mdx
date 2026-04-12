@@ -1,0 +1,26 @@
+---
+title: file_extensions
+description: API reference for codeweaver.core.file_extensions
+---
+
+# `codeweaver.core.file_extensions`
+
+Constants used throughout the CodeWeaver project, primarily for default configurations.
+
+## Class: `FallBackTestDef`
+
+Definition for a fallback test based on file content.
+
+## Function: `all_js_exts`
+
+```python
+all_js_exts()
+```
+
+Return all common JavaScript-related extensions for a given stem.
+
+Args:
+    stem: The file stem (name without extension).
+
+Returns:
+    A tuple of file names with common JavaScript-related extensions. Does not include `.jsx` or `.tsx` extensions.

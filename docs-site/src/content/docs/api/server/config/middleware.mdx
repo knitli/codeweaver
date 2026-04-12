@@ -1,0 +1,42 @@
+---
+title: middleware
+description: API reference for codeweaver.server.config.middleware
+---
+
+# `codeweaver.server.config.middleware`
+
+McpMiddleware configuration settings for CodeWeaver.
+
+NOTE: This module defines configurations for **mcp** middleware. It only applies to the mcp protocol server, and not CodeWeaver's http endpoints or services.
+
+## Class: `ErrorHandlingMiddlewareSettings`
+
+Settings for error handling middleware.
+
+## Class: `LoggingMiddlewareSettings`
+
+Settings for logging middleware (both structured and unstructured).
+
+## Class: `MiddlewareOptions`
+
+Settings for middleware.
+
+## Class: `RateLimitingMiddlewareSettings`
+
+Settings for rate limiting middleware.
+
+## Class: `ResponseCachingMiddlewareSettings`
+
+Settings for response caching middleware.
+
+## Class: `RetryMiddlewareSettings`
+
+Settings for retry middleware.
+
+## Function: `default_for_transport`
+
+```python
+default_for_transport()
+```
+
+Get default mcp middleware settings for a given transport protocol.

@@ -1,0 +1,372 @@
+---
+title: embedding
+description: API reference for codeweaver.providers.config.sdk.embedding
+---
+
+# `codeweaver.providers.config.sdk.embedding`
+
+Provider-specific embedding configuration models and utilities.
+
+## Class: `BaseEmbeddingConfig`
+
+Base configuration for embedding models.
+
+### Method: `as_vector_params`
+
+```python
+as_vector_params()
+```
+
+Get Qdrant VectorParams for this embedding configuration.
+
+Returns:
+    VectorParams instance with dimension and datatype set.
+
+## Class: `BedrockCohereConfigDict`
+
+Configuration options specific to Bedrock Cohere embedding models.
+
+## Class: `BedrockEmbeddingConfig`
+
+Configuration options for Bedrock embedding models.
+
+### Method: `set_datatype`
+
+```python
+set_datatype()
+```
+
+Set the embedding datatype explicitly in the embedding configuration.
+
+Args:
+    datatype: The datatype to set.
+
+### Method: `set_dimension`
+
+```python
+set_dimension()
+```
+
+Set the embedding dimension explicitly in the embedding configuration.
+
+Args:
+    dimension: The dimension to set.
+
+## Class: `BedrockEmbeddingRequestParams`
+
+Parameters for Bedrock embedding requests.
+
+## Class: `BedrockTitanV2ConfigDict`
+
+Configuration options specific to the Bedrock Titan V2 embedding model.
+
+## Class: `CohereEmbeddingConfig`
+
+Configuration options for Cohere embedding models.
+
+### Method: `set_datatype`
+
+```python
+set_datatype()
+```
+
+Set the embedding datatype explicitly in the embedding configuration.
+
+Args:
+    datatype: The datatype to set.
+
+### Method: `set_dimension`
+
+```python
+set_dimension()
+```
+
+Set the embedding dimension explicitly in the embedding configuration.
+
+Args:
+    dimension: The dimension to set.
+
+## Class: `CohereEmbeddingOptionsDict`
+
+Embedding request options for Cohere embedding API.
+
+These parameters are passed to the embed() method.
+
+## Class: `EmbeddingMixin`
+
+Mixin class for dense and sparse embedding configurations. Provides shared methods and interfaces for both types of embedding configurations.
+
+### Method: `as_options`
+
+```python
+as_options()
+```
+
+Return the configuration as a dictionary of options.
+
+### Method: `get_datatype`
+
+```python
+get_datatype()
+```
+
+Get resolved datatype through fallback chain.
+
+Resolution order:
+1. Explicit config
+2. Model capabilities
+3. Provider-specific defaults
+
+Returns:
+    Resolved datatype or None
+
+### Method: `get_datatype_sync`
+
+```python
+get_datatype_sync()
+```
+
+Synchronous version of get_datatype() for backward compatibility.
+
+Note: This does not perform full resolution like the async version.
+For full resolution, use get_datatype() directly.
+
+Returns:
+    Resolved datatype
+
+### Method: `get_dimension`
+
+```python
+get_dimension()
+```
+
+Get resolved dimension through fallback chain.
+
+Resolution order:
+1. Explicit config (self.embedding/self.query fields)
+2. Model capabilities (from capability resolver)
+3. User-registered defaults
+4. Hardcoded fallback
+
+Returns:
+    Resolved dimension or 0 if sparse embeddings
+
+### Method: `get_dimension_sync`
+
+```python
+get_dimension_sync()
+```
+
+Synchronous version of get_dimension() for backward compatibility.
+
+Note: This does not perform full resolution like the async version.
+For full resolution, use get_dimension() directly.
+
+Returns:
+    Resolved dimension or None
+
+### Method: `mirror_settings`
+
+```python
+mirror_settings()
+```
+
+If the types for embedding and query are the same, mirrors settings between them with deep merge. If updates are provided, overrides resolved settings with the updates.
+
+### Method: `set_datatype`
+
+```python
+set_datatype()
+```
+
+Set the embedding datatype explicitly in the embedding configuration.
+
+## Class: `FastEmbedEmbeddingConfig`
+
+Configuration options for FastEmbed embedding models.
+
+FastEmbed has no specific embedding parameters. It does pass kwargs on to the ONNX model, but they are the same keys/values as `FastEmbedClientOptions`, and are combined internally in FastEmbed. So, these are empty dicts and we recommend you set configs using `FastEmbedClientOptions` instead of these fields, but we include them here for consistency and future extensibility.
+
+### Method: `set_datatype`
+
+```python
+set_datatype()
+```
+
+Set the embedding datatype explicitly in the embedding configuration.
+
+Args:
+    datatype: The datatype to set.
+
+### Method: `set_dimension`
+
+```python
+set_dimension()
+```
+
+Set the embedding dimension explicitly in the embedding configuration.
+
+Args:
+    dimension: The dimension to set.
+
+## Class: `GoogleEmbeddingConfig`
+
+Configuration options for Google embedding models.
+
+### Method: `set_datatype`
+
+```python
+set_datatype()
+```
+
+Set the embedding datatype explicitly in the embedding configuration.
+
+Args:
+    datatype: The datatype to set.
+
+### Method: `set_dimension`
+
+```python
+set_dimension()
+```
+
+Set the embedding dimension explicitly in the embedding configuration.
+
+Args:
+    dimension: The dimension to set.
+
+## Class: `GoogleEmbeddingRequestParams`
+
+Parameters for Google embedding requests.
+
+## Class: `HuggingFaceEmbeddingConfig`
+
+Configuration options for HuggingFace embedding models.
+
+### Method: `set_datatype`
+
+```python
+set_datatype()
+```
+
+Set the embedding datatype explicitly in the embedding configuration.
+
+Args:
+    datatype: The datatype to set.
+
+### Method: `set_dimension`
+
+```python
+set_dimension()
+```
+
+Set the embedding dimension explicitly in the embedding configuration.
+
+Args:
+    dimension: The dimension to set.
+
+## Class: `HuggingFaceEmbeddingOptionsDict`
+
+Embedding request options for HuggingFace embedding API.
+
+These parameters are passed to the embedding generation method (e.g., pipeline or client method).
+
+## Class: `MistralEmbeddingConfig`
+
+Configuration options for Mistral AI embedding models.
+
+### Method: `set_dimension`
+
+```python
+set_dimension()
+```
+
+Set the embedding dimension explicitly in the embedding configuration.
+
+Args:
+    dimension: The dimension to set.
+
+## Class: `MistralEmbeddingOptionsDict`
+
+Embedding request options for Mistral AI embedding API.
+
+These parameters are passed to the embeddings.create() method.
+
+## Class: `OpenAIEmbeddingConfig`
+
+Configuration options for OpenAI and OpenAI-compatible embedding models.
+
+Supports OpenAI, Azure OpenAI, Ollama, Fireworks, Together AI, GitHub Models, Groq, and other OpenAI-compatible providers.
+
+### Method: `set_datatype`
+
+```python
+set_datatype()
+```
+
+Set the embedding datatype explicitly in the embedding configuration.
+
+Args:
+    datatype: The datatype to set.
+
+### Method: `set_dimension`
+
+```python
+set_dimension()
+```
+
+Set the embedding dimension explicitly in the embedding configuration.
+
+Args:
+    dimension: The dimension to set.
+
+## Class: `OpenAIEmbeddingRequestParams`
+
+Parameters for OpenAI-compatible embedding requests.
+
+These parameters work across all OpenAI-compatible providers including
+Azure OpenAI, Ollama, Fireworks, Together AI, GitHub Models, and Groq.
+
+## Class: `SentenceTransformersEmbeddingConfig`
+
+Configuration options for Sentence Transformers embedding models.
+
+Note: Sentence Transformers receives model kwargs through its client constructor. Provide model options to the `model_kwargs` field in `SentenceTransformersClientOptions`.
+
+### Method: `set_datatype`
+
+```python
+set_datatype()
+```
+
+Set the embedding datatype explicitly in the embedding configuration.
+
+Args:
+    datatype: The datatype to set.
+
+### Method: `set_dimension`
+
+```python
+set_dimension()
+```
+
+Set the embedding dimension explicitly in the embedding configuration.
+
+Args:
+    dimension: The dimension to set.
+
+## Class: `SentenceTransformersEncodeDict`
+
+Parameters for the SentenceTransformer encode() method.
+
+## Class: `SerializedEmbeddingOptionsDict`
+
+A dictionary representing serialized embedding options for different providers.
+
+## Class: `VoyageEmbeddingConfig`
+
+Configuration options for Voyage AI embedding models.
+
+## Class: `VoyageEmbeddingOptionsDict`
+
+Parameters for Voyage AI embedding requests.

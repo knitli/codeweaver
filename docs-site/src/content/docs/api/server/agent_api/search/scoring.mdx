@@ -1,0 +1,80 @@
+---
+title: scoring
+description: API reference for codeweaver.server.agent_api.search.scoring
+---
+
+# `codeweaver.server.agent_api.search.scoring`
+
+Scoring and reranking utilities for search results.
+
+This module handles the scoring pipeline including:
+- Hybrid search score combination (dense + sparse)
+- Semantic reranking
+- Intent-based semantic weighting
+
+## Function: `apply_hybrid_weights`
+
+```python
+apply_hybrid_weights()
+```
+
+Apply static weights to hybrid search scores (in-place).
+
+Args:
+    candidates: List of search results with dense and sparse scores
+    dense_weight: Weight for dense embeddings (default: 0.65)
+    sparse_weight: Weight for sparse embeddings (default: 0.35)
+
+Note:
+    Modifies candidates in place by updating the score attribute.
+
+## Function: `apply_semantic_weighting`
+
+```python
+apply_semantic_weighting()
+```
+
+Apply semantic importance weighting based on intent.
+
+Args:
+    base_score: Base relevance score
+    chunk: CodeChunk with potential semantic metadata
+    intent_type: Detected query intent
+    agent_task: Corresponding agent task
+    boost_factor: Maximum boost percentage (default: 0.2 = 20%)
+
+Returns:
+    Final score with semantic weighting applied
+
+## Function: `process_reranked_results`
+
+```python
+process_reranked_results()
+```
+
+Process reranked results and apply semantic weighting.
+
+Args:
+    reranked_results: Results from reranking provider
+    original_candidates: Original search results (for mapping back)
+    intent_type: Detected query intent
+    agent_task: Corresponding agent task
+
+Returns:
+    List of SearchResult objects with updated scores
+
+## Function: `process_unranked_results`
+
+```python
+process_unranked_results()
+```
+
+Process results without reranking, applying semantic weighting to base scores.
+
+Args:
+    candidates: Original search results
+    intent_type: Detected query intent
+    agent_task: Corresponding agent task
+
+Returns:
+    List of SearchResult objects with updated relevance scores

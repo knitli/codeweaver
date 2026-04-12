@@ -1,0 +1,26 @@
+---
+title: conversion
+description: API reference for codeweaver.server.agent_api.search.conversion
+---
+
+# `codeweaver.server.agent_api.search.conversion`
+
+Conversion utilities for search results.
+
+This module handles the conversion between different result formats,
+primarily converting SearchResult objects from vector stores to
+CodeMatch objects for API responses.
+
+## Function: `convert_search_result_to_code_match`
+
+```python
+convert_search_result_to_code_match()
+```
+
+Convert SearchResult from vector store to CodeMatch for response.
+
+Args:
+    result: SearchResult from vector store search
+
+Returns:
+    CodeMatch with all required fields populated

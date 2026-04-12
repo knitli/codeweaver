@@ -1,0 +1,58 @@
+---
+title: intent
+description: API reference for codeweaver.server.agent_api.search.intent
+---
+
+# `codeweaver.server.agent_api.search.intent`
+
+Intent classification models for query analysis.
+
+## Class: `IntentResult`
+
+Result of intent analysis with strategy recommendations.
+
+## Class: `IntentType`
+
+Enumeration of intent types.
+
+## Class: `QueryComplexity`
+
+Enumeration of query complexity levels.
+
+### Method: `default`
+
+```python
+default()
+```
+
+Return the default query complexity level.
+
+## Class: `QueryIntent`
+
+Classified query intent with confidence scoring.
+
+## Function: `detect_intent`
+
+```python
+detect_intent()
+```
+
+Analyze query and return intent classification with confidence.
+
+Uses keyword-based heuristics for v0.1 (agent-driven analysis planned for v0.2).
+
+Args:
+    query: Search query string to analyze
+
+Returns:
+    QueryIntent with detected intent_type, confidence score, reasoning, and metadata
+
+Examples:
+    &gt;&gt;&gt; detect_intent("how does authentication work")
+    QueryIntent(intent_type=IntentType.UNDERSTAND, confidence=0.9, ...)
+
+    &gt;&gt;&gt; detect_intent("fix login bug")
+    QueryIntent(intent_type=IntentType.DEBUG, confidence=0.9, ...)
+
+    &gt;&gt;&gt; detect_intent("add user registration")
+    QueryIntent(intent_type=IntentType.IMPLEMENT, confidence=0.9, ...)

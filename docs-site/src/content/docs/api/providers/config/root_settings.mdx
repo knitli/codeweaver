@@ -1,0 +1,43 @@
+---
+title: root_settings
+description: API reference for codeweaver.providers.config.root_settings
+---
+
+# `codeweaver.providers.config.root_settings`
+
+Root settings for provider-only CodeWeaver installation.
+
+This module provides the root settings class when only the providers package
+is installed (along with core). This enables use of embedding, vector store,
+and reranking providers without the full CodeWeaver server.
+
+## Class: `CodeWeaverProviderSettings`
+
+Root settings wrapper for provider-only installation.
+
+When only the providers package is installed (with core), this provides
+configuration for all provider types: embedding, vector store, reranking,
+data providers, and agents.
+
+Configuration structure:
+    ```toml
+    [provider]
+    embedding.provider = "voyage"
+    primary.embedding.model_name = "voyage-code-3"
+
+    vector_store.provider = "qdrant"
+    vector_store.url = "http://localhost:6333"
+
+    [logging]
+    level = "INFO"
+    ```
+
+Note:
+    This is the root settings class for provider-only installations.
+    When the full server package is installed, CodeWeaverSettings
+    should be used instead, which nests ProviderSettings under the
+    provider field.
+
+## Class: `CodeWeaverProviderSettingsDict`
+
+TypedDict for CodeWeaver provider settings.

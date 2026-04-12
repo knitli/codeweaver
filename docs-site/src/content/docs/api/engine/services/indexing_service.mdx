@@ -1,0 +1,60 @@
+---
+title: indexing_service
+description: API reference for codeweaver.engine.services.indexing_service
+---
+
+# `codeweaver.engine.services.indexing_service`
+
+Indexing service for orchestrating file discovery, chunking, embedding, and storage.
+
+## Class: `IndexingService`
+
+Orchestrates the indexing workflow.
+
+Responsibilities:
+- Coordinate file discovery → chunking → embedding → storage
+- Manage checkpointing at intervals
+- Update file manifest
+- Report progress
+
+### Method: `index_project`
+
+```python
+index_project()
+```
+
+Index the project codebase.
+
+Args:
+    force_reindex: If True, skip persistence checks and reindex everything
+    add_dense: Whether to add dense embeddings
+    add_sparse: Whether to add sparse embeddings
+    progress_callback: Optional granular progress callback
+
+Returns:
+    Number of files indexed
+
+### Method: `process_changes`
+
+```python
+process_changes()
+```
+
+Process a batch of file changes (incremental indexing).
+
+### Method: `reconcile_from_backup`
+
+```python
+reconcile_from_backup()
+```
+
+Reconcile primary index from backup store after failover recovery.
+
+This handles the "Smart Promote" logic:
+1. If models match, zero-cost copy vectors.
+2. If chunks are compatible (fit in context), reuse text and re-embed.
+3. If incompatible, fall back to standard indexing (via manifest status).
+
+## Class: `ProgressCallback`
+
+Protocol for progress callback functions.

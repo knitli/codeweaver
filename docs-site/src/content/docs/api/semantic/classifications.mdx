@@ -1,0 +1,175 @@
+---
+title: classifications
+description: API reference for codeweaver.semantic.classifications
+---
+
+# `codeweaver.semantic.classifications`
+
+Complete implementation specification for CodeWeaver's new semantic categorization system
+based on language workbench methodology with multi-dimensional importance scoring.
+
+## Class: `AgentTask`
+
+Dataclass-based agent task with context weight profile.
+
+Values are `BaseAgentTask` dataclass instances.
+
+### Method: `profiles`
+
+```python
+profiles()
+```
+
+Get the context weight profiles for all tasks.
+
+## Class: `BaseAgentTask`
+
+Base class for agent tasks with context weight profiles.
+
+## Class: `ImportanceRank`
+
+Semantic importance rankings from highest to lowest priority.
+
+These are general guidelines. The actual importance depends on the task and context, but these serve as a useful baseline.
+
+### Method: `from_classification`
+
+```python
+from_classification()
+```
+
+Get semantic importance rank for a given classification.
+
+### Method: `from_token_purpose`
+
+```python
+from_token_purpose()
+```
+
+Map token purpose to an approximate importance rank.
+
+## Class: `ImportanceScores`
+
+Multi-dimensional importance scoring for AI assistant contexts.
+
+### Method: `as_dict`
+
+```python
+as_dict()
+```
+
+Convert importance scores to a dictionary format.
+
+### Method: `default`
+
+```python
+default()
+```
+
+Get default importance scores.
+
+### Method: `for_task`
+
+```python
+for_task()
+```
+
+Get importance scores adjusted for a specific agent task context.
+
+### Method: `from_dict`
+
+```python
+from_dict()
+```
+
+Create ImportanceScores from a dictionary format.
+
+### Method: `weighted_score`
+
+```python
+weighted_score()
+```
+
+Calculate weighted importance score for given AI assistant context.
+
+## Class: `ImportanceScoresDict`
+
+Typed dictionary for context weights in AI assistant scenarios.
+
+`ImportanceScoresDict` is the python-serialized and mutable version of `ImportanceScores`.
+
+## Class: `ScoreValidation`
+
+Validation results for importance score accuracy.
+
+## Class: `SemanticClass`
+
+Language-agnostic semantic categories for AST nodes.
+
+### Method: `add_language_member`
+
+```python
+add_language_member()
+```
+
+Add a new language-specific semantic category.
+
+### Method: `categories`
+
+```python
+categories()
+```
+
+Get mapping of categories to their ThingClass definitions.
+
+### Method: `from_token_purpose`
+
+```python
+from_token_purpose()
+```
+
+Map token purpose to an approximate semantic category.
+
+### Method: `rank_map`
+
+```python
+rank_map()
+```
+
+Get mapping of categories to their semantic ranks.
+
+## Class: `SemanticClassDict`
+
+Typed dictionary for semantic category definitions.
+
+## Class: `ThingClass`
+
+Universal semantic category for AST nodes.
+
+### Method: `validate_importance_scores`
+
+```python
+validate_importance_scores()
+```
+
+Ensure importance_scores is a ImportanceScoresDict.
+
+### Method: `validate_name`
+
+```python
+validate_name()
+```
+
+Ensure name is a SemanticClass.
+
+## Class: `UsageMetrics`
+
+Metrics on real-world usage of semantic categories.
+
+### Method: `add_uses`
+
+```python
+add_uses()
+```
+
+Add usage counts for a list of categories.

@@ -1,0 +1,55 @@
+---
+title: health_service
+description: API reference for codeweaver.server.health.health_service
+---
+
+# `codeweaver.server.health.health_service`
+
+Health service for collecting and aggregating system health information.
+
+## Class: `HealthService`
+
+Service for collecting and aggregating health information from all components.
+
+### Method: `add_indexed_language`
+
+```python
+add_indexed_language()
+```
+
+Add a language to the set of indexed languages.
+
+### Method: `get_health_response`
+
+```python
+get_health_response()
+```
+
+Collect health information from all components and return complete response.
+
+Returns:
+    HealthResponse with current system health
+
+### Method: `set_indexer`
+
+```python
+set_indexer()
+```
+
+Set the indexer instance after initialization.
+
+### Method: `to_dict`
+
+```python
+to_dict()
+```
+
+Convert HealthService to dictionary for serialization.
+
+### Method: `update_last_indexed`
+
+```python
+update_last_indexed()
+```
+
+Update the last indexed timestamp to current time.

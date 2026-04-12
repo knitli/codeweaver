@@ -1,0 +1,43 @@
+---
+title: dependencies
+description: API reference for codeweaver.providers.dependencies
+---
+
+# `codeweaver.providers.dependencies`
+
+Dependency injection setup for provider configuration.
+
+This module provides DI type aliases and factory functions for provider settings.
+Settings classes are configured via DI to enable:
+- Decoupled configuration from provider implementations
+- Automatic dependency resolution (e.g., embedding dimensions ← vector store size)
+- Ready-built SDK clients injected into providers
+- Lazy resolution of provider configurations
+
+## Architecture
+
+Provider settings follow this pattern:
+```
+User Config (TOML/env vars)
+↓
+ProviderSettings (root config container)
+↓
+DI Resolution: EmbeddingProviderSettingsDep = Annotated[EmbeddingProviderSettingsType, depends(...)]
+↓
+Provider receives: client (SDK), config (settings), embedding_options, query_options
+```
+
+Each provider category has:
+- A union type (e.g., EmbeddingProviderSettingsType) discriminating by provider
+- A DI type alias (e.g., EmbeddingProviderSettingsDep) for injection
+- A factory function to create the provider settings instance, resolving dependencies as needed
+- A DI type alias for the provider instance itself (e.g., EmbeddingProviderDep)
+
+## Placeholder Status
+
+This module contains intentional placeholders:
+- Type aliases without corresponding factories (marked with "⏳ Factory pending")
+- Factory functions marked as `...` (to be implemented)
+- Import statements for types not yet fully defined
+
+This is expected on the feat/di_monorepo branch.

@@ -1,0 +1,149 @@
+---
+title: cache_manager
+description: API reference for codeweaver.providers.embedding.cache_manager
+---
+
+# `codeweaver.providers.embedding.cache_manager`
+
+Centralized cache manager for embedding providers with namespace isolation.
+
+This module provides the EmbeddingCacheManager class which replaces per-instance
+stores with a centralized, namespace-isolated caching system. This enables true
+cross-instance deduplication while maintaining async safety.
+
+Architecture:
+- Namespace isolation: &#123;provider_id&#125;.&#123;embedding_kind&#125; prevents collisions
+- Async-safe locking: Uses asyncio.Lock instead of threading.Lock
+- Centralized storage: Replaces ClassVar registries with singleton pattern
+- DI integration: Singleton via FastAPI lifespan and dependency injection
+
+Example:
+    &gt;&gt;&gt; cache_manager = EmbeddingCacheManager(registry=get_embedding_registry())
+    &gt;&gt;&gt; namespace = cache_manager._get_namespace("voyage-code-2", "dense")
+    &gt;&gt;&gt; chunks, hash_map = await cache_manager.deduplicate(chunks, namespace, batch_id)
+
+## Class: `EmbeddingCacheManager`
+
+Centralized cache manager with namespace isolation for embedding providers.
+
+Replaces per-instance _store and _hash_store ClassVar registries with a
+singleton pattern that provides:
+- True cross-instance deduplication
+- Namespace isolation (dense vs sparse, different providers)
+- Async-safe locking per namespace
+- Statistics tracking per namespace
+
+The cache manager is designed to be injected as a singleton dependency into
+all embedding provider instances via FastAPI's lifespan and DI system.
+
+Attributes:
+    registry: Global embedding registry for cross-provider coordination
+    _batch_stores: Namespace-isolated UUID stores for batches
+    _hash_stores: Namespace-isolated Blake hash stores for deduplication
+    _locks: Async locks per namespace for thread-safe operations
+    _stats: Statistics per namespace (hits, misses, unique chunks)
+
+### Method: `clear_namespace`
+
+```python
+clear_namespace()
+```
+
+Clear all data for a specific namespace.
+
+Useful for testing or resetting provider state.
+
+Args:
+    namespace: Namespace to clear
+
+Warning:
+    This is a destructive operation - all cached data will be lost
+
+### Method: `deduplicate`
+
+```python
+deduplicate()
+```
+
+Deduplicate chunks using namespace-isolated hash store.
+
+This method identifies chunks that have already been processed in this
+namespace and returns only the unique chunks that need embedding.
+
+Args:
+    chunks: List of code chunks to deduplicate
+    namespace: Namespace key (e.g., "voyage-code-2.dense")
+    batch_id: UUID for this batch (used for tracking)
+
+Returns:
+    Tuple of (unique_chunks, hash_mapping) where:
+        - unique_chunks: Chunks not seen before in this namespace
+        - hash_mapping: Dict mapping chunk index to its Blake hash
+
+Thread Safety:
+    Uses async lock per namespace to ensure thread-safe deduplication
+
+### Method: `get_batch`
+
+```python
+get_batch()
+```
+
+Get batch by ID from namespace-isolated store.
+
+Args:
+    batch_id: UUID of the batch
+    namespace: Namespace key
+
+Returns:
+    List of chunks if batch exists, None otherwise
+
+### Method: `get_stats`
+
+```python
+get_stats()
+```
+
+Get deduplication statistics.
+
+Args:
+    namespace: Specific namespace, or None for all namespaces
+
+Returns:
+    Statistics dict for namespace(s)
+
+### Method: `register_embeddings`
+
+```python
+register_embeddings()
+```
+
+Register embeddings in global registry.
+
+Handles updating existing entries or creating new ones in the registry.
+This is NOT namespace-isolated - the registry maintains embeddings for all
+chunks regardless of which provider created them.
+
+Args:
+    chunk_id: UUID of the chunk
+    embedding_info: Batch information with embeddings
+    chunk: The CodeChunk object to store
+
+### Method: `store_batch`
+
+```python
+store_batch()
+```
+
+Store batch for potential reprocessing.
+
+Stores the final chunk list (after deduplication) for this batch.
+This enables reprocessing or retrieval of batches later.
+
+Args:
+    chunks: Final list of chunks to store
+    batch_id: UUID for this batch
+    namespace: Namespace key
+
+Thread Safety:
+    Uses async lock per namespace to ensure thread-safe storage

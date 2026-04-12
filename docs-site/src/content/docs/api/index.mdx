@@ -1,0 +1,18 @@
+---
+title: codeweaver
+description: API reference for codeweaver
+---
+
+# `codeweaver`
+
+CodeWeaver - Intelligent codebase context discovery.
+
+## Function: `get_version`
+
+```python
+get_version()
+```
+
+Get the current version of CodeWeaver.
+
+Because our version is dynamically generated during build/release, we try several methods to get it. If you downloaded CodeWeaver from PyPi, then the first will work, or the second if the file didn't get generated for some reason. If you're running from source, we try to get the version from git tags. If all else fails, we return "0.0.0".

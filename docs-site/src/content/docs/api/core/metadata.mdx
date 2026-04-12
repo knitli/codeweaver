@@ -1,0 +1,130 @@
+---
+title: metadata
+description: API reference for codeweaver.core.metadata
+---
+
+# `codeweaver.core.metadata`
+
+Defines metadata types and enums for code chunks in CodeWeaver.
+
+## Class: `ChunkKind`
+
+Represents the kind of a code chunk.
+
+### Method: `from_path`
+
+```python
+from_path()
+```
+
+Create a ChunkKind from a file path.
+
+## Class: `ChunkSource`
+
+Represents the type of a code chunk -- basically how it was extracted.
+
+## Class: `ExtCategory`
+
+Represents a file extension and its associated category.
+
+### Method: `from_file`
+
+```python
+from_file()
+```
+
+Create an ExtCategory from a file path.
+
+### Method: `from_language`
+
+```python
+from_language()
+```
+
+Create an ExtKind from a string representation.
+
+### Method: `resolve_extension_tests`
+
+```python
+resolve_extension_tests()
+```
+
+Resolve the extension tests for a given file path.
+
+### Method: `serialize_for_cli`
+
+```python
+serialize_for_cli()
+```
+
+Serialize the ExtCategory for CLI output.
+
+## Class: `ExtLangPair`
+
+Mapping of file extensions to their corresponding programming languages.
+
+Not all 'extensions' are actually file extensions, some are file names or special cases, like `Makefile` or `Dockerfile`.
+
+### Method: `is_same`
+
+```python
+is_same()
+```
+
+Check if the given filename is the same filetype as the extension.
+
+## Class: `ExtTestDef`
+
+A NamedTuple defining a file extension test. Consists of the extension, the language if the test passes, and the test -- a callable that takes the file content and returns a bool.
+
+### Method: `test_ext`
+
+```python
+test_ext()
+```
+
+Run the test callable with the given extension and content.
+
+## Class: `Metadata`
+
+Metadata associated with a code chunk.
+
+## Function: `determine_ext_category`
+
+```python
+determine_ext_category()
+```
+
+Determine the ExtCategory based on validated data. Validated data here is the partially validated data field dictionary for a CodeChunk during pydantic model validation (i.e. what a default_factory can optionally receive).
+
+## Function: `get_ext_lang_pair_for_file`
+
+```python
+get_ext_lang_pair_for_file()
+```
+
+Get the `ExtLangPair` for a given file path.
+
+## Function: `get_ext_lang_pairs`
+
+```python
+get_ext_lang_pairs()
+```
+
+Yield all `ExtLangPair` instances for code, config, and docs files.
+
+## Function: `get_language_from_extension`
+
+```python
+get_language_from_extension()
+```
+
+Get the language associated with a given file extension.
+
+## Function: `get_semantic_or_config_lang`
+
+```python
+get_semantic_or_config_lang()
+```
+
+Get the `SemanticSearchLanguage` or `ConfigLanguage` for a given file path.

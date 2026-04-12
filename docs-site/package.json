@@ -5,22 +5,23 @@
   "type": "module",
   "scripts": {
     "astro": "bunx astro",
-    "prebuild": "bunx wrangler -c ./wrangler.jsonc types; bunx astro sync",
+    "prebuild": "bunx wrangler types; bunx astro sync",
     "build": "bunx astro build",
-    "deploy": "bun run build && bunx wrangler -c ./wrangler.jsonc deploy",
+    "deploy": "bun run build && bunx wrangler deploy",
     "dev": "bunx astro dev",
+    "postinstall": "node scripts/patch-astro-prerender.mjs",
     "prepare": "test -f ./node_modules/bun/install.js && node ./node_modules/bun/install.js || true",
     "preview": "bunx astro preview",
-    "wrangler": "bunx wrangler -c ./wrangler.jsonc"
+    "wrangler": "bunx wrangler"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.38.2",
-    "@knitli/astro-docs-template": "^0.4.1",
-    "@knitli/docs-components": "^1.4.1"
+    "@astrojs/starlight": "^0.38.3",
+    "@knitli/astro-docs-template": "^0.5.2",
+    "@knitli/docs-components": "^1.4.5"
   },
   "devDependencies": {
     "@astrojs/check": "latest",
-    "@knitli/tsconfig": "latest",
+    "@knitli/tsconfig": "^0.3.0",
     "@types/node": "latest",
     "typescript": "latest",
     "wrangler": "latest"

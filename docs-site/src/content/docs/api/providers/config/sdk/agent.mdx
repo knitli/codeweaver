@@ -1,0 +1,63 @@
+---
+title: agent
+description: API reference for codeweaver.providers.config.sdk.agent
+---
+
+# `codeweaver.providers.config.sdk.agent`
+
+Settings objects for agent model constructors.
+
+NOTE: As with other function config modules, the corresponding provider (i.e. anthropic for `AnthropicAgentModelConfig`), refers to the *SDK client* that uses these settings -- not necessarily the model provider or the service provider (i.e. AWS for Bedrock). For example: `BedrockAgentModelConfig` refers to settings used by the Bedrock SDK client, which may be used to access models from multiple service providers, while for Anthropic's Claude models with AWS Bedrock, the agent model config is `AnthropicAgentModelConfig`, because Anthropic's native client is being used, even though the service provider is AWS.
+
+It might seem complicated, but we've simplified it at the top provider-level settings by differentiating by both provider and SDK client where necessary, so for the example above, there is a `AnthropicBedrockAgentProviderSettings` class for using Anthropic's Claude models via AWS Bedrock where the `agent_config` field's type is `AnthropicAgentModelConfig`, and a `BedrockAgentProviderSettings` class for using other models via Bedrock where the `agent_config` field's type is `BedrockAgentModelConfig`.
+
+*Not all settings in a model are necessarily supported by every model or every SDK*. These are `pydantic_ai` types, and that library takes a little bit of a different approach to configuration than we do. I'm not sure we'd do it differently though because it quickly becomes a complex problem space given the number of providers, models, and SDKs and the speed at which new models and features are released. When in doubt, refer to the SDK documentation and model card/docs for the specific model you're using to verify which settings are supported.
+
+Each ModelConfig inherits from the base `AgentModelConfig` (which is actually `pydantic_ai.models.ModelSettings`) and adds additional fields for settings that are specific to that provider's SDK. Generally you can be certain that the SDK will support the namespaced fields (e.g. `anthropic_thinking` or `bedrock_guardrail_config` -- not necessarily for every model), but for the general fields inherited from `AgentModelConfig`, it's a good idea to check the SDK documentation for the specific model you're using to verify that the setting is supported. The `AgentModelConfig` fields are common settings found across providers (like `temperature` and `max_tokens`), but not every provider supports every setting, and some providers have unique settings that aren't shared by others, which is why we have provider-specific ModelConfig classes that inherit from the base `AgentModelConfig`. If two fields are similar, use the namespaced field. For example, if you're using Anthropic's SDK, use `anthropic_thinking` instead of a hypothetical `thinking` field that might be added to the base `AgentModelConfig` in the future, even if other providers eventually support a similar setting. This way you can be sure that the setting is supported by the SDK you're using, and you won't run into issues with your settings not being applied.
+
+## Class: `AnthropicAgentModelConfig`
+
+Simplified settings used for AnthropicModelSettings when Anthropic is not installed, used for an Anthropic model request.
+
+## Class: `BedrockAgentModelConfig`
+
+Settings for Bedrock models.
+
+See [the Bedrock Converse API docs](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html#API_runtime_Converse_RequestSyntax) for a full list.
+See [the boto3 implementation](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-runtime/client/converse.html) of the Bedrock Converse API.
+
+## Class: `CerebrasAgentModelConfig`
+
+Simplified settings object for CerebrasModelSettings when OpenAI is not installed.
+
+## Class: `CohereAgentModelConfig`
+
+Settings for a Cohere model request.
+
+## Class: `GoogleAgentModelConfig`
+
+Simplified settings object for GoogleModelSettings when Google is not installed.
+
+## Class: `GroqAgentModelConfig`
+
+Simplified settings object for GroqModelSettings when Groq is not installed; settings for a Groq model request.
+
+## Class: `HuggingFaceAgentModelConfig`
+
+Simplified settings object for HuggingFaceModelSettings when HuggingFace is not installed; settings for a Hugging Face model request.
+
+## Class: `MistralAgentModelConfig`
+
+Simplified settings object for MistralModelSettings when Mistral is not installed; settings for a Mistral model request.
+
+## Class: `OpenAIAgentModelConfig`
+
+Settings used for an OpenAI model request.
+
+## Class: `OpenRouterAgentModelConfig`
+
+Settings for an OpenRouter model request.
+
+## Class: `OpenRouterAgentProviderConfig`
+
+Represents the 'Provider' object from the OpenRouter API.

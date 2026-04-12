@@ -1,0 +1,61 @@
+---
+title: dictview
+description: API reference for codeweaver.core.types.dictview
+---
+
+# `codeweaver.core.types.dictview`
+
+Read-only view wrapper around a mapping (intended for TypedDict-backed dicts).
+
+## Class: `DictView`
+
+Read-only view wrapper around a mapping (intended for TypedDict-backed dicts).
+
+Provides a read-only view of a TypedDict (or other) mapping, preventing any modifications to the underlying data. This is useful for exposing configuration or data structures that should not be altered after creation.
+
+Args:
+    mapping (TypedDictT): The mapping to wrap.
+    make_immutable (bool, optional): Whether to make the underlying mapping immutable using `MappingProxyType`. Defaults to `True`. Important things to understand here:
+        - DictView is always read-only, and the underlying mapping, if it is mutable, cannot be modified through the DictView interface (but can still be modified directly if the original mapping is accessible).
+        - If `make_immutable` is `True`, the underlying mapping is wrapped in a `MappingProxyType`, making it immutable. This prevents any modifications to the original mapping through any references *to this mapping* -- like DictView, MappingProxyType provides a dynamic read-only view of the original mapping. The main difference is hashability and performance: MappingProxyType is hashable and slightly faster for read operations.
+        - If `make_immutable` is `False`, the original mapping is used directly. This is useful if the original mapping is already immutable or you're not paranoid about mutability like we are.
+
+### Method: `get`
+
+```python
+get()
+```
+
+Return the value for the given key, or the default value if the key is not found.
+
+### Method: `get_subview`
+
+```python
+get_subview()
+```
+
+Return a DictView of the sub-mapping at the given key.
+
+### Method: `items`
+
+```python
+items()
+```
+
+Return a view of the items in the mapping.
+
+### Method: `keys`
+
+```python
+keys()
+```
+
+Return a view of the keys in the mapping.
+
+### Method: `values`
+
+```python
+values()
+```
+
+Return a view of the values in the mapping.

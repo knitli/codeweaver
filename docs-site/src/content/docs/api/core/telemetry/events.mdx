@@ -1,0 +1,132 @@
+---
+title: events
+description: API reference for codeweaver.core.telemetry.events
+---
+
+# `codeweaver.core.telemetry.events`
+
+Telemetry event schemas for PostHog integration.
+
+Defines two primary events that leverage PostHog's property system:
+1. SessionEvent - Aggregated session statistics for understanding usage patterns
+2. SearchEvent - Per-search metrics for find_code with A/B testing support
+
+All events use privacy-safe, anonymized data with support for opt-in detailed tracking.
+
+## Class: `SearchEvent`
+
+Per-search telemetry event for find_code analytics.
+
+Tracks:
+- Search intent and strategies used
+- Performance timing
+- Result quality metrics
+- Index state
+- Feature flags for A/B testing
+
+Supports privacy-aware detailed tracking via tools_over_privacy setting.
+
+### Method: `to_posthog_event`
+
+```python
+to_posthog_event()
+```
+
+Convert to PostHog event format with structured properties.
+
+Uses serialize_for_telemetry() to apply anonymization rules defined
+in _telemetry_keys() for FindCodeResponseSummary and CodeMatch.
+
+## Class: `SessionEvent`
+
+Session telemetry event for understanding usage patterns.
+
+Serializes SessionStatistics to track:
+- Setup success/failure for identifying trouble spots
+- Request statistics and performance
+- Token economics and savings
+- Repository characteristics (languages, file counts)
+- Failover statistics
+
+Leverages PostHog properties:
+- $set_once for first-session tracking
+- $set for updateable properties
+- Nested properties for logical grouping
+
+### Method: `from_statistics`
+
+```python
+from_statistics()
+```
+
+Create SessionEvent from SessionStatistics.
+
+Args:
+    stats: Session statistics to serialize
+    version: CodeWeaver version
+    setup_success: Whether setup completed successfully
+    setup_attempts: Number of setup attempts before success
+    config_errors: List of configuration error types encountered
+    duration_seconds: Total session duration
+
+Returns:
+    SessionEvent instance
+
+### Method: `to_posthog_event`
+
+```python
+to_posthog_event()
+```
+
+Convert to PostHog event format with structured properties.
+
+Uses serialize_for_telemetry() to apply anonymization rules defined
+in _telemetry_keys() for each statistics component.
+
+## Class: `TelemetryEvent`
+
+Protocol for telemetry events.
+
+### Method: `to_posthog_event`
+
+```python
+to_posthog_event()
+```
+
+Convert event to PostHog format.
+
+Returns:
+    Tuple of (event_name, properties_dict)
+
+## Function: `capture_search_event`
+
+```python
+capture_search_event()
+```
+
+Convenience function to capture a search event.
+
+Args:
+    response: FindCodeResponseSummary from find_code
+    query: Original search query
+    intent_type: Detected or specified intent
+    strategies: Search strategies used
+    execution_time_ms: Total execution time
+    tools_over_privacy: Whether to include detailed query data
+    feature_flags: Feature flag variants for A/B testing
+
+## Function: `capture_session_event`
+
+```python
+capture_session_event()
+```
+
+Convenience function to capture a session event.
+
+Args:
+    stats: Session statistics to serialize
+    version: CodeWeaver version
+    setup_success: Whether setup completed successfully
+    setup_attempts: Number of setup attempts
+    config_errors: Configuration errors encountered
+    duration_seconds: Session duration

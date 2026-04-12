@@ -5,51 +5,50 @@
  * SPDX-License-Identifier: MIT OR Apache-2.0
  */
 
-@layer base, starlight, theme, components, utilities
+@layer base, starlight, theme, components, utilities;
 
 /* Knitli subnav bar height */
 :root {
   --sl-subnav-height: 2rem;
 }
 
-@theme {
-  :root {
-	--sl-color-accent-low: #321f10;
-	--sl-color-accent: #9c5512;
-	--sl-color-accent-high: #ddc3b0;
-	--sl-color-white: #ffffff;
-	--sl-color-gray-1: #e5eff7;
-	--sl-color-gray-2: #c0ccd5;
-	--sl-color-gray-3: #90a8b9;
-	--sl-color-gray-4: #455b6b;
-	--sl-color-gray-5: #263b4a;
-	--sl-color-gray-6: #152937;
-	--sl-color-black: #101920;
-  }
-  /* Light mode colors. */
-  :root[data-theme='light'] {
-	--sl-color-accent-low: #e7d2c4;
-	--sl-color-accent: #7b3f00;
-	--sl-color-accent-high: #492a11;
-	--sl-color-white: #101920;
-	--sl-color-gray-1: #152937;
-	--sl-color-gray-2: #263b4a;
-	--sl-color-gray-3: #455b6b;
-	--sl-color-gray-4: #788fa0;
-	--sl-color-gray-5: #b8c4cd;
-	--sl-color-gray-6: #e5eff7;
-	--sl-color-gray-7: #f2f7fb;
-	--sl-color-black: #ffffff;
-  }
+/* Dark mode colors (default). Starlight palette is semantic:
+ * gray-1 = near-foreground (high contrast with bg),
+ * gray-6 = near-background (low contrast). */
+:root {
+  --sl-color-accent-low: #321f10;
+  --sl-color-accent: #9c5512;
+  --sl-color-accent-high: #ddc3b0;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #e5eff7;
+  --sl-color-gray-2: #c0ccd5;
+  --sl-color-gray-3: #90a8b9;
+  --sl-color-gray-4: #455b6b;
+  --sl-color-gray-5: #263b4a;
+  --sl-color-gray-6: #152937;
+  --sl-color-black: #101920;
 }
+
+/* Light mode colors. */
+:root[data-theme='light'] {
+  --sl-color-accent-low: #e7d2c4;
+  --sl-color-accent: #7b3f00;
+  --sl-color-accent-high: #492a11;
+  --sl-color-white: #101920;
+  --sl-color-gray-1: #152937;
+  --sl-color-gray-2: #263b4a;
+  --sl-color-gray-3: #455b6b;
+  --sl-color-gray-4: #788fa0;
+  --sl-color-gray-5: #b8c4cd;
+  --sl-color-gray-6: #e5eff7;
+  --sl-color-gray-7: #f2f7fb;
+  --sl-color-black: #ffffff;
+}
+
 /* Custom typography */
 .sl-markdown-content {
   font-size: 1rem;
   line-height: 1.75;
-}
-
-.sl-markdown-content h1 {
-  color: var(--sl-color-gray-6);
 }
 
 .sl-markdown-content a {
@@ -63,18 +62,23 @@
   border-bottom-color: var(--sl-color-accent);
 }
 
-/* Code blocks */
-.sl-markdown-content pre {
-  background-color: var(--sl-color-gray-2);
-  border: 1px solid var(--sl-color-gray-4);
-  border-radius: 0.5rem;
-}
-
-/* Inline code */
-.sl-markdown-content code:not(pre code) {
-  background-color: var(--sl-color-gray-2);
-  color: var(--sl-color-accent-high);
+/* Inline code — use near-background surface and foreground text.
+ * Fenced code blocks are handled by expressive-code (tied to the
+ * configured Shiki theme) and are intentionally NOT overridden. */
+.sl-markdown-content :not(pre) > code {
+  background-color: var(--sl-color-gray-6);
+  color: var(--sl-color-white);
   padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
   font-size: 0.875em;
+}
+
+/* Override Starlight's default, which forces inline code inside headings
+ * to inherit the heading's (large) font-size. In the API reference every
+ * class/method entry is `## Class: `Name`` / `### Method: `name``, so the
+ * default makes the monospaced identifier render at H2/H3 size. Scale it
+ * down to a fraction of the heading while keeping it visually distinct. */
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) code {
+  font-size: 0.85em;
+  font-weight: inherit;
 }

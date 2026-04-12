@@ -1,0 +1,19 @@
+---
+title: env_registry
+description: API reference for codeweaver.providers.env_registry
+---
+
+# `codeweaver.providers.env_registry`
+
+Provider environment variable registry.
+
+This package provides a declarative registry system for provider environment variables,
+replacing the previous match statement-based approach with lightweight frozen dataclasses.
+
+Main components:
+- EnvVarConfig: Individual environment variable configuration
+- ProviderEnvConfig: Complete provider configuration
+- ProviderEnvRegistry: Central registry with lazy loading
+- Builder functions: Composable helpers for common patterns
+
+This package is part of the providers package and depends on core.

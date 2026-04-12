@@ -1,0 +1,92 @@
+---
+title: progress_tracker
+description: API reference for codeweaver.engine.managers.progress_tracker
+---
+
+# `codeweaver.engine.managers.progress_tracker`
+
+Module for tracking indexing progress and statistics.
+
+PURE state management and reporting. No UI dependencies.
+
+## Class: `IndexingErrorDict`
+
+Structured error information for failed file indexing.
+
+## Class: `IndexingPhase`
+
+Enum representing different phases of the indexing process.
+
+## Class: `IndexingProgressTracker`
+
+Pure state tracker for indexing progress.
+
+No UI code. Maintains IndexingStats and phase.
+
+### Method: `get_stats`
+
+```python
+get_stats()
+```
+
+Return the current stats.
+
+### Method: `update_phase`
+
+```python
+update_phase()
+```
+
+Update the current indexing phase.
+
+## Class: `IndexingStats`
+
+Statistics tracking for indexing progress.
+
+### Method: `add_error`
+
+```python
+add_error()
+```
+
+Add a structured error to the tracking system.
+
+### Method: `elapsed_time`
+
+```python
+elapsed_time()
+```
+
+Calculate elapsed time since indexing started.
+
+### Method: `get_error_summary`
+
+```python
+get_error_summary()
+```
+
+Get summary of errors by phase and type.
+
+### Method: `human_elapsed_time`
+
+```python
+human_elapsed_time()
+```
+
+Get human-readable elapsed time.
+
+### Method: `processing_rate`
+
+```python
+processing_rate()
+```
+
+Files processed per second.
+
+### Method: `total_errors`
+
+```python
+total_errors()
+```
+
+Total number of files with errors.

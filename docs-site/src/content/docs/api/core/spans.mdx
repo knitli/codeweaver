@@ -1,0 +1,193 @@
+---
+title: spans
+description: API reference for codeweaver.core.spans
+---
+
+# `codeweaver.core.spans`
+
+Span data structures and operations for CodeWeaver.
+
+## Class: `Span`
+
+An immutable span of lines in a file, defined by a start and end line number, and a source identifier.
+
+`Span`s are a big part of CodeWeaver's foundational data structures, so they have a robust API for manipulation and comparison.
+`Span` supports intersection, union, difference, and symmetric difference operations (both by using operators and methods), as well as containment checks and subset/superset checks.
+
+All spans have an identifier, that they should share with the source (e.g. file) of the span. This allows for operations between spans from different sources to be safely handled, as they will not interfere with each other.
+
+While we want it to be intuitive to us, it might not be intuitive for everyone, so let's break down the key features and caveats:
+
+    - Spans are inclusive of their start and end lines.
+    - Operations between spans from different sources will not interfere with each other (but can return None in some cases, so get your null checks ready).
+    - All spans have an identifier that they should share with the source (e.g. file) of the span.
+    - Spans are immutable and cannot be modified after creation, but you can easily create new spans based on existing ones, including with a Span.
+    - Spans are iterable, *and iterate over the lines*. If you want to iterate over the attributes, use `span.as_tuple`.
+    - Operations:
+
+        - `in` can test if an integer (i.e. line number), a tuple (i.e. (start, end)), or another `Span` is contained within the span.
+            - For line numbers and tuples, it only checks the start and end lines, not the source identifier.
+            - For spans, or tuples with a source identifier, it checks if the span overlaps with the current span in the source.
+        - `difference` (`-`) operation can return a single span (if the difference is contiguous), a tuple of spans (if the other span is fully contained), or None (if the spans do not overlap).
+        - `union` (`|`) operation will return a new span that covers both spans, but only if they share the same source identifier. Otherwise returns the original span.
+        - `intersection` (`&`) operation will return a new span that is the overlap of both spans, or None if they do not overlap.
+        - `symmetric_difference` (`^`) operation will return a tuple of spans that are the parts of each span that do not overlap with the other, or None if they do not overlap.
+        - `equals` (`==`) operation will return True if the spans are equal, and False otherwise. Spans are only equal if they have the same start, end, **and** source identifier.
+
+Why immutable? Because we don't want to accidentally modify a span that is being used elsewhere, and we want to ensure that spans are always in a valid state. It also allows us to comfortably use them as keys, and in sets, and supports our data-safe set-like operations here.
+
+### Method: `check_span`
+
+```python
+check_span()
+```
+
+Ensure that the start is less than or equal to the end.
+
+### Method: `contains_line`
+
+```python
+contains_line()
+```
+
+Check if this span contains a specific line.
+
+Note: This is a naive check that assumes the line is from the same source.
+
+### Method: `difference`
+
+```python
+difference()
+```
+
+Return the difference between this span and another span.
+
+If the spans don't overlap,
+
+### Method: `from_sourced_lines`
+
+```python
+from_sourced_lines()
+```
+
+Create a Span for the same source as this one, but with a new start and end.
+
+### Method: `from_tuple`
+
+```python
+from_tuple()
+```
+
+Create a Span from a tuple of (start, end, source_id).
+
+### Method: `intersection`
+
+```python
+intersection()
+```
+
+Return the intersection of this span with another span.
+
+### Method: `is_adjacent`
+
+```python
+is_adjacent()
+```
+
+Check if this span is adjacent to another span.
+
+### Method: `is_subset`
+
+```python
+is_subset()
+```
+
+Check if this span is a subset of another span.
+
+### Method: `is_superset`
+
+```python
+is_superset()
+```
+
+Check if this span is a superset of another span.
+
+### Method: `serialize_for_cli`
+
+```python
+serialize_for_cli()
+```
+
+Serialize the span for CLI output.
+
+### Method: `symmetric_difference`
+
+```python
+symmetric_difference()
+```
+
+Return the symmetric difference between this span and another span.
+
+### Method: `union`
+
+```python
+union()
+```
+
+Combine this span with another span.
+
+## Class: `SpanGroup`
+
+A group of spans that can be manipulated as a single unit.
+
+SpanGroups allow for set-like operations on groups of spans, including union, intersection, difference, and symmetric difference.
+
+SpanGroups normalize spans on creation and when spans are added, merging overlapping or adjacent spans with the same source_id. This ensures that the spans in a SpanGroup are always non-overlapping and non-adjacent within the same source.
+
+### Method: `add`
+
+```python
+add()
+```
+
+Add a span to the group.
+
+### Method: `from_simple_spans`
+
+```python
+from_simple_spans()
+```
+
+Create a SpanGroup from a sequence of simple spans. Assumes all input spans are from the same source.
+
+Intended for ingestion, where a parser identifies spans as simple tuples of (start, end) from a single source/file, and passes them for grouping into a SpanGroup.
+
+## Class: `SpanTuple`
+
+A tuple representing a span of lines in a file.
+
+Attributes:
+    start (PositiveInt): The starting line number of the span (inclusive).
+    end (PositiveInt): The ending line number of the span (inclusive).
+    source_id (UUID7): The unique identifier for the source of the span.
+
+### Method: `from_span`
+
+```python
+from_span()
+```
+
+Convert a Span to a SpanTuple.
+
+Reads fields directly rather than using span._asdict(), because
+Span.__iter__ yields line numbers and NamedTuple._asdict() uses
+zip(fields, self), which would fill the dict with line-number
+integers instead of the actual field values.
+
+### Method: `to_span`
+
+```python
+to_span()
+```
+
+Convert a SpanTuple to a Span.

@@ -1,0 +1,49 @@
+---
+title: types
+description: API reference for codeweaver.providers.config.types
+---
+
+# `codeweaver.providers.config.types`
+
+Shared types for providers configurations.
+
+## Class: `AzureOptions`
+
+Azure-specific options.
+
+## Class: `Bm25Config`
+
+CodeWeaver's BM25 configuration for Qdrant vector store.
+
+### Method: `serialize_for_upsert`
+
+```python
+serialize_for_upsert()
+```
+
+Serialize the BM25 config for Qdrant upsert, updating avg_len.
+
+## Class: `CohereRequestOptionsDict`
+
+Additional request options for the Cohere API.
+
+## Class: `DocumentRepr`
+
+A shell representation of a `qdrant_client.models.Document`. Document itself requires text for embedding, and a model name, which in our case is always `Qdrant/Bm25`, but this representation only includes the fields necessary for configuration purposes.
+
+We don't currently allow users to set these options directly -- we want to experiment and identify optimal configuration for general and specific code search use cases, so we need to control these settings internally.
+
+### Method: `serialize_for_upsert`
+
+```python
+serialize_for_upsert()
+```
+
+Serialize the document representations for Qdrant upsert.
+
+## Class: `HttpxClientParams`
+
+Parameters for configuring an httpx client.
+
+Note: Type annotations use Any to avoid httpx import at initialization.
+At runtime, these accept the corresponding httpx types.

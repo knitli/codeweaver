@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# sample tags.yml for starlight-tags plugin configuration
+tags:
+  getting-started:
+    label: "Getting Started"
+    description: "Essential first steps"
+    color: "#22c55e"
+    icon: "🚀"
+    priority: 100
+
+  components:
+    label: "Components"
+    description: "UI building blocks"
+    color: "#3b82f6"
+    icon: "🧩"
+
+  advanced:
+    label: "Advanced"
+    description: "For experienced users"
+    color: "#f59e0b"
+    icon: "⚡"
+    difficulty: advanced
+    prerequisites:
+      - getting-started
+
+defaults:
+  color: "#6b7280"
