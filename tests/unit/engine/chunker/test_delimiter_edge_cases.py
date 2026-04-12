@@ -355,7 +355,25 @@ class TestGovernorChecks:
         calls: list[str] = []
         governor = RecordingGovernor(calls)
 
-        delimiter_chunker._delimiters = [
+        class RecordingChunker(DelimiterChunker):
+            def __init__(self, *, governor: ChunkGovernor, calls: list[str]) -> None:
+                super().__init__(governor=governor)
+                self._calls = calls
+
+            def _match_explicit_delimiters(
+                self, _: str, __: list[Delimiter]
+            ):
+                self._calls.append("explicit")
+                return []
+
+            def _match_keyword_delimiters(
+                self, _: str, __: list[Delimiter]
+            ):
+                self._calls.append("keyword")
+                return []
+
+        recording_chunker = RecordingChunker(governor=delimiter_chunker.governor, calls=calls)
+        recording_chunker._delimiters = [
             Delimiter(
                 start="{",
                 end="}",
@@ -376,18 +394,7 @@ class TestGovernorChecks:
             ),
         ]
 
-        def record_explicit(_: str, __: list[Delimiter]):
-            calls.append("explicit")
-            return []
-
-        def record_keyword(_: str, __: list[Delimiter]):
-            calls.append("keyword")
-            return []
-
-        delimiter_chunker._match_explicit_delimiters = record_explicit
-        delimiter_chunker._match_keyword_delimiters = record_keyword
-
-        delimiter_chunker._find_delimiter_matches("def foo():\n    return 1\n", governor=governor)
+        recording_chunker._find_delimiter_matches("def foo():\n    return 1\n", governor=governor)
 
         assert calls == ["explicit", "timeout", "keyword"]
 
