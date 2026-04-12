@@ -270,7 +270,7 @@ class DelimiterChunker(BaseChunker):
             List of delimiter matches
         """
         governor.check_timeout()
-        matches = self._find_delimiter_matches(content)
+        matches = self._find_delimiter_matches(content, governor=governor)
 
         if not matches:
             matches = self._fallback_paragraph_chunking(content)
@@ -340,7 +340,9 @@ class DelimiterChunker(BaseChunker):
                 file_path=str(file_path) if file_path else None,
             )
 
-    def _find_delimiter_matches(self, content: str) -> list[DelimiterMatch]:
+    def _find_delimiter_matches(
+        self, content: str, *, governor: Any | None = None
+    ) -> list[DelimiterMatch]:
         """Find all delimiter matches in content using two-phase matching.
 
         Phase 1: Matches explicit start/end pairs (e.g., {...}, (...))
@@ -348,6 +350,7 @@ class DelimiterChunker(BaseChunker):
 
         Args:
             content: Source code to scan
+            governor: Optional resource governor for timeout checks between phases
 
         Returns:
             List of DelimiterMatch objects ordered by position
@@ -363,6 +366,10 @@ class DelimiterChunker(BaseChunker):
 
         # Phase 1: Handle explicit start/end pairs (existing logic)
         matches.extend(self._match_explicit_delimiters(content, explicit_delimiters))
+
+        # Check timeout between phases to avoid unbounded work
+        if governor is not None:
+            governor.check_timeout()
 
         # Phase 2: Handle keyword delimiters with empty ends
         matches.extend(self._match_keyword_delimiters(content, keyword_delimiters))
@@ -475,6 +482,13 @@ class DelimiterChunker(BaseChunker):
         for delimiter in keyword_delimiters:
             delimiter_map.setdefault(delimiter.start, []).append(delimiter)
 
+        # Precompute brace-nesting levels at all keyword positions in a single
+        # O(n) forward pass.  The previous approach called _calculate_nesting_level
+        # per keyword match, each scanning from position 0, resulting in O(n * m)
+        # total work that caused timeouts on large files (especially Python 3.13).
+        keyword_positions = [m.start() for m in combined_pattern.finditer(content)]
+        nesting_at = self._precompute_nesting_levels(content, keyword_positions)
+
         for match in combined_pattern.finditer(content):
             matched_text = match.group(0)
             keyword_pos = match.start()
@@ -501,8 +515,8 @@ class DelimiterChunker(BaseChunker):
                 )
 
                 if struct_end is not None:
-                    # Calculate nesting level by counting parent structures
-                    nesting_level = self._calculate_nesting_level(content, keyword_pos)
+                    # Look up precomputed nesting level (O(1) per keyword)
+                    nesting_level = nesting_at.get(keyword_pos, 0)
 
                     # Create a complete match from keyword to closing structure
                     # This represents the entire construct (e.g., function...})
@@ -516,6 +530,98 @@ class DelimiterChunker(BaseChunker):
                     )
 
         return matches
+
+    def _precompute_nesting_levels(
+        self, content: str, positions: list[int]
+    ) -> dict[int, int]:
+        """Precompute brace-nesting levels at given positions in a single forward pass.
+
+        Replaces per-position calls to ``_calculate_nesting_level`` which each
+        scanned from position 0, yielding O(n * m) total work.  This method
+        achieves the same result in O(n + m) by walking the content once and
+        recording the running brace depth at each requested position.
+
+        Args:
+            content: Source code
+            positions: Character offsets whose nesting level is needed
+
+        Returns:
+            Mapping from position to nesting level (0 = top-level)
+        """
+        if not positions:
+            return {}
+
+        result: dict[int, int] = {}
+        sorted_positions = sorted(positions)
+        pos_idx = 0
+        brace_depth = 0
+        in_string = False
+        string_char: str | None = None
+        content_len = len(content)
+        i = 0
+
+        while i < content_len:
+            # Record nesting level for every target position we have reached
+            while pos_idx < len(sorted_positions) and sorted_positions[pos_idx] <= i:
+                result[sorted_positions[pos_idx]] = brace_depth
+                pos_idx += 1
+
+            if pos_idx >= len(sorted_positions):
+                break  # All positions recorded
+
+            c = content[i]
+
+            # Track string boundaries
+            if c in ('"', "'", "`") and (i == 0 or content[i - 1] != "\\"):
+                in_string, string_char = self._toggle_string(
+                    c, in_string=in_string, string_char=string_char
+                )
+            elif not in_string:
+                skip_to = self._skip_nesting_comment(content, i, c, content_len)
+                if skip_to is not None:
+                    i = skip_to
+                    continue
+                brace_depth = self._adjust_brace_depth(c, brace_depth)
+
+            i += 1
+
+        # Any remaining positions beyond the end of content
+        for p in sorted_positions[pos_idx:]:
+            result[p] = brace_depth
+
+        return result
+
+    @staticmethod
+    def _toggle_string(
+        c: str, *, in_string: bool, string_char: str | None
+    ) -> tuple[bool, str | None]:
+        """Toggle string state for quote character."""
+        if not in_string:
+            return True, c
+        if c == string_char:
+            return False, None
+        return in_string, string_char
+
+    @staticmethod
+    def _skip_nesting_comment(content: str, i: int, c: str, content_len: int) -> int | None:
+        """Return new index if a comment starts at *i*, else None."""
+        two_chars = content[i : i + 2]
+        if two_chars == "//" or c == "#":
+            nl = content.find("\n", i)
+            return nl if nl >= 0 else content_len
+        if two_chars == "/*":
+            end = content.find("*/", i + 2)
+            return end + 2 if end >= 0 else content_len
+        return None
+
+    @staticmethod
+    def _adjust_brace_depth(c: str, depth: int) -> int:
+        """Adjust brace depth for open/close brace characters."""
+        if c == "{":
+            return depth + 1
+        if c == "}":
+            return max(0, depth - 1)
+        return depth
 
     def _calculate_nesting_level(self, content: str, pos: int) -> int:
         """Calculate nesting level at a given position by counting braces.
