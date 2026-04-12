@@ -1,0 +1,99 @@
+---
+title: checks
+description: API reference for codeweaver.core.utils.checks
+---
+
+# `codeweaver.core.utils.checks`
+
+Utility functions for type checking and validation.
+
+## Function: `file_is_binary`
+
+```python
+file_is_binary()
+```
+
+Check if a file is binary by reading its initial bytes.
+
+## Function: `has_package`
+
+```python
+has_package()
+```
+
+Check if a package is installed.
+
+First checks via importlib.metadata to catch cases like `fastembed-gpu` which don't import under that name.
+Then falls back to importlib.util.find_spec to catch packages that may not be registered in metadata.
+
+## Function: `is_ci`
+
+```python
+is_ci()
+```
+
+Check if the code is running in a Continuous Integration environment.
+
+## Function: `is_class`
+
+```python
+is_class()
+```
+
+Check if an object is a class.
+
+## Function: `is_debug`
+
+```python
+is_debug()
+```
+
+Check if the application is running in debug mode.
+
+## Function: `is_local_host`
+
+```python
+is_local_host()
+```
+
+Check if a host is a localhost address.
+
+## Function: `is_pydantic_basemodel`
+
+```python
+is_pydantic_basemodel()
+```
+
+Check if a model is a Pydantic BaseModel.
+
+## Function: `is_test_environment`
+
+```python
+is_test_environment()
+```
+
+Check if the code is running in a test environment.
+
+## Function: `is_typeadapter`
+
+```python
+is_typeadapter()
+```
+
+Check if an object is a Pydantic TypeAdapter.
+
+## Function: `is_wsl`
+
+```python
+is_wsl()
+```
+
+Check if the code is running inside Windows Subsystem for Linux (WSL).
+
+## Function: `is_wsl_vscode`
+
+```python
+is_wsl_vscode()
+```
+
+Check if the code is running inside WSL with VSCode integration.

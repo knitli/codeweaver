@@ -1,0 +1,19 @@
+---
+title: definitions
+description: API reference for codeweaver.providers.env_registry.definitions
+---
+
+# `codeweaver.providers.env_registry.definitions`
+
+Provider environment variable definitions.
+
+Auto-exports all provider configurations for registry discovery.
+
+This module serves as a central collection point for all provider definitions.
+The registry will automatically discover and register any uppercase module-level
+variables that are ProviderEnvConfig instances or lists of ProviderEnvConfig.
+
+Organization:
+- openai_compatible.py: ~15 providers using OpenAI SDK
+- cloud_platforms.py: Multi-client providers (Azure, Heroku, Vercel)
+- specialized.py: Providers with unique configurations (Qdrant, Bedrock, etc.)

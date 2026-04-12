@@ -1,0 +1,101 @@
+---
+title: base
+description: API reference for codeweaver.providers.embedding.capabilities.base
+---
+
+# `codeweaver.providers.embedding.capabilities.base`
+
+Base types and models for CodeWeaver embedding models.
+
+## Class: `EmbeddingModelCapabilities`
+
+Describes the capabilities of an embedding model, such as the default dimension.
+
+### Method: `default`
+
+```python
+default()
+```
+
+Create a default instance of the model profile.
+
+### Method: `from_capabilities`
+
+```python
+from_capabilities()
+```
+
+Create an instance from a dictionary of capabilities.
+
+## Class: `ModelFamily`
+
+Defines a family of embedding models with compatible vector spaces.
+
+Model families group embedding models that produce compatible embeddings, meaning
+their vectors can be directly compared and stored in the same vector space. This
+enables cross-model operations like using different models for embedding vs querying,
+or migrating between models within a family without re-embedding. All datatypes and dimensions must still match.
+
+Attributes:
+    family_id: Unique identifier for the model family (e.g., "voyage-3", "cohere-v3").
+    default_dimension: Dimensionality of the embedding vectors in this family.
+    output_dimensions: tuple of possible output dimensions for models in this family.
+    default_dtype: Data type of vector components (default: "float16").
+    output_dtypes: Accepted data types for model outputs within this family.
+    is_normalized: Whether embeddings are normalized to unit length.
+    preferred_metrics: Preferred distance metrics for this family, in order of suitability.
+    member_models: Set of model names belonging to this family.
+    asymmetric_query_models: Optional set of specialized query-only models.
+    cross_provider_compatible: Whether this family maintains compatibility across providers.
+
+### Method: `is_compatible`
+
+```python
+is_compatible()
+```
+
+Check if two models are compatible within this family.
+
+Models are compatible if both are members of the family, allowing their
+embeddings to be directly compared in the same vector space.
+
+Args:
+    embed_model: Name of the model used for embedding documents.
+    query_model: Name of the model used for queries.
+
+Returns:
+    True if both models belong to this family's member models, False otherwise.
+
+### Method: `validate_dimensions`
+
+```python
+validate_dimensions()
+```
+
+Validate that embedding dimensions match the family specification.
+
+Args:
+    embed_dim: Dimension of the embedding model's output.
+    query_dim: Dimension of the query model's output.
+
+Returns:
+    Tuple of (is_valid, error_message). If valid, error_message is None.
+    If invalid, error_message describes the dimension mismatch.
+
+## Class: `SparseCapabilities`
+
+Sparse embedding model capabilities for dependency injection.
+
+## Class: `SparseEmbeddingModelCapabilities`
+
+A model describing the capabilities of a sparse embedding model.
+
+Sparse embeddings are much simpler than dense embeddings, so this model is much simpler.
+
+## Function: `get_sparse_caps`
+
+```python
+get_sparse_caps()
+```
+
+Get sparse embedding model capabilities.

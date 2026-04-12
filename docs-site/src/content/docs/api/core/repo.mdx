@@ -1,0 +1,53 @@
+---
+title: repo
+description: API reference for codeweaver.core.repo
+---
+
+# `codeweaver.core.repo`
+
+Heuristic-based repository environment and topography detection.
+
+## Class: `DirectoryPurpose`
+
+Enum for common directory purposes in a repository.
+
+### Method: `validators`
+
+```python
+validators()
+```
+
+Each member has its own validator to assess membership.
+
+## Class: `RepoChecklist`
+
+A checklist-style representation of repository structure.
+
+The attribute names aren't 1-for-1 to directory names. For example, `has_src_dir` indicates a directory named `src` or `source`.
+
+### Method: `from_files`
+
+```python
+from_files()
+```
+
+Create a RepoChecklist from a list of file paths.
+
+Args:
+    files: A sequence of file paths in the repository.
+    project_path: The root directory of the project.
+
+Returns:
+    An instance of RepoChecklist with detected directories and files.
+
+## Class: `RepoChecklistDict`
+
+A dictionary representation of the RepoChecklist dataclass.
+
+Keys are the attribute names of RepoChecklist, and values are their corresponding types. Used for type hinting in methods that return mixed types.
+
+## Class: `RepoDirectory`
+
+Representation of a directory in the repository with its purpose.
+
+`RepoDirectory` also have detailed properties that are lazily evaluated, and helper methods for working with directories.

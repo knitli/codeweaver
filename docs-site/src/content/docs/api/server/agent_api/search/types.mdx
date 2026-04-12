@@ -1,0 +1,66 @@
+---
+title: types
+description: API reference for codeweaver.server.agent_api.search.types
+---
+
+# `codeweaver.server.agent_api.search.types`
+
+Types and models for the find_code agent API.
+
+## Class: `CodeMatch`
+
+Individual code match with context and metadata.
+
+### Method: `serialize_for_cli`
+
+```python
+serialize_for_cli()
+```
+
+Serialize code match for CLI display.
+
+Returns a dict suitable for rendering in CLI output formats.
+
+### Method: `validate_span`
+
+```python
+validate_span()
+```
+
+Validate span consistency.
+
+## Class: `CodeMatchType`
+
+Enumeration of code match types.
+
+## Class: `FindCodeResponseSummary`
+
+Structured response from find_code tool.
+
+### Method: `assemble_cli_summary`
+
+```python
+assemble_cli_summary()
+```
+
+Assemble a concise CLI summary of the response.
+
+### Method: `get_schema`
+
+```python
+get_schema()
+```
+
+Get the JSON schema for the model as a Python dictionary.
+
+### Method: `populate_computed_fields`
+
+```python
+populate_computed_fields()
+```
+
+Populate computed fields from other data.
+
+## Class: `FindCodeSubmission`
+
+Structured submission for find_code tool.

@@ -1,0 +1,42 @@
+---
+title: error_handler
+description: API reference for codeweaver.cli.ui.error_handler
+---
+
+# `codeweaver.cli.ui.error_handler`
+
+Unified error handling for CLI commands.
+
+## Class: `CLIErrorHandler`
+
+Unified error handling for CLI commands.
+
+Provides consistent error display across all CLI commands with appropriate
+detail levels based on error type and verbosity flags.
+
+When a ``CodeWeaverError`` exception chain is displayed, each node in the
+chain contributes its message and location, but suggestions are aggregated
+and de-duplicated across the whole chain, and the issue-reporting
+boilerplate is printed exactly once.  This prevents walls of identical
+advice when multiple CodeWeaver exceptions wrap one another.
+
+### Method: `handle_error`
+
+```python
+handle_error()
+```
+
+Handle and display errors appropriately.
+
+Args:
+    error: Exception to handle
+    context: Context description (e.g., "Server startup")
+    exit_code: Exit code to use (default: 1)
+
+## Function: `handle_keyboard_interrupt_gracefully`
+
+```python
+handle_keyboard_interrupt_gracefully()
+```
+
+Context manager to handle KeyboardInterrupt gracefully for CLI commands.

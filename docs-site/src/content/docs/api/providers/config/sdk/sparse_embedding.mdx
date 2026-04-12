@@ -1,0 +1,87 @@
+---
+title: sparse_embedding
+description: API reference for codeweaver.providers.config.sdk.sparse_embedding
+---
+
+# `codeweaver.providers.config.sdk.sparse_embedding`
+
+This module defines configuration models for sparse embedding providers in CodeWeaver, including Sentence Transformers and FastEmbed. Each model includes provider-specific configuration options for embedding and query encoding, as well as methods to convert these configurations into the format expected by the respective provider's SDK. The base class `BaseSparseEmbeddingConfig` provides common functionality for all sparse embedding configurations, while specific classes like `SentenceTransformersSparseEmbeddingConfig` and `FastEmbedSparseEmbeddingConfig` implement provider-specific details.
+
+## Class: `BaseSparseEmbeddingConfig`
+
+Base configuration for sparse embedding models.
+
+### Method: `set_dimension`
+
+```python
+set_dimension()
+```
+
+No op for sparse embeddings.
+
+## Class: `FastEmbedSparseEmbeddingConfig`
+
+Configuration options for FastEmbed sparse embedding models.
+
+Inherits all configuration from FastEmbedEmbeddingConfig.
+
+### Method: `as_sparse_vector_params`
+
+```python
+as_sparse_vector_params()
+```
+
+Get Qdrant SparseVectorParams for this sparse embedding configuration.
+
+### Method: `set_datatype`
+
+```python
+set_datatype()
+```
+
+Set the embedding datatype explicitly in the embedding configuration.
+
+Args:
+    datatype: The datatype to set.
+
+### Method: `set_dimension`
+
+```python
+set_dimension()
+```
+
+Set the embedding dimension explicitly in the embedding configuration.
+
+Args:
+    dimension: The dimension to set.
+
+## Class: `SentenceTransformersSparseEmbeddingConfig`
+
+Configuration options for Sentence Transformers sparse embedding models.
+
+### Method: `as_sparse_vector_params`
+
+```python
+as_sparse_vector_params()
+```
+
+Get Qdrant SparseVectorParams for this sparse embedding configuration.
+
+### Method: `set_datatype`
+
+```python
+set_datatype()
+```
+
+Set the embedding datatype explicitly in the embedding configuration.
+
+Args:
+    datatype: The datatype to set.
+
+### Method: `set_dimension`
+
+```python
+set_dimension()
+```
+
+No op for sparse embeddings since dimension is determined by the tokenizer and not fixed. Return self for chaining.

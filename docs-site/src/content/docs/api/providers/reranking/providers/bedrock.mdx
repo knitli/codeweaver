@@ -1,0 +1,89 @@
+---
+title: bedrock
+description: API reference for codeweaver.providers.reranking.providers.bedrock
+---
+
+# `codeweaver.providers.reranking.providers.bedrock`
+
+Bedrock reranking provider.
+
+Pydantic models and provider class for Bedrock reranking. Excuse the many ty ignores -- boto3 is boto3.
+
+## Class: `BaseBedrockModel`
+
+Base model for Bedrock-related Pydantic models.
+
+## Class: `BedrockInlineDocumentSource`
+
+An inline document source for reranking.
+
+## Class: `BedrockRerankConfiguration`
+
+Configuration for Bedrock reranking.
+
+## Class: `BedrockRerankModelConfiguration`
+
+Configuration for a Bedrock reranking model.
+
+## Class: `BedrockRerankRequest`
+
+Request for Bedrock reranking.
+
+## Class: `BedrockRerankResultItem`
+
+A single reranked result item.
+
+## Class: `BedrockRerankingProvider`
+
+Provider for Bedrock reranking.
+
+## Class: `BedrockRerankingResult`
+
+Result of a Bedrock reranking request.
+
+## Class: `BedrockTextQuery`
+
+A query for reranking.
+
+## Class: `DocumentSource`
+
+A document source for reranking.
+
+### Method: `validate_documents`
+
+```python
+validate_documents()
+```
+
+Validate that exactly one document type is provided.
+
+## Class: `RerankConfiguration`
+
+Configuration for reranking.
+
+### Method: `from_arn`
+
+```python
+from_arn()
+```
+
+Create a RerankConfiguration from a Bedrock model ARN.
+
+## Function: `bedrock_reranking_input_transformer`
+
+```python
+bedrock_reranking_input_transformer()
+```
+
+Transform input documents into the format expected by the Bedrock API.
+
+We can't actually produce the full objects we need here with just the documents. We need the query and model config to construct the full object.
+We're going to handle that in the rerank method, and break type override law. 👮
+
+## Function: `bedrock_reranking_output_transformer`
+
+```python
+bedrock_reranking_output_transformer()
+```
+
+Transform the Bedrock API response into the format expected by the reranking provider.

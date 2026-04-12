@@ -1,0 +1,95 @@
+---
+title: governance
+description: API reference for codeweaver.engine.chunker.governance
+---
+
+# `codeweaver.engine.chunker.governance`
+
+Resource governance for chunking operations.
+
+This module provides resource limit enforcement during chunking operations
+to prevent resource exhaustion and ensure responsive operation across large
+codebases. The ResourceGovernor enforces timeouts and chunk count limits
+through a context manager protocol.
+
+## Class: `PerformanceSettings`
+
+Protocol for performance settings configuration.
+
+## Class: `ResourceGovernor`
+
+Enforces resource limits during chunking operations.
+
+This context manager tracks operation timing and chunk counts to prevent
+resource exhaustion. It enforces two critical limits:
+
+1. **Timeout limit**: Maximum time allowed for chunking a single file
+2. **Chunk count limit**: Maximum chunks that can be generated per file
+
+The governor uses a context manager protocol to automatically initialize
+and clean up resource tracking. All resource checks are thread-safe through
+the use of instance-local state with no shared mutable data.
+
+Usage:
+    ```python
+    with ResourceGovernor(settings) as governor:
+        for node in nodes:
+            governor.check_timeout()  # Verify not timed out
+            chunk = create_chunk(node)
+            governor.register_chunk()  # Track and check limits
+    ```
+
+Attributes:
+    settings: Performance configuration containing timeout and limit values
+    _start_time: Timestamp when context manager was entered (None when inactive)
+    _chunk_count: Number of chunks registered in current operation
+
+Raises:
+    ChunkingTimeoutError: When operation exceeds configured timeout
+    ChunkLimitExceededError: When chunk count exceeds configured maximum
+
+### Method: `check_chunk_limit`
+
+```python
+check_chunk_limit()
+```
+
+Check if chunk count has exceeded configured limit.
+
+Compares current chunk count against maximum allowed per file.
+This prevents memory exhaustion and index bloat from pathological input.
+
+Raises:
+    ChunkLimitExceededError: When chunk count exceeds maximum
+
+### Method: `check_timeout`
+
+```python
+check_timeout()
+```
+
+Check if operation has exceeded timeout limit.
+
+Compares elapsed time against configured timeout threshold.
+Safe to call even if context manager is not active (no-op).
+
+Raises:
+    ChunkingTimeoutError: When elapsed time exceeds timeout_seconds
+
+### Method: `register_chunk`
+
+```python
+register_chunk()
+```
+
+Register a new chunk and enforce all resource limits.
+
+Increments the chunk counter and checks both timeout and chunk limits.
+This is the primary method to call after creating each chunk.
+
+Call this after successfully creating each chunk to maintain accurate
+resource tracking and enforcement.
+
+Raises:
+    ChunkingTimeoutError: If timeout limit exceeded
+    ChunkLimitExceededError: If chunk count limit exceeded

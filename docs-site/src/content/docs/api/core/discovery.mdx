@@ -1,0 +1,81 @@
+---
+title: discovery
+description: API reference for codeweaver.core.discovery
+---
+
+# `codeweaver.core.discovery`
+
+Defines the DiscoveredFile dataclass representing files found during project scanning.
+
+## Class: `DiscoveredFile`
+
+Represents a file discovered during project scanning.
+
+`DiscoveredFile` instances are immutable and hashable, making them suitable for use in sets and as dictionary keys, and ensuring that their state cannot be altered after creation.
+In CodeWeaver operations, they are created using the `from_path` method when scanning and indexing a codebase.
+
+### Method: `from_chunk`
+
+```python
+from_chunk()
+```
+
+Create a DiscoveredFile from a CodeChunk, if it has a valid file_path.
+
+### Method: `from_path`
+
+```python
+from_path()
+```
+
+Create a DiscoveredFile from a file path.
+
+### Method: `is_path_binary`
+
+```python
+is_path_binary()
+```
+
+Check if a file at path is binary by reading its first 1024 bytes.
+
+### Method: `is_path_text`
+
+```python
+is_path_text()
+```
+
+Check if a file at path is text.
+
+### Method: `is_same`
+
+```python
+is_same()
+```
+
+Checks if a file at other_path is the same as this one, by comparing blake3 hashes.
+
+The other can be in a different location (paths not the same), useful for checking if a file has been moved or copied, or deduping files (we can just point to one copy).
+
+### Method: `normalize_content`
+
+```python
+normalize_content()
+```
+
+Normalize file content by ensuring it's a UTF-8 string.
+
+## Function: `compute_semantic_file_hash`
+
+```python
+compute_semantic_file_hash()
+```
+
+Compute a file hash using AST-based hashing for supported semantic languages.
+
+For files with a supported AST language (Python, JavaScript, etc.), parse the file
+to an AST and hash the canonical tree representation. This ignores comments,
+whitespace, and formatting changes so that only genuine semantic modifications
+trigger a different hash.
+
+Fall back to a raw content blake3 hash for unsupported languages or when AST
+parsing fails.

@@ -1,0 +1,31 @@
+---
+title: watching_service
+description: API reference for codeweaver.engine.services.watching_service
+---
+
+# `codeweaver.engine.services.watching_service`
+
+Service for file watching and triggering indexing.
+
+## Class: `FileWatchingService`
+
+Service that monitors file system changes and triggers indexing updates.
+
+### Method: `run`
+
+```python
+run()
+```
+
+Run the file watcher.
+
+This performs an initial index check (via IndexingService) and then starts
+watching for changes.
+
+### Method: `update_logging`
+
+```python
+update_logging()
+```
+
+Update watchfiles logging configuration.

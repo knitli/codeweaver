@@ -1,0 +1,72 @@
+---
+title: reranking
+description: API reference for codeweaver.providers.config.sdk.reranking
+---
+
+# `codeweaver.providers.config.sdk.reranking`
+
+Provider-specific reranking configuration models and utilities.
+
+## Class: `BaseRerankingConfig`
+
+Base configuration for reranking models.
+
+### Method: `as_options`
+
+```python
+as_options()
+```
+
+Return the configuration as a dictionary of options.
+
+## Class: `BedrockRerankingConfig`
+
+Configuration options for Bedrock reranking models.
+
+Bedrock is the only provider that requires model-level configuration.
+
+## Class: `BedrockRerankingModelConfig`
+
+Model configuration for Bedrock reranking models.
+
+## Class: `BedrockRerankingOptionsDict`
+
+Parameters for Bedrock reranking requests.
+
+## Class: `CohereRerankingConfig`
+
+Configuration options for Cohere reranking models.
+
+## Class: `CohereRerankingOptionsDict`
+
+Parameters for Cohere reranking requests.
+
+## Class: `FastEmbedRerankingConfig`
+
+Configuration options for FastEmbed reranking models.
+
+## Class: `FastEmbedRerankingOptionsDict`
+
+Parameters for FastEmbed reranking requests.
+
+## Class: `SentenceTransformersRerankingConfig`
+
+Configuration options for Sentence Transformers reranking models.
+
+Uses CrossEncoder models for reranking tasks.
+
+## Class: `SentenceTransformersRerankingOptionsDict`
+
+Parameters for Sentence Transformers cross-encoder reranking requests.
+
+## Class: `SerializedRerankingOptionsDict`
+
+A dictionary representing serialized reranking options for different providers.
+
+## Class: `VoyageRerankingConfig`
+
+Configuration options for Voyage AI reranking models.
+
+## Class: `VoyageRerankingOptionsDict`
+
+Parameters for Voyage AI reranking requests.

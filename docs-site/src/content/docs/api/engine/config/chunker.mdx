@@ -1,0 +1,80 @@
+---
+title: chunker
+description: API reference for codeweaver.engine.config.chunker
+---
+
+# `codeweaver.engine.config.chunker`
+
+Configuration models for user-defined languages and delimiters in CodeWeaver.
+
+## Class: `ChunkerSettings`
+
+Configuration for chunker system.
+
+You can use these settings to customize how CodeWeaver chunks files for indexing, and to add support for custom languages or delimiters.
+
+Note: If you're adding support for another language, we'd love you to open a pull request to add it to our built-in language definitions! See `codeweaver.core` and `codeweaver.engine` for more details.
+
+### Method: `ensure_models_rebuilt`
+
+```python
+ensure_models_rebuilt()
+```
+
+Ensure forward references are resolved before first use.
+
+This method must be called at module level after all class definitions
+to resolve forward references to LanguageFamily and DelimiterPattern types
+used in CustomLanguage and CustomDelimiter models.
+
+### Method: `model_post_init`
+
+```python
+model_post_init()
+```
+
+Post-initialization hook.
+
+## Class: `ChunkerSettingsDict`
+
+TypedDict for Chunker settings.
+
+Not intended to be used directly; used for internal type checking and validation.
+
+## Class: `ConcurrencySettings`
+
+Concurrency configuration.
+
+## Class: `ConcurrencySettingsDict`
+
+TypedDict for concurrency settings.
+
+Not intended to be used directly; used for internal type checking and validation.
+
+## Class: `CustomDelimiter`
+
+A custom delimiter for separating multiple prompts in a single input string. If you only want to define a new language and extensions but not a delimiter, use the `CustomLanguage` class instead.
+
+### Method: `validate_instance`
+
+```python
+validate_instance()
+```
+
+Validate the instance after initialization.
+
+## Class: `CustomLanguage`
+
+A custom programming language for language specific parsing.
+
+By default, CodeWeaver only indexes extensions it recognizes. There are a lot (~170 languages and 200+ extensions) but not everything. If you want it to index files with extensions it doesn't recognize, you can define a custom language here. You only need to do this if you **don't** want to define a custom delimiter for your language. CodeWeaver will try to detect the best chunking strategy for your language, and will probably do a decent job, but if you want to define custom delimiters, use the `CustomDelimiter` class instead.
+
+## Class: `PerformanceSettings`
+
+Performance and resource limit configuration.
+
+## Class: `PerformanceSettingsDict`
+
+TypedDict for performance settings.
+
+Not intended to be used directly; used for internal type checking and validation.

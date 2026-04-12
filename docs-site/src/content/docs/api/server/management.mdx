@@ -1,0 +1,155 @@
+---
+title: management
+description: API reference for codeweaver.server.management
+---
+
+# `codeweaver.server.management`
+
+Management HTTP server for observability and monitoring.
+
+Runs independently of MCP transport choice (stdio or HTTP).
+Provides health, stats, metrics, and settings endpoints.
+
+## Class: `ManagementServer`
+
+HTTP server for management endpoints.
+
+Always runs on HTTP (port 9329 default), independent of MCP transport.
+Provides observability endpoints for monitoring and debugging.
+
+Reuses existing endpoint handlers from app_bindings.py.
+
+### Method: `create_app`
+
+```python
+create_app()
+```
+
+Create Starlette app with management routes.
+
+Routes are conditionally registered based on endpoint_settings
+(matching pattern from app_bindings.py).
+
+IMPORTANT: Reuses existing handlers from app_bindings.py.
+
+### Method: `get_instance`
+
+```python
+get_instance()
+```
+
+Get the current management server instance.
+
+### Method: `is_shutdown_requested`
+
+```python
+is_shutdown_requested()
+```
+
+Check if shutdown has been requested.
+
+### Method: `request_shutdown`
+
+```python
+request_shutdown()
+```
+
+Request graceful shutdown of the daemon.
+
+### Method: `start`
+
+```python
+start()
+```
+
+Start management server.
+
+Args:
+    host: Server host (default: 127.0.0.1)
+    port: Server port (default: 9329)
+
+### Method: `stop`
+
+```python
+stop()
+```
+
+Stop management server gracefully.
+
+## Function: `favicon`
+
+```python
+favicon()
+```
+
+Serve the CodeWeaver favicon (SVG format).
+
+## Function: `health`
+
+```python
+health()
+```
+
+Return enhanced health information as JSON (FR-010-Enhanced).
+
+Provides comprehensive system health including:
+- Overall status (healthy/degraded/unhealthy)
+- Indexing progress and state
+- Service health for all providers
+- Statistics on indexed content and queries
+
+## Function: `settings`
+
+```python
+settings()
+```
+
+Get the current settings.
+
+## Function: `settings_info`
+
+```python
+settings_info()
+```
+
+Return current settings as JSON.
+
+## Function: `shutdown_handler`
+
+```python
+shutdown_handler()
+```
+
+Request graceful shutdown of the daemon.
+
+## Function: `state_info`
+
+```python
+state_info()
+```
+
+Return the complete application state as JSON.
+
+## Function: `stats_info`
+
+```python
+stats_info()
+```
+
+Return current session statistics as JSON.
+
+## Function: `status_info`
+
+```python
+status_info()
+```
+
+Return current operational status (progress, failover, runtime state).
+
+## Function: `version_info`
+
+```python
+version_info()
+```
+
+Return current version information as JSON.

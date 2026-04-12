@@ -1,0 +1,54 @@
+---
+title: condition
+description: API reference for codeweaver.providers.vector_stores.search.condition
+---
+
+# `codeweaver.providers.vector_stores.search.condition`
+
+Module defining various search conditions for filtering points based on payload and other criteria.
+
+Nearly all of this file and its contents were adapted from Qdrant's example MCP server, [mcp-server-qdrant](https://github.com/qdrant/mcp-server-qdrant/), and fall under Qdrant's copyright and Apache 2.0 license. Any modifications or changes made to the original code are copyrighted by Knitli Inc. and are licensed under MIT OR Apache-2.0, whichever you want.
+
+## Class: `FieldCondition`
+
+All possible payload filtering conditions.
+
+## Class: `Filter`
+
+Filter conditions.
+
+## Class: `FilterableField`
+
+Represents a field that can be filtered.
+
+## Class: `HasIdCondition`
+
+ID-based filtering condition.
+
+## Class: `HasVectorCondition`
+
+Filter points which have specific vector assigned.
+
+## Class: `IsEmptyCondition`
+
+Select points with empty payload for a specified field.
+
+## Class: `IsNullCondition`
+
+Select points with null payload for a specified field.
+
+## Class: `MinShould`
+
+Minimum number of conditions that must match.
+
+## Class: `Nested`
+
+Select points with payload for a specified nested field.
+
+## Class: `NestedCondition`
+
+Select points with payload for a specified nested field.
+
+## Class: `ValuesCount`
+
+Values count filter request.

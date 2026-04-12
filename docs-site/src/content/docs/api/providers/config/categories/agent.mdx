@@ -1,0 +1,74 @@
+---
+title: agent
+description: API reference for codeweaver.providers.config.categories.agent
+---
+
+# `codeweaver.providers.config.categories.agent`
+
+Top-level settings for agent providers.
+
+## Class: `AnthropicAgentProviderSettings`
+
+Settings for Anthropic agent provider.
+
+## Class: `AnthropicAzureAgentProviderSettings`
+
+Settings for Anthropic models on Azure.
+
+## Class: `AnthropicBedrockAgentProviderSettings`
+
+Settings for Anthropic models on AWS Bedrock.
+
+## Class: `AnthropicGoogleVertexAgentProviderSettings`
+
+Settings for Anthropic models on Google Vertex.
+
+## Class: `BaseAgentProviderSettings`
+
+Settings for agent providers.
+
+### Method: `is_cloud`
+
+```python
+is_cloud()
+```
+
+Return True if the provider is a cloud provider, False otherwise.
+
+## Class: `CerebrasAgentProviderSettings`
+
+Settings for Cerebras agent provider.
+
+## Class: `CohereAgentProviderSettings`
+
+Settings for the Cohere agent provider.
+
+## Class: `GoogleAgentProviderSettings`
+
+Settings for the Google agent provider (non-Anthropic).
+
+## Class: `GroqAgentProviderSettings`
+
+Settings for Groq agent provider.
+
+## Class: `HuggingFaceAgentProviderSettings`
+
+Settings for Hugging Face Inference agent models.
+
+## Class: `MistralAgentProviderSettings`
+
+Settings for Mistral agent provider.
+
+## Class: `OpenAIAgentProviderSettings`
+
+Settings for the OpenAI agent provider.
+
+Note: This is a catchall that does not only cover OpenAI as a provider, but also any provider that doesn't have its own settings class.
+
+## Class: `OpenRouterAgentProviderSettings`
+
+Settings for OpenRouter agent provider.
+
+## Class: `PydanticGatewayProviderSettings`
+
+Settings for Pydantic Gateway agent provider.

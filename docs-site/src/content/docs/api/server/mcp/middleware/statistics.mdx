@@ -1,0 +1,98 @@
+---
+title: statistics
+description: API reference for codeweaver.server.mcp.middleware.statistics
+---
+
+# `codeweaver.server.mcp.middleware.statistics`
+
+Statistics middleware for FastMCP.
+
+## Class: `StatisticsMiddleware`
+
+Middleware to track request statistics and performance metrics.
+
+### Method: `get_statistics`
+
+```python
+get_statistics()
+```
+
+Get current statistics.
+
+Returns:
+    Current session statistics
+
+### Method: `get_timing_statistics`
+
+```python
+get_timing_statistics()
+```
+
+Get current timing statistics.
+
+Returns:
+    Current timing statistics
+
+### Method: `on_call_tool`
+
+```python
+on_call_tool()
+```
+
+Handle incoming requests and track statistics.
+
+### Method: `on_get_prompt`
+
+```python
+on_get_prompt()
+```
+
+Handle prompt retrieval requests and track statistics.
+
+### Method: `on_list_prompts`
+
+```python
+on_list_prompts()
+```
+
+Handle prompt listing requests and track statistics.
+
+### Method: `on_list_resource_templates`
+
+```python
+on_list_resource_templates()
+```
+
+Handle resource template listing requests and track statistics.
+
+### Method: `on_list_resources`
+
+```python
+on_list_resources()
+```
+
+Handle resource listing requests and track statistics.
+
+### Method: `on_list_tools`
+
+```python
+on_list_tools()
+```
+
+Handle tool listing requests and track statistics.
+
+### Method: `on_read_resource`
+
+```python
+on_read_resource()
+```
+
+Handle resource read requests and track statistics.
+
+### Method: `reset_statistics`
+
+```python
+reset_statistics()
+```
+
+Reset all statistics to initial state.

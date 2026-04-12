@@ -1,0 +1,88 @@
+---
+title: filter_factory
+description: API reference for codeweaver.providers.vector_stores.search.filter_factory
+---
+
+# `codeweaver.providers.vector_stores.search.filter_factory`
+
+Filter related functionality for searching and processing data, primarily with vector stores, but also for other data providers.
+
+Nearly all of this file and its contents were adapted from Qdrant's example MCP server, [mcp-server-qdrant](https://github.com/qdrant/mcp-server-qdrant/), and fall under Qdrant's copyright and Apache 2.0 license. Any modifications or changes made to the original code are copyrighted by Knitli Inc. and are licensed under MIT OR Apache-2.0, whichever you want.
+
+## Function: `make_filter`
+
+```python
+make_filter()
+```
+
+Create a filter dict from provided raw values mapped against declared filterable fields.
+
+## Function: `make_indexes`
+
+```python
+make_indexes()
+```
+
+Create a mapping of field names to their payload schema types.
+
+## Function: `to_qdrant_filter`
+
+```python
+to_qdrant_filter()
+```
+
+Convert CodeWeaver Filter to Qdrant-compatible Filter format.
+
+Translates CodeWeaver's Filter objects into Qdrant's filter format with
+proper field conditions for file paths, languages, line ranges, and metadata.
+
+Args:
+    filter_obj: CodeWeaver Filter object with conditions to translate.
+
+Returns:
+    Qdrant-compatible Filter object or None if input is None.
+
+Note:
+    The current implementation passes through the Filter object as-is since
+    CodeWeaver's Filter model (from engine.search.condition) is already compatible
+    with Qdrant's filter format. This function serves as an integration point
+    for future filter transformations or field mapping customizations.
+
+Examples:
+    &gt;&gt;&gt; from codeweaver.providers.vector_stores.search import (
+    ...     Filter,
+    ...     FieldCondition,
+    ...     MatchAny,
+    ... )
+    &gt;&gt;&gt; # Filter by file paths
+    &gt;&gt;&gt; filter_obj = Filter(
+    ...     must=[
+    ...         FieldCondition(
+    ...             key="file_path", match=MatchAny(any=["src/main.py", "src/utils.py"])
+    ...         )
+    ...     ]
+    ... )
+    &gt;&gt;&gt; qdrant_filter = to_qdrant_filter(filter_obj)
+    &gt;&gt;&gt; assert qdrant_filter == filter_obj
+
+    &gt;&gt;&gt; # Filter by language
+    &gt;&gt;&gt; filter_obj = Filter(
+    ...     must=[
+    ...         FieldCondition(
+    ...             key="language", match=MatchAny(any=["python", "javascript"])
+    ...         )
+    ...     ]
+    ... )
+    &gt;&gt;&gt; qdrant_filter = to_qdrant_filter(filter_obj)
+    &gt;&gt;&gt; assert qdrant_filter is not None
+
+    &gt;&gt;&gt; # Filter by line range
+    &gt;&gt;&gt; from codeweaver.providers.vector_stores.search import Range
+    &gt;&gt;&gt; filter_obj = Filter(
+    ...     must=[FieldCondition(key="line_start", range=Range(gte=10, lte=100))]
+    ... )
+    &gt;&gt;&gt; qdrant_filter = to_qdrant_filter(filter_obj)
+    &gt;&gt;&gt; assert qdrant_filter is not None
+
+    &gt;&gt;&gt; # No filter
+    &gt;&gt;&gt; assert to_qdrant_filter(None) is None

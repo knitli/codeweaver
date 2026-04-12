@@ -1,0 +1,223 @@
+---
+title: manifest_manager
+description: API reference for codeweaver.engine.managers.manifest_manager
+---
+
+# `codeweaver.engine.managers.manifest_manager`
+
+File manifest tracking for incremental indexing.
+
+Maintains persistent state of indexed files with content hashes to enable:
+- Detection of new, modified, and deleted files between sessions
+- Incremental indexing (skip unchanged files)
+- Vector store reconciliation
+- Stale entry cleanup
+
+## Class: `FileManifestEntry`
+
+Single file entry in the manifest.
+
+## Class: `FileManifestManager`
+
+Manages file manifest save/load operations.
+
+PURE state management.
+
+### Method: `create_new`
+
+```python
+create_new()
+```
+
+Create a new empty manifest.
+
+### Method: `delete`
+
+```python
+delete()
+```
+
+Delete manifest file.
+
+### Method: `load`
+
+```python
+load()
+```
+
+Load manifest from disk if available.
+
+### Method: `save`
+
+```python
+save()
+```
+
+Save manifest to disk.
+
+## Class: `FileManifestStats`
+
+Statistics about the file manifest.
+
+## Class: `IndexFileManifest`
+
+Persistent manifest of indexed files for incremental indexing.
+
+### Method: `add_file`
+
+```python
+add_file()
+```
+
+Add or update a file in the manifest.
+
+### Method: `add_files_batch`
+
+```python
+add_files_batch()
+```
+
+Add or update multiple files in the manifest in a single operation.
+
+Args:
+    entries: List of dicts, each containing:
+        - path: Path object (relative)
+        - content_hash: BlakeHashKey
+        - chunk_ids: list[str]
+        - dense_embedding_provider: str | None (optional)
+        - dense_embedding_model: str | None (optional)
+        - sparse_embedding_provider: str | None (optional)
+        - sparse_embedding_model: str | None (optional)
+        - has_dense_embeddings: bool (optional)
+        - has_sparse_embeddings: bool (optional)
+
+### Method: `file_changed`
+
+```python
+file_changed()
+```
+
+Check if file content has changed.
+
+### Method: `file_needs_reindexing`
+
+```python
+file_needs_reindexing()
+```
+
+Check if file needs reindexing.
+
+### Method: `get_all_chunk_ids`
+
+```python
+get_all_chunk_ids()
+```
+
+Get all chunk IDs from all files in the manifest.
+
+Returns:
+    Set of all chunk IDs across all files
+
+### Method: `get_all_file_paths`
+
+```python
+get_all_file_paths()
+```
+
+Get set of all file paths in the manifest.
+
+### Method: `get_chunk_ids_for_file`
+
+```python
+get_chunk_ids_for_file()
+```
+
+Get chunk IDs for a specific file.
+
+Args:
+    path: Path to the file
+
+Returns:
+    List of chunk IDs, empty list if file not found
+
+### Method: `get_embedding_model_info`
+
+```python
+get_embedding_model_info()
+```
+
+Get embedding model information for a file.
+
+Args:
+    path: Path to the file
+
+Returns:
+    Dict with embedding model info, empty dict if file not found
+
+### Method: `get_file`
+
+```python
+get_file()
+```
+
+Get manifest entry for a file.
+
+### Method: `get_files_by_embedding_config`
+
+```python
+get_files_by_embedding_config()
+```
+
+Get files matching embedding configuration criteria.
+
+Args:
+    has_dense: Filter by dense embedding presence (None = don't filter)
+    has_sparse: Filter by sparse embedding presence (None = don't filter)
+
+Returns:
+    Set of file paths matching the criteria
+
+### Method: `get_files_needing_embeddings`
+
+```python
+get_files_needing_embeddings()
+```
+
+Get files that need embeddings added.
+
+Categorizes files by what type of embeddings they need:
+- dense_only: Files needing dense embeddings (processed first)
+- sparse_only: Files needing sparse embeddings (but not dense)
+
+Args:
+    current_dense_provider: Currently configured dense provider
+    current_dense_model: Currently configured dense model
+    current_sparse_provider: Currently configured sparse provider
+    current_sparse_model: Currently configured sparse model
+
+Returns:
+    Dict with 'dense_only' and 'sparse_only' keys containing sets of file paths
+
+### Method: `get_stats`
+
+```python
+get_stats()
+```
+
+Get manifest statistics.
+
+### Method: `has_file`
+
+```python
+has_file()
+```
+
+Check if file exists in manifest.
+
+### Method: `remove_file`
+
+```python
+remove_file()
+```
+
+Remove a file from the manifest.

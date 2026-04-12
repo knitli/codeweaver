@@ -1,0 +1,88 @@
+---
+title: stores
+description: API reference for codeweaver.core.stores
+---
+
+# `codeweaver.core.stores`
+
+A foundational enum class for the CodeWeaver project for common functionality.
+
+## Class: `BlakeStore`
+
+Typed store specialized for Blake3-hash keys.
+
+Used primarily for deduplication scenarios. Note that BlakeStore does not maintain a trash heap, at least with how we use it internally. If you need one, it's still there -- just pass a weakref dict to the constructor during initialization (and in that case, don't use `make_blake_store`).
+
+BlakeStore is designed to map Blake3 hash keys to values, making it ideal for scenarios where deduplication is essential. It leverages the efficiency of Blake3 hashing to ensure that identical inputs yield the same key, allowing for effective storage and retrieval of unique data entries.
+
+Example:
+```python
+# Create a BlakeStore for storing strings
+from codeweaver.core.stores import make_blake_store
+
+str_blake_store = make_blake_store[str](
+    value_type=str, size_limit=5 * 1024 * 1024
+)  # 5 MB limit
+
+# Add a string to the store
+input_string = "Hello, CodeWeaver!"
+blake_key = str_blake_store.add(input_string.encode("utf-8"))
+print(f"Blake3 Key: &#123;blake_key.hexdigest()&#125;")
+# prints: '9ef97bd4f3bfa743877f024bad519269ae6f9757a81540475781e6f79e895dff'
+```
+
+## Class: `StoreDict`
+
+Dictionary representation of a _SimpleTypedStore.
+
+Use make_uuid_store() or make_blake_store() factory functions instead.
+
+## Class: `UUIDStore`
+
+Typed store specialized for UUID keys.
+
+UUIDStore is designed to map UUID7 keys to values, making it suitable for general-purpose storage scenarios where unique identifiers are required. It leverages the uniqueness and temporal ordering of UUID7 to ensure that each entry in the store can be reliably identified and retrieved.
+
+Example:
+```python
+# Create a UUIDStore for storing integers
+from codeweaver.core.stores import make_uuid_store
+
+int_uuid_store = make_uuid_store[int](
+    value_type=int, size_limit=5 * 1024 * 1024
+)  # 5 MB limit
+
+# Add an integer to the store
+uuid_key = int_uuid_store.add(42)
+print(f"UUID Key: &#123;uuid_key&#125;")
+# prints something like: '0690f9b6-c5e5-7534-8000-7b873c2eed02'
+
+# Retrieve the integer from the store
+retrieved_value = int_uuid_store.get(uuid_key)
+print(f"Retrieved Value: &#123;retrieved_value&#125;")
+# prints: '42'
+```
+
+## Function: `make_blake_store`
+
+```python
+make_blake_store()
+```
+
+Create a BlakeStore with the specified value type.
+
+## Function: `make_uuid_store`
+
+```python
+make_uuid_store()
+```
+
+Create a UUIDStore with the specified value type.
+
+## Function: `to_uuid`
+
+```python
+to_uuid()
+```
+
+Generate a new UUID7.

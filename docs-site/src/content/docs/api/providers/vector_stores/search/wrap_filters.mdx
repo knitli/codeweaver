@@ -1,0 +1,26 @@
+---
+title: wrap_filters
+description: API reference for codeweaver.providers.vector_stores.search.wrap_filters
+---
+
+# `codeweaver.providers.vector_stores.search.wrap_filters`
+
+Filter wrapping utility for result and query functions. Replaces a single `query_filter` parameter with multiple parameters defined by `filterable_fields`.
+
+Nearly all of this file and its contents were adapted from Qdrant's example MCP server, [mcp-server-qdrant](https://github.com/qdrant/mcp-server-qdrant/), and fall under Qdrant's copyright and Apache 2.0 license. Any modifications or changes made to the original code are copyrighted by Knitli Inc. and are licensed under MIT OR Apache-2.0, whichever you want.
+
+## Function: `make_partial_function`
+
+```python
+make_partial_function()
+```
+
+Creates a partial function with fixed values.
+
+## Function: `wrap_filters`
+
+```python
+wrap_filters()
+```
+
+Wraps the original_func function: replaces `query_filter` parameter with multiple parameters defined by `filterable_fields`.

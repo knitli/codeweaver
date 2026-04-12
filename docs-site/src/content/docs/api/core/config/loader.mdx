@@ -1,0 +1,50 @@
+---
+title: loader
+description: API reference for codeweaver.core.config.loader
+---
+
+# `codeweaver.core.config.loader`
+
+Configuration loader with automatic package detection.
+
+This module provides utilities for automatically loading the appropriate
+root settings class based on which CodeWeaver packages are installed.
+
+## Function: `get_settings`
+
+```python
+get_settings()
+```
+
+Auto-load the appropriate root settings based on installation.
+
+This function detects which CodeWeaver packages are installed and
+loads the corresponding root settings class. This allows the same
+code to work across different installation configurations.
+
+Args:
+    **kwargs: Additional arguments to pass to settings constructor
+
+Returns:
+    The appropriate root settings instance for the current installation
+
+Raises:
+    ImportError: If the detected package's settings module cannot be imported
+
+Examples:
+    ```python
+    # Works with any installation
+    settings = get_settings()
+    await settings.finalize()
+
+    # With custom config
+    settings = get_settings(config_file="/path/to/config.toml")
+    ```
+
+## Function: `get_settings_async`
+
+```python
+get_settings_async()
+```
+
+Async version of get_settings for use in async contexts.

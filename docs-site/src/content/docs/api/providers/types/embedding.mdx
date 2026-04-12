@@ -1,0 +1,75 @@
+---
+title: embedding
+description: API reference for codeweaver.providers.types.embedding
+---
+
+# `codeweaver.providers.types.embedding`
+
+Embedding-related types and classes for provider systems.
+
+## Class: `ConfiguredCapability`
+
+Contains a capability and its associated configuration.
+
+Note: user-defined capabilities may not have a capabilities object, but hopefully they define one :). If they don't we have to assume conservative defaults.
+
+For asymmetric embedding configurations, the config field may be an AsymmetricEmbeddingProviderSettings,
+which contains both embed_provider and query_provider settings.
+
+### Method: `datatype`
+
+```python
+datatype()
+```
+
+Get the data type of the embedding vectors for this capability.
+
+### Method: `dimension`
+
+```python
+dimension()
+```
+
+Get the dimensionality of the embedding vectors for this capability.
+
+### Method: `distance`
+
+```python
+distance()
+```
+
+Get the preferred distance metric for this capability.
+
+## Class: `EmbeddingCapabilityGroup`
+
+A group of embedding model capabilities for use with vector search. The goal here is to define a group of models that can be used for different types of vector search based on needs and assessed intent/strategy.
+
+Currently, we only use it to define sparse and dense providers (or IDF in lieu of sparse if configured), but the overall plan is to take a multivector, tailored, approach to each search based on needs. Right now it's just simple RRF (reciprocal rank fusion) between sparse and dense vectors or idf and dense vectors (which is still more robust than essentially every other code search tool out there...).
+
+### Method: `as_vector_params`
+
+```python
+as_vector_params()
+```
+
+Convert the embedding capability group to Qdrant collection parameters.
+
+Uses role-based vector names: "primary" for dense, "sparse" for sparse/idf.
+
+### Method: `from_capabilities`
+
+```python
+from_capabilities()
+```
+
+Creates an EmbeddingCapabilityGroup from a sequence of model capabilities.
+
+## Function: `inject_embedding_settings`
+
+```python
+inject_embedding_settings()
+```
+
+Inject embedding settings into globals to resolve Pydantic forward references.
+
+This avoids circular imports by importing late.

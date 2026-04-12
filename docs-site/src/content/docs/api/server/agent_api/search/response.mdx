@@ -1,0 +1,105 @@
+---
+title: response
+description: API reference for codeweaver.server.agent_api.search.response
+---
+
+# `codeweaver.server.agent_api.search.response`
+
+Response building utilities for find_code.
+
+This module handles the construction of FindCodeResponseSummary objects
+from search results, including summary generation and metadata calculation.
+
+## Function: `build_error_response`
+
+```python
+build_error_response()
+```
+
+Build an error response with graceful degradation.
+
+Args:
+    error: Exception that occurred
+    query_intent: Optional detected query intent
+    execution_time_ms: Execution time in milliseconds
+
+Returns:
+    FindCodeResponseSummary indicating failure
+
+## Function: `build_success_response`
+
+```python
+build_success_response()
+```
+
+Build a successful FindCodeResponseSummary.
+
+Args:
+    code_matches: List of code matches to include
+    query: Original search query
+    intent_type: Detected query intent
+    total_candidates: Total number of candidates before limiting
+    token_limit: Maximum token limit
+    execution_time_ms: Execution time in milliseconds
+    strategies_used: List of search strategies used
+
+Returns:
+    FindCodeResponseSummary with all fields populated
+
+## Function: `calculate_token_count`
+
+```python
+calculate_token_count()
+```
+
+Calculate approximate token count from code matches.
+
+Args:
+    code_matches: List of code matches to count tokens for
+    token_limit: Maximum token limit to enforce
+
+Returns:
+    Estimated token count, capped at token_limit
+
+## Function: `extract_languages`
+
+```python
+extract_languages()
+```
+
+Extract unique programming languages from code matches.
+
+Args:
+    code_matches: List of code matches
+
+Returns:
+    Tuple of unique languages found (excludes ConfigLanguage)
+
+## Function: `generate_summary`
+
+```python
+generate_summary()
+```
+
+Generate a human-readable summary of search results.
+
+Args:
+    code_matches: List of code matches
+    intent_type: Detected query intent
+    query: Original search query
+
+Returns:
+    Summary string (max 1000 characters)
+
+## Function: `get_indexer_state_info`
+
+```python
+get_indexer_state_info()
+```
+
+Get indexing state and coverage from global application state.
+
+Returns:
+    Tuple of (indexing_state, index_coverage):
+    - indexing_state: "complete", "in_progress", "not_started", or "unknown"
+    - index_coverage: Percentage of files indexed (0-100), or None if unavailable

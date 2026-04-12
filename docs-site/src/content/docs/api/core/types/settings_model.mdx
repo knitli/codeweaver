@@ -1,0 +1,22 @@
+---
+title: settings_model
+description: API reference for codeweaver.core.types.settings_model
+---
+
+# `codeweaver.core.types.settings_model`
+
+Base settings model for CodeWeaver using Pydantic Settings.
+
+## Class: `BaseCodeWeaverSettings`
+
+Base settings model for CodeWeaver with privacy-preserving telemetry serialization.
+
+This class extends `pydantic_settings.BaseSettings` to provide a foundation for CodeWeaver's configuration management.
+
+As with all CodeWeaver base models, it mandates all subclasses implement the `_telemetry_keys` method to specify how sensitive data should be handled during telemetry serialization. This makes it each class's responsibility to define which fields are safe for telemetry and how they should be anonymized or excluded. Classes can implement a `_telemetry_handler` method for finer control over the telemetry serialization process.
+
+
+
+Subclasses can use the `from_config` class method to create instances from specific configuration files, facilitating testing and specialized setups. If a subclass is subordinate to the main `CodeWeaverSettings`, it should handle settings_customize_sources in a way that avoids conflicts -- mirroring a localized version of the logic here, but only when the main class is not available. Since users can install only parts of CodeWeaver, this is important for modularity.
+
+Every class has the `project_path`, `config_file`, and `user_config_dir` properties available for use in configuration; primarily for situations where `CodeWeaverSettings` is not available.

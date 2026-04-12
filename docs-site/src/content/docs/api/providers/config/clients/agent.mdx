@@ -1,0 +1,87 @@
+---
+title: agent
+description: API reference for codeweaver.providers.config.clients.agent
+---
+
+# `codeweaver.providers.config.clients.agent`
+
+Client Options for Agent-based Providers.
+
+## Class: `AnthropicAzureClientOptions`
+
+Client options for Anthropic agents on Azure Foundry.
+
+## Class: `AnthropicBedrockClientOptions`
+
+Client options for Anthropic agents on Bedrock runtime.
+
+These differ from the standard AWS SDK options because Anthropic's client uses different variable names, which it converts to the standard AWS variable names internally. For example, `aws_secret_key` instead of `aws_secret_access_key`.
+
+## Class: `AnthropicClientOptions`
+
+Client options for Anthropic-based embedding providers.
+
+## Class: `AnthropicGoogleVertexClientOptions`
+
+Client options for Anthropic agents on Google Vertex AI runtime.
+
+## Class: `BaseAnthropicClientOptions`
+
+Base client options for Anthropic-based providers.
+
+## Class: `GroqClientOptions`
+
+Client options for Groq-based agent providers.
+
+## Class: `OpenAIAgentClientOptions`
+
+Client options for OpenAI-based agent providers.
+
+### Method: `computed_base_url`
+
+```python
+computed_base_url()
+```
+
+Return the default base URL for the OpenAI agent client based on the provider.
+
+## Class: `PydanticGatewayClientOptions`
+
+Client options for Pydantic Gateway-based agent providers.
+
+Pydantic Gateway is a proxy service that routes requests to various upstream LLM providers. It isn't actually a client itself, but we treat it like one for the purposes of configuration. In reality, your options here configure how Pydantic-AI connects to the Pydantic Gateway, and which upstream provider it uses.
+
+In practice, these values are passed to a factory function in Pydantic-AI that creates the *client and provider* instances based on the upstream provider selected.
+
+## Providing Provider-Specific Options
+
+If you want to define provider-specific options, like for Cohere or OpenAI, you **should not use this class**.
+Instead:
+  - Use the provider's options class directly (e.g., `CohereClientOptions` or `OpenAIClientOptions`).
+  - Set the base_url (or equivalent) to point to your Pydantic Gateway region.
+  - Provide your Pydantic Gateway API key in the `api_key` field.
+  - **Set your provider as the upstream_provider**.
+
+In practice these steps do what pydantic's factory function does, but gives you more customization.
+
+If you use this class and set Pydantic Gateway as your provider, you can still provide provider-specific ModelConfig settings. These will be passed through to the upstream provider by Pydantic Gateway.
+
+### Method: `as_settings`
+
+```python
+as_settings()
+```
+
+Return the client options as a dictionary suitable for passing as settings to the client constructor.
+
+## Class: `XAIClientOptions`
+
+Client options for X_AI-based providers.
+
+## Function: `discriminate_anthropic_agent_client_options`
+
+```python
+discriminate_anthropic_agent_client_options()
+```
+
+Identify the Anthropic agent provider settings type for discriminator field.

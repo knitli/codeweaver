@@ -1,0 +1,26 @@
+---
+title: core_settings
+description: API reference for codeweaver.core.dependencies.core_settings
+---
+
+# `codeweaver.core.dependencies.core_settings`
+
+Settings initialization and related dependencies.
+
+## Function: `bootstrap_settings`
+
+```python
+bootstrap_settings()
+```
+
+Bootstrap global settings as DI root.
+
+Auto-detects the appropriate settings class based on installed packages
+(server, engine, provider, or core) and returns it as BaseCodeWeaverSettings.
+
+This is the DI system's entry point - settings are created once at startup
+and all other providers can inject them via:
+    settings: BaseCodeWeaverSettings = INJECTED
+
+Returns:
+    The appropriate settings instance for the current installation

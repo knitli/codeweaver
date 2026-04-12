@@ -1,0 +1,95 @@
+---
+title: resolvers
+description: API reference for codeweaver.providers.types.resolvers
+---
+
+# `codeweaver.providers.types.resolvers`
+
+Base capability resolvers.
+
+## Class: `BaseCapabilityResolver`
+
+Base class for capability resolvers.
+
+Provides a generic pattern for lazy-loading and resolving model capabilities
+by name. Subclasses must implement `_ensure_loaded()` to populate the
+capabilities registry.
+
+Type parameter Capability should be the capability model type (e.g., EmbeddingModelCapabilities).
+
+### Method: `all_capabilities`
+
+```python
+all_capabilities()
+```
+
+Get all registered capabilities.
+
+Returns:
+    A sequence of all registered capability objects.
+
+### Method: `all_model_names`
+
+```python
+all_model_names()
+```
+
+Get all registered model names.
+
+Returns:
+    A sequence of all registered model names.
+
+### Method: `resolve`
+
+```python
+resolve(model_name)
+```
+
+Get capabilities for a specific model name.
+
+Args:
+    model_name: The name of the model.
+
+Returns:
+    The capabilities for the specified model, or None if not found.
+
+## Class: `BaseEmbeddingCapabilityResolver`
+
+A capability resolver for embedding models.
+
+## Class: `BaseRerankingCapabilityResolver`
+
+A capability resolver for reranking models.
+
+## Class: `BaseResolver`
+
+Base class for all resolvers.
+
+### Method: `all_model_names`
+
+```python
+all_model_names()
+```
+
+Get all registered model names.
+
+Returns:
+    A sequence of all registered model names.
+
+### Method: `resolve`
+
+```python
+resolve(model_name)
+```
+
+Get capabilities for a specific model name.
+
+Args:
+    model_name: The name of the model.
+
+Returns:
+    The capabilities for the specified model, or None if not found.
+
+## Class: `BaseSparseEmbeddingCapabilityResolver`
+
+A capability resolver for sparse embedding models.

@@ -1,0 +1,194 @@
+---
+title: ui_protocol
+description: API reference for codeweaver.core.ui_protocol
+---
+
+# `codeweaver.core.ui_protocol`
+
+UI protocol for reporting progress and status to presentation layers.
+
+Defines thin protocol layer over Rich primitives for dependency inversion.
+Rich provides the output primitives (Console, Progress), this provides the
+abstraction layer that enables correct dependency direction.
+
+Key Design:
+- Protocol is thin wrapper over Rich concepts
+- Implementations use Rich primitives directly
+- Business logic depends on protocol (not Rich or CLI)
+- CLI/Server provide Rich-based implementations
+
+## Class: `NoOpProgressReporter`
+
+No-op implementation for non-interactive environments.
+
+Used when:
+- Running in server/daemon mode without CLI
+- Testing without UI
+- Library usage scenarios
+
+### Method: `complete_operation`
+
+```python
+complete_operation()
+```
+
+No-op complete operation.
+
+### Method: `report_error`
+
+```python
+report_error()
+```
+
+No-op error report.
+
+### Method: `report_progress`
+
+```python
+report_progress()
+```
+
+No-op progress report.
+
+### Method: `report_status`
+
+```python
+report_status()
+```
+
+No-op status report.
+
+### Method: `start_operation`
+
+```python
+start_operation()
+```
+
+No-op start operation.
+
+## Class: `ProgressReporter`
+
+Protocol for reporting progress to UI layer.
+
+Business logic (engine, server) depends on this protocol.
+Presentation layers (CLI, web UI) implement this protocol.
+
+This inversion enables correct dependency direction:
+- Core defines protocol (no dependencies)
+- Business logic depends on protocol (depends on core)
+- UI layer implements protocol (depends on core + business logic)
+
+### Method: `complete_operation`
+
+```python
+complete_operation()
+```
+
+Signal completion of operation.
+
+Args:
+    operation: Operation identifier
+    success: Whether operation succeeded
+    message: Completion message
+
+### Method: `report_error`
+
+```python
+report_error()
+```
+
+Report error.
+
+Args:
+    error: Error to report
+    recoverable: Whether the error is recoverable
+    extra: Additional context
+
+### Method: `report_progress`
+
+```python
+report_progress()
+```
+
+Report progress update.
+
+Args:
+    phase: Current operation phase (e.g., "discovery", "indexing")
+    current: Current progress count
+    total: Total items to process
+    extra: Additional context for the UI
+
+### Method: `report_status`
+
+```python
+report_status()
+```
+
+Report status message.
+
+Args:
+    message: Status message to display
+    level: Message level ("debug", "info", "warning", "error")
+    extra: Additional context
+
+### Method: `start_operation`
+
+```python
+start_operation()
+```
+
+Signal start of long-running operation.
+
+Args:
+    operation: Operation identifier
+    description: Human-readable description
+
+## Class: `RichConsoleProgressReporter`
+
+Rich Console-based implementation for server/non-CLI environments.
+
+Uses Rich Console directly without CLI's StatusDisplay.
+Suitable for:
+- Server/daemon mode (structured output to logs)
+- Simple CLI tools without full StatusDisplay
+- Testing with visible output
+
+### Method: `complete_operation`
+
+```python
+complete_operation()
+```
+
+Print operation completion.
+
+### Method: `report_error`
+
+```python
+report_error()
+```
+
+Print error with Rich formatting.
+
+### Method: `report_progress`
+
+```python
+report_progress()
+```
+
+Print progress using Rich Console.
+
+### Method: `report_status`
+
+```python
+report_status()
+```
+
+Print status with Rich formatting.
+
+### Method: `start_operation`
+
+```python
+start_operation()
+```
+
+Print operation start.

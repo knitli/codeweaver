@@ -1,0 +1,60 @@
+---
+title: telemetry
+description: API reference for codeweaver.core.config.telemetry
+---
+
+# `codeweaver.core.config.telemetry`
+
+Telemetry configuration settings.
+
+Configuration sources (priority order):
+1. Environment Variables (set in your shell or env file, in that order)
+2. CodeWeaver configuration (see `CodeWeaverSettings` for priority order)
+3. Defaults defined in `TelemetrySettings`, which are:
+    disable_telemetry: false
+    tools_over_privacy: false  (i.e., privacy first)
+    posthog_project_key: CodeWeaver's PostHog key (not an API key)
+    posthog_host: https://us.i.posthog.com
+    batch_size: 10
+    batch_interval_seconds: 60
+
+Environment Variables:
+    CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY
+    CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY
+    CODEWEAVER__TELEMETRY__POSTHOG_PROJECT_KEY
+    CODEWEAVER__TELEMETRY__POSTHOG_HOST
+    CODEWEAVER__TELEMETRY__BATCH_SIZE
+    CODEWEAVER__TELEMETRY__BATCH_INTERVAL_SECONDS
+
+## Class: `TelemetrySettings`
+
+Telemetry configuration settings.
+
+We collect basic telemetry data **by default** to help us improve CodeWeaver. **We do not collect _any_ potentially identifying information.**
+        We **DO _NOT_ collect**:
+            - file paths and repository names (all hashed),
+            - potential secrets (explicitly not included in serialization),
+            - any queries or results content (unless you explicitly tell us we can, see `tools_over_privacy`).
+        If enabled, we **DO collect**:
+            - usage patterns,
+            - errors,
+            - performance metrics,
+            - settings usage (e.g., which providers you use, whether you explicitly set certain settings, etc).
+        This helps us make CodeWeaver better for everyone.  **We will never sell your data or show you ads. We only use it to improve CodeWeaver.**
+CodeWeaver implements a granular privacy-first approach to telemetry. *Every single serializable class must define its own `__telemetry_keys__` method to explicitly list which fields are safe to serialize for telemetry purposes.* This ensures that no potentially identifying information is ever collected.
+
+We further screen data on ingest at Posthog to filter out any potential secrets or PII before we actually see and store it.
+
+### Method: `model_post_init`
+
+```python
+model_post_init()
+```
+
+Post-initialization to track unset fields and set defaults.
+
+## Class: `TelemetrySettingsDict`
+
+TypedDict for Telemetry settings.
+
+Not intended to be used directly; used for internal type checking and validation.

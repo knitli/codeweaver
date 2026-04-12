@@ -1,0 +1,39 @@
+---
+title: voyage
+description: API reference for codeweaver.providers.embedding.providers.voyage
+---
+
+# `codeweaver.providers.embedding.providers.voyage`
+
+VoyageAI embedding provider.
+
+## Class: `VoyageEmbeddingProvider`
+
+VoyageAI embedding provider.
+
+### Method: `model_post_init`
+
+```python
+model_post_init()
+```
+
+Post-initialization hook to detect context models and set options.
+
+Args:
+    __context: Pydantic context (unused).
+
+## Function: `voyage_context_output_transformer`
+
+```python
+voyage_context_output_transformer()
+```
+
+Transform the output of the Voyage AI context chunk embedding model.
+
+## Function: `voyage_output_transformer`
+
+```python
+voyage_output_transformer()
+```
+
+Transform the output of the Voyage AI model.

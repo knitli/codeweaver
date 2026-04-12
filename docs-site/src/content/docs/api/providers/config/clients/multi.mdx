@@ -1,0 +1,80 @@
+---
+title: multi
+description: API reference for codeweaver.providers.config.clients.multi
+---
+
+# `codeweaver.providers.config.clients.multi`
+
+Client options for providers that can be used with multiple categories (e.g. embedding, reranking).
+
+## Class: `BedrockClientOptions`
+
+Client options for Boto3-based providers like Bedrock. Most of these are required but can be configured in other ways, such as environment variables or AWS config files.
+
+## Class: `CohereClientOptions`
+
+Client options for Cohere (rerank and embeddings).
+
+### Method: `computed_base_url`
+
+```python
+computed_base_url()
+```
+
+Return the default base URL for the Cohere client based on the provider.
+
+## Class: `FastEmbedClientOptions`
+
+Client options for FastEmbed-based embedding providers.
+
+## Class: `GoogleClientOptions`
+
+Client options for the GenAI Google provider.
+
+## Class: `HuggingFaceClientOptions`
+
+Client options for HuggingFace Inference API-based embedding providers.
+
+## Class: `MistralClientOptions`
+
+Client options for Mistral-based embedding providers.
+
+## Class: `OpenAIClientOptions`
+
+Client options for OpenAI-based embedding providers.
+
+### Method: `computed_base_url`
+
+```python
+computed_base_url()
+```
+
+Return the default base URL for the OpenAI client based on the provider.
+
+## Class: `SentenceTransformersClientOptions`
+
+Client options for SentenceTransformers-based embedding providers.
+
+### Method: `default_kwargs_for_model`
+
+```python
+default_kwargs_for_model()
+```
+
+Get default client arguments for a specific model.
+
+## Class: `SentenceTransformersModelOptions`
+
+Options for SentenceTransformers models.
+
+## Class: `VoyageClientOptions`
+
+Client options for Voyage AI-based embedding and reranking providers.
+
+## Function: `discriminate_azure_embedding_client_options`
+
+```python
+discriminate_azure_embedding_client_options()
+```
+
+Identify the Azure embedding provider settings type for discriminator field.

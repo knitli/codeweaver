@@ -1,0 +1,65 @@
+---
+title: vector_store
+description: API reference for codeweaver.providers.config.clients.vector_store
+---
+
+# `codeweaver.providers.config.clients.vector_store`
+
+Vector Store Client Options.
+
+## Class: `GrpcParams`
+
+Parameters for configuring a grpc channel.
+
+## Class: `QdrantClientOptions`
+
+Client options for Qdrant vector store provider.
+
+Note: `kwargs` are passed directly to the underlying httpx or grpc client.
+
+The instantiated client's `_client` attribute will be either an `httpx.AsyncClient` for rest.based connections, or a `grpc.aio.Channel` for grpc-based connections, which may be useful for providing custom httpx or grpc clients.
+
+### Method: `finalize_settings`
+
+```python
+finalize_settings()
+```
+
+Validate that either location or url is provided.
+
+This is actually less of a true validator and more of a guard against common foot-guns with the `qdrant_client`.
+
+Quick version: `qdrant_client` offers `location`, `path`, `url`, and `host` settings but resolves them in a way that's not super intuitive. It errors if more than one is set, but doesn't provide any overrides to help you avoid that situation -- despite the fact that it will ignore other settings of path or location is set...
+
+I'll give them the benefit of the doubt on the missing overrides and assume there're no overrides or better handling because of limitations imposed by their minimum python version. Clearly though, I should probably take a stab at a PR to improve this in qdrant-client itself when I get a few extra cycles. I understand that maintaining backward compatibility is important, and I know folks like to keep things explicit, but I think there's room for improvement here.
+
+Instead, we assume you're trying to provide reasonable parameters, and like many people, might set both `location` and `url`, or `location` and `host`/`port`, etc. The overall strategy is to look for non-default options first. If multiple are found, we prioritize them in this order: `location`, `path`, `url`, `host` (well, the last two get some nuanced handling). The others are nulled out.
+
+### Method: `is_local_on_disk`
+
+```python
+is_local_on_disk()
+```
+
+Check if the Qdrant client is configured for local on-disk storage.
+
+### Method: `to_qdrant_params`
+
+```python
+to_qdrant_params()
+```
+
+Convert client options to qdrant_client constructor parameters.
+
+Maps CodeWeaver's simplified interface to qdrant_client's expected format.
+Handles both common cases (explicit fields) and advanced cases (escape hatches).
+
+Returns:
+    Dictionary suitable for passing to AsyncQdrantClient constructor
+
+Example:
+    &gt;&gt;&gt; options = QdrantClientOptions(
+    ...     url="https://qdrant.example.com", api_key="secret-key", timeout=30.0
+    ... )
+    &gt;&gt;&gt; params = options.to_qdrant_params()
+    &gt;&gt;&gt; client = AsyncQdrantClient(**params)

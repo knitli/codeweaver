@@ -135,13 +135,13 @@ cw = "codeweaver.cli.__main__:main"
 # Use `uv sync --group dev` to get everything needed for local development.
 dev = [
   "serena>=0.9.1",
-  "uv>=0.11.3",
+  "uv>=0.11.6",
   { include-group = "dev-helpers" },
   { include-group = "lint" },
   { include-group = "test" },
 ]
 build = [
-  "hatch-fancy-pypi-readme>=24.1.0",
+  "hatch-fancy-pypi-readme>=25.1.0",
   "hatchling>=1.29.0",
   "uv-dynamic-versioning>=0.14.0",
   { include-group = "docs" },
@@ -163,15 +163,15 @@ docs = [
 lint = [
   # black is used to format generated code
   "black>=26.3.1",
-  "ruff>=0.15.9",
+  "ruff>=0.15.10",
   "ty>=0.0.29",
 ]
 # Baseline test dependencies. Workspace members inherit this group via `uv sync --group test`
 # from the workspace root, so daemon/tokenizers no longer redeclare pytest et al.
 test = [
   "dirty-equals>=0.11.0",
-  "hypothesis>=6.151.11",
-  "pytest>=9.0.2",
+  "hypothesis>=6.151.12",
+  "pytest>=9.0.3",
   "pytest-asyncio>=1.3.0",
   "pytest-cov>=7.1.0",
   "pytest-env>=1.6.0",
@@ -184,7 +184,7 @@ test = [
 
 [build-system]
 requires = [
-  "hatch-fancy-pypi-readme>=24.1.0",
+  "hatch-fancy-pypi-readme>=25.1.0",
   "hatchling>=1.29.0",
   "uv-dynamic-versioning>=0.14.0",
 ]
@@ -628,6 +628,7 @@ markers = [
   # Stability & reliability
   "flaky: Tests that may occasionally fail due to timing or external factors",
   "indexing: Tests related to code indexing",
+  "install_smoke: Minimal smoke tests that must pass on any valid install profile (base, recommended, full, full-gpu, etc.) — used by the install-profile matrix workflow to validate wheel installs across python × extras combinations without requiring the full test suite's optional dependencies",
   "integration: Integration tests that test component interactions",
   # Platform-specific
   "linux_only: Tests that only run on Linux platforms",
@@ -799,8 +800,19 @@ invalid-argument-type = "ignore"
 unresolved-attribute = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/codeweaver/providers/vector_stores/qdrant_base.py"]
+include = [
+  "src/codeweaver/providers/config/clients/multi.py",
+  "src/codeweaver/providers/vector_stores/qdrant_base.py",
+  "src/codeweaver/providers/config/categories/embedding.py",
+  "src/codeweaver/providers/config/categories/sparse_embedding.py",
+]
 
+# Both files use `try: import X; except ImportError: X = Any` fallbacks to
+# gate optional dependencies (fastembed, torch, sentence-transformers, etc.)
+# Ty flags the `X = Any` reassignment as invalid because it narrows the
+# previously-declared type. The pattern is intentional and correct — it lets
+# pydantic models with `field: X | None = None` work whether or not the
+# optional package is installed.
 [tool.ty.overrides.rules]
 invalid-assignment = "ignore"
 
@@ -855,6 +867,30 @@ include = [
 
 [tool.ty.overrides.rules]
 unresolved-attribute = "ignore"
+
+# fastembed.py has two pre-existing ty issues that surface whenever any
+# line in the file is touched:
+#
+#   invalid-return-type (sparse _embed_documents/_embed_query): ty can't
+#     narrow `loop.run_in_executor(None, lambda: self._process_output(...))`
+#     through the executor/lambda hop into the declared
+#     `list[CodeWeaverSparseEmbedding]` return type. The conversion happens
+#     inside `_process_output` but ty's flow analysis doesn't trace it.
+#
+#   invalid-assignment (FastEmbedSparseProvider.client default): the default
+#     value `_SparseTextEmbedding` is read from a TYPE_CHECKING-guarded
+#     lateimport that resolves to `Unknown | None` statically; the real
+#     value is set via pydantic default_factory at runtime. ty sees the
+#     static Unknown and flags the class-level default.
+#
+# Both are pre-existing false positives. Scoping the suppressions to this
+# one file keeps the rest of the providers strict.
+[[tool.ty.overrides]]
+include = ["src/codeweaver/providers/embedding/providers/fastembed.py"]
+
+[tool.ty.overrides.rules]
+invalid-return-type = "ignore"
+invalid-assignment = "ignore"
 
 [[tool.ty.overrides]]
 include = [
@@ -973,3 +1009,6 @@ bump = true
 dirty = false  # Disabled .dirty suffix to maintain PEP 440 compliance
 # tag-branch = "main"  # Commented out to allow building on feature branches
 commit-prefix = "g"
+# Enable the metadata hook plugin so [tool.hatch.metadata.hooks.uv-dynamic-versioning]
+# templates `{{ version }}` into dependencies/optional-dependencies at build time.
+metadata = true

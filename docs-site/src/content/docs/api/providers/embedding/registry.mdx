@@ -1,0 +1,65 @@
+---
+title: registry
+description: API reference for codeweaver.providers.embedding.registry
+---
+
+# `codeweaver.providers.embedding.registry`
+
+A UUIDStore registry for embedding providers.
+
+This registry maps embedding batch IDs and indexes to their corresponding embedding vectors.
+It only stores the last `max_size` bytes, and moves old batches to a weakref store when the limit is exceeded (all UUIDStore instances work like this).
+
+## Class: `EmbeddingRegistry`
+
+A UUIDStore registry for generated embeddings. It maps CodeChunk IDs to their corresponding embeddings (as `ChunkEmbeddings`).
+
+UUID Stores are a key value store that enforces its value types. They have a weakref 'trash_heap' that stores old values when its main store is full, freeing up memory while still allowing access to old values in most cases. In practice, it provides guaranteed storage for the most recent items, and best-effort storage for older items.
+
+Since vectors are large, the `size_limit` defaults to 100 MB.
+
+### Method: `get_item_ages`
+
+```python
+get_item_ages()
+```
+
+Get the ages of all items in the store, where age is defined as the number of insertions since the item was added.
+
+### Method: `oldest_item`
+
+```python
+oldest_item()
+```
+
+Get the oldest item in the store based on insertion time.
+
+### Method: `validate_models`
+
+```python
+validate_models()
+```
+
+Validate that all embeddings use the same model and return the set of models used.
+
+## Function: `get_embedding_registry`
+
+```python
+get_embedding_registry()
+```
+
+Get the global EmbeddingRegistry instance, creating it if it doesn't exist.
+
+Note: The backup parameter is now deprecated and ignored. With the new multi-vector
+approach, backup embeddings are stored as additional vectors on the same points.
+This function always returns the main registry.
+
+## Function: `reset_embedding_registry`
+
+```python
+reset_embedding_registry()
+```
+
+Reset the global EmbeddingRegistry instance.
+
+Primarily used for testing to ensure isolation between tests.

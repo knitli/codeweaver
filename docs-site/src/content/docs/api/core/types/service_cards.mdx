@@ -1,0 +1,406 @@
+---
+title: service_cards
+description: API reference for codeweaver.core.types.service_cards
+---
+
+# `codeweaver.core.types.service_cards`
+
+Mappings of provider types for various purposes (e.g. to clients, classes, etc.).
+
+This module is an internal implementation detail. You shouldn't use it directly. It supplies the raw data used in the `Provider` and `SDKClient` and `ProviderCategory` enum classes (`codeweaver.core.types.provider`). Use those classes instead.
+
+To allow for lazy loading and prevent circular imports, we put the mappings in this separate module and wrapped in functions. To avoid circular dependencies and initialization order issues, we require callers to pass in themselves (`ProviderCategory`, `Provider`, or `SDKClient`) either as a class or instance.
+
+## Class: `ServiceCard`
+
+Service card representing a provider-category-client combination.
+
+A ServiceCard maps a provider-category pair to the actual provider class and
+client class needed to instantiate that service. For example:
+- (cohere, reranking) → (CohereRerankingProvider, AsyncClientV2)
+
+For multi-client scenarios (Azure, Bedrock, etc.), multiple cards exist
+with different metadata.discriminator values to select the right one.
+
+### Method: `create_instance`
+
+```python
+create_instance()
+```
+
+Create an instance of the client or provider using the handler if it exists, otherwise standard instantiation.
+
+This is a convenience method that abstracts away the logic of checking for a handler and applying it, versus just instantiating the client or provider in the standard way. The caller can simply call `card.create_instance()` and get the correct instance based on the card's configuration.
+
+Args:
+    target: Whether to create a "client" or "provider" instance.
+    *args: Positional arguments to pass to the handler function if it exists.
+    **kwargs: Keyword arguments to pass to the handler function if it exists.
+
+Returns:
+    An instance of the client or provider as defined by this service card.
+
+### Method: `create_instance_async`
+
+```python
+create_instance_async()
+```
+
+Asynchronously create an instance, awaiting if the handler or constructor is async.
+
+### Method: `evaluate`
+
+```python
+evaluate()
+```
+
+Evaluate if this service card matches the given model name or client preference.
+
+Used in multi-client scenarios to determine if this card should be selected
+based on the discriminator.
+
+Args:
+    model_name: The model name to check against the discriminator (if category is "model").
+    client_preference: The client preference to check against the discriminator (if category is "client").
+
+Returns:
+    True if this card matches the discriminator criteria, False otherwise.
+
+### Method: `has_multiple`
+
+```python
+has_multiple()
+```
+
+Check if this service card is part of a multi-client scenario.
+
+## Class: `ServiceMetadata`
+
+Optional metadata for services requiring special handling.
+
+Used for multi-client scenarios (e.g., Azure supporting both OpenAI and Anthropic)
+or cases requiring custom instantiation logic.
+
+## Function: `get_categories`
+
+```python
+get_categories()
+```
+
+Get the supported provider categories for a given provider, returned as strings.
+
+Args:
+    provider_instance: The `Provider` instance to get categories for.
+
+Returns:
+    A tuple of supported `ProviderCategory`s as strings.
+
+## Function: `get_local_only_provider_members`
+
+```python
+get_local_only_provider_members()
+```
+
+Get the set of local-only provider members.
+
+Args:
+    provider_cls: The `Provider` class to get members from.
+
+Returns:
+    A set of `Provider` members that are local-only.
+
+## Function: `get_local_only_providers`
+
+```python
+get_local_only_providers()
+```
+
+Get the set of local-only providers.
+
+Returns:
+    A set of provider strings that are local-only.
+
+## Function: `get_openai_provider_members`
+
+```python
+get_openai_provider_members()
+```
+
+Get the set of OpenAI-related provider members.
+
+Args:
+    provider_cls: The `Provider` class to get members from.
+
+Returns:
+    A set of `Provider` members that use the OpenAI API.
+
+## Function: `get_openai_providers`
+
+```python
+get_openai_providers()
+```
+
+Get the set of OpenAI-related providers.
+
+Returns:
+    A set of provider strings that use the OpenAI API.
+
+## Function: `get_provider_capabilities_map`
+
+```python
+get_provider_capabilities_map()
+```
+
+Get the mapping of provider capabilities.
+
+The map is from `Provider` to their supported `ProviderCategory`s as strings.
+
+Args:
+    provider: The `Provider` class to get capabilities for.
+
+Returns:
+    A mapping of `Provider` to their supported `ProviderCategory`s as strings.
+
+## Function: `get_provider_category_sdk_clients_for_provider`
+
+```python
+get_provider_category_sdk_clients_for_provider()
+```
+
+Get all SDK clients for a given provider.
+
+Args:
+    client_cls: The `SDKClient` class to get the clients for.
+    provider: The `Provider` to get the clients for as a string.
+
+## Function: `get_provider_clients`
+
+```python
+get_provider_clients()
+```
+
+Get all SDK client options for a provider, grouped by service category.
+
+Useful for discovering what clients a provider supports for each service type.
+
+Args:
+    provider: The provider name (e.g., "azure", "openai").
+
+Returns:
+    Dictionary mapping service categories to tuples of SDK client names.
+    Empty dict if provider not found.
+
+Examples:
+    &gt;&gt;&gt; get_provider_clients("azure")
+    &#123;
+        'agent': ('openai', 'anthropic'),
+        'embedding': ('openai', 'cohere')
+    &#125;
+
+    &gt;&gt;&gt; get_provider_clients("openai")
+    &#123;
+        'agent': ('openai',),
+        'embedding': ('openai',)
+    &#125;
+
+## Function: `get_provider_literals`
+
+```python
+get_provider_literals()
+```
+
+Get the set of all provider literals.
+
+Returns:
+    A set of all provider literals as strings.
+
+## Function: `get_providers_for_category`
+
+```python
+get_providers_for_category()
+```
+
+Get all providers that support a given provider category.
+
+Args:
+    category: The `ProviderCategory` to get providers for.
+
+Returns:
+    A set of `Provider` members that support the given category.
+
+## Function: `get_sdk_client`
+
+```python
+get_sdk_client()
+```
+
+Get the SDK client for a given provider and category.
+
+Args:
+    client_cls: The `SDKClient` class to get the client for.
+    provider: The `Provider` to get the client for as a string.
+    category: The `ProviderCategory` to get the client for as a string.
+
+Returns:
+    The `SDKClient` class or tuple of classes for the given provider and category, or None if not found.
+
+## Function: `get_sdk_client_map`
+
+```python
+get_sdk_client_map()
+```
+
+Get the mapping of SDK clients.
+
+The map is from `(Provider, ProviderCategory)` to their `SDKClient` class.
+
+Args:
+    client_cls: The `SDKClient` class to get the mapping for.
+
+Returns:
+    A mapping of `(Provider, ProviderCategory)` to their `SDKClient` class(es).
+
+## Function: `get_service_card`
+
+```python
+get_service_card()
+```
+
+Get single service card for exact provider-category match with discriminator support.
+
+For multi-client providers (Azure, Bedrock, Heroku), this function uses
+discriminators to select the appropriate card:
+- model_hint: Selects based on model name (e.g., "claude-3" → Anthropic client)
+- client_preference: Selects based on explicit client preference
+
+If no discriminators match, returns the default card (one without discriminator).
+
+Args:
+    provider: The provider name (e.g., "azure", "openai").
+    category: The service category (e.g., "agent", "embedding").
+    client_preference: Optional client preference for multi-client providers.
+    model_hint: Optional model name hint for model-based discrimination.
+
+Returns:
+    ServiceCard if found, None if provider-category combination doesn't exist.
+
+Examples:
+    Simple case:
+    &gt;&gt;&gt; get_service_card("openai", "embedding")
+    ServiceCard(provider='openai', category='embedding', ...)
+
+    Multi-client with model hint:
+    &gt;&gt;&gt; get_service_card("azure", "agent", model_hint="claude-3-opus")
+    ServiceCard(...client_cls=AsyncAnthropicFoundry...)
+
+    Multi-client with client preference:
+    &gt;&gt;&gt; get_service_card("heroku", "embedding", client_preference="cohere")
+    ServiceCard(...client_cls=AsyncClientV2...)
+
+## Function: `get_service_cards`
+
+```python
+get_service_cards()
+```
+
+Query service cards by any combination of filters.
+
+This is the primary query function for finding service cards.
+All filters are optional and can be combined.
+
+Args:
+    provider: Filter by provider name (e.g., "openai", "cohere").
+    category: Filter by service category (e.g., "embedding", "agent").
+    client: Filter by SDK client name (e.g., "openai", "anthropic").
+
+Returns:
+    Tuple of matching service cards (may be empty).
+
+Examples:
+    Get all OpenAI cards:
+    &gt;&gt;&gt; get_service_cards(provider="openai")
+
+    Get all embedding providers:
+    &gt;&gt;&gt; get_service_cards(category="embedding")
+
+    Get providers using OpenAI client:
+    &gt;&gt;&gt; get_service_cards(client="openai")
+
+    Get specific provider-category combination:
+    &gt;&gt;&gt; get_service_cards(provider="azure", category="agent")
+
+## Function: `get_sometimes_local_provider_members`
+
+```python
+get_sometimes_local_provider_members()
+```
+
+Get the set of sometimes-local provider members.
+
+Args:
+    provider_cls: The `Provider` class to get members from.
+
+Returns:
+    A set of `Provider` members that are sometimes local.
+
+## Function: `get_sometimes_local_providers`
+
+```python
+get_sometimes_local_providers()
+```
+
+Get the set of sometimes-local providers.
+
+Returns:
+    A set of provider strings that are sometimes local.
+
+## Function: `service_card_factory`
+
+```python
+service_card_factory()
+```
+
+Factory function to create a ServiceCard with proper type checking.
+
+Simplified factory that creates ServiceCards with 4 core fields and
+optional metadata for special cases.
+
+Args:
+    provider: The provider (the service you pay for).
+    category: The category of service (embedding, agent, etc.).
+    provider_cls: The provider class (e.g., CohereProvider).
+    client_cls: The client class (e.g., AsyncCohereV2).
+    metadata: Optional metadata for multi-client scenarios or special handling.
+
+Returns:
+    A ServiceCard instance.
+
+Examples:
+    Simple case (most providers):
+    &gt;&gt;&gt; service_card_factory(
+    ...     "openai",
+    ...     "embedding",
+    ...     lateimport("codeweaver.providers.embedding", "OpenAIEmbeddingProvider"),
+    ...     lateimport("openai", "AsyncOpenAI"),
+    ...     client="openai",
+    ... )
+
+    Multi-client with discriminator:
+    &gt;&gt;&gt; service_card_factory(
+    ...     "azure",
+    ...     "agent",
+    ...     lateimport("pydantic_ai.providers.anthropic", "AnthropicProvider"),
+    ...     lateimport("anthropic", "AsyncAnthropicFoundry"),
+    ...     "anthropic",
+    ...     metadata=ServiceMetadata(discriminator=("model", "claude")),
+    ... )
+
+    Custom handler:
+    &gt;&gt;&gt; service_card_factory(
+    ...     "bedrock",
+    ...     "embedding",
+    ...     lateimport("codeweaver.providers.embedding", "BedrockEmbeddingProvider"),
+    ...     lateimport("boto3", "client"),
+    ...     "bedrock",
+    ...     metadata=ServiceMetadata(handler=("client", bedrock_client_factory)),
+    ... )

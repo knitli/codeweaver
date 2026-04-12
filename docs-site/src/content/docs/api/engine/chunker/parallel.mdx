@@ -1,0 +1,67 @@
+---
+title: parallel
+description: API reference for codeweaver.engine.chunker.parallel
+---
+
+# `codeweaver.engine.chunker.parallel`
+
+Parallel chunking operations for efficient multi-file processing.
+
+This module provides parallel chunking capabilities using ProcessPoolExecutor
+or ThreadPoolExecutor based on configuration settings. It enables efficient
+processing of large codebases by distributing file chunking across multiple
+workers while maintaining error isolation and memory efficiency.
+
+Key Features:
+- Process-based or thread-based execution (configurable)
+- Independent file processing with error isolation
+- Memory-efficient iterator pattern
+- Graceful error handling with detailed logging
+- Automatic chunker selection per file
+
+Architecture:
+- Uses ChunkerSelector for intelligent chunker routing
+- Creates fresh chunker instances in each worker
+- Yields results as (Path, list[CodeChunk]) tuples
+- Logs errors but continues processing remaining files
+
+Performance Considerations:
+- Process-based: Better for CPU-bound parsing (default)
+- Thread-based: Better for I/O-bound operations
+- Memory usage scales with max_workers setting
+- Iterator pattern prevents loading all results in memory
+
+## Function: `chunk_files_parallel`
+
+```python
+chunk_files_parallel()
+```
+
+Chunk multiple files in parallel using process or thread pool.
+
+Distributes file chunking across multiple workers for efficient processing
+of large codebases. Uses an iterator pattern to yield results as they
+complete, preventing memory exhaustion from loading all chunks at once.
+
+Args:
+    files: List of DiscoveredFile objects to chunk
+    governor: ChunkGovernor providing resource limits and configuration
+    max_workers: Maximum number of parallel workers. If None, uses settings
+        from governor or defaults to CPU count. For process executor, limited
+        to available CPUs. For thread executor, can exceed CPU count.
+    executor_type: Type of executor to use - "process" or "thread" or None.
+        If None, uses settings from governor or defaults to "process".
+        Process-based is better for CPU-bound parsing, thread-based for I/O.
+    tokenizer: Optional tokenizer for accurate token counting
+
+Yields:
+    Tuples of (file_path, chunks) for successfully chunked files.
+    Files that fail to chunk are logged but not yielded.
+
+## Function: `chunk_files_parallel_dict`
+
+```python
+chunk_files_parallel_dict()
+```
+
+Chunk multiple files in parallel and return as dictionary.

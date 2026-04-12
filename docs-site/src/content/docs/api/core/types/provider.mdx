@@ -1,0 +1,167 @@
+---
+title: provider
+description: API reference for codeweaver.core.types.provider
+---
+
+# `codeweaver.core.types.provider`
+
+Provider enums moved to core to break circular dependencies.
+
+## Class: `Provider`
+
+Enumeration of available providers.
+
+### Method: `all_envs`
+
+```python
+all_envs()
+```
+
+Get all environment variables used by all providers.
+
+### Method: `all_envs_for_client`
+
+```python
+all_envs_for_client()
+```
+
+Get all environment variables used by this provider for a specific client.
+
+### Method: `get_env_api_key`
+
+```python
+get_env_api_key()
+```
+
+Get the API key from environment variables, if set.
+
+### Method: `has_capability`
+
+```python
+has_capability()
+```
+
+Check if the provider has a specific capability.
+
+### Method: `is_agent_provider`
+
+```python
+is_agent_provider()
+```
+
+Check if the provider is an agent model provider.
+
+### Method: `is_data_provider`
+
+```python
+is_data_provider()
+```
+
+Check if the provider is a data provider.
+
+### Method: `is_embedding_provider`
+
+```python
+is_embedding_provider()
+```
+
+Check if the provider is an embedding provider.
+
+### Method: `is_reranking_provider`
+
+```python
+is_reranking_provider()
+```
+
+Check if the provider is a reranking provider.
+
+### Method: `is_sparse_provider`
+
+```python
+is_sparse_provider()
+```
+
+Check if the provider is a sparse embedding provider.
+
+### Method: `validate`
+
+```python
+validate()
+```
+
+Validate provider-specific settings.
+
+## Class: `ProviderCategory`
+
+Enumeration of available provider categories.
+
+### Method: `categories`
+
+```python
+categories()
+```
+
+Get all categories.
+
+## Class: `SDKClient`
+
+Enumeration of available SDK clients.
+
+There's not a 1-to-1 match of Provider to SDKClient, because some providers
+use the same SDK client (like OpenAI, which has 10+ providers using their SDK, at least for agents).
+
+### Method: `as_provider`
+
+```python
+as_provider()
+```
+
+Get the provider as a member of Provider.
+
+### Method: `card_for_provider_and_category`
+
+```python
+card_for_provider_and_category()
+```
+
+Get the service card for a given provider and category that uses this SDK client.
+
+### Method: `client_available`
+
+```python
+client_available()
+```
+
+Check if the SDK client package is available.
+
+### Method: `clients`
+
+```python
+clients()
+```
+
+Get all SDK clients as lazy imports.
+
+### Method: `for_provider_and_category`
+
+```python
+for_provider_and_category()
+```
+
+Get the SDK clients for a given provider and category.
+
+## Function: `get_categories`
+
+```python
+get_categories()
+```
+
+Get the categories of a provider.
+
+## Function: `get_default_provider_import_for_category`
+
+```python
+get_default_provider_import_for_category()
+```
+
+Get the default provider import for a given provider and category.

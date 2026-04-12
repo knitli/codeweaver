@@ -1,0 +1,56 @@
+---
+title: envs
+description: API reference for codeweaver.core.config.envs
+---
+
+# `codeweaver.core.config.envs`
+
+Environment variables for codeweaver configuration.
+
+## Class: `SetProviderEnvVarsDict`
+
+Dictionary of provider environment variables.
+
+## Class: `SettingsEnvVars`
+
+Environment variables for CodeWeaver settings.
+
+### Method: `from_defaults`
+
+```python
+from_defaults()
+```
+
+Create SettingsEnvVars with built-in defaults.
+
+### Method: `resolved_values`
+
+```python
+resolved_values()
+```
+
+Get resolved environment variable values.
+
+## Function: `as_cloud_string`
+
+```python
+as_cloud_string()
+```
+
+Format a provider name to indicate it's a cloud-only provider.
+
+## Function: `environment_variables`
+
+```python
+environment_variables()
+```
+
+Get environment variables for CodeWeaver settings.
+
+## Function: `get_provider_vars`
+
+```python
+get_provider_vars()
+```
+
+Get all environment variable names related to providers.
