@@ -591,17 +591,17 @@ run = '''
 echo "running test-cov task"
 echo "${CW_PREFIX} Running tests with coverage..."
 
-# Build pytest command with optional markers and timeout
-PYTEST_CMD="uv run --group test pytest tests/ --cov=codeweaver --cov-report= --junit-xml=test-results.xml -v"
+# Build argument list without eval (POSIX-safe)
+set -- uv run --group test pytest tests/ --cov=codeweaver --cov-report= --junit-xml=test-results.xml -v
 if [ -n "${usage_marks}" ]; then
-  PYTEST_CMD="$PYTEST_CMD -m \"${usage_marks}\""
+  set -- "$@" -m "${usage_marks}"
 fi
 if [ -n "${usage_timeout}" ]; then
-  PYTEST_CMD="$PYTEST_CMD --timeout=${usage_timeout}"
+  set -- "$@" --timeout="${usage_timeout}"
 fi
 
 # Run tests with parallel coverage (generates .coverage.* files)
-eval "$PYTEST_CMD"
+"$@"
 # Combine parallel coverage files into single .coverage file
 echo "${CW_PREFIX} Combining coverage data..."
 uv run --group test coverage combine
