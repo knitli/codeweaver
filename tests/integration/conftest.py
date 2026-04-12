@@ -15,7 +15,7 @@ import os
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -534,16 +534,8 @@ def configured_providers(
     container.override(VectorStoreProvider, mock_vector_store)
     container.override(RerankingProvider, mock_reranking_provider)
 
-    call_count = [0]  # Use list for mutable counter
-
-    def mock_time() -> float:
-        call_count[0] += 1
-        # Return monotonically increasing time values (start from a baseline)
-        return 1000000.0 + call_count[0] * 0.001
-
-    with patch("time.time", side_effect=mock_time):
-        yield
-        container.clear_overrides()
+    yield
+    container.clear_overrides()
 
 
 # ===========================================================================
@@ -1025,15 +1017,8 @@ def real_providers(
     container.override(VectorStoreProvider, real_vector_store)
     container.override(RerankingProvider, real_reranking_provider)
 
-    call_count = [0]
-
-    def mock_time() -> float:
-        call_count[0] += 1
-        return 1000000.0 + call_count[0] * 0.001
-
-    with patch("time.time", side_effect=mock_time):
-        yield
-        container.clear_overrides()
+    yield
+    container.clear_overrides()
 
 
 # ===========================================================================
@@ -1221,23 +1206,15 @@ async def indexed_test_project(known_test_codebase, clean_container, actual_vect
 
     server._state = state
 
-    # Patch time for deterministic behavior if needed
-    call_count = [0]
+    # Resolve indexer from container
+    indexer = await clean_container.resolve(IndexingService)
 
-    def mock_time() -> float:
-        call_count[0] += 1
-        return 1000000.0 + call_count[0] * 0.001
+    # Ensure it's using the correct project path
+    indexer._project_path = project_path
 
-    with patch("time.time", side_effect=mock_time):
-        # Resolve indexer from container
-        indexer = await clean_container.resolve(IndexingService)
+    await indexer.index_project(force_reindex=True)
 
-        # Ensure it's using the correct project path
-        indexer._project_path = project_path
-
-        await indexer.index_project(force_reindex=True)
-
-        yield project_path
+    yield project_path
 
     # Cleanup: Reset global state
     from codeweaver.server import server
