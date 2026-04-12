@@ -113,6 +113,7 @@ def test_testing_profile_uses_ultralight_constants(monkeypatch):
         ULTRALIGHT_EMBEDDING_MODEL,
         ULTRALIGHT_RERANKING_MODEL,
         ULTRALIGHT_SPARSE_EMBEDDING_MODEL,
+        ULTRALIGHT_ST_RERANKING_MODEL,
         ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL,
     )
 
