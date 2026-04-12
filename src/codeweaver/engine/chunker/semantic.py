@@ -509,7 +509,7 @@ class SemanticChunker(BaseChunker):
         code_lines = [
             line
             for line in content.splitlines()
-            if (stripped := line.strip()) and not stripped.startswith("#")
+            if (line_stripped := line.strip()) and not line_stripped.startswith("#")
         ]
 
         if len(code_lines) <= 1:
