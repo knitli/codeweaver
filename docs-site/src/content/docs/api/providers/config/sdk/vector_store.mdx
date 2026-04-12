@@ -1,0 +1,46 @@
+---
+title: vector_store
+description: API reference for codeweaver.providers.config.sdk.vector_store
+---
+
+# `codeweaver.providers.config.sdk.vector_store`
+
+SDK settings for vector store providers.
+
+## Class: `CollectionConfig`
+
+Collection configuration for Qdrant and in-memory vector stores.
+
+NOTE: The vector configurations share many of the same properties as these collection parameters. If vector configurations exist, such as for hnsw_config or quantization_config, they will override the corresponding collection parameters.
+
+### Method: `as_qdrant_config`
+
+```python
+as_qdrant_config()
+```
+
+Convert the collection configuration to a QdrantCollectionConfig object.
+
+### Method: `params`
+
+```python
+params()
+```
+
+Return the Qdrant collection parameters for this configuration.
+
+### Method: `set_vector_params`
+
+```python
+set_vector_params()
+```
+
+Assemble the vector parameters for the collection.
+
+## Function: `get_embedding_group`
+
+```python
+get_embedding_group()
+```
+
+Get the embedding capability group, using dependency injection.

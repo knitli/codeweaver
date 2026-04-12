@@ -1,0 +1,55 @@
+---
+title: utils
+description: API reference for codeweaver.core.dependencies.utils
+---
+
+# `codeweaver.core.dependencies.utils`
+
+Utilities for setting up dependencies.
+
+## Function: `ensure_container_initialized`
+
+```python
+ensure_container_initialized()
+```
+
+Ensure the DI container is initialized.
+
+This is necessary before importing any modules that might use dependency injection,
+to avoid circular import issues. It can be called at the top of any module that
+needs to use dependencies.
+
+## Function: `ensure_settings_initialized`
+
+```python
+ensure_settings_initialized()
+```
+
+Ensure settings are initialized in the DI container (sync version).
+
+This checks if settings exist in the container but does NOT attempt async bootstrap.
+Safe to call at module import time — returns silently if settings are not yet available.
+
+Settings will be bootstrapped later via the async startup path. Use this in sync contexts
+where the goal is to initialize the container and mark settings ready if they already exist.
+
+Note:
+    For async contexts or initial bootstrap, use ensure_settings_initialized_async()
+    instead, which properly awaits the bootstrap process.
+
+## Function: `ensure_settings_initialized_async`
+
+```python
+ensure_settings_initialized_async()
+```
+
+Ensure settings are initialized in the DI container (async version).
+
+This should be called from async contexts to properly bootstrap settings.
+It will await the async bootstrap_settings() if needed.
+
+This is the preferred way to initialize settings during application startup,
+as it properly handles the async nature of the bootstrap process.
+
+Raises:
+    Exception: If settings initialization fails

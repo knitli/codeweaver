@@ -1,0 +1,142 @@
+---
+title: embedding
+description: API reference for codeweaver.providers.config.categories.embedding
+---
+
+# `codeweaver.providers.config.categories.embedding`
+
+Top-level settings classes for embedding providers.
+
+## Class: `AsymmetricEmbeddingProviderSettings`
+
+Configuration for asymmetric embedding setup with separate embed and query models.
+
+Asymmetric embedding allows using different models for document embedding and query
+embedding while maintaining compatibility through shared vector spaces. This enables
+cost optimization (e.g., API for embed, local for queries) while preserving accuracy.
+
+Attributes:
+    config_type: Discriminator field for union type matching.
+    embed_provider: Provider settings for document embedding model.
+    query_provider: Provider settings for query embedding model.
+    validate_family_compatibility: Whether to validate models belong to same family.
+
+### Method: `get_embed_kwargs`
+
+```python
+get_embed_kwargs()
+```
+
+Get keyword arguments for the embed provider.
+
+### Method: `get_query_kwargs`
+
+```python
+get_query_kwargs()
+```
+
+Get keyword arguments for the query provider.
+
+### Method: `validate_model_compatibility`
+
+```python
+validate_model_compatibility()
+```
+
+Validate that embed and query models are compatible.
+
+## Class: `AsymmetricEmbeddingProviderSettingsDict`
+
+Dictionary representation of asymmetric embedding configuration.
+
+## Class: `AzureEmbeddingProviderSettings`
+
+Provider settings for Azure embedding models (Cohere or OpenAI).
+
+## Class: `BaseEmbeddingProviderSettings`
+
+Settings for (dense) embedding models. It validates that the model and provider settings are compatible and complete, reconciling environment variables and config file settings as needed.
+
+### Method: `get_embed_kwargs`
+
+```python
+get_embed_kwargs()
+```
+
+Get keyword arguments for embedding requests based on the provider settings.
+
+### Method: `get_query_embed_kwargs`
+
+```python
+get_query_embed_kwargs()
+```
+
+Get keyword arguments for query embedding requests based on the provider settings.
+
+### Method: `is_cloud`
+
+```python
+is_cloud()
+```
+
+Return True if the provider settings are for a cloud deployment.
+
+## Class: `BedrockEmbeddingProviderSettings`
+
+Provider settings for Bedrock embedding models.
+
+## Class: `CohereEmbeddingProviderSettings`
+
+Provider settings for direct use of Cohere as a provider.
+
+## Class: `EmbeddingProviderSettings`
+
+Settings for dense embedding models.
+
+### Method: `get_embed_kwargs`
+
+```python
+get_embed_kwargs()
+```
+
+Get keyword arguments for embedding requests based on the provider settings.
+
+### Method: `get_query_embed_kwargs`
+
+```python
+get_query_embed_kwargs()
+```
+
+Get keyword arguments for query embedding requests based on the provider settings.
+
+### Method: `is_cloud`
+
+```python
+is_cloud()
+```
+
+Return True if the provider settings are for a cloud deployment.
+
+## Class: `FastEmbedEmbeddingProviderSettings`
+
+Provider settings for FastEmbed embedding models.
+
+## Class: `GoogleEmbeddingProviderSettings`
+
+Provider settings for Google embedding models.
+
+## Class: `HuggingFaceEmbeddingProviderSettings`
+
+Provider settings for HuggingFace Inference embedding models.
+
+## Class: `MistralEmbeddingProviderSettings`
+
+Provider settings for Mistral embedding models.
+
+## Class: `SentenceTransformersEmbeddingProviderSettings`
+
+Provider settings for Sentence Transformers embedding models.
+
+## Class: `VoyageEmbeddingProviderSettings`
+
+Provider settings for Voyage embedding models.

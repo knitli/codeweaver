@@ -1,0 +1,72 @@
+---
+title: models
+description: API reference for codeweaver.core.types.models
+---
+
+# `codeweaver.core.types.models`
+
+Base dataclass and model implementations for CodeWeaver.
+
+## Class: `BasedModel`
+
+A baser `BaseModel` for all models in the CodeWeaver project.
+
+### Method: `get`
+
+```python
+get()
+```
+
+Get an item by key with a default value.
+
+### Method: `items`
+
+```python
+items()
+```
+
+Get items as (key, value) pairs.
+
+### Method: `keys`
+
+```python
+keys()
+```
+
+Get keys of the model.
+
+### Method: `serialize_for_cli`
+
+```python
+serialize_for_cli()
+```
+
+Serialize the model for CLI output.
+
+### Method: `serialize_for_telemetry`
+
+```python
+serialize_for_telemetry()
+```
+
+Serialize the model for telemetry output, filtering sensitive keys.
+
+### Method: `values`
+
+```python
+values()
+```
+
+Get values of the model.
+
+## Class: `RootedRoot`
+
+A pre-customized pydantic RootModel with common configuration for CodeWeaver.
+
+### Method: `serialize_for_cli`
+
+```python
+serialize_for_cli()
+```
+
+Serialize the model for CLI output.

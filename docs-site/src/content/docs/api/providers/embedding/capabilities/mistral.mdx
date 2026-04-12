@@ -1,0 +1,23 @@
+---
+title: mistral
+description: API reference for codeweaver.providers.embedding.capabilities.mistral
+---
+
+# `codeweaver.providers.embedding.capabilities.mistral`
+
+Mistral embedding capabilities.
+
+## Class: `MistralEmbeddingCapabilities`
+
+Capabilities for Mistral embedding models.
+
+## Function: `get_mistral_embedding_capabilities`
+
+```python
+get_mistral_embedding_capabilities()
+```
+
+Get Mistral embedding capabilities.
+
+NOTE: Like with the `voyage-code-3` model, we set the default dtype to `int8` for `codestral-embed`. Mistral's default, of course, is `float`.
+Like with voyage's model, codestral gets virtually no loss of retrieval quality when quantizing to int8, while getting a 4x reduction in storage and memory bandwidth.

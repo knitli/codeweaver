@@ -1,0 +1,44 @@
+---
+title: mixins
+description: API reference for codeweaver.providers.config.categories.mixins
+---
+
+# `codeweaver.providers.config.categories.mixins`
+
+Mixin classes for specific providers.
+
+## Class: `AzureProviderMixin`
+
+Provider settings for Azure.
+
+You need to provide these settings if you are using Azure for either Cohere *embedding or reranking models* or OpenAI *embedding* models. You need to provide these for agentic models too, but not with this class (well, we'll probably try to make it work if you do, but no guarantees).
+
+**For OpenAI embedding models:**
+**We only support the "**next-generation** Azure OpenAI API." Currently, you need to opt into this API in your Azure settings. We didn't want to start supporting the old API knowing it's going away.
+
+Note that we don't currently support using Azure's SDKs directly for embedding or reranking models. Instead, we use the OpenAI or Cohere clients configured to use Azure endpoints.
+
+For agent models:
+We support both OpenAI APIs for agentic models because our support comes from `pydantic_ai`, which supports both, it also implements the Azure SDK for agents.
+
+### Method: `as_azure_options`
+
+```python
+as_azure_options()
+```
+
+Return the settings as an AzureOptions TypedDict.
+
+## Class: `BedrockProviderMixin`
+
+Settings for AWS provider.
+
+## Class: `FastEmbedProviderMixin`
+
+Special settings for FastEmbed-GPU provider.
+
+These settings only apply if you are using a FastEmbed provider, installed the `codeweaver[fastembed-gpu]` or `codeweaver[full-gpu]` extra, have a CUDA-capable GPU, and have properly installed and configured the ONNX GPU runtime (see ONNX docs).
+
+You can provide these settings with your CodeWeaver embedding provider settings, or rerank provider settings. If you're using fastembed-gpu for both, we'll assume you are using the same settings for both if we find one of them.
+
+Important: You cannot have both `fastembed` and `fastembed-gpu` installed at the same time. They conflict with each other. Make sure to uninstall `fastembed` if you want to use `fastembed-gpu`.

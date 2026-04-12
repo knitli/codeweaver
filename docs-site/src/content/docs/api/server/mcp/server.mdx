@@ -1,0 +1,84 @@
+---
+title: server
+description: API reference for codeweaver.server.mcp.server
+---
+
+# `codeweaver.server.mcp.server`
+
+FastMCP Server Creation and Lifespan Management for CodeWeaver.
+
+This module handles the setup, configuration, and instantiation of FastMCP servers. **It does not *start* the servers;** instead, it provides factory functions to create server instances configured for either HTTP or stdio transport.
+
+## Function: `configure_uvicorn_logging`
+
+```python
+configure_uvicorn_logging()
+```
+
+Configure uvicorn logging based on verbosity settings.
+
+## Function: `create_http_server`
+
+```python
+create_http_server()
+```
+
+Get a FastMCP server configured for HTTP transport.
+
+## Function: `create_stdio_server`
+
+```python
+create_stdio_server()
+```
+
+Get a FastMCP server configured for stdio transport.
+
+Args:
+    settings: Optional FastMCP server settings dictionary, constructed when a custom config file is passed to the main CLI.
+    host: Optional host for the server (this is the host/port for the *codeweaver http mcp server* that the stdio client will be proxied to -- only needed if not default or not what's in your config).
+    port: Optional port for the server (this is the host/port for the *codeweaver http mcp server* that the stdio client will be proxied to -- only needed if not default or not what's in your config).
+    verbose: Enable verbose logging.
+    debug: Enable debug logging.
+
+Returns:
+    Configured FastMCP stdio server instance.
+
+## Function: `get_statistics_middleware`
+
+```python
+get_statistics_middleware()
+```
+
+Get the statistics middleware instance.
+
+## Function: `register_middleware`
+
+```python
+register_middleware()
+```
+
+Register middleware with the application.
+
+## Function: `register_tools`
+
+```python
+register_tools()
+```
+
+Register tools with the application.
+
+## Function: `setup_middleware`
+
+```python
+setup_middleware()
+```
+
+Setup middleware for the application.
+
+## Function: `setup_runargs`
+
+```python
+setup_runargs()
+```
+
+Setup run arguments for the server.

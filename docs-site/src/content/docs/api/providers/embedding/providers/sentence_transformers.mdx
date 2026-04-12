@@ -1,0 +1,31 @@
+---
+title: sentence_transformers
+description: API reference for codeweaver.providers.embedding.providers.sentence_transformers
+---
+
+# `codeweaver.providers.embedding.providers.sentence_transformers`
+
+Provider for Sentence Transformers models.
+
+## Class: `SentenceTransformersEmbeddingProvider`
+
+Sentence Transformers embedding provider for dense embeddings.
+
+## Class: `SentenceTransformersSparseProvider`
+
+Sentence Transformers sparse embedding provider.
+
+This provider handles sparse embeddings from SparseEncoder models,
+returning properly formatted sparse embeddings with indices and values.
+
+Note: This provider requires SparseEncoder which may not be available in all
+versions of sentence-transformers. The __init__ method will raise ConfigurationError
+if SparseEncoder is not available.
+
+## Function: `process_for_instruction_model`
+
+```python
+process_for_instruction_model()
+```
+
+Process documents for instruction models.

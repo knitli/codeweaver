@@ -1,0 +1,132 @@
+---
+title: profiles
+description: API reference for codeweaver.providers.config.profiles
+---
+
+# `codeweaver.providers.config.profiles`
+
+Prebuilt settings profiles for CodeWeaver quick setup.
+
+A few important things to note about profiles (or any provider settings):
+- Most providers are *not* available with the default installation of CodeWeaver. CodeWeaver has multiple install paths that include different sets of providers. The `recommended` install flag (`pip install code-weaver[recommended]`) includes *most* of the providers available in CodeWeaver, but not all.
+The `full` or `full-gpu` install flags (`pip install code-weaver[full]` or `pip install code-weaver[full-gpu]`) include *all* providers, and all optional dependencies, such as auth providers and GPU support (for the gpu flag).
+The recommended flag gives you access to:
+    - All current vector, agent and data providers
+    - All embedding and reranking providers except for Sentence Transformers (because these install paths are aligned with pydantic-ai's default dependencies, and Sentence Transformers is not a default dependency of pydantic-ai).
+- A-la-Carte installations: You can also use the `required-core` install flag (`pip install code-weaver[required-core]`) to install only the core dependencies of CodeWeaver, and then add individual providers using their own install flags, like:
+    `pip install code-weaver[required-core,openai,qdrant]`
+
+## Class: `ProviderConfigProfile`
+
+Dataclass wrapper for provider settings profiles.
+
+This is a frozen dataclass for use with BaseDataclassEnum.
+
+## Class: `ProviderProfile`
+
+Prebuilt provider settings profiles for quick setup.
+
+### Method: `as_provider_settings`
+
+```python
+as_provider_settings()
+```
+
+Get the provider settings as a dictionary.
+
+## Class: `VersionedProfile`
+
+Profile configuration with version tracking for compatibility management.
+
+Tracks the CodeWeaver version associated with each profile configuration,
+enabling semantic versioning-based compatibility checks between profile
+versions and collection metadata versions.
+
+Version Compatibility:
+    - Major version must match for compatibility (e.g., 0.x.x with 0.y.z)
+    - Minor and patch versions can differ (backward compatible)
+    - Changelog tracks profile evolution across versions
+
+Integration with Collections:
+    When a collection is created, it stores:
+    - profile_name: The name of this profile
+    - profile_version: The CodeWeaver version when profile was applied
+    - This enables compatibility validation on collection reuse
+
+Attributes:
+    name: Unique identifier for the profile (e.g., "recommended", "quickstart")
+    version: CodeWeaver version string following semantic versioning (e.g., "0.1.0a6")
+    embedding_config: The embedding provider configuration for this profile
+    changelog: Historical record of profile changes across versions
+
+### Method: `get_changelog_for_version`
+
+```python
+get_changelog_for_version()
+```
+
+Get changelog entries relevant to upgrading to target version.
+
+Filters changelog entries that apply when migrating from this profile's
+version to the target version. Useful for displaying migration guidance.
+
+Args:
+    target_version: Version string to migrate to
+
+Returns:
+    List of relevant changelog entries, newest first
+
+### Method: `is_compatible_with`
+
+```python
+is_compatible_with()
+```
+
+Check if profile version is compatible with collection version.
+
+Uses semantic versioning rules where major versions must match for
+compatibility. Minor and patch version differences are acceptable as
+they represent backward-compatible changes.
+
+Args:
+    profile_version: Version string of the profile (e.g., "0.1.0a6")
+    collection_version: Version string from collection metadata
+
+Returns:
+    True if versions are compatible (same major version), False otherwise
+
+Examples:
+    &gt;&gt;&gt; VersionedProfile.is_compatible_with("0.1.0", "0.2.5")
+    True  # Same major version (0)
+    &gt;&gt;&gt; VersionedProfile.is_compatible_with("0.1.0", "1.0.0")
+    False  # Different major versions
+    &gt;&gt;&gt; VersionedProfile.is_compatible_with("0.1.0a6", "0.1.0")
+    True  # Pre-release compatible with same major.minor
+
+### Method: `validate_against_collection`
+
+```python
+validate_against_collection()
+```
+
+Validate this profile can be used with an existing collection.
+
+Checks both profile name matching and version compatibility to determine
+if this profile can safely be used with a collection created under different
+profile/version settings.
+
+Args:
+    collection_profile_name: Profile name stored in collection metadata
+    collection_profile_version: Profile version stored in collection metadata
+
+Returns:
+    Tuple of (is_valid, error_message). error_message is None if valid.
+
+Examples:
+    &gt;&gt;&gt; profile = VersionedProfile("recommended", "0.1.0", config, [])
+    &gt;&gt;&gt; profile.validate_against_collection("recommended", "0.1.5")
+    (True, None)
+    &gt;&gt;&gt; profile.validate_against_collection("quickstart", "0.1.0")
+    (False, "Profile name mismatch: ...")
+    &gt;&gt;&gt; profile.validate_against_collection("recommended", "1.0.0")
+    (False, "Incompatible versions: ...")

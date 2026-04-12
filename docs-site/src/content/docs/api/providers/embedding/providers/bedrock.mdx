@@ -1,0 +1,146 @@
+---
+title: bedrock
+description: API reference for codeweaver.providers.embedding.providers.bedrock
+---
+
+# `codeweaver.providers.embedding.providers.bedrock`
+
+Bedrock embedding provider.
+
+## Class: `BaseBedrockModel`
+
+Base model for Bedrock-related Pydantic models.
+
+## Class: `BedrockEmbeddingProvider`
+
+Bedrock embedding provider.
+
+## Class: `BedrockInvokeEmbeddingRequest`
+
+Request for Bedrock embedding.
+
+## Class: `BedrockInvokeEmbeddingResponse`
+
+Response from Bedrock embedding.
+
+### Method: `from_boto3_response`
+
+```python
+from_boto3_response()
+```
+
+Create a BedrockInvokeEmbeddingResponse from a boto3 response.
+
+## Class: `CohereEmbeddingRequestBody`
+
+Request body for Cohere embedding model.
+
+### Method: `serialize`
+
+```python
+serialize()
+```
+
+Serialize the model to a UTF-8 encoded JSON byte stream.
+
+Bedrock expects the body to be a byte stream (e.g. `BytesIO`).
+
+## Class: `CohereEmbeddingResponse`
+
+Response from Cohere embedding.
+
+### Method: `serialize`
+
+```python
+serialize()
+```
+
+Serialize the model to a UTF-8 encoded JSON byte stream.
+
+## Class: `CohereRequestHandler`
+
+Handler for Cohere embedding requests.
+
+## Class: `ImageDescription`
+
+Description of an image in the request.
+
+## Class: `InvokeRequestDict`
+
+Request dict for invoking the model.
+
+## Class: `TitanEmbeddingV2RequestBody`
+
+Request body for Titan Embedding V2. Note that it's one document per request.
+
+This model serializes to the JSON body that Bedrock expects, **even when serialized to Python dicts**.
+
+### Method: `serialize`
+
+```python
+serialize()
+```
+
+Serialize the model to a UTF-8 encoded JSON byte stream.
+
+Bedrock expects the body to be a byte stream (e.g. `BytesIO`).
+
+## Class: `TitanEmbeddingV2Response`
+
+Response from Titan Embedding V2.
+
+### Method: `serialize`
+
+```python
+serialize()
+```
+
+Serialize the model to a UTF-8 encoded JSON byte stream.
+
+## Function: `is_cohere_request`
+
+```python
+is_cohere_request()
+```
+
+Determine if the given data is a Cohere embedding request.
+
+## Function: `is_cohere_response`
+
+```python
+is_cohere_response()
+```
+
+Determine if the given data is a Cohere embedding response.
+
+## Function: `is_one_of_valid_types`
+
+```python
+is_one_of_valid_types()
+```
+
+Check if the data is one of the valid types.
+
+## Function: `is_titan_response`
+
+```python
+is_titan_response()
+```
+
+Determine if the given data is a Titan Embedding V2 response.
+
+## Function: `shared_serializer`
+
+```python
+shared_serializer()
+```
+
+Shared serializer to serialize the model to a UTF-8 encoded JSON byte stream.
+
+## Function: `shared_validator`
+
+```python
+shared_validator()
+```
+
+Shared validator to route JSON/text/bytes to the appropriate Bedrock model.

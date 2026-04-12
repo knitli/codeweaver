@@ -1,0 +1,91 @@
+---
+title: backup_models
+description: API reference for codeweaver.providers.config.backup_models
+---
+
+# `codeweaver.providers.config.backup_models`
+
+Backup embedding model selection for failover scenarios.
+
+This module provides hardcoded backup embedding model selection for vector reconciliation.
+It handles fallback from cloud providers to local embedding models with automatic
+dependency checking.
+
+Models:
+- Primary: minishlab/potion-base-8M (sentence-transformers)
+- Fallback: jinaai/jina-embeddings-v2-small-en (fastembed)
+
+## Function: `create_backup_embeddings`
+
+```python
+create_backup_embeddings()
+```
+
+Create backup embeddings for given text(s).
+
+This is a convenience function that creates a provider and generates embeddings
+in a single call. For better performance with multiple calls, use
+get_backup_embedding_provider() and reuse the provider instance.
+
+Args:
+    text: Single text or list of texts to embed
+
+Returns:
+    List of embedding vectors, or None if provider unavailable
+
+Example:
+    &gt;&gt;&gt; embeddings = await create_backup_embeddings("example text")
+    &gt;&gt;&gt; if embeddings:
+    ...     print(f"Generated &#123;len(embeddings)&#125; embeddings")
+
+## Function: `get_backup_embedding_config`
+
+```python
+get_backup_embedding_config()
+```
+
+Get backup embedding configuration based on available dependencies.
+
+This function attempts to create a backup embedding provider using:
+1. Primary: sentence-transformers with minishlab/potion-base-8M
+2. Fallback: fastembed with jinaai/jina-embeddings-v2-small-en
+
+Returns:
+    EmbeddingProviderSettings instance if successful, None if no suitable provider available
+
+Raises:
+    ConfigurationError: If provider creation fails unexpectedly
+
+## Function: `get_backup_embedding_provider`
+
+```python
+get_backup_embedding_provider()
+```
+
+Get backup embedding provider based on available dependencies.
+
+This function attempts to create a backup embedding provider using:
+1. Primary: sentence-transformers with minishlab/potion-base-8M
+2. Fallback: fastembed with jinaai/jina-embeddings-v2-small-en
+
+Returns:
+    EmbeddingProvider instance if successful, None if no suitable provider available
+
+Raises:
+    ConfigurationError: If provider creation fails unexpectedly
+
+## Function: `get_backup_model_info`
+
+```python
+get_backup_model_info()
+```
+
+Get information about configured backup models.
+
+Returns:
+    Dictionary with backup model configuration details
+
+Example:
+    &gt;&gt;&gt; info = get_backup_model_info()
+    &gt;&gt;&gt; print(f"Primary: &#123;info['primary_model']&#125;")
+    Primary: minishlab/potion-base-8M

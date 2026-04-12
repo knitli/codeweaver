@@ -1,0 +1,195 @@
+---
+title: base
+description: API reference for codeweaver.providers.vector_stores.base
+---
+
+# `codeweaver.providers.vector_stores.base`
+
+Abstract provider interfaces for embeddings and vector storage.
+
+## Class: `VectorStoreProvider`
+
+Abstract interface for vector storage providers.
+
+### Method: `delete_by_file`
+
+```python
+delete_by_file()
+```
+
+Delete all chunks for a specific file.
+
+Args:
+    file_path: Path of file to remove from index.
+        Must be relative path from project root.
+        Use forward slashes for cross-platform compatibility.
+
+Raises:
+    CollectionNotFoundError: Collection doesn't exist.
+    DeleteError: Delete operation failed.
+
+Notes:
+    - Idempotent: No error if file has no chunks.
+    - Payload indexes updated to remove deleted chunks.
+
+### Method: `delete_by_files`
+
+```python
+delete_by_files()
+```
+
+Delete all chunks for multiple files in a single operation.
+
+Args:
+    file_paths: List of file paths to remove from index.
+        Paths should be relative to project root.
+
+Raises:
+    CollectionNotFoundError: Collection doesn't exist.
+    DeleteError: Delete operation failed.
+
+Notes:
+    - Idempotent: No error if files have no chunks.
+    - More efficient than multiple calls to delete_by_file.
+
+### Method: `delete_by_id`
+
+```python
+delete_by_id()
+```
+
+Delete specific code chunks by their unique identifiers.
+
+Args:
+    ids: List of chunk IDs to delete.
+        - Each ID must be valid UUID7.
+        - Maximum 1000 IDs per batch.
+
+Raises:
+    CollectionNotFoundError: Collection doesn't exist.
+    DeleteError: Delete operation failed.
+
+Notes:
+    - Idempotent: No error if some IDs don't exist.
+    - Operation is atomic (all-or-nothing for batch).
+
+### Method: `delete_by_name`
+
+```python
+delete_by_name()
+```
+
+Delete specific code chunks by their unique names.
+
+Args:
+    names: List of chunk names to delete.
+        - Each name must be non-empty string.
+        - Maximum 1000 names per batch.
+
+Raises:
+    CollectionNotFoundError: Collection doesn't exist.
+    DeleteError: Delete operation failed.
+
+Notes:
+    - Idempotent: No error if some names don't exist.
+    - Operation is atomic (all-or-nothing for batch).
+
+### Method: `dense_dimension`
+
+```python
+dense_dimension()
+```
+
+Get the dimension of dense embeddings for this vector store provider.
+
+Returns:
+    Dimension of dense embeddings, or None if dense embeddings not supported.
+
+### Method: `dense_dtype`
+
+```python
+dense_dtype()
+```
+
+Get the data type of dense embeddings for this vector store provider.
+
+Returns:
+    Data type of dense embeddings.
+
+### Method: `list_collections`
+
+```python
+list_collections()
+```
+
+List all collections in the vector store.
+
+Returns:
+    List of collection names, or None if operation not supported.
+    Returns empty list when no collections exist.
+
+Raises:
+    ConnectionError: Failed to connect to vector store.
+    ProviderError: Provider-specific operation failure.
+
+### Method: `search`
+
+```python
+search()
+```
+
+Search for similar vectors using query vector(s).
+
+Supports both dense-only and hybrid search.
+
+Args:
+    vector: Preferred input is a StrategizedQuery object containing:
+        - query: Original query string (for logging/metadata/tracking)
+        - dense: Dense embedding vector (list of floats or ints) or None
+        - sparse: Sparse embedding vector (list of floats/ints) or None
+        - strategy: Search strategy to use (DENSE_ONLY, SPARSE_ONLY, HYBRID_SEARCH)
+
+        Alternatively, a MixedQueryInput can be provided (will be deprecated), which is any of:
+        - For dense-only: list of floats or ints
+        - For sparse-only: list of floats or ints
+        - For hybrid: dict with keys "dense" and "sparse" mapping to respective vectors
+
+    query_filter: Optional filter to apply to search results.
+
+Returns:
+    List of search results sorted by relevance score (descending).
+    Maximum 100 results returned per query.
+    Each result includes score between 0.0 and 1.0.
+    Returns empty list when no results match query/filter.
+
+Raises:
+    CollectionNotFoundError: Collection doesn't exist.
+    DimensionMismatchError: Query vector dimension doesn't match collection.
+    InvalidFilterError: Filter contains invalid fields or values.
+    SearchError: Search operation failed.
+
+### Method: `upsert`
+
+```python
+upsert()
+```
+
+Insert or update code chunks with their embeddings.
+
+Args:
+    chunks: List of code chunks to insert/update.
+        - Each chunk must have unique chunk_id.
+        - Each chunk must have at least one embedding (sparse or dense).
+        - Embedding dimensions must match collection configuration.
+        - Maximum 1000 chunks per batch.
+
+Raises:
+    CollectionNotFoundError: Collection doesn't exist.
+    DimensionMismatchError: Embedding dimension doesn't match collection.
+    ValidationError: Chunk data validation failed.
+    UpsertError: Upsert operation failed.
+
+Notes:
+    - Existing chunks with same ID are replaced.
+    - Payload indexes updated for new/modified chunks.
+    - Operation is atomic (all-or-nothing for batch).

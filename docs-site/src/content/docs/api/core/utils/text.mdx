@@ -1,0 +1,123 @@
+---
+title: text
+description: API reference for codeweaver.core.utils.text
+---
+
+# `codeweaver.core.utils.text`
+
+Text manipulation utilities.
+
+## Function: `elapsed_time_to_human_readable`
+
+```python
+elapsed_time_to_human_readable()
+```
+
+Convert elapsed time between start_time and end_time to a human-readable format.
+
+## Function: `format_descriptor`
+
+```python
+format_descriptor()
+```
+
+Format a code descriptor for display.
+
+## Function: `format_docstring`
+
+```python
+format_docstring()
+```
+
+Format a docstring for display.
+
+## Function: `format_signature`
+
+```python
+format_signature()
+```
+
+Format a function signature for display.
+
+## Function: `format_snippet_name`
+
+```python
+format_snippet_name()
+```
+
+Format a snippet name for display.
+
+## Function: `humanize`
+
+```python
+humanize()
+```
+
+Capitalize the first word and turn underscores into spaces and strip a
+trailing ``"_id"``, if any. Creates a nicer looking string.
+
+Examples:
+    &gt;&gt;&gt; humanize("employee_salary")
+    'Employee salary'
+    &gt;&gt;&gt; humanize("author_id")
+    'Author'
+
+## Function: `sanitize_unicode`
+
+```python
+sanitize_unicode()
+```
+
+Sanitize unicode text by normalizing and removing invisible/control characters.
+
+## Function: `to_lowly_lowercase`
+
+```python
+to_lowly_lowercase()
+```
+
+Ensure insignificant words are lowercase.
+
+## Function: `to_tokens`
+
+```python
+to_tokens()
+```
+
+Convert a text string into a list of tokens.
+
+## Function: `truncate_text`
+
+```python
+truncate_text()
+```
+
+Truncate text to a maximum length, adding an ellipsis if truncated.
+
+Args:
+    text: The input text to truncate.
+    max_length: The maximum allowed length of the text (default: 100).
+    ellipsis: The string to append if truncation occurs (default: "...").
+
+Returns:
+    The truncated text if it exceeds max_length, otherwise the original text.
+
+## Function: `validate_regex_pattern`
+
+```python
+validate_regex_pattern()
+```
+
+Validate and compile a regex pattern from config/env.
+
+- Accepts compiled patterns as-is.
+- For strings, applies normalization via `_walk_pattern`, basic length and nested-quantifier checks,
+  then compiles. Raises `ConfigurationError` on invalid/unsafe patterns.
+
+## Function: `variable_to_env_var`
+
+```python
+variable_to_env_var()
+```
+
+Convert a variable name to an environment variable name.

@@ -1,0 +1,223 @@
+---
+title: vector_store
+description: API reference for codeweaver.providers.types.vector_store
+---
+
+# `codeweaver.providers.types.vector_store`
+
+Collection metadata models for vector stores.
+
+## Class: `CollectionMetadata`
+
+Metadata stored with collections for validation and compatibility checks.
+
+Version History:
+    - v1.2.0: Initial schema with dense_model, sparse_model
+    - v1.3.0: Added dense_model_family and query_model for asymmetric embedding support
+    - v1.4.0: Added configuration tracking and transformation tracking fields
+    - v1.5.0: Added collection policy system for controlling configuration changes
+
+Migration from v1.2.x to v1.3.0:
+    Collections created with v1.2.x are fully compatible with v1.3.0. The new fields
+    (dense_model_family, query_model) default to None, indicating single-model mode:
+
+    - dense_model_family=None: No model family tracking (backward compatible)
+    - query_model=None: Symmetric mode (query uses same model as dense_model)
+
+    Existing collections can be loaded, modified, and saved without requiring migration.
+    The pydantic validators handle missing fields gracefully via Field defaults.
+
+Migration from v1.3.0 to v1.4.0:
+    Collections created with v1.3.0 are fully compatible with v1.4.0. The new fields
+    default to None or empty lists, maintaining backward compatibility:
+
+    - profile_name, profile_version, config_hash, config_timestamp: Optional tracking
+    - quantization_type, quantization_rescore, original_dimension: Optional transformations
+    - transformations: Empty list by default
+
+Migration from v1.4.0 to v1.5.0:
+    Collections created with v1.4.0 are fully compatible with v1.5.0. The new policy
+    field defaults to FAMILY_AWARE, maintaining existing behavior:
+
+    - policy: Defaults to CollectionPolicy.FAMILY_AWARE for backward compatibility
+    - Existing collections will use FAMILY_AWARE policy unless explicitly changed
+    - No breaking changes to existing validation logic
+
+Asymmetric Embedding Support (v1.3.0+):
+    When dense_model_family is set, the collection supports cross-model querying within
+    the same family (e.g., Voyage-4 family allows voyage-4-large for embedding and
+    voyage-4-nano for queries). This enables:
+
+    - Local query models (zero cost, instant latency)
+    - API embedding models (higher quality)
+    - 3-point retrieval improvement (per Voyage AI)
+
+Transformation Tracking (v1.4.0+):
+    Tracks quantization and dimension reduction transformations applied to collections,
+    enabling migration auditing and accuracy impact analysis.
+
+### Method: `from_collection`
+
+```python
+from_collection()
+```
+
+Create CollectionMetadata from a collection dictionary.
+
+### Method: `to_collection`
+
+```python
+to_collection()
+```
+
+Convert to a dictionary that is the argument for collection creation.
+
+### Method: `validate_compatibility`
+
+```python
+validate_compatibility()
+```
+
+Validate collection metadata against current provider configuration.
+
+Performs family-aware validation when dense_model_family is present,
+allowing asymmetric embedding configurations where query models can differ
+from embed models as long as they belong to the same model family.
+
+Args:
+    other: Other collection metadata to compare against (typically from existing collection)
+
+Raises:
+    ModelSwitchError: If embedding models don't match and family validation fails
+    ConfigurationError: If models are incompatible within their family
+
+Warnings:
+    Logs warning if provider has changed (suggests reindexing)
+
+### Method: `validate_config_change`
+
+```python
+validate_config_change()
+```
+
+Validate configuration change against collection policy.
+
+Validates whether proposed configuration changes are allowed based on the
+collection's policy setting. This method is called before applying any
+configuration changes to ensure they won't break the collection.
+
+Args:
+    new_dense_model: Proposed new dense embedding model
+    new_query_model: Proposed new query model (for asymmetric embedding)
+    new_sparse_model: Proposed new sparse embedding model
+    new_provider: Proposed new provider
+
+Raises:
+    ConfigurationLockError: If the proposed change violates the collection policy
+        - STRICT: Any model or provider change
+        - FAMILY_AWARE: Model change outside the same family
+        - FLEXIBLE: Only warns, doesn't raise
+        - UNLOCKED: Never raises
+
+Examples:
+    &gt;&gt;&gt; metadata = CollectionMetadata(
+    ...     provider="voyage",
+    ...     project_name="my-project",
+    ...     dense_model="voyage-4-large",
+    ...     dense_model_family="voyage-4",
+    ...     policy=CollectionPolicy.FAMILY_AWARE,
+    ... )
+    &gt;&gt;&gt; # This succeeds - same family
+    &gt;&gt;&gt; metadata.validate_config_change(new_query_model="voyage-4-nano")
+    &gt;&gt;&gt; # This raises - different family
+    &gt;&gt;&gt; metadata.validate_config_change(new_dense_model="voyage-3-large")
+    Traceback (most recent call last):
+    ...
+    ConfigurationLockError: Model change breaks family compatibility
+
+## Class: `CollectionPolicy`
+
+Collection modification policy controlling configuration changes.
+
+Defines how strictly a collection's configuration is enforced when attempting
+to use different embedding models or providers with an existing collection.
+
+Values:
+    STRICT: No model changes allowed - only the exact original model can be used.
+    FAMILY_AWARE: Allow query model changes within the same model family (default).
+        This is the recommended setting as it enables asymmetric embedding where
+        documents are embedded with a high-quality model (e.g., voyage-4-large) and
+        queries use a lighter model (e.g., voyage-4-nano) for better latency/cost.
+    FLEXIBLE: Warn on breaking changes but don't block them. Use with caution as
+        this can lead to degraded search quality or errors.
+    UNLOCKED: Allow all configuration changes without validation. Only use for
+        testing or when you fully understand the implications.
+
+Default: FAMILY_AWARE - balances safety with flexibility for asymmetric embedding.
+
+Examples:
+    &gt;&gt;&gt; # Strict policy - no changes allowed
+    &gt;&gt;&gt; metadata = CollectionMetadata(
+    ...     provider="voyage", project_name="my-project", policy=CollectionPolicy.STRICT
+    ... )
+    &gt;&gt;&gt; # Will raise ConfigurationLockError if model changes
+
+    &gt;&gt;&gt; # Family-aware policy (default) - allows query model changes in family
+    &gt;&gt;&gt; metadata = CollectionMetadata(
+    ...     provider="voyage",
+    ...     project_name="my-project",
+    ...     dense_model="voyage-4-large",
+    ...     dense_model_family="voyage-4",
+    ...     policy=CollectionPolicy.FAMILY_AWARE,  # or omit for default
+    ... )
+    &gt;&gt;&gt; # Can use voyage-4-nano for queries, but not voyage-3 models
+
+## Class: `HybridVectorPayload`
+
+Metadata payload for stored vectors.
+
+### Method: `from_payload`
+
+```python
+from_payload()
+```
+
+Create a HybridVectorPayload from a dictionary payload.
+
+### Method: `index_field_types`
+
+```python
+index_field_types()
+```
+
+Return the payload fields mapped to their datatype for Qdrant indexing.
+
+### Method: `indexed_fields`
+
+```python
+indexed_fields()
+```
+
+Return the payload fields that are indexed by default in the Qdrant collection.
+
+### Method: `to_payload`
+
+```python
+to_payload()
+```
+
+Convert to a dictionary payload for storage.
+
+## Class: `PayloadFieldDict`
+
+A mapping of payload field names to their corresponding Qdrant data types; not all fields are indexed, but if they were, these would be the types.
+
+## Class: `TransformationRecord`
+
+Record of a transformation applied to collection.
+
+Tracks changes like quantization or dimension reduction applied to a collection,
+including timing and accuracy impact metrics.
+
+This dataclass is immutable to ensure transformation records cannot be
+modified after creation.

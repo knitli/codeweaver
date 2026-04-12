@@ -1,0 +1,103 @@
+---
+title: conversion
+description: API reference for codeweaver.providers.env_registry.conversion
+---
+
+# `codeweaver.providers.env_registry.conversion`
+
+Conversion utilities for registry models to legacy TypedDict format.
+
+Provides backward compatibility by converting ProviderEnvConfig to ProviderEnvVars.
+
+## Function: `env_var_config_to_info`
+
+```python
+env_var_config_to_info()
+```
+
+Convert EnvVarConfig (registry) to EnvVarInfo (legacy).
+
+Args:
+    config: Registry env var configuration
+
+Returns:
+    Legacy env var info compatible with existing code
+
+Example:
+    &gt;&gt;&gt; config = EnvVarConfig(
+    ...     env="OPENAI_API_KEY",
+    ...     description="API key",
+    ...     is_secret=True,
+    ...     variable_name="api_key",
+    ... )
+    &gt;&gt;&gt; info = env_var_config_to_info(config)
+    &gt;&gt;&gt; info.env
+    'OPENAI_API_KEY'
+
+## Function: `get_provider_configs`
+
+```python
+get_provider_configs()
+```
+
+Get all provider configurations from registry.
+
+Args:
+    provider_name: Provider name (e.g., "openai", "azure", "deepseek")
+
+Returns:
+    Tuple of provider configurations, or None if not found in registry
+
+Example:
+    &gt;&gt;&gt; configs = get_provider_configs("azure")
+    &gt;&gt;&gt; len(configs)
+    3  # Azure has 3 client configurations
+
+## Function: `get_provider_env_vars_from_registry`
+
+```python
+get_provider_env_vars_from_registry()
+```
+
+Get provider environment variables from registry.
+
+Main entry point for registry integration.
+
+Args:
+    provider_name: Provider name (e.g., "openai", "azure", "deepseek")
+
+Returns:
+    Tuple of ProviderEnvVars compatible with existing code, or None if not in registry
+
+Example:
+    &gt;&gt;&gt; env_vars = get_provider_env_vars_from_registry("deepseek")
+    &gt;&gt;&gt; env_vars[0]["api_key"].env
+    'DEEPSEEK_API_KEY'
+
+## Function: `provider_env_config_to_vars`
+
+```python
+provider_env_config_to_vars()
+```
+
+Convert ProviderEnvConfig (registry) to ProviderEnvVars (legacy).
+
+Args:
+    config: Registry provider configuration
+    resolve_inheritance: Whether to resolve inheritance (default True)
+
+Returns:
+    Legacy provider env vars compatible with existing code
+
+Example:
+    &gt;&gt;&gt; config = ProviderEnvConfig(
+    ...     provider="deepseek",
+    ...     clients=("openai",),
+    ...     api_key=EnvVarConfig(
+    ...         env="DEEPSEEK_API_KEY", description="API key", is_secret=True
+    ...     ),
+    ...     inherits_from="openai",
+    ... )
+    &gt;&gt;&gt; env_vars = provider_env_config_to_vars(config)
+    &gt;&gt;&gt; env_vars["api_key"].env
+    'DEEPSEEK_API_KEY'

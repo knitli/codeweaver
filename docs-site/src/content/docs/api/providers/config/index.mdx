@@ -1,0 +1,35 @@
+---
+title: config
+description: API reference for codeweaver.providers.config
+---
+
+# `codeweaver.providers.config`
+
+Package-level lazy imports for codeweaver.providers.config package.
+
+## Provider Configuration, Settings, and Options
+
+This package provides comprehensive configuration classes, types, and utilities for managing provider settings across various categories, including:
+- **Agent Providers**: Configuration for LLM-based agents.
+- **Data Providers**: Configuration for tools and data sources.
+- **Embedding Providers**: Configuration for models that generate vector embeddings.
+- **Sparse Embedding Providers**: Configuration for models that generate sparse vector embeddings.
+- **Reranking Providers**: Configuration for models that perform reranking of results.
+- **Vector Store Providers**: Configuration for vector databases and stores.
+
+## Structure and Organization
+
+Each category of provider configuration, and each provider within that category, has three levels of configuration:
+1. **Provider Settings**: These are the top-level settings classes for a given category of providers (e.g. `BaseAgentProviderSettings`, `BaseEmbeddingProviderSettings`, etc.) that define the common configuration options for that category, and are subclassed by provider-specific settings classes (e.g. `AnthropicAgentProviderSettings`, `OpenAIEmbeddingProviderSettings`, etc.). The `provider` is the *service provider*, 'who you pay', except for local providers which are more accurately 'what you use'. Another way to consider it is 'who you authenticate with or need an API key for'. The following two configuration levels are contained within a given provider setting class as fields. Defined in `codeweaver.providers.config.categories` package.
+
+2. **Client Options**: These are configuration classes that define the options for using a specific SDK or API client to interact with a provider. This can often be different from the service provider, for example, many providers use the OpenAI SDK or have OpenAI compatible APIs -- the provider is the provider, but the client is the OpenAI client. The parent `ProviderSettings` class will have this configuration in its `client_options` field. For convenience, we differentiate top-level provider settings classes by both provider and SDK, for example `AnthropicAgentProviderSettings` vs `AnthropicAzureAgentProviderSettings`, which both have an `AnthropicClientOptions` field, but the former is for directly using Anthropic as a service provider and the latter is for using Anthropic models with Azure as the service provider, which has some different configuration options and requirements. Defined in `codeweaver.providers.config.clients` package.
+
+3. **SDK Configuration**: These are configuration classes for *principal* method or functions calls to the underlying SDKs, which are not part of the client's constructor (i.e. client options). The field names correspond to a common name for the function or method call, for example `embed` is the field for configuring parameters to the SDK's embedding generation method. Defined in the `codeweaver.providers.config.sdk` package.
+
+### A Special Case: Model Configuration
+
+In most cases, either the ClientOptions or the SDK configuration will cover the configuration options for the model. However, there are some cases where the model configuration is separate or the model has its own constructor.
+
+This is true for *all agent providers*, because it is how PydanticAI structures its agent classes and types, and we use PydanticAI for all agent provider implementations. This is the `agent_config` field in the agent provider settings classes. Since agents have no functional settings with PydanticAI, the classes for `agent_config` are in the `codeweaver.providers.config.sdk.agent` package.
+
+The only other exception is for **Bedrock**, which for both reranking and embedding models, requires a separate model configuration class that is distinct from the client options and SDK configuration and is specific to the model family. For Bedrock, this is the `model_options` field in the top-level provider settings class, such as `BedrockEmbeddingProviderSettings`.

@@ -1,0 +1,137 @@
+---
+title: models
+description: API reference for codeweaver.providers.env_registry.models
+---
+
+# `codeweaver.providers.env_registry.models`
+
+Lightweight dataclass models for provider environment configuration.
+
+Uses frozen dataclasses with slots for performance and immutability.
+Validation happens at build-time, not runtime.
+
+## Class: `EnvVarConfig`
+
+Configuration for a single environment variable.
+
+Immutable, lightweight, validated at build-time.
+
+Attributes:
+    env: Environment variable name (e.g., "OPENAI_API_KEY")
+    description: Human-readable description
+    variable_name: Optional variable name in provider config
+    variables: Optional tuple of VariableInfo for nested config
+    is_secret: Whether this is a secret/sensitive value
+    fmt: Optional format specification (e.g., EnvFormat.FILEPATH)
+    choices: Optional frozenset of valid values
+    default: Optional default value
+
+Example:
+    &gt;&gt;&gt; EnvVarConfig(
+    ...     env="OPENAI_API_KEY",
+    ...     description="Your OpenAI API Key",
+    ...     is_secret=True,
+    ...     variable_name="api_key",
+    ... )
+
+### Method: `to_dict`
+
+```python
+to_dict()
+```
+
+Convert to dictionary for serialization.
+
+Returns:
+    dictionary suitable for JSON serialization
+
+Example:
+    &gt;&gt;&gt; config = EnvVarConfig(...)
+    &gt;&gt;&gt; data = config.to_dict()
+    &gt;&gt;&gt; import json
+    &gt;&gt;&gt; json.dumps(data)
+
+## Class: `ProviderEnvConfig`
+
+Complete environment configuration for a provider.
+
+Represents one "set" of environment variables for a provider.
+Multi-client providers (like Azure) have multiple instances.
+
+Attributes:
+    provider: Provider name (lowercase)
+    clients: Tuple of client SDK names (e.g., ("openai",))
+    note: Optional note about the provider
+    api_key: Optional API key configuration
+    host: Optional host/base_url configuration
+    endpoint: Optional endpoint configuration
+    region: Optional region configuration
+    port: Optional port configuration
+    log_level: Optional log level configuration
+    account_id: Optional account ID configuration
+    tls_on_off: Optional TLS enable/disable configuration
+    tls_cert_path: Optional TLS certificate path configuration
+    tls_key_path: Optional TLS key path configuration
+    other: Frozenset of custom/provider-specific fields as (key, EnvVarConfig) tuples
+    inherits_from: Optional parent provider for inheritance
+
+Example:
+    &gt;&gt;&gt; ProviderEnvConfig(
+    ...     provider="deepseek",
+    ...     clients=("openai",),
+    ...     api_key=EnvVarConfig(
+    ...         env="DEEPSEEK_API_KEY", description="API Key", is_secret=True
+    ...     ),
+    ...     inherits_from="openai",
+    ... )
+
+### Method: `all_vars`
+
+```python
+all_vars()
+```
+
+Get all environment variable configs including 'other'.
+
+Returns:
+    Tuple of all EnvVarConfig instances (immutable and hashable)
+
+Example:
+    &gt;&gt;&gt; config = ProviderEnvConfig(...)
+    &gt;&gt;&gt; all_vars = config.all_vars()
+    &gt;&gt;&gt; api_keys = [v for v in all_vars if v.is_secret]
+
+### Method: `get_other`
+
+```python
+get_other()
+```
+
+Get a custom field from 'other' by key.
+
+Args:
+    key: The key to look up in the 'other' dict
+
+Returns:
+    EnvVarConfig if found, None otherwise
+
+Example:
+    &gt;&gt;&gt; config = ProviderEnvConfig(...)
+    &gt;&gt;&gt; webhook_secret = config.get_other("webhook_secret")
+
+### Method: `to_dict`
+
+```python
+to_dict()
+```
+
+Convert to dictionary for serialization (such as for MCP registry script).
+
+Returns:
+    dictionary suitable for JSON serialization
+
+Example:
+    &gt;&gt;&gt; config = ProviderEnvConfig(...)
+    &gt;&gt;&gt; data = config.to_dict()
+    &gt;&gt;&gt; import json
+    &gt;&gt;&gt; json.dumps(data)

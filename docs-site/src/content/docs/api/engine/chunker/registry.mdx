@@ -1,0 +1,62 @@
+---
+title: registry
+description: API reference for codeweaver.engine.chunker.registry
+---
+
+# `codeweaver.engine.chunker.registry`
+
+Registry for maintaining per-file source IDs for span consistency.
+
+## Class: `SourceIdRegistry`
+
+Maintains per-file source IDs to ensure span consistency within files.
+
+This registry ensures that all spans from the same file share the same source_id, enabling set-like span operations and clean merging/splitting.
+
+### Method: `clear`
+
+```python
+clear()
+```
+
+Clear the registry.
+
+### Method: `file_from_path`
+
+```python
+file_from_path()
+```
+
+Get the DiscoveredFile instance for a given file path.
+
+### Method: `remove`
+
+```python
+remove()
+```
+
+Remove a file from the registry.
+
+Args:
+    value: UUID7 source ID or DiscoveredFile instance to remove
+
+Returns:
+    True if the file was in the registry, False otherwise
+
+### Method: `source_id_for`
+
+```python
+source_id_for()
+```
+
+Get or create a source ID for the given file.
+
+Uses the DiscoveredFile's existing source_id instead of generating a new one.
+This ensures consistency across the codeweaver system where DiscoveredFile
+objects serve as the canonical source of truth for file identity.
+
+Args:
+    file: DiscoveredFile instance with existing source_id
+
+Returns:
+    Hex string (newtype) representation of the file's UUID7 source_id

@@ -1,0 +1,30 @@
+---
+title: match
+description: API reference for codeweaver.providers.vector_stores.search.match
+---
+
+# `codeweaver.providers.vector_stores.search.match`
+
+This module defines the models used for filtering and matching in vector stores.  It defines various conditions and filters that can be applied to payloads in a vector store, such as Qdrant. Some can also be used for other filtering operations, such as in a search engine.
+
+Nearly all of this file and its contents were adapted from Qdrant's example MCP server, [mcp-server-qdrant](https://github.com/qdrant/mcp-server-qdrant/), and fall under Qdrant's copyright and Apache 2.0 license. Any modifications or changes made to the original code are copyrighted by Knitli Inc. and are licensed under MIT OR Apache-2.0, whichever you want.
+
+## Class: `MatchAny`
+
+Exact match on any of the given values.
+
+## Class: `MatchExcept`
+
+Should have at least one value not matching the any given values.
+
+## Class: `MatchPhrase`
+
+Full-text phrase match of the string.
+
+## Class: `MatchText`
+
+Full-text match of the strings.
+
+## Class: `MatchValue`
+
+Exact match of the given value.

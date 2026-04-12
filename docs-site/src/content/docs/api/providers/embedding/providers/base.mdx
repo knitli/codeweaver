@@ -1,0 +1,138 @@
+---
+title: base
+description: API reference for codeweaver.providers.embedding.providers.base
+---
+
+# `codeweaver.providers.embedding.providers.base`
+
+Base class for embedding providers.
+
+## Class: `EmbeddingErrorInfo`
+
+Information about an embedding error and the embedding batch.
+
+If the error occurs during a document embedding request, `EmbeddingErrorInfo` will have the `documents` and (usually) the `batch_id` fields populated. These fields aren't present for query embedding requests.
+For a query `EmbeddingErrorInfo`, only the `error` and `queries` fields are populated.
+
+## Class: `EmbeddingProvider`
+
+Abstract class for an embedding provider. You must pass in a client and capabilities.
+
+Each provider only supports a specific interface, but an interface can be used by multiple providers.
+
+The primary example of this one-to-many relationship is the OpenAI provider, which supports any OpenAI-compatible provider (Azure, Ollama, Fireworks, Heroku, Together, Github, and more).
+
+### Method: `chunks_to_strings`
+
+```python
+chunks_to_strings()
+```
+
+Convert a sequence of CodeChunk objects to their string representations.
+
+### Method: `clear_deduplication_stores`
+
+```python
+clear_deduplication_stores()
+```
+
+Clear namespace-isolated deduplication stores.
+
+This is primarily useful for testing to ensure clean state between test runs.
+Uses the centralized cache manager to clear only this provider's namespace.
+
+### Method: `embed_documents`
+
+```python
+embed_documents()
+```
+
+Embed a list of documents into vectors.
+
+Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
+
+### Method: `embed_query`
+
+```python
+embed_query()
+```
+
+Embed a query into a vector.
+
+### Method: `get_datatype`
+
+```python
+get_datatype()
+```
+
+Get the datatype of the embedding vectors based on capabilities and config.
+
+### Method: `get_dimension`
+
+```python
+get_dimension()
+```
+
+Get the dimension of the embedding vectors based on capabilities.
+
+### Method: `initialize_async`
+
+```python
+initialize_async()
+```
+
+Perform asynchronous initialization of the provider.
+
+Subclasses should override this method to perform any async setup,
+such as loading models or establishing connections, that should
+not block the event loop during provider creation.
+
+### Method: `is_normalized`
+
+```python
+is_normalized()
+```
+
+Return True if the vector's L2 norm is approximately 1 within tol.
+
+### Method: `model_dump_json`
+
+```python
+model_dump_json()
+```
+
+Serialize the model to JSON, excluding certain fields.
+
+### Method: `normalize`
+
+```python
+normalize()
+```
+
+Normalize an embedding vector to unit L2 length.
+
+Returns the input as floats if the vector is empty or has zero norm.
+Raises ValueError if the input contains non-finite values.
+
+## Class: `SparseEmbeddingProvider`
+
+Abstract class for sparse embedding providers.
+
+Uses namespace isolation (provider_id.sparse) to prevent collision with dense embeddings.
+Dense and sparse embeddings deduplicate independently via separate namespaces.
+
+## Function: `default_input_transformer`
+
+```python
+default_input_transformer()
+```
+
+Default input transformer that serializes CodeChunks to strings.
+
+## Function: `default_output_transformer`
+
+```python
+default_output_transformer()
+```
+
+Default output transformer that ensures the output is in the correct format.

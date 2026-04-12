@@ -1,0 +1,92 @@
+---
+title: semantic
+description: API reference for codeweaver.engine.chunker.semantic
+---
+
+# `codeweaver.engine.chunker.semantic`
+
+AST-based semantic chunker with rich metadata and intelligent deduplication.
+
+Provides semantic code chunking using tree-sitter grammars via ast-grep-py.
+Leverages sophisticated semantic analysis to extract meaningful code segments
+with importance scoring and classification metadata optimized for AI context.
+
+Key Features:
+- AST-based parsing for 26+ languages
+- Importance-weighted node filtering
+- Hierarchical metadata with classification
+- Content-based deduplication via Blake3 hashing
+- Graceful degradation for oversized nodes
+- Comprehensive edge case handling
+
+Architecture:
+- Uses existing Metadata TypedDict and SemanticMetadata structures
+- Class-level deduplication stores (UUIDStore, BlakeStore)
+- Resource governance for timeout and limit enforcement
+- Integration with SessionStatistics for metrics tracking
+
+## Class: `SemanticChunker`
+
+AST-based chunker with rich semantic metadata and intelligent deduplication.
+
+Provides semantic chunking for 26+ languages using tree-sitter grammars.
+Leverages sophisticated semantic analysis to extract meaningful code segments
+with importance scoring, classification metadata, and hierarchical tracking.
+
+The chunker applies multi-tiered token size management with graceful degradation:
+1. AST nodes within token limit → semantic chunks
+2. Oversized composite nodes → recursive child chunking
+3. Still oversized → delimiter-based fallback
+4. Last resort → return single chunk as-is (may exceed limit for indivisible content)
+
+Features:
+- Importance-weighted node filtering (default threshold: 0.3)
+- Content-based deduplication using Blake3 hashing
+- Comprehensive edge case handling (empty, binary, whitespace, single-line)
+- Resource governance (timeout and chunk count limits)
+- Rich metadata optimized for AI context delivery
+
+Attributes:
+    language: Target language for semantic parsing
+    _importance_threshold: Minimum importance score for node inclusion
+    _store: UUID store for chunk batches
+    _hash_store: BlakeStore[UUID7] = make_blake_store(
+
+### Method: `chunk`
+
+```python
+chunk()
+```
+
+Chunk content into semantic code segments with resource governance.
+
+Main entry point for semantic chunking. Handles edge cases, parses AST,
+filters nodes by importance, manages token limits, deduplicates content,
+and tracks metrics.
+
+Args:
+    content: Source code content to chunk
+    file: Optional DiscoveredFile with metadata and source_id
+    context: Optional additional context (currently unused)
+
+Returns:
+    List of CodeChunk objects with rich semantic metadata
+
+Raises:
+    BinaryFileError: If binary content detected in input
+    ParseError: If AST parsing fails for the content
+    ChunkingTimeoutError: If operation exceeds configured timeout
+    ChunkLimitExceededError: If chunk count exceeds configured maximum
+    ASTDepthExceededError: If AST nesting exceeds safe depth limit
+
+### Method: `clear_deduplication_stores`
+
+```python
+clear_deduplication_stores()
+```
+
+Clear class-level deduplication stores.
+
+This is primarily useful for testing to ensure clean state between test runs.
+In production, stores persist across chunking operations to detect duplicates
+across files within a session.

@@ -1,0 +1,29 @@
+---
+title: endpoint
+description: API reference for codeweaver.server.health.endpoint
+---
+
+# `codeweaver.server.health.endpoint`
+
+Health endpoint implementation for FastMCP server.
+
+## Function: `get_health`
+
+```python
+get_health()
+```
+
+Health check endpoint returning server status and metrics.
+
+This endpoint provides comprehensive health information including:
+- Overall system status (healthy/degraded/unhealthy)
+- Indexing progress and state
+- Service health for vector store, embedding providers, reranking
+- Statistics on indexed content and query performance
+
+
+Args:
+    ctx: FastMCP context with CodeWeaverState
+
+Returns:
+    HealthResponse with complete system health information

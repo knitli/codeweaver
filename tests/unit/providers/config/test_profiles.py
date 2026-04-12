@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import sys
 
+import pytest
+
 from codeweaver.core.constants import ULTRALIGHT_RERANKING_MODEL
 
 
@@ -107,8 +109,14 @@ def test_recommended_profile_uses_constants_for_model_names():
     assert str(rerank_first.model_name) == RECOMMENDED_CLOUD_RERANKING_MODEL
 
 
-def test_testing_profile_uses_ultralight_constants(monkeypatch):
-    """Testing profile must use the ultralight model name constants."""
+@pytest.mark.parametrize("has_fastembed", [True, False])
+def test_testing_profile_uses_ultralight_constants(monkeypatch, has_fastembed):
+    """Testing profile must use the ultralight model name constants.
+
+    When fastembed is available (3.12/3.13), sparse/reranking constants are
+    the ULTRALIGHT_* fastembed variants.  When fastembed is absent (3.14),
+    they fall back to the ULTRALIGHT_ST_* sentence-transformers variants.
+    """
     from codeweaver.core.constants import (
         ULTRALIGHT_EMBEDDING_MODEL,
         ULTRALIGHT_RERANKING_MODEL,
@@ -119,6 +127,7 @@ def test_testing_profile_uses_ultralight_constants(monkeypatch):
 
     pmod = _get_profiles_module(monkeypatch)
     monkeypatch.setattr(pmod, "HAS_ST", True)
+    monkeypatch.setattr(pmod, "HAS_FASTEMBED", has_fastembed)
 
     result = pmod._testing_profile()
 
@@ -141,4 +150,5 @@ def test_testing_profile_uses_ultralight_constants(monkeypatch):
     reranking = result.get("reranking")
     assert reranking is not None
     rerank_first = reranking[0] if isinstance(reranking, tuple) else reranking
-    assert str(rerank_first.model_name) == ULTRALIGHT_RERANKING_MODEL
+    expected_reranking = ULTRALIGHT_RERANKING_MODEL if has_fastembed else ULTRALIGHT_ST_RERANKING_MODEL
+    assert str(rerank_first.model_name) == expected_reranking

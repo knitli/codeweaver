@@ -40,6 +40,7 @@ jobs:
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     with:
       python-versions: '["3.12", "3.13", "3.14"]'
       # Run everything except docker, qdrant, skip_ci, and flaky tests
@@ -56,6 +57,7 @@ jobs:
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     with:
       python-versions: '["3.12", "3.13", "3.14"]'
       # Run everything except docker, qdrant, skip_ci, and flaky tests
@@ -73,6 +75,7 @@ jobs:
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     with:
       python-versions: '["3.12", "3.13", "3.14"]'
       # Run everything except docker, qdrant, skip_ci, and flaky tests
@@ -90,6 +93,7 @@ jobs:
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     with:
       benchmark-tests: true
       python-versions: '["3.12"]'
@@ -183,6 +187,7 @@ jobs:
       - weekly-comprehensive-windows
       - weekly-comprehensive-macos
       - weekly-benchmarks
+      - weekly-install-smoke
       - weekly-coverage-report
     if: always()
     permissions:
@@ -214,6 +219,7 @@ jobs:
           macos_result: ${{ needs.weekly-comprehensive-macos.result }}
           benchmark_result: ${{ needs.weekly-benchmarks.result }}
           coverage_result: ${{ needs.weekly-coverage-report.result }}
+          smoke_result: ${{ needs.weekly-install-smoke.result }}
         run: |
           echo "Linux Tests: ${linux_result}"
           echo "Install-Profile Smoke Tests: ${smoke_result}"
@@ -408,6 +414,7 @@ jobs:
             - macOS Tests: ${{ needs.weekly-comprehensive-macos.result }}
             - Benchmarks: ${{ needs.weekly-benchmarks.result }}
             - Coverage Report: ${{ needs.weekly-coverage-report.result }}
+            - Install-Profile Smoke Tests: ${{ needs.weekly-install-smoke.result }}
             ${benchmarkInfo}
 
             ### Action Required

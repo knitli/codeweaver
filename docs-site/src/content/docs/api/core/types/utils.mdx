@@ -1,0 +1,60 @@
+---
+title: utils
+description: API reference for codeweaver.core.types.utils
+---
+
+# `codeweaver.core.types.utils`
+
+Common utilities for type handling.
+
+## Function: `add_enum_alias`
+
+```python
+add_enum_alias()
+```
+
+Add an alias to an Enum member.
+
+## Function: `add_enum_member`
+
+```python
+add_enum_member()
+```
+
+Add a new member to an Enum class.
+
+## Function: `clean_sentinel_from_schema`
+
+```python
+clean_sentinel_from_schema()
+```
+
+Remove Sentinel/Unset artifacts from JSON schema.
+
+Use this as a `json_schema_extra` callback in models that use Sentinel/Unset
+as default values. This function:
+- Removes 'Unset' default values
+- Fixes empty anyOf arrays (invalid JSON Schema)
+- Simplifies single-item anyOf arrays
+
+Example:
+    model_config = ConfigDict(
+        json_schema_extra=clean_sentinel_from_schema,
+        ...
+    )
+
+## Function: `generate_field_title`
+
+```python
+generate_field_title()
+```
+
+Generate a title for a model field.
+
+## Function: `generate_title`
+
+```python
+generate_title()
+```
+
+Generate a title for a model.

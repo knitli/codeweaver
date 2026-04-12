@@ -1,0 +1,139 @@
+---
+title: indexer
+description: API reference for codeweaver.engine.config.indexer
+---
+
+# `codeweaver.engine.config.indexer`
+
+Indexing configuration settings for CodeWeaver.
+
+Settings for `codeweaver.engineIndexer`, `codeweaver.engineFileWatcher`, and related components.
+
+## Class: `FilteredPaths`
+
+Tuple of included and excluded file paths.
+
+### Method: `from_settings`
+
+```python
+from_settings()
+```
+
+Resolve included and excluded files based on filter settings.
+
+Resolves glob patterns for include and exclude paths, filtering includes for excluded extensions.
+
+If a file is specifically included in the `forced_includes`, it will not be excluded even if it matches an excluded extension or excludes.
+
+"Specifically included" means that it was defined directly in the `forced_includes`, and **not** as a glob pattern.
+
+This constructor is async so that it can resolve quietly in the background without slowing initialization.
+
+## Class: `IndexerSettings`
+
+Settings for indexing and file filtering.
+
+## How File Filtering Works
+
+CodeWeaver uses the `rignore` library (a Python wrapper for Rust's `ignore` crate) to
+efficiently walk directories while respecting various ignore rules. The filtering
+happens in this order:
+
+1. **Override patterns** (highest priority): Whitelist patterns for tooling dirs,
+   ignore patterns for excluded dirs (note: any positive whitelist here -- meaning not beginning with a `!` -- is treated as an *only* -- files not matching them will be ignored entirely.)
+2. **Ignore files**: .gitignore, .ignore, .git/info/exclude, global gitignore
+3. **Hidden files**: Files/dirs starting with . are ignored by default
+4. **Extension filter**: Only files with known extensions are included
+
+## Default Behavior
+
+With default settings, CodeWeaver will:
+- Respect .gitignore files (including parent directories and global gitignore)
+- Ignore hidden files and directories
+- Include .github, .circleci, and common tooling dirs (.vscode, .claude, etc.)
+- Exclude common build/cache dirs (node_modules, __pycache__, .git, etc.)
+- Only index files with known extensions (~360 supported file types)
+
+## Key Settings
+
+- `use_gitignore`: Respect .gitignore rules (default: True)
+- `ignore_hidden`: Ignore hidden files/dirs (default: True)
+- `include_tooling_dirs`: Whitelist common tooling dirs despite ignore_hidden (default: True)
+- `excludes`: Additional directories to exclude (default: common build/cache dirs)
+- `excluded_extensions`: File extensions to exclude (default: binaries, media, etc.)
+
+## Path Resolution
+
+All paths should be relative to the project root. CodeWeaver deconflicts paths:
+- Files in `forced_includes` are always included, even if they match excludes
+- Tooling directories are whitelisted via overrides, still respecting .gitignore
+- The `excludes` list is converted to ignore patterns
+
+### Method: `construct_filter`
+
+```python
+construct_filter()
+```
+
+Construct the filter function for rignore's `should_exclude_entry` parameter.
+
+Returns a function that returns True for paths that should be EXCLUDED.
+
+This filter:
+1. Allows directories to pass through (rignore handles dir filtering)
+2. Allows files in whitelisted tooling directories
+3. Excludes hidden files not in tooling directories (when ignore_hidden=True)
+4. Excludes files with explicitly excluded extensions
+5. Excludes files with extensions not in our known extensions list
+
+### Method: `model_post_init`
+
+```python
+model_post_init()
+```
+
+Post-initialization processing.
+
+### Method: `set_inc_exc`
+
+```python
+set_inc_exc()
+```
+
+Set that includes and excludes have been configured.
+
+### Method: `to_settings`
+
+```python
+to_settings()
+```
+
+Serialize to `RignoreSettings`.
+
+## Class: `IndexerSettingsDict`
+
+A serialized `IndexerSettings` object.
+
+## Class: `RignoreSettings`
+
+Settings for the rignore library.
+
+Maps to parameters of rignore.Walker. See https://pypi.org/project/rignore/
+
+Key parameters:
+- path: Root directory to walk
+- ignore_hidden: If True, ignore hidden files/directories (starting with .)
+- read_git_ignore: If True, respect .gitignore files
+- read_ignore_files: If True, respect .ignore files (ripgrep-style)
+- overrides: Glob patterns for whitelist/ignore. Plain patterns whitelist,
+             patterns starting with ! ignore (e.g., "**/.github/**" whitelists,
+             "!**/node_modules/**" ignores)
+- should_exclude_entry: Callback returning True to exclude a path
+
+## Function: `get_storage_path`
+
+```python
+get_storage_path()
+```
+
+Get the default storage directory for index and checkpoint data.

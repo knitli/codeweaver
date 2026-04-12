@@ -63,3 +63,10 @@ tools.biome = "latest"
 description = "Fix linting issues using Biome"
 run = "biome check . --write --changed"
 tools.biome = "latest"
+
+[tools]
+hk = "latest"
+
+[prepare.bun]
+auto = true
+dir = "docs-site"

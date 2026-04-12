@@ -16,7 +16,7 @@ authors = [
   { name = "Knitli Inc." },
   { name = "Adam Poulemanos", email = "adam@knit.li" },
 ]
-keywords = ["codeweaver", "tokenizers", "tiktoken", "embeddings", "nlp"]
+keywords = ["codeweaver", "embeddings", "nlp", "tiktoken", "tokenizers"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
@@ -37,11 +37,8 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://knitli.com"
-Repository = "https://github.com/knitli/codeweaver"
 Issues = "https://github.com/knitli/codeweaver/issues"
-
-[project.optional-dependencies]
-test = ["pytest", "pytest-cov"]
+Repository = "https://github.com/knitli/codeweaver"
 
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning>=0.14.0"]

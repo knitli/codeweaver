@@ -1,0 +1,144 @@
+---
+title: doctor
+description: API reference for codeweaver.cli.commands.doctor
+---
+
+# `codeweaver.cli.commands.doctor`
+
+Doctor command for validating prerequisites and configuration.
+
+Validates system requirements, configuration, providers, and file permissions
+to help diagnose issues with CodeWeaver installations.
+
+## Class: `DoctorCheck`
+
+Represents a single doctor check with results and suggestions.
+
+### Method: `set_check`
+
+```python
+set_check()
+```
+
+Create a doctor check with given status.
+
+Args:
+    name: Name of the check
+    status: Status of the check
+    message: Message to display
+    suggestions: List of actionable suggestions for resolution
+
+Returns:
+    DoctorCheck instance with given status
+
+## Function: `check_configuration_file`
+
+```python
+check_configuration_file()
+```
+
+Check if configuration file exists and is valid.
+
+## Function: `check_embedding_compatibility`
+
+```python
+check_embedding_compatibility()
+```
+
+Check if current embedding config matches collection.
+
+This check validates that the current embedding configuration is compatible
+with any existing indexed collection. It identifies:
+- No changes (index remains valid)
+- Compatible changes (query model changes in asymmetric config)
+- Transformations (quantization or dimension reduction possible)
+- Breaking changes (requires reindexing)
+
+ARCHITECTURE NOTE: Service automatically injected by DI container.
+Service itself has plain __init__ with no DI markers.
+
+## Function: `check_indexer_config`
+
+```python
+check_indexer_config()
+```
+
+Check if the indexer is properly configured and cache directory is writable.
+
+## Function: `check_project_path`
+
+```python
+check_project_path()
+```
+
+Check if project path exists and is accessible.
+
+## Function: `check_provider_availability`
+
+```python
+check_provider_availability()
+```
+
+Test basic connectivity to configured providers.
+
+## Function: `check_python_version`
+
+```python
+check_python_version()
+```
+
+Check if Python version meets minimum requirements.
+
+## Function: `check_required_dependencies`
+
+```python
+check_required_dependencies()
+```
+
+Check if required dependencies are installed using find_spec.
+
+## Function: `check_vector_store_config`
+
+```python
+check_vector_store_config()
+```
+
+Check vector store configuration with Docker/Cloud detection.
+
+## Function: `doctor`
+
+```python
+doctor()
+```
+
+Validate prerequisites and configuration.
+
+Args:
+    verbose: Show detailed information for all checks
+    display: StatusDisplay instance for output
+    config_file: Path to a specific config file to use
+    project_path: Path to project directory
+
+## Function: `main`
+
+```python
+main()
+```
+
+Entry point for the doctor CLI command.
+
+## Function: `process_checks`
+
+```python
+process_checks()
+```
+
+Process all doctor checks and return the results.
+
+Args:
+    display: StatusDisplay for output
+    settings: CodeWeaver settings object
+    container: Optional DI container for resolving services
+
+Returns:
+    List of DoctorCheck results

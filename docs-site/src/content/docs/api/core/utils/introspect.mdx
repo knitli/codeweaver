@@ -1,0 +1,330 @@
+---
+title: introspect
+description: API reference for codeweaver.core.utils.introspect
+---
+
+# `codeweaver.core.utils.introspect`
+
+Type and signature introspection utilities.
+
+The utilities are thin wrappers around the standard library's `inspect` module,
+providing convenient access to function signatures, annotations, and source code.
+
+## Function: `clean_args`
+
+```python
+clean_args()
+```
+
+Remove any keys from the args dictionary that aren't accepted by the target function.
+
+Args:
+    args (dict[str, Any]): The arguments dictionary to clean.
+    func: The function, method, or class to clean arguments for.
+
+Returns:
+    tuple[tuple[Any], dict[str, Any]]: The cleaned arguments tuple and dictionary.
+
+## Function: `get_caller`
+
+```python
+get_caller()
+```
+
+Retrieve the caller's frame information.
+
+Args:
+    depth (int): The depth of the caller to retrieve. Default is 1 (immediate caller).
+
+Returns:
+    inspect.FrameInfo | None: The frame information of the caller, or None if not found.
+
+## Function: `get_caller_module`
+
+```python
+get_caller_module()
+```
+
+Retrieve the caller's module.
+
+Args:
+    depth (int): The depth of the caller to retrieve. Default is 1 (immediate caller).
+
+Returns:
+    Any | None: The module of the caller, or None if not found.
+
+## Function: `get_caller_modulename`
+
+```python
+get_caller_modulename()
+```
+
+Retrieve the caller's module name.
+
+Args:
+    depth (int): The depth of the caller to retrieve. Default is 1 (immediate caller).
+
+Returns:
+    str | None: The module name of the caller, or None if not found.
+
+## Function: `get_class_attrs`
+
+```python
+get_class_attrs()
+```
+
+Retrieve the public and private (sunder `_` not dunder `__`) attributes defined on a given class.
+
+Filters out stdlib dunder attributes inherited from `object` and attributes starting with `__`.
+
+Args:
+    cls (type): The class to introspect.
+
+Returns:
+    tuple[Attribute, ...]: The attributes of the class.
+
+## Function: `get_class_constructor`
+
+```python
+get_class_constructor()
+```
+
+Retrieve the constructors (`__init__` methods) defined on a given class.
+
+Args:
+    cls (type): The class to introspect.
+
+Returns:
+    Attribute: The constructor of the class.
+
+## Function: `get_class_methods`
+
+```python
+get_class_methods()
+```
+
+Retrieve the public and private (sunder `_` not dunder `__`) methods defined on a given class.
+
+Filters out stdlib dunder methods inherited from `object` and methods starting with `__`.
+
+Args:
+    cls (type): The class to introspect.
+
+Returns:
+    tuple[Attribute, ...]: The methods of the class.
+
+## Function: `get_class_properties`
+
+```python
+get_class_properties()
+```
+
+Retrieve the public and private (sunder `_` not dunder `__`) properties defined on a given class.
+
+Filters out stdlib dunder properties inherited from `object` and properties starting with `__`.
+
+Args:
+    cls (type): The class to introspect.
+
+Returns:
+    tuple[Attribute, ...]: The properties of the class.
+
+## Function: `get_class_variables`
+
+```python
+get_class_variables()
+```
+
+Retrieve the public and private (sunder `_` not dunder `__`) variables defined on a given class.
+
+Filters out stdlib dunder variables inherited from `object` and variables starting with `__`.
+
+Args:
+    cls (type): The class to introspect.
+
+Returns:
+    tuple[Attribute, ...]: The variables of the class.
+
+## Function: `get_file_path`
+
+```python
+get_file_path()
+```
+
+Retrieve the file path where the given object is defined.
+
+Args:
+    obj (Any): The object to introspect.
+
+Returns:
+    Path | None: The file path where the object is defined, or None if not found.
+
+## Function: `get_function_annotations`
+
+```python
+get_function_annotations()
+```
+
+Retrieve the annotations of a given function.
+
+Args:
+    func (callable): The function to introspect.
+
+Returns:
+    dict[str, Any]: The annotations of the function.
+
+## Function: `get_function_parameters`
+
+```python
+get_function_parameters()
+```
+
+Retrieve the parameters of a given function.
+
+Args:
+    func (callable): The function to introspect.
+
+Returns:
+    dict[str, inspect.Parameter]: The parameters of the function.
+
+## Function: `get_function_signature`
+
+```python
+get_function_signature()
+```
+
+Retrieve the signature of a given function.
+
+Args:
+    func (callable): The function to introspect.
+
+Returns:
+    inspect.Signature: The signature of the function.
+
+## Function: `get_generic_params_for_type`
+
+```python
+get_generic_params_for_type()
+```
+
+Retrieve the generic parameters for a given type.
+
+Args:
+    tp (type): The type to introspect.
+
+Returns:
+    tuple[Any, ...]: The generic parameters of the type.
+
+## Function: `get_source_code`
+
+```python
+get_source_code()
+```
+
+Retrieve the source code of a given function.
+
+Args:
+    obj (Any): The object to introspect.
+
+Returns:
+    str: The source code of the object.
+
+## Function: `get_source_start_end`
+
+```python
+get_source_start_end()
+```
+
+Retrieve the source code of a given function.
+
+Args:
+    obj (Any): The object to introspect.
+
+Returns:
+    tuple[int, int]: The start and end line numbers of the source code.
+
+## Function: `is_constructor_arg`
+
+```python
+is_constructor_arg()
+```
+
+Check if a given argument name is a constructor argument for the specified class.
+
+Args:
+    cls (type): The class to introspect.
+    arg_name (str): The argument name to check.
+    alt_constructor (callable): An alternative constructor (i.e. classmethod or factory function) function to use instead of the default.
+
+Returns:
+    bool: True if the argument is a constructor argument, False otherwise.
+
+## Function: `keyword_args`
+
+```python
+keyword_args()
+```
+
+Retrieve the names of keyword arguments of a given function.
+
+Args:param.kind == param.VAR_POSITIONAL for param in signature.parameters.values()
+    func (callable): The function to introspect.
+
+Returns:
+    list[str]: The names of keyword arguments.
+
+## Function: `positional_args`
+
+```python
+positional_args()
+```
+
+Retrieve the names of positional arguments of a given function.
+
+Args:
+    func (callable): The function to introspect.
+
+Returns:
+    list[str]: The names of positional arguments.
+
+## Function: `return_type`
+
+```python
+return_type()
+```
+
+Retrieve the return type annotation of a given function.
+
+Args:
+    func (callable): The function to introspect.
+
+Returns:
+    Any: The return type annotation of the function.
+
+## Function: `takes_args`
+
+```python
+takes_args()
+```
+
+Check if a function accepts variable positional arguments (*args).
+
+Args:
+    func (callable): The function to introspect.
+
+Returns:
+    bool: True if the function accepts *args, False otherwise.
+
+## Function: `takes_kwargs`
+
+```python
+takes_kwargs()
+```
+
+Check if a function accepts variable keyword arguments (**kwargs).
+
+Args:
+    func (callable): The function to introspect.
+
+Returns:
+    bool: True if the function accepts **kwargs, False otherwise.

@@ -587,9 +587,14 @@ class ProviderSettings(BasedModel):
         in ENV_EXPLICIT_TRUE_VALUES
     )
 
-    _PROVIDER_CATEGORY_FIELDS: ClassVar[frozenset[str]] = frozenset(
-        {"embedding", "sparse_embedding", "reranking", "vector_store", "data", "agent"}
-    )
+    _PROVIDER_CATEGORY_FIELDS: ClassVar[frozenset[str]] = frozenset({
+        "embedding",
+        "sparse_embedding",
+        "reranking",
+        "vector_store",
+        "data",
+        "agent",
+    })
 
     def __init__(self, **data: Any) -> None:
         """Initialize ProviderSettings and register with DI container if available."""
@@ -608,6 +613,49 @@ class ProviderSettings(BasedModel):
             )
         super().__init__(**data)
 
+    @classmethod
+    def _normalize_provider_item(cls, field: str, item: dict[str, Any]) -> None:
+        """Normalize a single provider configuration item."""
+        provider = item.get("provider")
+
+        if field == "embedding" and "config_type" not in item:
+            item["config_type"] = (
+                "asymmetric"
+                if "embed_provider" in item or "query_provider" in item
+                else "symmetric"
+            )
+
+        if not provider:
+            return
+
+        for config_key in ("embedding_config", "sparse_embedding_config", "reranking_config"):
+            config_value = item.get(config_key)
+            if isinstance(config_value, dict):
+                config_value.setdefault("provider", provider)
+                config_value.setdefault("model_name", item.get("model_name"))
+
+        client_options = item.get("client_options")
+        if isinstance(client_options, dict):
+            client_options.setdefault("tag", provider)
+
+    @classmethod
+    def _normalize_provider_field_value(cls, data: dict[str, Any], field: str) -> None:
+        """Normalize a provider category field value in-place."""
+        value = data.get(field)
+        if value is None:
+            return
+
+        if not isinstance(value, tuple | list):
+            value = (value,)
+            data[field] = value
+
+        if not isinstance(value, list):
+            return
+
+        for item in value:
+            if isinstance(item, dict):
+                cls._normalize_provider_item(field, item)
+
     @model_validator(mode="before")
     @classmethod
     def coerce_provider_fields_to_tuples(cls, data: Any) -> Any:
@@ -615,53 +663,15 @@ class ProviderSettings(BasedModel):
 
         When provider settings arrive from TOML configs or pydantic-settings
         source merging, they may be bare dicts instead of sequences and may
-        lack discriminator fields needed by pydantic's tagged unions.  This
-        validator:
-        1. Wraps bare dicts/models in lists so pydantic can coerce to tuples.
-        2. Injects missing discriminator fields (``config_type``,
-           ``provider``) into nested dicts so pydantic can resolve the
-           correct union member.
+        lack discriminator fields needed by pydantic's tagged unions. This
+        validator wraps non-sequences and injects missing discriminator fields.
         """
         if not isinstance(data, dict):
             return data
+
         for field in cls._PROVIDER_CATEGORY_FIELDS:
-            value = data.get(field)
-            if value is None:
-                continue
-            # Ensure the value is a list (pydantic coerces to tuple)
-            if not isinstance(value, tuple | list):
-                value = [value]
-                data[field] = value
-            if not isinstance(value, list):
-                continue
-            for item in value:
-                if not isinstance(item, dict):
-                    continue
-                provider = item.get("provider")
-                # Inject config_type discriminator for embedding union
-                if field == "embedding" and "config_type" not in item:
-                    if "embed_provider" in item or "query_provider" in item:
-                        item["config_type"] = "asymmetric"
-                    else:
-                        item["config_type"] = "symmetric"
-                # Propagate provider into nested config dicts that use it
-                # as a discriminator (embedding_config, reranking_config, etc.)
-                if provider:
-                    for config_key in (
-                        "embedding_config",
-                        "sparse_embedding_config",
-                        "reranking_config",
-                    ):
-                        if config_key in item and isinstance(item[config_key], dict):
-                            item[config_key].setdefault("provider", provider)
-                            item[config_key].setdefault(
-                                "model_name", item.get("model_name")
-                            )
-                    # Inject tag into client_options for provider discrimination
-                    if "client_options" in item and isinstance(
-                        item["client_options"], dict
-                    ):
-                        item["client_options"].setdefault("tag", provider)
+            cls._normalize_provider_field_value(data, field)
+
         return data
 
     @model_validator(mode="after")

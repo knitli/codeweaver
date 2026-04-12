@@ -1,0 +1,121 @@
+---
+title: reconciliation_service
+description: API reference for codeweaver.engine.services.reconciliation_service
+---
+
+# `codeweaver.engine.services.reconciliation_service`
+
+Vector reconciliation service for backup vector validation and repair.
+
+This service ensures that all points in the vector store have the required backup
+vectors. It operates in a lazy repair mode, only fixing points that are missing
+backup vectors rather than proactively checking everything.
+
+The service integrates with the failover maintenance loop and runs periodically
+to ensure backup vector coverage for disaster recovery scenarios.
+
+## Class: `ReconciliationResult`
+
+Results from reconciliation operations.
+
+## Class: `RepairStats`
+
+Statistics for repair operations.
+
+## Class: `VectorReconciliationService`
+
+Service for reconciling backup vectors in the vector store.
+
+This service ensures that all points have the required backup vectors for
+failover scenarios. It operates in two modes:
+
+1. Detection: Identify points missing backup vectors
+2. Repair: Generate and add missing backup vectors
+
+The service uses batch processing for efficiency and integrates with
+the failover maintenance loop for periodic execution.
+
+### Method: `cleanup`
+
+```python
+cleanup()
+```
+
+Cleanup service resources.
+
+### Method: `detect_missing_vectors`
+
+```python
+detect_missing_vectors()
+```
+
+Detect points missing backup vectors.
+
+This method scrolls through the collection and identifies points that
+don't have the backup vector field populated.
+
+Args:
+    collection_name: Name of collection to check
+    limit: Maximum number of missing points to detect (None = all)
+
+Returns:
+    List of point IDs missing backup vectors
+
+Example:
+    &gt;&gt;&gt; service = VectorReconciliationService(vector_store)
+    &gt;&gt;&gt; missing = await service.detect_missing_vectors("my_collection")
+    &gt;&gt;&gt; print(f"Found &#123;len(missing)&#125; points missing backup vectors")
+
+### Method: `reconcile`
+
+```python
+reconcile()
+```
+
+Perform full reconciliation: detect and optionally repair missing vectors.
+
+This is the main entry point for the reconciliation service. It detects
+points missing backup vectors and optionally repairs them.
+
+Args:
+    collection_name: Collection to reconcile
+    auto_repair: Whether to automatically repair detected issues
+    detection_limit: Maximum points to detect (None = all)
+
+Returns:
+    Dictionary with reconciliation results:
+    - detected: Number of points missing backup vectors
+    - repaired: Number of successfully repaired points
+    - failed: Number of points that failed to repair
+    - errors: List of error messages
+
+Example:
+    &gt;&gt;&gt; service = VectorReconciliationService(vector_store)
+    &gt;&gt;&gt; result = await service.reconcile("my_collection", auto_repair=True)
+    &gt;&gt;&gt; print(f"Detected: &#123;result['detected']&#125;, Repaired: &#123;result['repaired']&#125;")
+
+### Method: `repair_missing_vectors`
+
+```python
+repair_missing_vectors()
+```
+
+Repair points by generating and adding missing backup vectors.
+
+This method retrieves the points, generates backup embeddings from their
+content, and updates the vector store with the new backup vectors.
+
+Args:
+    collection_name: Name of collection containing points
+    point_ids: List of point IDs to repair
+
+Returns:
+    Dictionary with repair statistics:
+    - repaired: Number of successfully repaired points
+    - failed: Number of points that failed to repair
+    - errors: List of error messages encountered
+
+Example:
+    &gt;&gt;&gt; missing = await service.detect_missing_vectors("collection")
+    &gt;&gt;&gt; stats = await service.repair_missing_vectors("collection", missing)
+    &gt;&gt;&gt; print(f"Repaired: &#123;stats['repaired']&#125;, Failed: &#123;stats['failed']&#125;")

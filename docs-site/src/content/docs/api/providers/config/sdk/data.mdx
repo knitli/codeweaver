@@ -1,0 +1,95 @@
+---
+title: data
+description: API reference for codeweaver.providers.config.sdk.data
+---
+
+# `codeweaver.providers.config.sdk.data`
+
+Data provider configuration.
+
+This module provides types for configuring data providers, which in fact are internal MCP tools. These tools are used by CodeWeaver's internal context agents to fetch, verify, and tailor information for the user's agent or the user.
+
+## Class: `BaseToolConfig`
+
+Base configuration for data providers.
+
+### Method: `to_call`
+
+```python
+to_call()
+```
+
+Convert the data config to a tool call.
+
+For example, most tools expect to receive either an api_key or a client instance. The data config should be able to convert itself into the appropriate tool call format, which may involve instantiating a client with the stored API key or other configuration parameters. The context parameter can be used to access any relevant contextual information that may be needed to construct the tool call, such as user information, session data, other relevant state, or flags to specify which tool is called for multi-tool providers.
+
+## Class: `DuckDuckGoSearchToolConfig`
+
+Configuration for the DuckDuckGoSearchTool.
+
+### Method: `to_call`
+
+```python
+to_call()
+```
+
+Convert the DuckDuckGo data config to a DuckDuckGoSearchTool call.
+
+## Class: `ExaAnswerToolOptions`
+
+Configuration options for Exa's answer tool.
+
+## Class: `ExaContentsOptions`
+
+Options for content retrieval in Exa tools.
+
+## Class: `ExaFindSimilarToolOptions`
+
+Configuration options for Exa's find similar tool.
+
+## Class: `ExaGetContentsToolOptions`
+
+Configuration options for Exa's get contents tool.
+
+## Class: `ExaSearchToolOptions`
+
+Configuration options for Exa's search tool.
+
+These parameters are passed as instance attributes to the ExaSearchTool. Any settings here will override settings passed to the function call. We do this to allow you to override and prevent certain agent behaviors, such as the number of results returned (because agents are calling the function).
+
+## Class: `ExaToolConfig`
+
+Configuration for Exa data provider. Exa is an ai-tailored search service that provides curated web search and deep research capabilities.
+
+The Exa provider is actually 4 tools:
+- `ExaSearchTool`: Performs web and database (i.e. academic) searches using Exa's search capabilities, returning results and content in a structured format.
+- `ExaFindSimilarTool`: Find pages similar to the given **URL** and returns them with content.
+- `ExaGetContentsTool`: Returns scraped content for a given list of **URLs**.
+- `ExaAnswerTool`: Returns direct answers to specific plain language questions using Exa's search and research capabilities. All answers include citations and links to sources.
+
+*Not implemented, but this is where we're going:*
+- CodeWeaver's internal context agents use the `GetContentsTool` to retrieve API research and documentation content for inclusion in CodeWeaver's internal knowledge base. This is part of CodeWeaver's latent retrieval and data curation capabilities and happens in between user interactions.
+- They use the `AnswerTool` to augment answers as needed when responding to user or user agent queries with up-to-date information from the web or databases.
+- For now, we don't plan to default to enabling the `SearchTool` and `FindSimilarTool` for internal context agents. The search tool may be worth exposing -- it has multiple modes wit the two most likely useful being `neural` and `deep`. The former is a semantic search mode against a large index of web content, and the latter is a deep multi-agent research tool that can perform complex searches and synthesize information from multiple sources.
+
+We're very conservative about what tools we expose to the internal context agents; we want to make sure they stay focused on their core competency of tailoring and curating information for the user and the user's agent, and we don't want to overwhelm them with too many tools or capabilities that could lead them astray. The `GetContentsTool` and `AnswerTool` are the most directly relevant to their core competency, so those are the ones we're prioritizing for now.
+
+### Method: `to_call`
+
+```python
+to_call()
+```
+
+Convert the Exa data config to a call to register the exa tools.
+
+## Class: `TavilySearchContextToolConfig`
+
+Configuration for the TavilySearchContextTool.
+
+### Method: `to_call`
+
+```python
+to_call()
+```
+
+Convert the Tavily data config to a TavilySearchContextTool call.

@@ -1,0 +1,168 @@
+---
+title: registry
+description: API reference for codeweaver.providers.env_registry.registry
+---
+
+# `codeweaver.providers.env_registry.registry`
+
+Central registry for provider environment configurations.
+
+Provides lazy loading, caching, and query API for provider configs.
+Thread-safe, supports external registration.
+
+## Class: `ProviderEnvRegistry`
+
+Central registry for provider environment configurations.
+
+Features:
+- Lazy initialization (only loads when first accessed)
+- Thread-safe initialization
+- External registration support
+- Efficient lookup and querying
+- Inheritance resolution
+
+Example:
+    &gt;&gt;&gt; # Get all configs for a provider
+    &gt;&gt;&gt; configs = ProviderEnvRegistry.get("deepseek")
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # Get just API key env vars
+    &gt;&gt;&gt; api_keys = ProviderEnvRegistry.get_api_key_envs("openai")
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # Get configs for specific client
+    &gt;&gt;&gt; azure_openai = ProviderEnvRegistry.get_for_client("azure", "openai")
+
+### Method: `all_configs`
+
+```python
+all_configs()
+```
+
+Get all registered provider configurations.
+
+Returns:
+    Dictionary mapping provider names to their configs
+
+Example:
+    &gt;&gt;&gt; all_configs = ProviderEnvRegistry.all_configs()
+    &gt;&gt;&gt; for provider, configs in all_configs.items():
+    ...     print(f"&#123;provider&#125;: &#123;len(configs)&#125; config(s)")
+
+### Method: `all_providers`
+
+```python
+all_providers()
+```
+
+Get all registered provider names.
+
+Returns:
+    Tuple of provider names (lowercase, sorted)
+
+Example:
+    &gt;&gt;&gt; providers = ProviderEnvRegistry.all_providers()
+    &gt;&gt;&gt; print(len(providers))
+    40
+
+### Method: `get`
+
+```python
+get()
+```
+
+Get all configurations for a provider.
+
+Handles inheritance - if a config has `inherits_from`, the parent's
+configs are included in the result.
+
+Args:
+    provider: Provider name (case-insensitive)
+
+Returns:
+    List of ProviderEnvConfig instances (empty if not found)
+
+Example:
+    &gt;&gt;&gt; configs = ProviderEnvRegistry.get("deepseek")
+    &gt;&gt;&gt; # Returns [DeepSeek config, OpenAI inherited configs]
+
+### Method: `get_api_key_envs`
+
+```python
+get_api_key_envs()
+```
+
+Get API key environment variable names for a provider.
+
+Cached for performance.
+
+Args:
+    provider: Provider name
+
+Returns:
+    Tuple of environment variable names (e.g., ("OPENAI_API_KEY",))
+
+Example:
+    &gt;&gt;&gt; api_keys = ProviderEnvRegistry.get_api_key_envs("openai")
+    &gt;&gt;&gt; print(api_keys)
+    ('OPENAI_API_KEY',)
+
+### Method: `get_for_client`
+
+```python
+get_for_client()
+```
+
+Get configs for provider filtered by client SDK.
+
+Args:
+    provider: Provider name
+    client: SDK provider's name (e.g., "openai", "anthropic"); the result of `SDKClient.SOME_MEMBER.variable`
+
+Returns:
+    Tuple of matching configs
+
+Example:
+    &gt;&gt;&gt; configs = ProviderEnvRegistry.get_for_client("azure", "openai")
+    &gt;&gt;&gt; # Returns only Azure OpenAI config, not Cohere or Anthropic
+
+### Method: `register`
+
+```python
+register()
+```
+
+Register provider configuration.
+
+Note: External registration is an internal API and may change.
+CodeWeaver has no stable public API during 0.x development.
+
+Args:
+    provider: Provider name (lowercase)
+    config: Single config or list of configs
+    external: If True, this is an external registration (plugin/extension).
+             Prevents conflicts with built-in providers.
+
+Raises:
+    ValueError: If external provider conflicts with built-in provider
+
+Example (internal use only):
+    &gt;&gt;&gt; ProviderEnvRegistry.register(
+    ...     "myprovider", ProviderEnvConfig(...), external=True
+    ... )
+
+### Method: `to_dict`
+
+```python
+to_dict()
+```
+
+Export all configurations as dictionaries.
+
+Used by MCP registry generation script.
+
+Returns:
+    Serializable dictionary of all configs
+
+Example:
+    &gt;&gt;&gt; import json
+    &gt;&gt;&gt; data = ProviderEnvRegistry.to_dict()
+    &gt;&gt;&gt; json.dumps(data, indent=2)

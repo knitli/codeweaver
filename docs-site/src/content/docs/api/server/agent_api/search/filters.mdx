@@ -1,0 +1,60 @@
+---
+title: filters
+description: API reference for codeweaver.server.agent_api.search.filters
+---
+
+# `codeweaver.server.agent_api.search.filters`
+
+Post-search filtering utilities.
+
+This module provides functions for filtering search results based on
+various criteria such as test file inclusion and language focus.
+
+## Function: `apply_filters`
+
+```python
+apply_filters()
+```
+
+Apply all configured filters to search results.
+
+Args:
+    candidates: List of search results to filter
+    include_tests: Whether to include test files
+    focus_languages: Optional tuple of language names to include
+
+Returns:
+    Filtered list of search results
+
+## Function: `filter_by_languages`
+
+```python
+filter_by_languages()
+```
+
+Filter search results to only include specified languages.
+
+Args:
+    candidates: List of search results to filter
+    focus_languages: tuple of language names to include
+
+Returns:
+    Filtered list of search results
+
+## Function: `filter_test_files`
+
+```python
+filter_test_files()
+```
+
+Filter out test files if include_tests is False.
+
+Args:
+    candidates: List of search results to filter
+
+Returns:
+    Filtered list of search results
+
+Note:
+    This is a basic implementation using path name heuristics.
+    Future versions will use repo metadata to properly tag test files.

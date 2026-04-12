@@ -1,0 +1,120 @@
+---
+title: filesystem
+description: API reference for codeweaver.core.utils.filesystem
+---
+
+# `codeweaver.core.utils.filesystem`
+
+Git and filesystem-related utility functions.
+
+## Function: `get_git_branch`
+
+```python
+get_git_branch()
+```
+
+Get the current branch name of a git repository.
+
+## Function: `get_git_revision`
+
+```python
+get_git_revision()
+```
+
+Get the SHA-1 of the HEAD of a git repository.
+
+## Function: `get_project_path`
+
+```python
+get_project_path()
+```
+
+Get the root directory of the project.
+
+## Function: `get_tooling_dirs`
+
+```python
+get_tooling_dirs()
+```
+
+Get common tooling directories within the project root.
+
+## Function: `get_user_cache_dir`
+
+```python
+get_user_cache_dir()
+```
+
+Get the user cache directory based on the operating system.
+
+## Function: `get_user_config_dir`
+
+```python
+get_user_config_dir()
+```
+
+Get the user configuration directory based on the operating system.
+
+## Function: `get_user_data_dir`
+
+```python
+get_user_data_dir()
+```
+
+Get the user data directory based on the operating system.
+
+## Function: `get_user_state_dir`
+
+```python
+get_user_state_dir()
+```
+
+Get the user state directory based on the operating system.
+
+## Function: `has_git`
+
+```python
+has_git()
+```
+
+Check if git is installed and available.
+
+## Function: `in_codeweaver_clone`
+
+```python
+in_codeweaver_clone()
+```
+
+Check if the current repo is CodeWeaver.
+
+## Function: `is_git_dir`
+
+```python
+is_git_dir()
+```
+
+Is the given directory version-controlled with git?
+
+## Function: `normalize_ext`
+
+```python
+normalize_ext()
+```
+
+Normalize a file extension to a standard format. Cached because of hot/repetitive use.
+
+## Function: `set_relative_path`
+
+```python
+set_relative_path()
+```
+
+Validates a path and makes it relative to the project root if the path is absolute.
+
+## Function: `try_git_rev_parse`
+
+```python
+try_git_rev_parse()
+```
+
+Attempt to use git to get the root directory of the current git repository.

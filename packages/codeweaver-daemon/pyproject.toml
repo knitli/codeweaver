@@ -33,24 +33,24 @@ dependencies = [
   "httpx[http2]>=0.28.1",
 ]
 
+
 [project.urls]
 Homepage = "https://knitli.com"
-Repository = "https://github.com/knitli/codeweaver"
 Issues = "https://github.com/knitli/codeweaver/issues"
+Repository = "https://github.com/knitli/codeweaver"
 
 [project.optional-dependencies]
 build = ["hatchling"]
-test = ["pytest", "pytest-asyncio", "pytest-cov"]
 
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning>=0.14.0"]
 build-backend = "hatchling.build"
 
-[tool.hatch.build.targets.wheel]
-packages = ["./src/codeweaver_daemon"]
-
 [tool.hatch.version]
 source = "uv-dynamic-versioning"
+
+[tool.hatch.build.targets.wheel]
+packages = ["./src/codeweaver_daemon"]
 
 [tool.uv-dynamic-versioning]
 vcs = "git"
@@ -77,3 +77,4 @@ asyncio_mode = "auto"
 
 [tool.ruff.lint]
 per-file-ignores = { "tests/*" = ["S101"] }
+

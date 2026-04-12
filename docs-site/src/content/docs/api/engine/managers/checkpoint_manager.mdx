@@ -1,0 +1,170 @@
+---
+title: checkpoint_manager
+description: API reference for codeweaver.engine.managers.checkpoint_manager
+---
+
+# `codeweaver.engine.managers.checkpoint_manager`
+
+Checkpoint and resume functionality for indexing pipeline.
+
+Persists indexing state to enable resumption after interruption.
+
+## Class: `ChangeImpact`
+
+Classification of configuration change impact on index validity.
+
+Defines how configuration changes affect the need for reindexing operations.
+Each level represents increasingly severe impacts requiring different handling strategies.
+
+## Class: `CheckpointManager`
+
+Manages checkpoint save/load operations for indexing pipeline.
+
+PURE state management. No default configuration fetching.
+
+This manager now includes unified compatibility checking that bridges:
+- CheckpointSettingsFingerprint (new family-aware comparison)
+- IndexingCheckpoint.matches_settings() (existing validation)
+
+### Method: `delete`
+
+```python
+delete()
+```
+
+Delete checkpoint file.
+
+### Method: `is_index_valid_for_config`
+
+```python
+is_index_valid_for_config()
+```
+
+Unified compatibility check connecting fingerprint and checkpoint logic.
+
+This method bridges the gap between:
+- CheckpointSettingsFingerprint (new family-aware comparison)
+- IndexingCheckpoint.matches_settings() (existing validation)
+
+It implements family-aware compatibility checking for asymmetric embedding
+configurations while maintaining backward compatibility with existing
+checkpoint validation logic.
+
+Args:
+    checkpoint: Existing indexing checkpoint
+    new_config: New embedding configuration to check against
+
+Returns:
+    Tuple of (is_valid: bool, impact: ChangeImpact)
+    - is_valid: True if checkpoint can be reused with new config
+    - impact: Classification of the configuration change impact
+
+### Method: `load`
+
+```python
+load()
+```
+
+Load checkpoint from disk if available.
+
+### Method: `save`
+
+```python
+save()
+```
+
+Save checkpoint to disk.
+
+## Class: `CheckpointSettingsFingerprint`
+
+Family-aware configuration fingerprint for checkpoint compatibility checking.
+
+This dataclass captures the critical configuration elements that determine whether
+an existing index can be reused. It supports asymmetric embedding configurations
+where query models can change without invalidating the index if they stay within
+the same model family.
+
+Attributes:
+    embedding_config_type: Whether config is "symmetric" or "asymmetric"
+    embed_model: Document embedding model name
+    embed_model_family: Model family ID for compatibility checks (optional)
+    query_model: Query embedding model name (required for asymmetric configs)
+    sparse_model: Sparse embedding model name (optional)
+    vector_store: Vector store provider name
+    config_hash: Hash of full configuration for validation
+
+### Method: `is_compatible_with`
+
+```python
+is_compatible_with()
+```
+
+Check compatibility and classify change impact with family-aware logic.
+
+Implements comprehensive compatibility checking that handles:
+- Asymmetric embedding configs with model families
+- Symmetric embedding model changes
+- Sparse model changes
+- Vector store changes
+
+For asymmetric configs:
+- Same family + same embed model + different query model = COMPATIBLE
+- Different families or embed models = BREAKING
+
+For symmetric configs:
+- Different model = BREAKING
+
+Args:
+    other: The other fingerprint to compare against (typically from checkpoint)
+
+Returns:
+    Tuple of (is_compatible: bool, impact: ChangeImpact)
+
+## Class: `CheckpointSettingsMap`
+
+Subset of settings relevant for checkpoint hashing.
+
+This is the complete settings map used for hash generation, distinct from
+the CheckpointSettingsFingerprint which is used for compatibility checking.
+
+## Class: `IndexingCheckpoint`
+
+Persistent checkpoint for indexing pipeline state.
+
+### Method: `current_settings_hash`
+
+```python
+current_settings_hash()
+```
+
+Compute Blake3 hash of current settings.
+
+### Method: `is_stale`
+
+```python
+is_stale()
+```
+
+Check if checkpoint is too old or settings mismatch.
+
+### Method: `matches_settings`
+
+```python
+matches_settings()
+```
+
+Check if checkpoint settings match current configuration.
+
+## Function: `get_checkpoint_settings_map`
+
+```python
+get_checkpoint_settings_map()
+```
+
+Get relevant settings for checkpoint hashing.
+
+Note: This is a helper for the manager/checkpoint to use.
+It still needs access to the global settings to compute the hash.
+
+We could also consider vector store changes more carefully -- we can migrate
+vector stores without reindexing if needed.

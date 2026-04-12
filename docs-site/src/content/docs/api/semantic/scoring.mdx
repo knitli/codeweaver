@@ -1,0 +1,27 @@
+---
+title: scoring
+description: API reference for codeweaver.semantic.scoring
+---
+
+# `codeweaver.semantic.scoring`
+
+Semantic scoring system for AST nodes with contextual adjustments.
+
+## Class: `SemanticScorer`
+
+Calculates importance scores for AST nodes using semantic categories and contextual factors.
+
+### Method: `calculate_importance_score`
+
+```python
+calculate_importance_score()
+```
+
+Calculate the final importance score for a thing.
+
+Args:
+    semantic_category: The semantic category of the thing
+    thing: The AST thing to score
+
+Returns:
+    Final importance score incorporating base score and contextual adjustments

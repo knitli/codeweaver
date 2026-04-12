@@ -1,0 +1,43 @@
+---
+title: utils
+description: API reference for codeweaver.core.telemetry.utils
+---
+
+# `codeweaver.core.telemetry.utils`
+
+Privacy utilities for telemetry.
+
+## Class: `IntifyingPatterns`
+
+Patterns for identifying identifiable information.
+
+## Function: `find_identifiable_info`
+
+```python
+find_identifiable_info()
+```
+
+Find identifiable information in the given data string.
+
+Args:
+    data (str): The data string to analyze.
+
+Returns:
+    list[str]: A list of identifiable information found in the data.
+
+## Function: `redact_identifiable_info`
+
+```python
+redact_identifiable_info()
+```
+
+Redact identifiable information from the given data string.
+
+Replaces identified patterns with generic placeholders while maintaining
+string structure. This is a best-effort approach for privacy protection.
+
+Args:
+    data (str): The data string to redact.
+
+Returns:
+    str: The data string with identifiable information redacted.

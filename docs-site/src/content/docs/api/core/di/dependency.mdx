@@ -1,0 +1,141 @@
+---
+title: dependency
+description: API reference for codeweaver.core.di.dependency
+---
+
+# `codeweaver.core.di.dependency`
+
+Dependency marker for declarative injection.
+
+## Class: `Depends`
+
+Dependency marker, inspired by FastAPI.
+
+Marks a parameter for dependency injection by the DI container.
+
+## Basic Usage (Auto-Resolution)
+
+The simplest approach is to use the INJECTED sentinel with a type annotation:
+
+```python "Simple Auto-Resolution"
+from codeweaver.core.di import INJECTED, dependency_provider
+
+
+@dependency_provider(scope="singleton")
+class ServiceProvider:
+    def __init__(self):
+        self.value = 42
+
+
+async def my_function(service: ServiceProvider = INJECTED) -&gt; None:
+    # service is automatically injected based on the type annotation
+    print(service.value)
+```
+
+## Advanced Usage (Explicit Factory)
+
+For more control, use the Depends marker with an explicit factory:
+
+```python "Explicit Factory with Depends"
+from typing import Annotated
+from codeweaver.core.di import Depends, INJECTED, dependency_provider
+
+
+@dependency_provider(ServiceProvider)
+async def service_factory() -&gt; ServiceProvider:
+    # Custom initialization logic here
+    return ServiceProvider()
+
+
+async def my_function(
+    service: Annotated[ServiceProvider, Depends(service_factory)] = INJECTED,
+) -&gt; None:
+    print(service.value)
+```
+
+## Scope Control
+
+Control caching behavior with the `scope` parameter:
+
+```python "Scope Control"
+from typing import Annotated
+from codeweaver.core.di import depends, INJECTED
+
+# Singleton: one instance per application lifetime
+type SingletonService = Annotated[Service, depends(scope="singleton")]
+
+# Request: one instance per request
+type RequestService = Annotated[Service, depends(scope="request")]
+
+# Function: new instance every time (no caching)
+type FunctionService = Annotated[Service, depends(scope="function")]
+
+
+async def handler(
+    singleton: SingletonService = INJECTED,
+    request: RequestService = INJECTED,
+    fresh: FunctionService = INJECTED,
+) -&gt; None: ...
+```
+
+## Type Aliases for Clean Code
+
+Create type aliases to avoid repeating Annotated everywhere:
+
+```python "Type Aliases"
+from typing import TYPE_CHECKING, Annotated
+from codeweaver.core.di import INJECTED, depends
+
+if TYPE_CHECKING:
+    from someplace import ServiceProvider
+
+# Simple alias (uses default singleton scope)
+type ServiceDep = ServiceProvider
+
+# Or with explicit behavior
+type RequestScopedService = Annotated[ServiceProvider, depends(scope="request")]
+
+
+async def my_function(service: RequestScopedService = INJECTED) -&gt; None:
+    # service will be injected with request scope
+    ...
+```
+
+## Class: `DependsPlaceholder`
+
+Indicates that a parameter's value should be injected by the DI container.
+
+Supports type-safe usage via subscript syntax to satisfy type checkers while
+maintaining sentinel behavior at runtime.
+
+Usage:
+    # Type-safe with subscript (recommended):
+    async def my_function(
+        embedding: Annotated[EmbeddingProvider, Depends(get_embedding)] = INJECTED
+    ) -&gt; None:
+        # embedding will be injected by the container
+        ...
+
+    # Or with type alias:
+    async def my_function(
+        embedding: EmbeddingDep = INJECTED
+    ) -&gt; None:
+        ...
+
+## Function: `depends`
+
+```python
+depends()
+```
+
+Helper function to create a Depends marker.
+
+## Function: `is_depends_marker`
+
+```python
+is_depends_marker()
+```
+
+Check if a value is a DI injection marker or sentinel.
+
+Handles Depends markers, DependsPlaceholder sentinels, and the INJECTED proxy.

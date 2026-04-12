@@ -1,0 +1,36 @@
+---
+title: resolver
+description: API reference for codeweaver.providers.agent.resolver
+---
+
+# `codeweaver.providers.agent.resolver`
+
+Resolver implementation for agentic models.
+
+## Class: `AgentCapabilityResolver`
+
+Resolver for agent model capabilities.
+
+### Method: `all_model_names`
+
+```python
+all_model_names()
+```
+
+Return a list of all known model names.
+
+### Method: `resolve`
+
+```python
+resolve()
+```
+
+Resolve the capabilities for a given model name.
+
+## Function: `get_agent_resolver`
+
+```python
+get_agent_resolver()
+```
+
+Get a singleton instance of the agent capability resolver.

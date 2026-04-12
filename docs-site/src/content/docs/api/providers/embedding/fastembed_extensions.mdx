@@ -1,0 +1,46 @@
+---
+title: fastembed_extensions
+description: API reference for codeweaver.providers.embedding.fastembed_extensions
+---
+
+# `codeweaver.providers.embedding.fastembed_extensions`
+
+Some added models for fastembed provider to modernize the offerings a bit.
+
+## Function: `add_models`
+
+```python
+add_models()
+```
+
+Add custom models to the input cls.
+
+Models are added to the *class*; the function returns the input class, not an instance.
+
+## Function: `get_cross_encoder`
+
+```python
+get_cross_encoder()
+```
+
+Get the cross encoder with added custom models.
+
+## Function: `get_sparse_embedder`
+
+```python
+get_sparse_embedder()
+```
+
+Get the sparse embedder with added custom models.
+
+TODO: Temporarily disabled until we can work out the bugs on added sparse models in FastEmbed.
+
+## Function: `get_text_embedder`
+
+```python
+get_text_embedder()
+```
+
+Get the text embedder with added custom models.
+
+Only adds models that aren't already in FastEmbed's native registry to avoid conflicts.

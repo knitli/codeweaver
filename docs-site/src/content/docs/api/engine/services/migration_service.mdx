@@ -1,0 +1,88 @@
+---
+title: migration_service
+description: API reference for codeweaver.engine.services.migration_service
+---
+
+# `codeweaver.engine.services.migration_service`
+
+Migration service for vector store transformations.
+
+This service implements dimension reduction and quantization migrations with:
+- CRITICAL #3: Parallel processing with worker pools
+- CRITICAL #4: Data integrity validation (4 layers)
+- CRITICAL #5: Resume capability with checkpoints
+
+ARCHITECTURE: Plain class with no DI in constructor (factory handles DI).
+
+## Class: `ChunkResult`
+
+Result from migrating a chunk.
+
+## Class: `InvalidStateTransitionError`
+
+Invalid state transition attempted.
+
+## Class: `MigrationCheckpoint`
+
+Persistent checkpoint for migration state.
+
+## Class: `MigrationError`
+
+Base exception for migration errors.
+
+## Class: `MigrationResult`
+
+Results of migration operation.
+
+## Class: `MigrationService`
+
+Comprehensive migration service with parallel workers.
+
+ARCHITECTURE NOTE: This is a PLAIN CLASS with no DI in constructor.
+Factory function in engine/dependencies.py handles DI integration.
+
+Implements:
+- CRITICAL #3: Parallel processing with worker pool
+- CRITICAL #4: Data integrity validation (4 layers)
+- CRITICAL #5: Resume capability with checkpoints
+
+### Method: `migrate_dimensions_parallel`
+
+```python
+migrate_dimensions_parallel()
+```
+
+Main entry point for parallel dimension migration.
+
+Implements CRITICAL #3 (parallel processing), CRITICAL #4 (data integrity),
+and CRITICAL #5 (resume capability).
+
+Args:
+    new_dimension: Target dimension for migration
+    worker_count: Number of parallel workers (default: 4)
+    batch_size: Vectors per batch (default: 1000)
+    resume: Whether to resume from checkpoint (default: True)
+
+Returns:
+    MigrationResult with timing and statistics
+
+Raises:
+    ValidationError: Data integrity validation failed
+    MigrationError: Migration operation failed
+
+## Class: `MigrationState`
+
+Migration state machine states.
+
+State Transitions:
+    PENDING -&gt; IN_PROGRESS -&gt; COMPLETED -&gt; ROLLBACK -&gt; PENDING
+                            ↓
+                          FAILED -&gt; PENDING
+
+## Class: `ValidationError`
+
+Data integrity validation failed.
+
+## Class: `WorkItem`
+
+Work item for parallel migration.
