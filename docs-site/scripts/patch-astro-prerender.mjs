@@ -20,9 +20,10 @@
  * TODO: Remove once Astro publishes a fix
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 
-const ROOT = resolve(import.meta.dirname, "..");
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 function patchFile(relPath, patches) {
   const absPath = resolve(ROOT, "node_modules", relPath);

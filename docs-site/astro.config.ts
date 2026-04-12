@@ -34,7 +34,7 @@ const configOptions: DocsTemplateOptions = {
       "yaml"
     ]
   },
-  siderbarConfig: [
+  sidebarConfig: [
     {
       label: 'Getting Started',
       items: [

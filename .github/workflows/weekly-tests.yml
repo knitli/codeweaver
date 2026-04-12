@@ -227,7 +227,6 @@ jobs:
           echo "macOS Tests: ${macos_result}"
           echo "Benchmarks: ${benchmark_result}"
           echo "Coverage Report: ${coverage_result}"
-          echo "Install-Profile Smoke Tests: ${smoke_result}"
 
           # Calculate overall status
           critical_failure=false
