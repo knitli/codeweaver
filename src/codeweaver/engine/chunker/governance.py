@@ -157,7 +157,7 @@ class ResourceGovernor:
                 limit_value=float(self.settings.max_chunks_per_file),
                 actual_value=float(self._chunk_count),
                 extra_context={
-                    "elapsed_seconds": time.monotonic() - self._start_time if self._start_time else 0
+                    "elapsed_seconds": time.monotonic() - self._start_time if self._start_time is not None else 0
                 },
             )
 
