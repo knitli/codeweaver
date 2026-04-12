@@ -34,11 +34,6 @@ dependencies = [
   "tokenizers>=0.22.1",
   "typing_extensions>=4.15.0",
 ]
-# Version is derived from the same git tag as the root code-weaver package
-# via uv-dynamic-versioning, so all three workspace packages always ship with
-# matching versions and the root can pin them with `=={{ version }}` in its
-# metadata hook.
-dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://knitli.com"
@@ -48,9 +43,6 @@ Repository = "https://github.com/knitli/codeweaver"
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning>=0.14.0"]
 build-backend = "hatchling.build"
-
-[tool.hatch.version]
-source = "uv-dynamic-versioning"
 
 [tool.hatch.build.targets.wheel]
 packages = ["./src/codeweaver_tokenizers"]
@@ -83,10 +75,3 @@ asyncio_mode = "auto"
 
 [tool.ruff.lint]
 per-file-ignores = { "tests/*" = ["S101"] }
-
-[tool.uv-dynamic-versioning]
-vcs = "git"
-style = "pep440"
-bump = true
-dirty = false
-commit-prefix = "g"
