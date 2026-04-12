@@ -540,7 +540,11 @@ class IndexingService:
         if not self._deleted_files:
             return
 
-        rel_paths: list[Path] = [rel_path for path in self._deleted_files if (rel_path := set_relative_path(path, base_path=self._project_path))]
+        rel_paths: list[Path] = [
+            rel_path
+            for path in self._deleted_files
+            if (rel_path := set_relative_path(path, base_path=self._project_path))
+        ]
 
         if self._vector_store and rel_paths:
             await self._vector_store.delete_by_files(rel_paths)

@@ -68,11 +68,7 @@ def _make_settings(custom_delimiters: list[CustomDelimiter]) -> ChunkerSettings:
     return ChunkerSettings(custom_delimiters=custom_delimiters, performance=PerformanceSettings())
 
 
-def _make_mock_file(
-    suffix: str,
-    *,
-    ext_category: object = None,
-) -> Mock:
+def _make_mock_file(suffix: str, *, ext_category: object = None) -> Mock:
     """Return a minimal DiscoveredFile-like Mock."""
     mock_stat = Mock()
     mock_stat.st_size = 512
@@ -107,8 +103,7 @@ class TestCustomDelimiterPrepend:
         # 'python' is a SemanticSearchLanguage; extensions are required when the
         # language name is not in the secondary ALL_LANGUAGES registry.
         ext = ExtLangPair(
-            ext=FileExt(cast(LiteralStringT, ".py")),
-            language=SemanticSearchLanguage.PYTHON,
+            ext=FileExt(cast(LiteralStringT, ".py")), language=SemanticSearchLanguage.PYTHON
         )
         cd = CustomDelimiter(
             language=LanguageName(cast(LiteralStringT, "python")),
@@ -126,8 +121,7 @@ class TestCustomDelimiterPrepend:
         """Built-in family patterns remain alongside the custom delimiter."""
         pattern = _make_pattern()
         ext = ExtLangPair(
-            ext=FileExt(cast(LiteralStringT, ".py")),
-            language=SemanticSearchLanguage.PYTHON,
+            ext=FileExt(cast(LiteralStringT, ".py")), language=SemanticSearchLanguage.PYTHON
         )
         cd = CustomDelimiter(
             language=LanguageName(cast(LiteralStringT, "python")),
@@ -156,8 +150,7 @@ class TestLanguageTypeComparison:
         """ExtLangPair.language = SemanticSearchLanguage is matched correctly."""
         pattern = _make_pattern("sstart", "send")
         ext = ExtLangPair(
-            ext=FileExt(cast(LiteralStringT, ".py")),
-            language=SemanticSearchLanguage.PYTHON,
+            ext=FileExt(cast(LiteralStringT, ".py")), language=SemanticSearchLanguage.PYTHON
         )
         cd = CustomDelimiter(extensions=[ext], delimiters=[pattern])
         gov = _make_governor(_make_settings([cd]))
@@ -172,15 +165,8 @@ class TestLanguageTypeComparison:
         pattern = _make_pattern("cfgfunc", "cfgend")
         # ConfigLanguage.BASH is not in the secondary ALL_LANGUAGES registry, so
         # extensions are required for validation.
-        ext = ExtLangPair(
-            ext=FileExt(cast(LiteralStringT, ".sh")),
-            language=ConfigLanguage.BASH,
-        )
-        cd = CustomDelimiter(
-            language=ConfigLanguage.BASH,
-            extensions=[ext],
-            delimiters=[pattern],
-        )
+        ext = ExtLangPair(ext=FileExt(cast(LiteralStringT, ".sh")), language=ConfigLanguage.BASH)
+        cd = CustomDelimiter(language=ConfigLanguage.BASH, extensions=[ext], delimiters=[pattern])
         gov = _make_governor(_make_settings([cd]))
         # ConfigLanguage.BASH.variable should resolve to "bash"
         chunker = DelimiterChunker(gov, language="bash")
@@ -220,7 +206,9 @@ class TestLanguageTypeComparison:
 class TestCustomDelimiterErrorHandling:
     """A single bad pattern must not abort loading for the whole language."""
 
-    def test_invalid_pattern_is_skipped_with_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_invalid_pattern_is_skipped_with_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Loading continues and emits a warning when one pattern is invalid."""
         valid_pattern = _make_pattern("goodfunc", "goodend")
         invalid_pattern = _make_pattern("badstart", "badend")

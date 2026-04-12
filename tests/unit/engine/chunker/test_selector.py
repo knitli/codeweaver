@@ -154,4 +154,7 @@ def test_selector_handles_oserror_on_stat(
 
     # Verify warning was logged
     warning_records = [r for r in caplog.records if r.levelno == logging.WARNING]
-    assert any("Could not stat file" in r.message and "Permission denied" in r.message for r in warning_records)
+    assert any(
+        "Could not stat file" in r.message and "Permission denied" in r.message
+        for r in warning_records
+    )

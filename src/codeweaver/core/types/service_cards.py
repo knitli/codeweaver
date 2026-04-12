@@ -1013,9 +1013,7 @@ async def _start_filtered_instance_in_thread(
         filtered = kwargs
     else:
         params = sig.parameters
-        accepts_var_kw = any(
-            p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()
-        )
+        accepts_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())
         if accepts_var_kw:
             filtered = kwargs
         else:
@@ -1385,8 +1383,8 @@ def _build_data_provider_cards() -> list[ServiceCard]:
                 # so extract .tool_config (ExaToolConfig) before passing to exa_toolset.
                 # Safe fallback: if config has no .tool_config (e.g. already an ExaToolConfig
                 # or None), it is passed through unchanged—both are valid for exa_toolset.
-                provider_handler=lambda provider_cls, card, client=None, config=None, **kwargs: provider_cls(
-                    client, config=getattr(config, "tool_config", config), **kwargs
+                provider_handler=lambda provider_cls, card, client=None, config=None, **kwargs: (
+                    provider_cls(client, config=getattr(config, "tool_config", config), **kwargs)
                 )
             ),
         ),

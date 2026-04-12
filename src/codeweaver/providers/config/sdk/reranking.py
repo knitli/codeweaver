@@ -348,9 +348,7 @@ class SentenceTransformersRerankingConfig(BaseRerankingConfig):
         # moment it was written.
         return SerializedRerankingOptionsDict(
             model_name=self.model_name,
-            rerank=cast(
-                dict[str, Any], (type(self)._defaults()["rerank"] | (self.rerank or {}))
-            ),
+            rerank=cast(dict[str, Any], (type(self)._defaults()["rerank"] | (self.rerank or {}))),
             model={},
         )
 

@@ -663,10 +663,7 @@ type ExaToolType = ExaSearchTool | ExaFindSimilarTool | ExaGetContentsTool | Exa
 
 
 async def exa_toolset(
-    client: AsyncExa,
-    *,
-    config: ExaToolConfig | None = None,
-    register: bool = True,
+    client: AsyncExa, *, config: ExaToolConfig | None = None, register: bool = True
 ) -> list[Tool]:
     """Create and optionally register Exa tools based on configuration.
 
@@ -688,10 +685,7 @@ async def exa_toolset(
         config = ExaToolConfig()
 
     tools = await register_exa_tools(
-        client=client,
-        config=config,
-        register=register,
-        return_tools=True,
+        client=client, config=config, register=register, return_tools=True
     )
     return tools or []
 

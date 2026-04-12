@@ -130,9 +130,7 @@ class SparseEmbeddingProviderSettings(BaseSparseEmbeddingProviderSettings):
         )
         model_name = data.get("model_name")
         model_key = (
-            "model_name_or_path"
-            if provider == Provider.SENTENCE_TRANSFORMERS
-            else "model_name"
+            "model_name_or_path" if provider == Provider.SENTENCE_TRANSFORMERS else "model_name"
         )
 
         # (a) No client_options yet — construct the right class from model_name.
