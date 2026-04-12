@@ -47,10 +47,5 @@
     ]
   },
   "yaml.validate": true,
-  "python.terminal.useEnvFile": true,
-  "python-envs.pythonProjects": [
-    {
-
-    }
-  ]
+  "python.terminal.useEnvFile": true
 }

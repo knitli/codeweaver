@@ -14,7 +14,7 @@ Filter that blocks uvicorn access log messages.
 ### Method: `filter`
 
 ```python
-filter()
+filter(record: logging.LogRecord)
 ```
 
 Return False for uvicorn access logs to block them.
@@ -22,7 +22,7 @@ Return False for uvicorn access logs to block them.
 ## Function: `get_stdio_server`
 
 ```python
-get_stdio_server()
+get_stdio_server(config_file=None, project_path=None, host=None, port=None)
 ```
 
 Get a FastMCP stdio server setup for CodeWeaver.
@@ -39,7 +39,7 @@ Returns:
 ## Function: `run`
 
 ```python
-run()
+run(config_file=None, project_path=None, host=None, port=None, transport="stdio", verbose=False, debug=False)
 ```
 
 Run the CodeWeaver server with appropriate transport.

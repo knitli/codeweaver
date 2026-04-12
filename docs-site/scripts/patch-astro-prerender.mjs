@@ -19,7 +19,7 @@
  * See: withastro/astro#15650
  * TODO: Remove once Astro publishes a fix
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -27,21 +27,46 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 function patchFile(relPath, patches) {
   const absPath = resolve(ROOT, "node_modules", relPath);
+  if (!existsSync(absPath)) {
+    console.error(`  ✗ ${relPath} (target file not found: ${absPath})`);
+    process.exitCode = 1;
+    return;
+  }
+
   let content = readFileSync(absPath, "utf-8");
   let changed = false;
+  let alreadyPatchedCount = 0;
+  const missingPatterns = [];
 
   for (const [search, replace] of patches) {
     if (content.includes(search)) {
       content = content.replace(search, replace);
       changed = true;
+    } else if (content.includes(replace)) {
+      alreadyPatchedCount += 1;
+    } else {
+      missingPatterns.push(search);
     }
   }
 
   if (changed) {
     writeFileSync(absPath, content);
+  }
+
+  if (missingPatterns.length > 0) {
+    console.error(
+      `  ✗ ${relPath} (${missingPatterns.length} expected pattern${missingPatterns.length === 1 ? "" : "s"} not found)`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  if (changed) {
     console.log(`  ✓ patched ${relPath}`);
+  } else if (alreadyPatchedCount === patches.length) {
+    console.log(`  ⊘ ${relPath} (already patched)`);
   } else {
-    console.log(`  ⊘ ${relPath} (already patched or no match)`);
+    console.log(`  ⊘ ${relPath} (no changes needed)`);
   }
 }
 
