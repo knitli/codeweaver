@@ -399,7 +399,9 @@ def _testing_profile(
     # 5.x. Pick a different model per backend — cross-encoder/ms-marco-
     # MiniLM-L6-v2 is a standard BERT-MiniLM architecture with no remote
     # code trickery and works with sentence-transformers CrossEncoder.
-    reranking_model = ULTRALIGHT_RERANKING_MODEL if HAS_FASTEMBED else ULTRALIGHT_ST_RERANKING_MODEL
+    reranking_model = (
+        ULTRALIGHT_RERANKING_MODEL if HAS_FASTEMBED else ULTRALIGHT_ST_RERANKING_MODEL
+    )
     default_collection = _default_collection_options(
         project_name=project_name, project_path=project_path
     )
