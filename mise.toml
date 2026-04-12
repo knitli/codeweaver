@@ -583,11 +583,25 @@ env.PYTHONWARNINGS = "ignore:Core Pydantic V1:UserWarning"
 tools.uv = "latest"
 tools.python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 depends = ["sync"]  # ensure test dependencies are installed
+usage = '''
+flag "-m --marks <markers>" help="pytest marker expression to filter tests"
+flag "--timeout <seconds>" help="per-test timeout in seconds"
+'''
 run = '''
 echo "running test-cov task"
 echo "${CW_PREFIX} Running tests with coverage..."
+
+# Build argument list without eval (POSIX-safe)
+set -- uv run --group test pytest tests/ --cov=codeweaver --cov-report= --junit-xml=test-results.xml -v
+if [ -n "${usage_marks}" ]; then
+  set -- "$@" -m "${usage_marks}"
+fi
+if [ -n "${usage_timeout}" ]; then
+  set -- "$@" --timeout="${usage_timeout}"
+fi
+
 # Run tests with parallel coverage (generates .coverage.* files)
-uv run --group test pytest tests/ --cov=codeweaver --cov-report= --junit-xml=test-results.xml -v "$@"
+"$@"
 # Combine parallel coverage files into single .coverage file
 echo "${CW_PREFIX} Combining coverage data..."
 uv run --group test coverage combine
@@ -599,8 +613,13 @@ uv run --group test coverage report
 run_windows = '''
 echo "running test-cov task"
 echo [codeweaver] Running tests with coverage...
+
+set PYTEST_CMD=uv run --group test pytest tests/ --cov=codeweaver --cov-report= --junit-xml=test-results.xml -v
+if defined usage_marks set PYTEST_CMD=%PYTEST_CMD% -m "%usage_marks%"
+if defined usage_timeout set PYTEST_CMD=%PYTEST_CMD% --timeout=%usage_timeout%
+
 REM Run tests with parallel coverage (generates .coverage.* files)
-uv run --group test pytest tests/ --cov=codeweaver --cov-report= --junit-xml=test-results.xml -v %*
+%PYTEST_CMD%
 REM Combine parallel coverage files into single .coverage file
 echo [codeweaver] Combining coverage data...
 uv run --group test coverage combine
