@@ -85,9 +85,9 @@ if has_package("sentence_transformers"):
             SentenceTransformerModelCardData as SentenceTransformerModelCardData,
         )
     except ImportError:
-        SentenceTransformer = Any  # type: ignore[assignment, misc]
-        SentenceEvaluator = Any  # type: ignore[assignment, misc]
-        SentenceTransformerModelCardData = Any  # type: ignore[assignment, misc]
+        SentenceTransformer = Any  # ty:ignore[invalid-assignment]
+        SentenceEvaluator = Any  # ty:ignore[invalid-assignment]
+        SentenceTransformerModelCardData = Any  # ty:ignore[invalid-assignment]
 else:
     SentenceTransformer = Any
     SentenceEvaluator = Any

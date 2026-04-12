@@ -46,6 +46,7 @@ from codeweaver.core.constants import (
     ULTRALIGHT_EMBEDDING_MODEL,
     ULTRALIGHT_RERANKING_MODEL,
     ULTRALIGHT_SPARSE_EMBEDDING_MODEL,
+    ULTRALIGHT_ST_RERANKING_MODEL,
     ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL,
 )
 from codeweaver.core.types import AnonymityConversion, FilteredKeyT
@@ -389,7 +390,16 @@ def _testing_profile(
     from codeweaver.providers.config.providers import ProviderSettingsDict
 
     embedding_model = ULTRALIGHT_EMBEDDING_MODEL if HAS_ST else BACKUP_EMBEDDING_MODEL_FALLBACK
-    reranking_model = ULTRALIGHT_RERANKING_MODEL
+    # Reranker model depends on the loader backend. FastEmbed loads
+    # jinaai/jina-reranker-v1-tiny-en via its own ONNX path which works
+    # fine; SentenceTransformers CrossEncoder goes through
+    # `AutoConfig.from_pretrained(trust_remote_code=True)` and blows up
+    # because the model's remote configuration_bert.py still imports
+    # `transformers.onnx.OnnxConfig`, which was removed in transformers
+    # 5.x. Pick a different model per backend — cross-encoder/ms-marco-
+    # MiniLM-L6-v2 is a standard BERT-MiniLM architecture with no remote
+    # code trickery and works with sentence-transformers CrossEncoder.
+    reranking_model = ULTRALIGHT_RERANKING_MODEL if HAS_FASTEMBED else ULTRALIGHT_ST_RERANKING_MODEL
     default_collection = _default_collection_options(
         project_name=project_name, project_path=project_path
     )
