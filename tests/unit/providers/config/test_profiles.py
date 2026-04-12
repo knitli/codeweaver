@@ -139,7 +139,12 @@ def test_testing_profile_uses_ultralight_constants(monkeypatch, has_fastembed):
     sparse = result.get("sparse_embedding")
     assert sparse is not None
     sparse_first = sparse[0] if isinstance(sparse, tuple) else sparse
-    expected_sparse = ULTRALIGHT_SPARSE_EMBEDDING_MODEL if has_fastembed else ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL
+    # Conditional based on FastEmbed availability (py-rust-stemmers not on Python 3.14)
+    expected_sparse = (
+        ULTRALIGHT_SPARSE_EMBEDDING_MODEL
+        if pmod.HAS_FASTEMBED
+        else ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL
+    )
     assert str(sparse_first.model_name) == expected_sparse
 
     reranking = result.get("reranking")

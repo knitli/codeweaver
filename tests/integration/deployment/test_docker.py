@@ -329,7 +329,8 @@ ENABLE_TELEMETRY=false
             )
 
             # Wait for Qdrant to be ready using dynamic port
-            max_attempts = 30
+            # Increased from 30 to 60 attempts (120s total) to handle CI resource constraints
+            max_attempts = 60
             for _attempt in range(max_attempts):
                 with contextlib.suppress(Exception):
                     result = run_command(
