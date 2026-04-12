@@ -42,7 +42,7 @@ def test_timeout_enforcement():
 
     with patch("codeweaver.engine.chunker.governance.time") as mock_time:
         # Set up time progression: 0.0 at __enter__, 1.5 at check_timeout()
-        mock_time.time.side_effect = [0.0, 1.5]
+        mock_time.monotonic.side_effect = [0.0, 1.5]
 
         with pytest.raises(ChunkingTimeoutError, match="exceeded timeout"):
             with ResourceGovernor(settings) as governor:
