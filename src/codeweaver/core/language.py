@@ -359,6 +359,53 @@ class SemanticSearchLanguage(str, BaseEnum):
         )
 
     @property
+    def line_comment_prefixes(self) -> tuple[str, ...]:
+        """
+        Returns a tuple of string prefixes used for single-line comments in this language.
+        """
+        match self:
+            case (
+                SemanticSearchLanguage.C_LANG
+                | SemanticSearchLanguage.C_PLUS_PLUS
+                | SemanticSearchLanguage.C_SHARP
+                | SemanticSearchLanguage.JAVA
+                | SemanticSearchLanguage.JAVASCRIPT
+                | SemanticSearchLanguage.JSX
+                | SemanticSearchLanguage.GO
+                | SemanticSearchLanguage.KOTLIN
+                | SemanticSearchLanguage.RUST
+                | SemanticSearchLanguage.SCALA
+                | SemanticSearchLanguage.SOLIDITY
+                | SemanticSearchLanguage.SWIFT
+                | SemanticSearchLanguage.TYPESCRIPT
+                | SemanticSearchLanguage.TSX
+            ):
+                return ("//",)
+            case (
+                SemanticSearchLanguage.BASH
+                | SemanticSearchLanguage.ELIXIR
+                | SemanticSearchLanguage.NIX
+                | SemanticSearchLanguage.PYTHON
+                | SemanticSearchLanguage.RUBY
+                | SemanticSearchLanguage.YAML
+            ):
+                return ("#",)
+            case SemanticSearchLanguage.HASKELL | SemanticSearchLanguage.LUA:
+                return ("--",)
+            case SemanticSearchLanguage.HCL:
+                return ("#", "//")
+            case SemanticSearchLanguage.PHP:
+                return ("//", "#")
+            case (
+                SemanticSearchLanguage.CSS
+                | SemanticSearchLanguage.HTML
+                | SemanticSearchLanguage.JSON
+            ):
+                return ()
+            case _:
+                return ()
+
+    @property
     def extensions(self) -> tuple[FileExtensionT, ...] | None:
         """
         Returns the file extensions associated with this language.
