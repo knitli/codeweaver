@@ -724,6 +724,44 @@ class SemanticSearchLanguage(str, BaseEnum):
         return self in type(self).injection_languages()
 
     @property
+    def line_comment_prefixes(self) -> tuple[str, ...]:
+        """
+        Returns the line comment prefix(es) for this language.
+
+        Used to distinguish comment-only lines from substantive code lines. Languages without
+        single-line comment syntax (e.g. CSS, HTML, JSON) return an empty tuple.
+        """
+        return {
+            SemanticSearchLanguage.BASH: ("#",),
+            SemanticSearchLanguage.C_LANG: ("//",),
+            SemanticSearchLanguage.C_PLUS_PLUS: ("//",),
+            SemanticSearchLanguage.C_SHARP: ("//",),
+            SemanticSearchLanguage.CSS: (),
+            SemanticSearchLanguage.ELIXIR: ("#",),
+            SemanticSearchLanguage.GO: ("//",),
+            SemanticSearchLanguage.HASKELL: ("--",),
+            SemanticSearchLanguage.HCL: ("#", "//"),
+            SemanticSearchLanguage.HTML: (),
+            SemanticSearchLanguage.JAVA: ("//",),
+            SemanticSearchLanguage.JAVASCRIPT: ("//",),
+            SemanticSearchLanguage.JSX: ("//",),
+            SemanticSearchLanguage.JSON: (),
+            SemanticSearchLanguage.KOTLIN: ("//",),
+            SemanticSearchLanguage.LUA: ("--",),
+            SemanticSearchLanguage.NIX: ("#",),
+            SemanticSearchLanguage.PHP: ("//", "#"),
+            SemanticSearchLanguage.PYTHON: ("#",),
+            SemanticSearchLanguage.RUBY: ("#",),
+            SemanticSearchLanguage.RUST: ("//",),
+            SemanticSearchLanguage.SCALA: ("//",),
+            SemanticSearchLanguage.SOLIDITY: ("//",),
+            SemanticSearchLanguage.SWIFT: ("//",),
+            SemanticSearchLanguage.TYPESCRIPT: ("//",),
+            SemanticSearchLanguage.TSX: ("//",),
+            SemanticSearchLanguage.YAML: ("#",),
+        }.get(self, ())
+
+    @property
     def injected_languages(self) -> tuple[SemanticSearchLanguage, ...] | None:
         """
         Returns the languages commonly injected into this language, if any.
@@ -1543,12 +1581,7 @@ def language_from_path(
     if file_ext in all_exts or name_ext in all_exts:
         target_exts = (file_ext, name_ext)
         return next(
-            (
-                ext_pair.language
-                for ext_pair in all_languages
-                if ext_pair.ext in target_exts
-            ),
-            None,
+            (ext_pair.language for ext_pair in all_languages if ext_pair.ext in target_exts), None
         )
     return None
 

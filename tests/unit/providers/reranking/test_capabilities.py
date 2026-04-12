@@ -14,10 +14,13 @@ from codeweaver.providers.reranking.capabilities.base import RerankingModelCapab
 pytestmark = [pytest.mark.unit]
 
 
+@pytest.mark.unit
 class TestRerankingModelCapabilitiesOversizedChunks:
     """Test handling of oversized chunks in reranking capabilities."""
 
-    def test_first_chunk_exceeds_max_input_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_first_chunk_exceeds_max_input_logs_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Verify warning is logged when first chunk exceeds max_input."""
         # Create capabilities with small max_input
         capabilities = RerankingModelCapabilities(

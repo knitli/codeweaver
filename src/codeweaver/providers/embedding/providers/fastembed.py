@@ -157,9 +157,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         embeddings = await loop.run_in_executor(
             None,
             lambda: list(
-                self.client.embed(
-                    documents=cast(Iterable[str], ready_documents), **kwargs
-                )
+                self.client.embed(documents=cast(Iterable[str], ready_documents), **kwargs)
             ),
         )
         partial_tokens = rpartial(self._update_token_stats, from_docs=ready_documents)

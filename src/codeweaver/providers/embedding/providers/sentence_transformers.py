@@ -174,12 +174,7 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
     # path, which calls `self._initialize(impl_deps, custom_deps, **kwargs)`
     # at line 307 of providers/embedding/providers/base.py. Same pattern here.
 
-    def _initialize(
-        self,
-        impl_deps: Any = None,
-        custom_deps: Any = None,
-        **kwargs: Any,
-    ) -> None:
+    def _initialize(self, impl_deps: Any = None, custom_deps: Any = None, **kwargs: Any) -> None:
         """Initialize the SparseEncoder-backed sparse provider.
 
         Called from `EmbeddingProvider.__init__` at line 307 after required

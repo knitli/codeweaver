@@ -505,11 +505,14 @@ class SemanticChunker(BaseChunker):
             ]
 
         # Single line (no semantic structure to parse)
-        # Count non-comment, non-blank lines to handle files with license headers
+        # Count non-comment, non-blank lines to handle files with license headers.
+        # Use language-aware comment prefixes so e.g. `//` is filtered for Java/JS/C++
+        # and `--` for Haskell/Lua, rather than only Python-style `#`.
+        comment_prefixes = self.language.line_comment_prefixes
         code_lines = [
             line
             for line in content.splitlines()
-            if (stripped := line.strip()) and not stripped.startswith("#")
+            if (stripped := line.strip()) and not stripped.startswith(comment_prefixes)
         ]
 
         if len(code_lines) <= 1:
