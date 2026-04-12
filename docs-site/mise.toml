@@ -66,3 +66,7 @@ tools.biome = "latest"
 
 [tools]
 hk = "latest"
+
+[prepare.bun]
+auto = true
+dir = "docs-site"

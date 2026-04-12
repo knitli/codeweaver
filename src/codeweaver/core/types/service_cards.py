@@ -1098,7 +1098,17 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             "sparse_embedding",
             lateimport(
                 "codeweaver.providers.embedding.providers.sentence_transformers",
-                "SentenceTransformersSparseEmbeddingProvider",
+                # NOTE: class is named `SentenceTransformersSparseProvider`
+                # (no `Embedding` in the middle), matching the
+                # `SparseEmbeddingProvider` generic base. Earlier code in
+                # this card had `SentenceTransformersSparseEmbeddingProvider`
+                # which never existed on disk — lateimport silently failed
+                # at resolution time and raised ValueError from
+                # `create_instance`'s `_resolve()` catch. The latent bug
+                # only surfaced once the testing profile actually routed
+                # sparse through ST on 3.14 (previously it always used
+                # FastEmbed, which hit a different card).
+                "SentenceTransformersSparseProvider",
             ),
             lateimport("sentence_transformers", "SparseEncoder"),
             "sentence_transformers",

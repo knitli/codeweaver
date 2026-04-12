@@ -189,7 +189,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
     FastEmbed implementation for sparse embeddings.
     """
 
-    client: type[SparseTextEmbedding] | SparseTextEmbedding | None = _SparseTextEmbedding
+    client: type[SparseTextEmbedding] | SparseTextEmbedding = _SparseTextEmbedding  # ty:ignore[invalid-assignment]
     caps: SparseEmbeddingModelCapabilities | None = None
     _output_transformer: Callable[[Any], list[CodeWeaverSparseEmbedding]] = (
         fastembed_sparse_output_transformer

@@ -160,28 +160,65 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
     provider: Provider = Provider.SENTENCE_TRANSFORMERS
     caps: SparseEmbeddingModelCapabilities | None = None
 
-    def __init__(
+    # No custom __init__ — inherit from `SparseEmbeddingProvider` which takes
+    # `client, config, registry, cache_manager, caps, impl_deps, custom_deps,
+    # **kwargs`. The previous override only declared `(client, caps, **kwargs)`
+    # and then called `super().__init__(client=client, caps=caps, kwargs=kwargs)`
+    # (literal `kwargs=` arg, not splat), both of which were broken:
+    #   - Dropped required base-class args (config/registry/cache_manager)
+    #     into **kwargs where the base init couldn't see them as named args.
+    #   - Passed `kwargs=kwargs` instead of `**kwargs`, so even the drained
+    #     kwargs never reached the base init.
+    # The sibling `SentenceTransformersEmbeddingProvider` at line 71 has no
+    # custom __init__ either and works fine through the base class's init
+    # path, which calls `self._initialize(impl_deps, custom_deps, **kwargs)`
+    # at line 307 of providers/embedding/providers/base.py. Same pattern here.
+
+    def _initialize(
         self,
-        client: _SparseEncoderType,
-        caps: SparseEmbeddingModelCapabilities | None = None,
+        impl_deps: Any = None,
+        custom_deps: Any = None,
         **kwargs: Any,
     ) -> None:
-        """Initialize the Sentence Transformers sparse embedding provider.
+        """Initialize the SparseEncoder-backed sparse provider.
 
-        Args:
-            caps: Model capabilities (matches base class parameter name)
-            client: Optional pre-initialized SparseEncoder client
-            **kwargs: Additional keyword arguments
+        Called from `EmbeddingProvider.__init__` at line 307 after required
+        fields (client, config, registry, cache_manager, embed/query options,
+        namespace) have been set but before the pydantic `super().__init__`
+        finalizes the model.
+
+        Two responsibilities:
+
+          1. Guard against a sentence-transformers version that doesn't ship
+             `SparseEncoder`. In practice the `_SparseEncoderType` class-level
+             alias would already resolve to `Any` (via the `HAS_SPARSE_ENCODER`
+             check at module import), and the service card's lateimport of
+             `SparseEncoder` would fail before we got here — but keep the
+             defensive check so the failure message is specific and
+             actionable instead of a confusing downstream `AttributeError`.
+
+          2. Everything else is a no-op. The SparseEncoder instance is
+             instantiated upstream by the service card's
+             `_start_filtered_instance_in_thread` handler (which calls
+             `SparseEncoder(**filtered_client_options)`) and passed into the
+             base class's `__init__` as the `client` parameter. By the time
+             `_initialize` runs, `self.client` is already a valid
+             SparseEncoder instance and there's nothing left to do.
+
+        Required by `SparseEmbeddingProvider.__abstractmethods__`; without
+        this override the class can't be instantiated.
         """
         if not HAS_SPARSE_ENCODER:
             raise ConfigurationError(
-                "SparseEncoder is not available in the installed version of sentence-transformers. "
-                "Sparse embedding support may require a different version or additional dependencies."
+                "SparseEncoder is not available in the installed version of "
+                "sentence-transformers. CodeWeaver requires "
+                "sentence-transformers>=4 for SparseEncoder support; we pin "
+                "major 5."
             )
-
-        # Call super().__init__ with None for client if not provided
-        # We'll initialize it asynchronously in initialize_async
-        super().__init__(client=client, caps=caps, kwargs=kwargs)  # type: ignore
+        # Nothing further to initialize — the SparseEncoder instance was
+        # supplied to the base-class __init__ via the service card dispatch
+        # chain, and embed/query options are set on self by the base init
+        # before this method runs.
 
     @property
     def base_url(self) -> str | None:
@@ -203,7 +240,21 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
     ) -> list[CodeWeaverSparseEmbedding]:
         """Embed a sequence of documents into sparse vectors."""
         preprocessed = cast(list[str], self.chunks_to_strings(documents))
-        embed_partial = rpartial(self.client.encode, **(self.client_options | kwargs))
+        # Use `embed_options` (set by the base class's __init__ from
+        # config.sparse_embedding_config.embedding) rather than the
+        # nonexistent `client_options` attribute. Previously this line
+        # read `self.client_options | kwargs` which silently fell through
+        # to a bound method from the pydantic BaseModel (probably
+        # `model_copy` — every `foo_options` name happens to shadow
+        # nothing, but `client_options` didn't, so Python resolved the
+        # attribute via pydantic's __getattr__ which returns bound
+        # methods). `method | dict` raises TypeError at call time, not
+        # attribute-access time, so the bug was silent until the full
+        # search pipeline actually reached this method with real
+        # documents. Mirrors the dense sibling
+        # `SentenceTransformersEmbeddingProvider._embed_documents` which
+        # uses `self.embed_options` on line 100.
+        embed_partial = rpartial(self.client.encode, **(self.embed_options | kwargs))
         loop = asyncio.get_running_loop()
         results = await loop.run_in_executor(None, embed_partial, preprocessed)
         _ = self._fire_and_forget(lambda: self._update_token_stats(from_docs=preprocessed))
@@ -217,6 +268,10 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
     ) -> list[CodeWeaverSparseEmbedding]:
         """Embed a sequence of queries into sparse vectors."""
         preprocessed = cast(list[str], query)
+        # `self.query_options` IS a valid base-class attribute (set
+        # alongside `embed_options` in the parent __init__), so the
+        # query path worked even when the document path was broken.
+        # Kept explicit here for symmetry with `_embed_documents`.
         embed_partial = rpartial(self.client.encode, **(self.query_options | kwargs))
         loop = asyncio.get_running_loop()
         results = await loop.run_in_executor(None, embed_partial, preprocessed)

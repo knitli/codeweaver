@@ -33,15 +33,16 @@ if has_package("sentence_transformers"):
     # So if the configured settings uses SentenceTransformersClientOptions
     # Then we need to have these in the namespace for pydantic to resolve
     try:
+        #! **All three of these must stay in the runtime namespace in order for pydantic to resolve the models**
         from sentence_transformers import SentenceTransformer as SentenceTransformer
         from sentence_transformers.evaluation import SentenceEvaluator as SentenceEvaluator
         from sentence_transformers.model_card import (
             SentenceTransformerModelCardData as SentenceTransformerModelCardData,
         )
     except ImportError:
-        SentenceTransformer = Any  # type: ignore[assignment, misc]
-        SentenceEvaluator = Any  # type: ignore[assignment, misc]
-        SentenceTransformerModelCardData = Any  # type: ignore[assignment, misc]
+        SentenceTransformer = Any  # ty:ignore[invalid-assignment]
+        SentenceEvaluator = Any  # ty:ignore[invalid-assignment]
+        SentenceTransformerModelCardData = Any  # ty:ignore[invalid-assignment]
 else:
     SentenceTransformer = Any
     SentenceEvaluator = Any
@@ -129,9 +130,7 @@ class SparseEmbeddingProviderSettings(BaseSparseEmbeddingProviderSettings):
         )
         model_name = data.get("model_name")
         model_key = (
-            "model_name_or_path"
-            if provider == Provider.SENTENCE_TRANSFORMERS
-            else "model_name"
+            "model_name_or_path" if provider == Provider.SENTENCE_TRANSFORMERS else "model_name"
         )
 
         # (a) No client_options yet — construct the right class from model_name.

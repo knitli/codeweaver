@@ -135,13 +135,13 @@ cw = "codeweaver.cli.__main__:main"
 # Use `uv sync --group dev` to get everything needed for local development.
 dev = [
   "serena>=0.9.1",
-  "uv>=0.11.3",
+  "uv>=0.11.6",
   { include-group = "dev-helpers" },
   { include-group = "lint" },
   { include-group = "test" },
 ]
 build = [
-  "hatch-fancy-pypi-readme>=24.1.0",
+  "hatch-fancy-pypi-readme>=25.1.0",
   "hatchling>=1.29.0",
   "uv-dynamic-versioning>=0.14.0",
   { include-group = "docs" },
@@ -163,15 +163,15 @@ docs = [
 lint = [
   # black is used to format generated code
   "black>=26.3.1",
-  "ruff>=0.15.9",
+  "ruff>=0.15.10",
   "ty>=0.0.29",
 ]
 # Baseline test dependencies. Workspace members inherit this group via `uv sync --group test`
 # from the workspace root, so daemon/tokenizers no longer redeclare pytest et al.
 test = [
   "dirty-equals>=0.11.0",
-  "hypothesis>=6.151.11",
-  "pytest>=9.0.2",
+  "hypothesis>=6.151.12",
+  "pytest>=9.0.3",
   "pytest-asyncio>=1.3.0",
   "pytest-cov>=7.1.0",
   "pytest-env>=1.6.0",
@@ -184,7 +184,7 @@ test = [
 
 [build-system]
 requires = [
-  "hatch-fancy-pypi-readme>=24.1.0",
+  "hatch-fancy-pypi-readme>=25.1.0",
   "hatchling>=1.29.0",
   "uv-dynamic-versioning>=0.14.0",
 ]

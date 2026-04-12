@@ -97,11 +97,14 @@ def test_metadata_completeness():
 
     project = pyproject.get("project", {})
 
-    # Required PEP 621 fields
+    # Required PEP 621 fields (may be static in [project] or listed in [project.dynamic])
     required_fields = ["name", "description", "readme", "requires-python", "license", "authors"]
+    dynamic_fields = project.get("dynamic", [])
 
     for field in required_fields:
-        assert field in project, f"Required field '{field}' missing from [project]"
+        assert field in project or field in dynamic_fields, (
+            f"Required field '{field}' missing from [project] and not listed in dynamic"
+        )
 
     # Verify dynamic version
     assert "version" in project.get("dynamic", []), "Version must be dynamic"
