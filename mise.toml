@@ -586,47 +586,42 @@ depends = ["sync"]  # ensure test dependencies are installed
 usage = '''
 flag "-m --marks <markers>" help="pytest marker expression to filter tests"
 flag "--timeout <seconds>" help="per-test timeout in seconds"
+flag "--timeout-method <method>" help="pytest-timeout method (thread or signal)"
 '''
 run = '''
 echo "running test-cov task"
 echo "${CW_PREFIX} Running tests with coverage..."
 
 # Build argument list without eval (POSIX-safe)
-set -- uv run --group test pytest tests/ --cov=codeweaver --cov-report= --junit-xml=test-results.xml -v
+# Coverage measurement, reporting (html/xml/term-missing), and fail-under
+# are all configured in pyproject.toml [tool.pytest] addopts.
+# pytest-cov handles parallel combine and report generation internally.
+set -- uv run --group test pytest tests/ --junit-xml=test-results.xml -v
 if [ -n "${usage_marks}" ]; then
   set -- "$@" -m "${usage_marks}"
 fi
 if [ -n "${usage_timeout}" ]; then
   set -- "$@" --timeout="${usage_timeout}"
 fi
+if [ -n "${usage_timeout_method}" ]; then
+  set -- "$@" --timeout-method="${usage_timeout_method}"
+fi
 
-# Run tests with parallel coverage (generates .coverage.* files)
 "$@"
-# Combine parallel coverage files into single .coverage file
-echo "${CW_PREFIX} Combining coverage data..."
-uv run --group test coverage combine
-# Generate coverage reports from combined data
-echo "${CW_PREFIX} Generating coverage reports..."
-uv run --group test coverage xml
-uv run --group test coverage report
 '''
 run_windows = '''
 echo "running test-cov task"
 echo [codeweaver] Running tests with coverage...
 
-set PYTEST_CMD=uv run --group test pytest tests/ --cov=codeweaver --cov-report= --junit-xml=test-results.xml -v
+REM Coverage measurement, reporting (html/xml/term-missing), and fail-under
+REM are all configured in pyproject.toml [tool.pytest] addopts.
+REM pytest-cov handles parallel combine and report generation internally.
+set PYTEST_CMD=uv run --group test pytest tests/ --junit-xml=test-results.xml -v
 if defined usage_marks set PYTEST_CMD=%PYTEST_CMD% -m "%usage_marks%"
 if defined usage_timeout set PYTEST_CMD=%PYTEST_CMD% --timeout=%usage_timeout%
+if defined usage_timeout_method set PYTEST_CMD=%PYTEST_CMD% --timeout-method=%usage_timeout_method%
 
-REM Run tests with parallel coverage (generates .coverage.* files)
 %PYTEST_CMD%
-REM Combine parallel coverage files into single .coverage file
-echo [codeweaver] Combining coverage data...
-uv run --group test coverage combine
-REM Generate coverage reports from combined data
-echo [codeweaver] Generating coverage reports...
-uv run --group test coverage xml
-uv run --group test coverage report
 '''
 
 [tasks.test-categories]
