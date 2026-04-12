@@ -45,6 +45,9 @@ dist/
 *.tgz
 coverage
 *.lcov
+.coverage*
+coverage.xml
+htmlcov/
 .env
 *.local.*
 *.local

@@ -337,6 +337,62 @@ class MyClass:
 
 
 @pytest.mark.unit
+class TestGovernorChecks:
+    """Test resource governor integration points."""
+
+    def test_timeout_check_between_match_phases(
+        self, delimiter_chunker: DelimiterChunker
+    ) -> None:
+        """Ensure match phase timeout checks are invoked between phases."""
+
+        class RecordingGovernor:
+            def __init__(self, calls: list[str]) -> None:
+                self._calls = calls
+
+            def check_timeout(self) -> None:
+                self._calls.append("timeout")
+
+        calls: list[str] = []
+        governor = RecordingGovernor(calls)
+
+        delimiter_chunker._delimiters = [
+            Delimiter(
+                start="{",
+                end="}",
+                kind=DelimiterKind.BLOCK,
+                priority=DelimiterKind.BLOCK.default_priority,
+                inclusive=True,
+                take_whole_lines=False,
+                nestable=True,
+            ),
+            Delimiter(
+                start="def",
+                end="",
+                kind=DelimiterKind.FUNCTION,
+                priority=DelimiterKind.FUNCTION.default_priority,
+                inclusive=True,
+                take_whole_lines=True,
+                nestable=True,
+            ),
+        ]
+
+        def record_explicit(_: str, __: list[Delimiter]):
+            calls.append("explicit")
+            return []
+
+        def record_keyword(_: str, __: list[Delimiter]):
+            calls.append("keyword")
+            return []
+
+        delimiter_chunker._match_explicit_delimiters = record_explicit
+        delimiter_chunker._match_keyword_delimiters = record_keyword
+
+        delimiter_chunker._find_delimiter_matches("def foo():\n    return 1\n", governor=governor)
+
+        assert calls == ["explicit", "timeout", "keyword"]
+
+
+@pytest.mark.unit
 class TestEdgeCaseContent:
     """Test delimiter chunker with edge case content."""
 
