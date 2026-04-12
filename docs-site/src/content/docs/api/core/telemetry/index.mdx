@@ -1,0 +1,30 @@
+---
+title: telemetry
+description: API reference for codeweaver.core.telemetry
+---
+
+# `codeweaver.core.telemetry`
+
+Privacy-preserving telemetry system for CodeWeaver.
+
+This module provides telemetry infrastructure for collecting anonymized,
+aggregated metrics to understand CodeWeaver usage patterns and identify
+trouble spots while maintaining strict privacy guarantees.
+
+Key Principles:
+- Never collect PII, code, or repository information
+- Aggregated statistics only
+- Easy opt-out mechanism
+- Fail-safe (errors don't affect application)
+- PostHog v7 context API for session tracking
+
+Events:
+- SessionEvent: Aggregated session statistics (usage patterns, setup success)
+- SearchEvent: Per-search metrics (performance, quality, A/B testing)
+
+Example:
+    &gt;&gt;&gt; from codeweaver.core.telemetry import get_telemetry_client, capture_search_event
+    &gt;&gt;&gt; client = get_telemetry_client()
+    &gt;&gt;&gt; client.start_session(&#123;"version": "0.5.0"&#125;)
+    &gt;&gt;&gt; if client.enabled:
+    ...     client.capture("codeweaver_session", &#123;"searches": 10&#125;)

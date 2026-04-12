@@ -1,0 +1,52 @@
+---
+title: custom
+description: API reference for codeweaver.engine.chunker.delimiters.custom
+---
+
+# `codeweaver.engine.chunker.delimiters.custom`
+
+Language-specific delimiter patterns and customizations.
+
+This module defines custom delimiter patterns for languages that have unique
+syntax not covered by their family patterns, or require overrides.
+
+Example:
+    &gt;&gt;&gt; CUSTOM_PATTERNS["bash"]
+    [bash_while_pattern, bash_until_pattern, ...]
+
+## Function: `generate_rst_character_ranges`
+
+```python
+generate_rst_character_ranges()
+```
+
+Generate a list of RST section underline characters based on a given character.
+
+Args:
+    character: A single character to generate underline patterns for.
+
+Returns:
+    A list of strings representing RST section underline patterns.
+
+Example:
+    &gt;&gt;&gt; generate_rst_character_ranges("=")
+    ['=', '==', '===', '====', '=====']
+
+## Function: `get_custom_patterns`
+
+```python
+get_custom_patterns()
+```
+
+Get custom delimiter patterns for a language.
+
+Args:
+    language: Language name (normalized to lowercase)
+
+Returns:
+    List of custom DelimiterPattern objects, or empty list if none
+
+Example:
+    &gt;&gt;&gt; patterns = get_custom_patterns("bash")
+    &gt;&gt;&gt; len(patterns)
+    6

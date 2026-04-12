@@ -1,0 +1,49 @@
+---
+title: inmemory
+description: API reference for codeweaver.providers.vector_stores.inmemory
+---
+
+# `codeweaver.providers.vector_stores.inmemory`
+
+In-memory vector store with JSON persistence using Qdrant in-memory mode.
+
+## Class: `MemoryVectorStoreProvider`
+
+In-memory vector store with persistence for development/testing and local backup.
+
+Uses Qdrant's in-memory mode (:memory:) with automatic persistence to disk.
+Suitable for small codebases (&lt;10k chunks) and testing scenarios.
+
+### Method: `close`
+
+```python
+close()
+```
+
+Close Qdrant client and stop background tasks.
+
+### Method: `handle_persistence`
+
+```python
+handle_persistence()
+```
+
+Trigger persistence if auto_persist is enabled.
+
+Called after upsert and delete operations to persist changes.
+
+### Method: `search`
+
+```python
+search()
+```
+
+Search for similar vectors.
+
+### Method: `upsert`
+
+```python
+upsert()
+```
+
+Insert or update code chunks with hybrid embeddings.

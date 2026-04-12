@@ -1,0 +1,89 @@
+---
+title: pipeline
+description: API reference for codeweaver.server.agent_api.search.pipeline
+---
+
+# `codeweaver.server.agent_api.search.pipeline`
+
+Search pipeline orchestration.
+
+This module handles the core search pipeline including:
+- Query embedding (dense and sparse)
+- Vector store search
+- Reranking (when provider available)
+
+## Function: `build_query_vector`
+
+```python
+build_query_vector()
+```
+
+Build query vector for search from embeddings.
+
+Args:
+    query_result: QueryResult containing embeddings keyed by intent
+    query: Natural language query string
+
+Returns:
+    A StrategizedQuery containing sparse and/or dense vectors and the chosen strategy
+
+Raises:
+    ValueError: If both embeddings are None
+
+## Function: `embed_query`
+
+```python
+embed_query()
+```
+
+Embed query using configured embedding providers.
+
+Tries dense embedding first, then sparse. Returns result with whichever
+succeeded. If both fail, raises ValueError.
+
+Args:
+    query: Natural language query to embed
+    context: Optional FastMCP context for structured logging
+    dense_provider: Injected dense embedding provider
+    sparse_provider: Injected sparse embedding provider
+
+Returns:
+    QueryResult with dense and/or sparse embeddings
+
+Raises:
+    ValueError: If no embedding providers configured or both fail
+
+## Function: `execute_vector_search`
+
+```python
+execute_vector_search()
+```
+
+Execute vector search against configured vector store.
+
+Args:
+    query_vector: Query vector (dense, sparse, or hybrid)
+    context: Optional FastMCP context for structured logging
+    vector_store: Injected vector store instance
+
+Returns:
+    List of search results from vector store
+
+Raises:
+    ValueError: If no vector store provider configured
+
+## Function: `raise_value_error`
+
+```python
+raise_value_error()
+```
+
+Raise QueryError with message including current query.
+
+## Function: `rerank_results`
+
+```python
+rerank_results()
+```
+
+Rerank search results using configured reranking provider(s) with cascading fallback.

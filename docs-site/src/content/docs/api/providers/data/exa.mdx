@@ -1,0 +1,140 @@
+---
+title: exa
+description: API reference for codeweaver.providers.data.exa
+---
+
+# `codeweaver.providers.data.exa`
+
+Customized Exa data provider implementation for CodeWeaver.
+
+## Class: `AsyncExa`
+
+Mock AsyncExa client for type checking.
+
+## Class: `ExaAnswerResult`
+
+An Exa answer result with citations.
+
+See [Exa Answer API documentation](https://docs.exa.ai/reference/answer)
+for more information.
+
+## Class: `ExaAnswerTool`
+
+The Exa answer tool.
+
+## Class: `ExaContentResult`
+
+Content retrieved from a URL.
+
+See [Exa Contents API documentation](https://docs.exa.ai/reference/get-contents)
+for more information.
+
+## Class: `ExaFindSimilarTool`
+
+The Exa find similar tool.
+
+## Class: `ExaGetContentsTool`
+
+The Exa get contents tool.
+
+## Class: `ExaSearchResult`
+
+An Exa search result with content.
+
+See [Exa Search API documentation](https://docs.exa.ai/reference/search)
+for more information.
+
+## Class: `ExaSearchTool`
+
+The Exa search tool.
+
+Class-level options will **override** options provided at call time. This is to prevent agents from overriding important configuration options or restrictions.
+
+## Function: `exa_answer_tool`
+
+```python
+exa_answer_tool()
+```
+
+Creates an Exa answer tool.
+
+Args:
+    client: The Exa async client. Required.
+    system_prompt: An optional system prompt to provide to the Exa answer tool. This can be used to guide the behavior of the tool. For example, you could provide a prompt that instructs the tool to focus on certain types of sources. If not provided, the tool will use its default behavior.
+        This is useful for sharing a client across multiple tools.
+
+## Function: `exa_find_similar_tool`
+
+```python
+exa_find_similar_tool()
+```
+
+Creates an Exa find similar tool.
+
+Args:
+    client: The Exa async client. Required.
+
+    num_results: The number of similar results to return. Defaults to 5.
+    include_domains: An optional list of domains to include in the results.
+    exclude_domains: An optional list of domains to exclude from the results.
+    contents_options: Optional content retrieval options.
+
+## Function: `exa_get_contents_tool`
+
+```python
+exa_get_contents_tool()
+```
+
+Creates an Exa get contents tool.
+
+Args:
+    client: The Exa async client. Required.
+    max_characters: Maximum characters of text content per result. Use this to limit
+        token usage. Defaults to None (no limit).
+    contents_options: Optional content retrieval options.
+    filter_empty_results: Whether to filter out empty results. Defaults to True.
+    summary: Whether to include a summary of the content. Defaults to None.
+
+## Function: `exa_search_tool`
+
+```python
+exa_search_tool()
+```
+
+Creates an Exa search tool.
+
+Args:
+    client: The Exa async client. Required.
+
+    num_results: The number of results to return. Defaults to 5.
+    max_characters: Maximum characters of text content per result. Use this to limit
+        token usage. Defaults to None (no limit).
+
+## Function: `exa_toolset`
+
+```python
+exa_toolset()
+```
+
+Create and optionally register Exa tools based on configuration.
+
+This is the main entry point for the Exa data provider, used by the
+service card system. It creates all configured Exa tools based on the
+provided configuration.
+
+Args:
+    client: The Exa async client.
+    config: Tool configuration. If None, uses `ExaToolConfig()` defaults
+        (both answer and get-contents tools enabled by default).
+    register: Whether to register the tools. Defaults to True.
+
+Returns:
+    List of created Tool instances.
+
+## Function: `register_exa_tools`
+
+```python
+register_exa_tools()
+```
+
+Registers Exa tools with the given FastMCP app.

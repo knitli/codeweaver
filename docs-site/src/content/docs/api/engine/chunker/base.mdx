@@ -1,0 +1,86 @@
+---
+title: base
+description: API reference for codeweaver.engine.chunker.base
+---
+
+# `codeweaver.engine.chunker.base`
+
+Base chunker services and definitions.
+
+CodeWeaver has a robust chunking system that allows it to extract meaningful information from any codebase. Chunks are created based on a graceful degradation strategy:
+
+1. **Semantic Chunking**: When we have a tree-sitter grammar for a language (there are currently 26 supported languages, see `codeweaver.language.SemanticSearchLanguage`), semantic chunking is the primary strategy.
+
+2. **Delimiter Chunking**: If semantic chunking isn't available or fails (e.g., parse errors, oversized nodes without chunkable children), we fall back to delimiter-based chunking using language-specific patterns.
+
+3. **Generic Fallback**: If delimiter patterns don't match, we use generic delimiters (braces, newlines, etc.) to ensure we can always produce chunks.
+
+This multi-tiered approach ensures reliable chunking across 170+ languages while maintaining semantic quality for supported languages.
+
+## Class: `AdaptiveChunkBehavior`
+
+Actions for adaptive chunk sizing.
+
+The adaptive chunking system classifies each chunk by size and determines
+the appropriate action:
+
+- KEEP: Chunk is within acceptable range, use as-is
+- MERGE: Chunk is too small, should combine with neighbors
+- TRY_CHILDREN: Chunk exceeds optimal, try semantic split first
+- FORCE_SPLIT: Chunk exceeds hard limit, must split mechanically
+
+## Class: `BaseChunker`
+
+Base class for chunkers.
+
+### Method: `chunk`
+
+```python
+chunk()
+```
+
+Chunk the given content into code chunks using `self._governor` settings.
+
+Args:
+    content: The text content to chunk.
+    file: The DiscoveredFile object containing file metadata and source_id.
+    context: Additional context for chunking.
+
+Returns:
+    List of CodeChunk objects with source_id from the DiscoveredFile.
+
+## Class: `ChunkGovernor`
+
+Configuration for chunking behavior.
+
+### Method: `classify_chunk_size`
+
+```python
+classify_chunk_size()
+```
+
+Determine what action to take for a chunk of given size.
+
+Args:
+    tokens: Estimated token count of the chunk
+
+Returns:
+    AdaptiveChunkBehavior indicating the recommended action:
+    - MERGE: tokens &lt; floor_tokens (too small, combine with neighbors)
+    - KEEP: floor_tokens &lt;= tokens &lt;= acceptable_max_tokens (good size)
+    - TRY_CHILDREN: acceptable_max_tokens &lt; tokens &lt;= chunk_limit (try semantic split)
+    - FORCE_SPLIT: tokens &gt; chunk_limit (must split mechanically)
+
+### Method: `from_settings`
+
+```python
+from_settings()
+```
+
+Create a ChunkGovernor from ChunkerSettings.
+
+Args:
+    settings: The ChunkerSettings to create the governor from.
+
+Returns:
+    A ChunkGovernor instance.

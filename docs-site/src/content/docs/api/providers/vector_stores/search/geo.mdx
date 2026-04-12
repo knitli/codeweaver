@@ -1,0 +1,32 @@
+---
+title: geo
+description: API reference for codeweaver.providers.vector_stores.search.geo
+---
+
+# `codeweaver.providers.vector_stores.search.geo`
+
+Geo filter request and payload schemas.
+
+We may never use these, but they are here for completeness.
+
+Nearly all of this file and its contents were adapted from Qdrant's example MCP server, [mcp-server-qdrant](https://github.com/qdrant/mcp-server-qdrant/), and fall under Qdrant's copyright and Apache 2.0 license. Any modifications or changes made to the original code are copyrighted by Knitli Inc. and are licensed under MIT OR Apache-2.0, whichever you want.
+
+## Class: `GeoBoundingBox`
+
+Geo filter request  Matches coordinates inside the rectangle, described by coordinates of lop-left and bottom-right edges.
+
+## Class: `GeoLineString`
+
+Ordered sequence of GeoPoints representing the line.
+
+## Class: `GeoPoint`
+
+Geo point payload schema.
+
+## Class: `GeoPolygon`
+
+Geo filter request  Matches coordinates inside the polygon, defined by `exterior` and `interiors`.
+
+## Class: `GeoRadius`
+
+Geo filter request  Matches coordinates inside the circle of `radius` and center with coordinates `center`.

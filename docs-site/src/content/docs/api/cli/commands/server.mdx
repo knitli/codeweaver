@@ -1,0 +1,34 @@
+---
+title: server
+description: API reference for codeweaver.cli.commands.server
+---
+
+# `codeweaver.cli.commands.server`
+
+CodeWeaver MCP server command-line interface.
+
+## Function: `main`
+
+```python
+main()
+```
+
+Entry point for the CodeWeaver server CLI.
+
+## Function: `server`
+
+```python
+server()
+```
+
+Start CodeWeaver MCP server.
+
+This starts the MCP protocol server. When using stdio transport (default),
+CodeWeaver connects to the daemon's HTTP backend for background services.
+
+Transport modes:
+- stdio (default): Standard I/O transport, proxies to HTTP backend
+- streamable-http: Direct HTTP-based transport on port 9328
+
+For stdio transport, first start the daemon with `codeweaver start`.
+Management endpoints available at http://127.0.0.1:9329.

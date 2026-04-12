@@ -1,0 +1,51 @@
+---
+title: utils
+description: API reference for codeweaver.providers.config.clients.utils
+---
+
+# `codeweaver.providers.config.clients.utils`
+
+Utility functions for configuration providers.
+
+## Function: `discriminate_embedding_clients`
+
+```python
+discriminate_embedding_clients()
+```
+
+Identify the provider-specific settings type for discriminator field.
+
+## Function: `ensure_endpoint_version`
+
+```python
+ensure_endpoint_version()
+```
+
+Ensure the URL ends with /v1 for openai or v2 for cohere.
+
+## Function: `simple_provider_discriminator`
+
+```python
+simple_provider_discriminator()
+```
+
+Identify the provider for simple agent model provider options based on tag or URL patterns.
+
+## Function: `try_for_azure_endpoint`
+
+```python
+try_for_azure_endpoint()
+```
+
+Try to identify the Azure endpoint.
+
+Azure uses this format: `https://&lt;endpoint&gt;.&lt;region_name&gt;.inference.ai.azure.com/v1`,
+But because people often conflate `endpoint` and `url`, we try to be flexible.
+
+## Function: `try_for_heroku_endpoint`
+
+```python
+try_for_heroku_endpoint()
+```
+
+Try to identify the Heroku endpoint.

@@ -1,0 +1,226 @@
+---
+title: qdrant_base
+description: API reference for codeweaver.providers.vector_stores.qdrant_base
+---
+
+# `codeweaver.providers.vector_stores.qdrant_base`
+
+Defines a base class for the Qdrant and In Memory Qdrant vector stores to reduce code duplication.
+
+## Class: `QdrantBaseProvider`
+
+Base class for Qdrant and In Memory Qdrant vector stores with shared functionality.
+
+### Method: `apply_quantization`
+
+```python
+apply_quantization()
+```
+
+Apply quantization to existing collection.
+
+This is a pure Qdrant config change - no vector updates needed.
+Qdrant still expects float inputs, handles conversion internally.
+
+Args:
+    collection_name: Name of collection to quantize.
+    quantization_type: Type of quantization to apply ("int8" or "binary").
+    rescore: Whether to enable rescoring for accuracy (default: True).
+
+Raises:
+    ProviderError: If quantization application fails.
+
+### Method: `collection_info`
+
+```python
+collection_info()
+```
+
+Get the collection metadata.
+
+### Method: `create_payload_index`
+
+```python
+create_payload_index()
+```
+
+Create a payload index on the specified field.
+
+Args:
+    collection_name: Name of the collection.
+    field_name: Name of the payload field to index.
+    key_type: field value's data or schema type (what category of data will be indexed)
+
+Raises:
+    ProviderError: Qdrant operation failed.
+
+Returns:
+    UpdateResult: Response from Qdrant after creating the index.
+
+### Method: `delete_by_file`
+
+```python
+delete_by_file()
+```
+
+Delete all chunks for a specific file.
+
+Args:
+    file_path: File path to remove from index.
+
+### Method: `delete_by_files`
+
+```python
+delete_by_files()
+```
+
+Delete all chunks for multiple files in a single operation.
+
+Args:
+    file_paths: List of file paths to remove from index.
+
+### Method: `delete_by_id`
+
+```python
+delete_by_id()
+```
+
+Delete chunks by their unique identifiers.
+
+Args:
+    ids: List of chunk IDs to delete.
+
+### Method: `delete_by_name`
+
+```python
+delete_by_name()
+```
+
+Delete chunks by their unique names.
+
+Args:
+    names: List of chunk names to delete.
+
+### Method: `delete_collection`
+
+```python
+delete_collection()
+```
+
+Delete a vector store collection.
+
+Args:
+    collection_name: Name of collection to delete. If None, uses configured collection.
+
+Returns:
+    bool: True if collection was deleted, False if it didn't exist.
+
+Raises:
+    ProviderError: If client is not initialized or operation fails.
+
+### Method: `get_collection`
+
+```python
+get_collection()
+```
+
+Get collection details.
+
+Args:
+    collection_name: Name of the collection to retrieve.
+
+Returns:
+    Collection information as CollectionInfo from Qdrant.
+
+Raises:
+    ProviderError: If client is not initialized or operation fails.
+
+### Method: `handle_persistence`
+
+```python
+handle_persistence()
+```
+
+This is no-op, but implemented by the memory provider to trigger persistence.
+
+### Method: `list_collections`
+
+```python
+list_collections()
+```
+
+List all collections in the Qdrant instance.
+
+Returns:
+    List of collection names.
+
+Raises:
+    ConnectionError: Failed to connect to Qdrant server.
+    ProviderError: Qdrant operation failed.
+
+### Method: `migrate_from`
+
+```python
+migrate_from()
+```
+
+Migrate data from a source client to this provider's client.
+
+Args:
+    source_client: Source Qdrant client.
+    collection_names: Specific collections to migrate (default: all).
+    batch_size: Batch size for scrolling and upserting.
+
+Raises:
+    ProviderError: If client is not initialized.
+
+### Method: `migrate_to`
+
+```python
+migrate_to()
+```
+
+Migrate data from this provider's client to a destination client.
+
+Args:
+    dest_client: Destination Qdrant client.
+    collection_names: Specific collections to migrate (default: all).
+    batch_size: Batch size for scrolling and upserting.
+
+Raises:
+    ProviderError: If client is not initialized.
+
+### Method: `search`
+
+```python
+search()
+```
+
+Search for similar vectors using dense, sparse, or hybrid search.
+
+Args:
+    vector: Query vector (StrategizedQuery or list of floats/ints or dict for hybrid
+    other inputs will be deprecated in favor of StrategizedQuery in the future).
+    query_filter: Optional filter for search results.
+
+Returns:
+    List of search results sorted by relevance score.
+
+Raises:
+    CollectionNotFoundError: Collection doesn't exist.
+    SearchError: Search operation failed.
+
+### Method: `upsert`
+
+```python
+upsert()
+```
+
+Insert or update code chunks with hybrid embeddings.
+
+Args:
+    chunks: List of code chunks with embeddings to store.
+
+Raises:
+    CollectionNotFoundError: Collection doesn't exist.
+    UpsertError: Upsert operation failed.

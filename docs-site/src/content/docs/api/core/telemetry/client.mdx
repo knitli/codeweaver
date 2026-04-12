@@ -1,0 +1,165 @@
+---
+title: client
+description: API reference for codeweaver.core.telemetry.client
+---
+
+# `codeweaver.core.telemetry.client`
+
+PostHog telemetry client wrapper with context API support.
+
+Provides a privacy-aware wrapper around the PostHog Python client with:
+- PostHog v7 context API for session tracking and shared tags
+- Privacy filtering via serialize_for_telemetry() on data models
+- Error handling (telemetry never crashes the application)
+- Easy configuration and opt-out
+- Feature flag support for A/B testing
+
+## Class: `TelemetryService`
+
+Privacy-aware PostHog client wrapper with context API support.
+
+Handles telemetry event sending with error handling and configuration management.
+Uses PostHog v7 context API for session tracking and shared properties.
+Privacy filtering is handled via serialize_for_telemetry() on BasedModel and
+DataclassSerializationMixin objects before passing to capture().
+
+Example:
+    &gt;&gt;&gt; client = TelemetryService.from_settings()
+    &gt;&gt;&gt; client.start_session(&#123;"version": "0.5.0"&#125;)
+    &gt;&gt;&gt; if client.enabled:
+    ...     client.capture("codeweaver_search", &#123;"intent": "UNDERSTAND"&#125;)
+    &gt;&gt;&gt; client.end_session()
+
+### Method: `capture`
+
+```python
+capture()
+```
+
+Send event to PostHog with privacy controls.
+
+Args:
+    event: Event name
+    properties: Event properties dictionary (should already be privacy-filtered)
+    distinct_id: Optional user identifier (default: session_id for privacy)
+
+Note:
+    This method never raises exceptions. All errors are logged
+    but do not affect application execution.
+
+    Properties should be privacy-safe. Use serialize_for_telemetry() on
+    objects before passing properties to ensure sensitive data is filtered.
+
+    The $process_person_profile property is automatically set to False
+    to ensure privacy-respecting anonymous events.
+
+### Method: `capture_from_event`
+
+```python
+capture_from_event()
+```
+
+Send event from a TelemetryEvent object.
+
+Args:
+    event_obj: Object implementing TelemetryEvent protocol
+
+### Method: `capture_with_serialization`
+
+```python
+capture_with_serialization()
+```
+
+Send event with automatic privacy serialization.
+
+Args:
+    event: Event name
+    data_obj: Object with serialize_for_telemetry() method (BasedModel or DataclassSerializationMixin)
+    distinct_id: Optional distinct ID (defaults to session_id)
+
+Note:
+    This method automatically calls serialize_for_telemetry() on the data object
+    to ensure sensitive fields are filtered according to _telemetry_keys().
+
+### Method: `end_session`
+
+```python
+end_session()
+```
+
+Clean up context and flush pending events.
+
+Should be called at application shutdown to ensure all events
+are sent before exit.
+
+### Method: `from_settings`
+
+```python
+from_settings()
+```
+
+Create PostHog client from telemetry settings.
+
+Returns:
+    Configured PostHog client instance
+
+### Method: `get_all_feature_flags`
+
+```python
+get_all_feature_flags()
+```
+
+Get all feature flags for the current session.
+
+Returns:
+    Dictionary of flag key to variant value
+
+### Method: `get_feature_flag`
+
+```python
+get_feature_flag()
+```
+
+Get feature flag value for the current session.
+
+Args:
+    flag_key: Feature flag key
+
+Returns:
+    Feature flag variant value or None if not found/disabled
+
+### Method: `shutdown`
+
+```python
+shutdown()
+```
+
+Flush pending events and close client.
+
+Should be called at application shutdown to ensure all events
+are sent before exit.
+
+### Method: `start_session`
+
+```python
+start_session()
+```
+
+Initialize PostHog context for the session.
+
+Sets up session tracking and shared tags that will be inherited
+by all events captured during this session.
+
+Args:
+    metadata: Optional metadata dict with keys like 'version', 'backend', etc.
+
+## Function: `get_telemetry_client`
+
+```python
+get_telemetry_client()
+```
+
+Get singleton telemetry client instance.
+
+Returns:
+    Cached PostHog client configured from settings

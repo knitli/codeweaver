@@ -1,0 +1,380 @@
+---
+title: ast_grep
+description: API reference for codeweaver.semantic.ast_grep
+---
+
+# `codeweaver.semantic.ast_grep`
+
+Custom wrappers around ast-grep's core types to add functionality and serialization.
+
+Like the rest of CodeWeaver, we use our specific vocabulary for concepts to make roles and relationships more clear. See [codeweaver.semantic.grammar_things] for more details.
+
+## The Short(er) Version
+
+### Translation Table
+
+| Tree-sitter Term | CodeWeaver Term | Notes |
+|-----------------|-----------------|-------|
+| Abstract type (with subtypes) | Category | Doesn't appear in parse trees |
+| Named/unnamed node | Thing | Concrete parse tree node |
+| Node with no fields | Token | Leaf node |
+| Node with fields/children | Composite Thing | Non-leaf node |
+| Field | Direct Connection | Has semantic Role |
+| Child | Positional Connection | Ordered, no Role |
+| Field name | Role | Semantic function |
+| Extra | `can_be_anywhere`  | Can be anywhere in the AST |
+| `named` attribute | `is_explicit_rule` | Has named grammar rule |
+| `multiple` attribute | `allows_multiple` | Upper cardinality bound |
+| `required` attribute | `requires_presence` | Lower cardinality bound |
+| 'root' attribute | `is_file` | It's the file. |
+
+### What These Things Are
+
+- **Thing**: A concrete node in the parse tree. Everything in the tree is a Thing. Things can be Token things or CompositeThings.
+- **Token**: A Token is a solitary thing -- in tree-sitter terms, it is a leaf node with no fields or children. Tokens are the "words" of the programming language, like keywords, operators, and identifiers.
+- **CompositeThing**: A CompositeThing is a thing that has fields and/or children (direct or positional connections). CompositeThings are the "phrases" of the programming language, like expressions, statements, and declarations. CompositeThings are always made up of other Things (Tokens or CompositeThings).
+- **Category**: A Category is an abstract type that can have multiple subtypes. Categories do not appear in the parse tree, but they are used to group related Things together. For example, the Category "expression" might include the subtypes "binary_expression", "call_expression", and "literal". While they don't appear in the parse tree, they can be used in search patterns to match any of their subtypes. Since there aren't very many categories, they can be an easy way to write patterns that target specific functional parts of the code.
+- **Direct Connection**: A Direct Connection is a named field in a CompositeThing that has a specific semantic Role. For example, in a function declaration, the "name" field is a Direct Connection with the Role "function_name". Direct Connections are not ordered, and they can be optional or required (the `constraints` attribute provides this information, which is based on the `allows_multiple` and `requires_presence` attributes). A CompositeThing can have multiple Direct Connections, and each connection can be to more than one target (its `target_things` attribute), and they can be of different types (Token, CompositeThing, and even Category), but it must have at least one *possible* Direct Connection. Depending on constraints, a CompositeThing may appear in the AST without an connections of any kind.
+- **Positional Connection**: A Positional Connection is a child of a CompositeThing that does not have a specific semantic Role. Positional Connections are ordered, and they can be optional or required (the `constraints` attribute provides this information, which is based on the `allows_multiple` and `requires_presence` attributes). Because of their ordered nature, a CompositeThing will either have 1 or none of a PositionalConnections type. A PositionalConnections may reference multiple types (its `target_things` attribute), which is ordered.
+- **Role**: A Role is the semantic function of a Direct Connection, like 'name' for a function's name, or 'condition' for an if statement's condition.
+- **Meta Variable**: A Meta Variable is a special syntax used in search patterns to capture nodes in the AST. Meta Variables are prefixed with a `$` symbol, and they can be named or unnamed. Named Meta Variables are used to capture specific nodes, while unnamed Meta Variables are used to capture any node. There are also Multi-Capture Meta Variables that can capture multiple nodes. See [the ast-grep documentation](https://ast-grep.github.io/docs/patterns/metavars/) for more details.
+- **Rules** - Ast-grep provides a rich rule system for defining more complex search patterns than what you can do with just meta variables. See [the ast-grep documentation](https://ast-grep.github.io/guide/rule-config.html) for more details.
+
+## Connections and Navigation
+
+**All connections defined in the grammar are optional.** Sort of. For direct connections, about 36% of them require exactly one target with only one possible target type, so if one of those is present, then so will its target (and probably vice versa). Only about 8% of positional connections require exactly one target with only one possible target type, so positional connections are much more likely to be absent. But in general, you should always code defensively and assume that any connection may be absent.
+
+A common way to move ("traverse") through the AST is to start at the root node (the FileThing) and then move down through its children, and then their children, and so on. You can also move up the tree to a node's parent, or sideways to its siblings. Each AstThing has methods for moving in these directions, as well as properties for accessing its connections.
+
+## Class: `AstThing`
+
+Wrapper for `SgNode` to make it serializable and give it extra functionality.
+
+AstThing represents a node in the AST, which can be a Token (leaf node) or a CompositeThing (non-leaf node). It provides methods for traversing the AST, searching for nodes, and classifying nodes semantically. Each AstThing is associated with a specific programming language, which helps in semantic classification and importance scoring.
+
+Other notable improvements over raw `SgNode`:
+- Serialization support via Pydantic
+- Unique identifiers for nodes (`thing_id` and `parent_thing_id`)
+- Cached properties for potentially expensive operations (like `text`, `kind`, `range`, etc.)
+- Integration with CodeWeaver's semantic classification and scoring system
+    - Each Thing can determine its semantic classification and importance score, providing richer context for search and analysis.
+    - Allows prioritization of Things based on their semantic importance, the goal of the search, and the task at hand.
+- Clearer terminology aligned with CodeWeaver's vocabulary (e.g., Thing, Token, CompositeThing)
+- Stronger typing and generics for better developer experience
+- Each AstThing holds references to its "pure" grammar Thing, which provides information about *what it can be* in the AST, not just what we see in this particular instance.
+
+### Method: `ancestors`
+
+```python
+ancestors()
+```
+
+Get the ancestors of the node.
+
+### Method: `child`
+
+```python
+child()
+```
+
+Get the nth child of the node.
+
+### Method: `commit_edits`
+
+```python
+commit_edits()
+```
+
+Commit a list of edits to the source code.
+
+### Method: `find`
+
+```python
+find()
+```
+
+Find a node using a config.
+
+### Method: `find_all`
+
+```python
+find_all()
+```
+
+Find all nodes using a config.
+
+### Method: `follows`
+
+```python
+follows()
+```
+
+Check if the node follows the given rule.
+
+### Method: `from_sg_node`
+
+```python
+from_sg_node()
+```
+
+Create an AstThing from an ast-grep `SgNode`.
+
+### Method: `get_file`
+
+```python
+get_file()
+```
+
+Get the root of the node.
+
+### Method: `get_match`
+
+```python
+get_match()
+```
+
+Get the match for the given meta variable.
+
+### Method: `get_multiple_matches`
+
+```python
+get_multiple_matches()
+```
+
+Get the matches for the given meta variable.
+
+### Method: `get_root`
+
+```python
+get_root()
+```
+
+Get the root of the node. Alias for `get_file`.
+
+### Method: `get_transformed`
+
+```python
+get_transformed()
+```
+
+Get the transformed text for the given meta variable.
+
+### Method: `has`
+
+```python
+has()
+```
+
+Check if the node has the given rule.
+
+### Method: `importance_for_context`
+
+```python
+importance_for_context()
+```
+
+Calculate the importance score for this node for a specific context.
+
+### Method: `importance_for_task`
+
+```python
+importance_for_task()
+```
+
+Calculate the importance score for this node for a specific task.
+
+### Method: `inside`
+
+```python
+inside()
+```
+
+Check if the node is inside the given rule.
+
+### Method: `matches`
+
+```python
+matches()
+```
+
+Check if the node matches the given rule.
+
+### Method: `next`
+
+```python
+next()
+```
+
+Get the next sibling of the thing.
+
+### Method: `next_all`
+
+```python
+next_all()
+```
+
+Get all next siblings of the node.
+
+### Method: `precedes`
+
+```python
+precedes()
+```
+
+Check if the node precedes the given rule.
+
+### Method: `prev`
+
+```python
+prev()
+```
+
+Get the previous sibling of the node.
+
+### Method: `prev_all`
+
+```python
+prev_all()
+```
+
+Get all previous siblings of the node.
+
+### Method: `replace`
+
+```python
+replace()
+```
+
+Replace the text of the node with new_text.
+
+### Method: `serialize_for_cli`
+
+```python
+serialize_for_cli()
+```
+
+Serialize the AstThing for CLI output.
+
+### Method: `serialize_for_embedding`
+
+```python
+serialize_for_embedding()
+```
+
+Serialize the AstThing for embedding purposes.
+
+### Method: `serialize_special_fields`
+
+```python
+serialize_special_fields()
+```
+
+Serialize the special fields of the AstThing.
+
+## Class: `FileThing`
+
+Wrapper for SgRoot to make it serializable and provide additional functionality.
+
+`FileThing` is the root node of an AST, representing the entire source file. It provides access to the filename and the root node of the AST. We call it a FileThing to make its role as the start of a file's syntax tree more explicit (because... root... of what?). It is a file, and a Thing.
+
+### Method: `from_file`
+
+```python
+from_file()
+```
+
+Create a FileThing from a file.
+
+### Method: `from_sg_node`
+
+```python
+from_sg_node()
+```
+
+Create a FileThing from an ast-grep SgNode.
+
+### Method: `from_sg_root`
+
+```python
+from_sg_root()
+```
+
+Create a FileThing from an ast-grep SgRoot.
+
+### Method: `serialize_for_embedding`
+
+```python
+serialize_for_embedding()
+```
+
+Serialize the FileThing for embedding purposes.
+
+## Class: `MetaVar`
+
+Represents a meta variable in the AST.
+
+### Method: `to_metavar`
+
+```python
+to_metavar()
+```
+
+Return the pattern representation of the meta variable.
+
+## Class: `Position`
+
+Represents a `Pos` from ast-grep with pydantic validation. The position of the node in the source code.
+
+### Method: `from_pos`
+
+```python
+from_pos()
+```
+
+Create a Position from an ast-grep Pos.
+
+### Method: `to_pos`
+
+```python
+to_pos()
+```
+
+Convert a Position to an ast-grep Pos.
+
+## Class: `Range`
+
+Represents a `Range` from ast-grep with pydantic validation. The range of the node in the source code.
+
+### Method: `from_sg_range`
+
+```python
+from_sg_range()
+```
+
+Create a Range from an ast-grep range.
+
+### Method: `to_sg_range`
+
+```python
+to_sg_range()
+```
+
+Convert a Range to an ast-grep Range.
+
+## Class: `Strictness`
+
+Represents the strictness level for code analysis.
+
+## Function: `rebuild_models_for_tests`
+
+```python
+rebuild_models_for_tests()
+```
+
+Rebuild all models with AstThing forward references for test scenarios.
+
+This should be called at the beginning of test modules that instantiate CodeChunk,
+ChunkEmbeddings, or other models that depend on AstThing/SemanticMetadata.
+
+Returns:
+    bool: True if all models were rebuilt successfully, False otherwise

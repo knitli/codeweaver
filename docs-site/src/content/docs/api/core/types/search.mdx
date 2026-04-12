@@ -1,0 +1,68 @@
+---
+title: search
+description: API reference for codeweaver.core.types.search
+---
+
+# `codeweaver.core.types.search`
+
+Core search types for CodeWeaver.
+
+## Class: `SearchResult`
+
+Result from vector search operations.
+
+## Class: `SearchStrategy`
+
+Enumeration of search types.
+
+## Class: `StrategizedQuery`
+
+NamedTuple representing a strategized query for code search.
+
+### Method: `has_dense`
+
+```python
+has_dense()
+```
+
+Check if dense embedding is present and non-empty.
+
+### Method: `has_sparse`
+
+```python
+has_sparse()
+```
+
+Check if sparse embedding is present and non-empty.
+
+### Method: `is_empty`
+
+```python
+is_empty()
+```
+
+Check if both dense and sparse embeddings are None or empty.
+
+### Method: `is_hybrid`
+
+```python
+is_hybrid()
+```
+
+Check if both dense and sparse embeddings are present and non-empty.
+
+### Method: `to_hybrid_query`
+
+```python
+to_hybrid_query()
+```
+
+Convert to a FusionQuery for hybrid search.
+
+### Method: `to_query`
+
+```python
+to_query()
+```
+
+Convert to a query dict based on available embeddings.

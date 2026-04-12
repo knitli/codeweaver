@@ -1,0 +1,53 @@
+---
+title: token_patterns
+description: API reference for codeweaver.semantic.token_patterns
+---
+
+# `codeweaver.semantic.token_patterns`
+
+Constants and patterns used in semantic analysis.
+
+## Class: `TokenPatternCacheDict`
+
+TypedDict for token pattern cache.
+
+## Function: `get_checks`
+
+```python
+get_checks()
+```
+
+Get all classifications for a thing name using optimized lazy-compiled patterns.
+
+Uses lazy compilation strategy for fast module imports:
+1. Patterns stored as raw strings at module level
+2. Compiled on first access per language
+3. Cached for subsequent calls
+
+Tiered lookup strategy (language is always known):
+1. Language-specific patterns (fastest, most specific)
+2. Generic cross-language patterns (broader coverage)
+
+Args:
+    thing_name: The name of the thing to classify
+    language: The programming language (always known per user confirmation)
+
+Returns:
+    Tuple of matching SemanticClass values
+
+## Function: `get_token_patterns_sync`
+
+```python
+get_token_patterns_sync()
+```
+
+Get token patterns with lazy initialization.
+
+Patterns are compiled synchronously on first call and cached thereafter.
+This is typically called during module initialization before async operations begin.
+
+The compilation is a one-time operation (~10-50ms) that happens on first access.
+All subsequent calls return the cached patterns immediately.
+
+Returns:
+    TokenPatternCacheDict: Compiled regex patterns for token classification

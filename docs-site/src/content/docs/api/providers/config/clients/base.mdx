@@ -1,0 +1,37 @@
+---
+title: base
+description: API reference for codeweaver.providers.config.clients.base
+---
+
+# `codeweaver.providers.config.clients.base`
+
+Base ClientOptions for all provider clients.
+
+## Class: `ClientOptions`
+
+A base class for provider client options.
+
+Client options are specific to the underlying SDK client that's used. They are not
+necessarily the same as the *provider*. The provider is who you pay, while the client
+if what you use to connect. For the most part, this is intuitive but there are some
+exceptions. The biggest exception is Azure, which does not have its own provider class,
+because it instead uses either Cohere or OpenAI providers. You're connecting to and paying Azure,
+but using the correct provider class for what you're trying to do.
+
+The standard way to pass client options to a provider is with the `as_settings()` method, which provides a kwargs dictionary.
+
+### Method: `as_settings`
+
+```python
+as_settings()
+```
+
+Return the client options as a dictionary suitable for passing as settings to the client constructor.
+
+### Method: `assemble_env_vars`
+
+```python
+assemble_env_vars()
+```
+
+Apply environment variables to the client options.

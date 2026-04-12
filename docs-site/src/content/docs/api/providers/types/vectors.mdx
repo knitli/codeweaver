@@ -1,0 +1,278 @@
+---
+title: vectors
+description: API reference for codeweaver.providers.types.vectors
+---
+
+# `codeweaver.providers.types.vectors`
+
+Vector configuration types for Qdrant integration.
+
+## Class: `VectorConfig`
+
+Immutable configuration for a single named vector in Qdrant.
+
+Aligns directly with Qdrant's vector configuration while adding
+minimal metadata for generation and identification.
+
+Attributes:
+    name: Physical Qdrant vector name (e.g., "primary", "backup", "sparse")
+          Should reflect the vector's purpose/role, not the model.
+    model_name: Model used to generate this vector (metadata for generation)
+    params: Direct Qdrant VectorParams or SparseVectorParams
+    role: Optional semantic role (defaults to name if not provided)
+
+Example:
+    &gt;&gt;&gt; config = VectorConfig(
+    ...     name="primary",
+    ...     model_name=ModelName("voyage-code-3"),
+    ...     params=VectorParams(size=1024, distance="Cosine"),
+    ...     role=VectorRole.PRIMARY,
+    ... )
+
+### Method: `from_provider_settings`
+
+```python
+from_provider_settings()
+```
+
+Create VectorConfig from provider settings.
+
+Args:
+    config: Provider settings (embedding or sparse)
+    name: Physical Qdrant vector name (REQUIRED, purpose-based)
+          e.g., "primary", "backup", "sparse", "semantic_code"
+    role: Optional semantic role (defaults to name)
+
+Returns:
+    Configured VectorConfig instance
+
+Example:
+    &gt;&gt;&gt; from codeweaver.providers.config.categories import EmbeddingProviderSettings
+    &gt;&gt;&gt; settings = EmbeddingProviderSettings(...)
+    &gt;&gt;&gt; config = await VectorConfig.from_provider_settings(
+    ...     settings, name="primary", role=VectorRole.PRIMARY
+    ... )
+
+### Method: `to_qdrant_config`
+
+```python
+to_qdrant_config()
+```
+
+Return (name, params) tuple for Qdrant collection config.
+
+Returns:
+    Tuple of (physical_vector_name, vector_params) ready for
+    Qdrant's vectors_config or sparse_vectors_config dict.
+
+Example:
+    &gt;&gt;&gt; config = VectorConfig(name="primary", ...)
+    &gt;&gt;&gt; name, params = config.to_qdrant_config()
+    &gt;&gt;&gt; collection_config = CollectionParams(vectors_config=&#123;name: params&#125;)
+
+## Class: `VectorRole`
+
+Semantic roles for vectors (extensible for future strategies).
+
+The enum values should match common physical vector names by default.
+Use .variable property to get snake_case string representation.
+
+Example:
+    &gt;&gt;&gt; VectorRole.PRIMARY.variable
+    'primary'
+    &gt;&gt;&gt; VectorRole.BACKUP.variable
+    'backup'
+
+Future extensions might include:
+    - SEMANTIC_CODE: "semantic_code"
+    - SEMANTIC_DOCS: "semantic_docs"
+    - KEYWORD: "keyword"
+
+## Class: `VectorSet`
+
+Immutable collection of vectors for a search/indexing strategy.
+
+Manages multiple named vectors with flexible organization. Vectors
+can be keyed by strategy name, intent, or any identifier. Provides
+query methods and conversion to Qdrant collection configuration.
+
+Attributes:
+    vectors: Dict of VectorConfig keyed by logical identifier
+             (e.g., "primary", "backup", "sparse", "semantic_v1")
+
+Example:
+    &gt;&gt;&gt; vector_set = VectorSet(vectors=&#123;
+    ...     "primary": VectorConfig(name="primary", ...),
+    ...     "backup": VectorConfig(name="backup", ...),
+    ...     "sparse": VectorConfig(name="sparse", ...),
+    ... &#125;)
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # Convert to Qdrant config
+    &gt;&gt;&gt; vectors_config = vector_set.to_qdrant_vectors_config()
+    &gt;&gt;&gt; sparse_config = vector_set.to_qdrant_sparse_vectors_config()
+
+### Method: `backup`
+
+```python
+backup()
+```
+
+Get backup dense vector (common case).
+
+Returns first vector with BACKUP role, or None.
+
+### Method: `by_key`
+
+```python
+by_key()
+```
+
+Get vector by its logical dict key.
+
+Args:
+    key: Logical identifier used in vectors dict
+
+Returns:
+    Matching VectorConfig or None
+
+### Method: `by_name`
+
+```python
+by_name()
+```
+
+Get vector by its physical Qdrant name.
+
+Args:
+    name: Physical vector name (e.g., "primary", "backup")
+
+Returns:
+    Matching VectorConfig or None
+
+### Method: `by_role`
+
+```python
+by_role()
+```
+
+Get all vectors with a specific role.
+
+Supports multiple vectors with the same role for future
+multi-strategy support.
+
+Args:
+    role: VectorRole enum or string role name
+
+Returns:
+    List of matching VectorConfigs (may be empty)
+
+Example:
+    &gt;&gt;&gt; primaries = vector_set.by_role(VectorRole.PRIMARY)
+    &gt;&gt;&gt; backups = vector_set.by_role("backup")
+
+### Method: `default`
+
+```python
+default()
+```
+
+Create default VectorSet with recommended configuration.
+
+Returns:
+    VectorSet with recommended profile configuration
+
+### Method: `dense_vectors`
+
+```python
+dense_vectors()
+```
+
+Get all dense vectors.
+
+Returns:
+    Dict of dense VectorConfigs (preserves keys)
+
+### Method: `from_profile`
+
+```python
+from_profile()
+```
+
+Create VectorSet from provider profile.
+
+Creates standard layout with primary, backup (optional), and
+sparse (optional) vectors based on profile configuration.
+Uses role-based physical vector names.
+
+Args:
+    profile: Provider profile with embedding configurations
+
+Returns:
+    Configured VectorSet with standard layout
+
+Example:
+    &gt;&gt;&gt; from codeweaver.providers.config.profiles import ProviderProfile
+    &gt;&gt;&gt; vector_set = await VectorSet.from_profile(ProviderProfile.RECOMMENDED)
+
+### Method: `primary`
+
+```python
+primary()
+```
+
+Get primary dense vector (common case).
+
+Returns first vector with PRIMARY role, or None.
+
+### Method: `sparse`
+
+```python
+sparse()
+```
+
+Get sparse vector (common case).
+
+Returns first vector with SPARSE role, or None.
+
+### Method: `sparse_vectors`
+
+```python
+sparse_vectors()
+```
+
+Get all sparse vectors.
+
+Returns:
+    Dict of SparseVectorConfigs (preserves keys)
+
+### Method: `to_qdrant_sparse_vectors_config`
+
+```python
+to_qdrant_sparse_vectors_config()
+```
+
+Generate Qdrant sparse_vectors_config dict for sparse vectors.
+
+Returns:
+    Dict mapping physical vector names to SparseVectorParams,
+    ready for CollectionConfig.sparse_vectors_config
+
+Example:
+    &gt;&gt;&gt; config = CollectionParams(
+    ...     sparse_vectors_config=vector_set.to_qdrant_sparse_vectors_config()
+    ... )
+
+### Method: `to_qdrant_vectors_config`
+
+```python
+to_qdrant_vectors_config()
+```
+
+Generate Qdrant vectors_config dict for dense vectors.
+
+Returns:
+    Dict mapping physical vector names to VectorParams,
+    ready for CollectionConfig.vectors_config
+
+Example:
+    &gt;&gt;&gt; config = CollectionParams(vectors_config=vector_set.to_qdrant_vectors_config())

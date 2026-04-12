@@ -1,0 +1,62 @@
+---
+title: failover_detector
+description: API reference for codeweaver.engine.config.failover_detector
+---
+
+# `codeweaver.engine.config.failover_detector`
+
+Failover detector abstraction to break circular dependency with ProviderSettings.
+
+## Class: `FailoverDetector`
+
+Abstract interface for detecting whether failover should be disabled.
+
+This abstraction breaks the circular dependency between FailoverSettings
+and ProviderSettings by inverting the dependency. FailoverSettings depends
+on this abstract interface, while concrete implementations depend on
+ProviderSettings.
+
+The detector pattern follows the Dependency Inversion Principle (SOLID),
+allowing high-level failover logic to remain independent of provider
+configuration details.
+
+### Method: `should_disable_failover`
+
+```python
+should_disable_failover()
+```
+
+Determine whether failover should be automatically disabled.
+
+Returns:
+    True if failover should be disabled based on provider configuration,
+    False otherwise.
+
+## Class: `LocalEmbeddingDetector`
+
+Detect whether to disable failover based on local embedding provider.
+
+This implementation disables failover when the primary embedding provider
+is local, as local providers don't require network failover mechanisms.
+
+The detector is registered with the DI container to provide the
+FailoverDetector interface, enabling automatic injection into consumers.
+
+### Method: `should_disable_failover`
+
+```python
+should_disable_failover()
+```
+
+Check if the primary embedding provider is local.
+
+Failover is automatically disabled when:
+- The embedding provider list is non-empty AND
+- The first (primary) embedding provider is marked as local
+
+If no embedding providers are configured (empty list), failover
+remains enabled as a safety measure.
+
+Returns:
+    True if the primary embedding provider is local and failover
+    should be disabled, False otherwise.

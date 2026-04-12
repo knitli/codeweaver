@@ -1,0 +1,160 @@
+---
+title: selector
+description: API reference for codeweaver.engine.chunker.selector
+---
+
+# `codeweaver.engine.chunker.selector`
+
+Intelligent chunker selection based on file language and capabilities.
+
+This module implements the ChunkerSelector which routes files to the appropriate
+chunker implementation based on language detection and capability analysis. It
+provides graceful degradation from semantic to delimiter-based chunking when
+parsing fails or languages are unsupported.
+
+The selector creates fresh chunker instances per file to ensure isolation and
+prevent state contamination across chunking operations.
+
+## Class: `ChunkerSelector`
+
+Selects appropriate chunker based on file language and capabilities.
+
+The selector uses language detection from file extensions to determine which
+chunking strategy to employ. It prefers semantic (AST-based) chunking for
+supported languages and gracefully falls back to delimiter-based chunking
+when semantic parsing fails or the language is unsupported.
+
+Attributes:
+    governor: ChunkGovernor instance providing resource limits and configuration
+
+Examples:
+    Basic usage with file discovery:
+
+    &gt;&gt;&gt; from codeweaver.engine.chunker.base import ChunkGovernor
+    &gt;&gt;&gt; from codeweaver.core import DiscoveredFile
+    &gt;&gt;&gt; from pathlib import Path
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; governor = ChunkGovernor(capabilities=(...))
+    &gt;&gt;&gt; selector = ChunkerSelector(governor)
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # Select chunker for a Python file
+    &gt;&gt;&gt; file = DiscoveredFile.from_path(Path("script.py"))
+    &gt;&gt;&gt; chunker = selector.select_for_file(file)
+    &gt;&gt;&gt; # Returns SemanticChunker for Python
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # Process the file
+    &gt;&gt;&gt; chunks = chunker.chunk(file.path.read_text(), file_path=file.path)
+
+Selection Algorithm:
+    1. Detect language from file extension using SemanticSearchLanguage
+    2. If language is in SemanticSearchLanguage enum:
+       - Attempt to create SemanticChunker
+       - On ParseError or NotImplementedError, log warning and fall back
+    3. Fall back to DelimiterChunker
+    4. Return fresh chunker instance (never reused across files)
+
+### Method: `select_for_file`
+
+```python
+select_for_file()
+```
+
+Select best chunker for given file (creates fresh instance).
+
+Analyzes the file's extension to determine the appropriate chunking
+strategy. Always creates a new chunker instance to ensure isolation
+between file operations.
+
+Args:
+    file: DiscoveredFile with path attribute for language detection
+
+Returns:
+    Fresh BaseChunker instance appropriate for file's language.
+    Returns SemanticChunker for supported languages or
+    DelimiterChunker for unsupported languages.
+
+Raises:
+    FileTooLargeError: When the file size exceeds the configured
+        ``max_file_size_mb`` limit in performance settings. The error
+        includes the actual file size, the configured limit, and
+        resolution suggestions. Callers should catch this before the
+        generic ``Exception`` fallback to log structured size details.
+        Configure via ``governor.settings.performance.max_file_size_mb``.
+
+Notes:
+    - Each call creates a new chunker instance (no reuse)
+    - Falls back to DelimiterChunker for unsupported languages
+    - Falls back to delimiter chunking on semantic parse errors
+    - Logs warnings when fallback occurs
+    - Checks max_file_size_mb from settings before chunking
+
+Examples:
+    &gt;&gt;&gt; from pathlib import Path
+    &gt;&gt;&gt; from codeweaver.core import DiscoveredFile
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; file = DiscoveredFile.from_path(Path("example.py"))
+    &gt;&gt;&gt; chunker1 = selector.select_for_file(file)
+    &gt;&gt;&gt; chunker2 = selector.select_for_file(file)
+    &gt;&gt;&gt; assert chunker1 is not chunker2  # Fresh instances
+
+### Method: `select_for_file_path`
+
+```python
+select_for_file_path()
+```
+
+Select best chunker for given file path (convenience method).
+
+Creates a DiscoveredFile from the path and delegates to select_for_file.
+This is a convenience method for when you only have a Path object.
+
+Args:
+    file_path: Path to the file (Path object or path-like)
+
+Returns:
+    Fresh BaseChunker instance appropriate for file's language.
+
+Examples:
+    &gt;&gt;&gt; from pathlib import Path
+    &gt;&gt;&gt; file_path = Path("example.py")
+    &gt;&gt;&gt; chunker = selector.select_for_file_path(file_path)
+
+## Class: `GracefulChunker`
+
+Wraps chunker with graceful degradation to fallback.
+
+This wrapper implements a fallback pattern where a primary chunker is
+attempted first, and on any failure a fallback chunker is used instead.
+This enables robust chunking with seamless degradation from sophisticated
+strategies (semantic) to simpler ones (delimiter, text splitting).
+
+Attributes:
+    primary: First chunker to attempt
+    fallback: Backup chunker to use on primary failure
+
+Examples:
+    Wrapping semantic chunker with delimiter fallback:
+
+    &gt;&gt;&gt; from codeweaver.engine.chunker.semantic import SemanticChunker
+    &gt;&gt;&gt; from codeweaver.engine.chunker.delimiter import DelimiterChunker
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; primary = SemanticChunker(governor, SemanticSearchLanguage.PYTHON)
+    &gt;&gt;&gt; fallback = DelimiterChunker(governor, LanguageFamily.C_LIKE)
+    &gt;&gt;&gt; chunker = GracefulChunker(primary, fallback)
+    &gt;&gt;&gt;
+    &gt;&gt;&gt; # This will try semantic first, fall back on error
+    &gt;&gt;&gt; chunks = chunker.chunk(content, file_path=path)
+
+Error Handling:
+    - Catches all exceptions from primary chunker
+    - Logs warning with error details
+    - Attempts fallback chunker
+    - Propagates fallback chunker exceptions (no double-fallback)
+
+### Method: `chunk`
+
+```python
+chunk()
+```
+
+Try primary chunker, fall back on error.

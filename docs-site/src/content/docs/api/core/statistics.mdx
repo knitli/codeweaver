@@ -1,0 +1,344 @@
+---
+title: statistics
+description: API reference for codeweaver.core.statistics
+---
+
+# `codeweaver.core.statistics`
+
+Statistics tracking for CodeWeaver, including file indexing, retrieval, and session performance metrics.
+
+## Class: `FailoverStats`
+
+Statistics tracking for vector store failover operations.
+
+## Class: `FileStatistics`
+
+Comprehensive file statistics tracking categories, languages, and operations.
+
+### Method: `add_chunk_from_codechunk`
+
+```python
+add_chunk_from_codechunk()
+```
+
+Add chunk statistics using a CodeChunk object (efficient).
+
+This method tracks chunk creation statistics including chunk type
+(semantic vs delimiter), size, and language. It uses pre-computed
+information from the CodeChunk to avoid redundant operations.
+
+Args:
+    chunk: CodeChunk with pre-computed ext_category and metadata
+    operation: Type of operation performed (usually "processed" for chunks)
+
+### Method: `add_file`
+
+```python
+add_file()
+```
+
+Add a file operation, automatically categorizing by extension.
+
+### Method: `add_file_from_discovered`
+
+```python
+add_file_from_discovered()
+```
+
+Add a file operation using a DiscoveredFile (more efficient).
+
+This method is more efficient than add_file() when you already have a
+DiscoveredFile object, as it avoids redundant ExtCategory.from_file() calls.
+
+Args:
+    discovered_file: DiscoveredFile with pre-computed ext_category
+    operation: Type of operation performed (indexed, retrieved, etc.)
+
+### Method: `add_other_files`
+
+```python
+add_other_files()
+```
+
+Add files to the 'other' category.
+
+### Method: `get_summary_by_category`
+
+```python
+get_summary_by_category()
+```
+
+Get a summary of unique files and operations by category.
+
+### Method: `get_summary_by_language`
+
+```python
+get_summary_by_language()
+```
+
+Get a summary of statistics by language across all categories.
+
+## Class: `Identifier`
+
+A named tuple for request identifiers.
+
+## Class: `SessionStatistics`
+
+Statistics for tracking session performance and usage.
+
+### Method: `add_chunk_from_codechunk`
+
+```python
+add_chunk_from_codechunk()
+```
+
+Add chunk statistics using a CodeChunk object (efficient).
+
+This method tracks chunk creation statistics at the session level,
+including chunk type, size, and language distribution.
+
+Args:
+    chunk: CodeChunk with pre-computed ext_category and metadata
+    operation: Type of operation performed (usually "processed" for chunks)
+
+### Method: `add_failed_request`
+
+```python
+add_failed_request()
+```
+
+Add a failed request count.
+
+### Method: `add_file_from_discovered`
+
+```python
+add_file_from_discovered()
+```
+
+Add a file operation using a DiscoveredFile (more efficient).
+
+This method is more efficient than add_file() when you already have a
+DiscoveredFile object, as it avoids redundant ExtCategory.from_file() calls.
+
+Args:
+    discovered_file: DiscoveredFile with pre-computed ext_category
+    operation: Type of operation performed (indexed, retrieved, etc.)
+
+### Method: `add_file_operation`
+
+```python
+add_file_operation()
+```
+
+Add a file operation to the index statistics.
+
+### Method: `add_file_operations`
+
+```python
+add_file_operations()
+```
+
+Add multiple file operations to the index statistics.
+
+### Method: `add_file_operations_by_extcategory`
+
+```python
+add_file_operations_by_extcategory()
+```
+
+Add file operations to the index statistics by extension category.
+
+### Method: `add_other_files`
+
+```python
+add_other_files()
+```
+
+Add files to the 'other' category in index statistics.
+
+### Method: `add_successful_request`
+
+```python
+add_successful_request()
+```
+
+Add a successful request count.
+
+### Method: `add_token_usage`
+
+```python
+add_token_usage()
+```
+
+Add token usage statistics.
+
+### Method: `get_timing_statistics`
+
+```python
+get_timing_statistics()
+```
+
+Get the current timing statistics.
+
+### Method: `get_token_usage`
+
+```python
+get_token_usage()
+```
+
+Get the current token usage statistics.
+
+### Method: `log_request_from_context`
+
+```python
+log_request_from_context()
+```
+
+Log a request from the given context.
+
+Note: This is fastmcp.Context, *not* fastmcp.middleware.MiddlewareContext
+
+### Method: `report`
+
+```python
+report()
+```
+
+Generate a report of the current statistics.
+
+### Method: `request_in_log`
+
+```python
+request_in_log()
+```
+
+Check if a request ID is in the successful or failed request logs.
+
+### Method: `reset`
+
+```python
+reset()
+```
+
+Reset all statistics to their initial state.
+
+### Method: `serialize_token_statistics`
+
+```python
+serialize_token_statistics()
+```
+
+Serialize the token statistics to a dictionary.
+
+### Method: `update_failover_stats`
+
+```python
+update_failover_stats()
+```
+
+Update failover statistics.
+
+Args:
+    failover_active: Set failover active status
+    increment_failover_count: Increment the failover count
+    failover_time_seconds: Add to total failover time
+    last_failover_time: Set last failover timestamp
+    increment_backup_syncs: Increment backup sync counter
+    increment_sync_back_ops: Increment sync-back operations counter
+    chunks_synced_back: Add to chunks synced back count
+    active_store_type: Set active store type (primary/backup)
+    primary_circuit_breaker_state: Set circuit breaker state
+    backup_file_exists: Set backup file existence flag
+    backup_file_size_bytes: Set backup file size
+    chunks_in_failover: Set number of chunks in failover
+
+## Class: `TimingStatistics`
+
+By-operation timing statistics for CodeWeaver operations.
+
+### Method: `update`
+
+```python
+update()
+```
+
+Update the timing statistics for a specific request type.
+
+### Method: `update_http_requests`
+
+```python
+update_http_requests()
+```
+
+Update the timing statistics for a specific HTTP request type.
+
+## Class: `TokenCategory`
+
+Categories of token usage for vector store operations.
+
+## Class: `TokenCost`
+
+Cost categories for token usage.
+
+### Method: `expense`
+
+```python
+expense()
+```
+
+Calculate the expense for a given number of tokens.
+
+## Class: `TokenCounter`
+
+A counter for tracking token usage by operation.
+
+## Function: `add_failed_request`
+
+```python
+add_failed_request()
+```
+
+Add a failed request to the log.
+
+## Function: `add_successful_request`
+
+```python
+add_successful_request()
+```
+
+Add a successful request to the log.
+
+## Function: `get_session_statistics`
+
+```python
+get_session_statistics()
+```
+
+Get the current session statistics.
+
+## Function: `normalize_language`
+
+```python
+normalize_language()
+```
+
+Normalize a language string to a SemanticSearchLanguage or ConfigLanguage.
+
+## Function: `record_timed_http_request`
+
+```python
+record_timed_http_request()
+```
+
+Record the time taken for an HTTP request of a given type.
+
+## Function: `timed_http`
+
+```python
+timed_http()
+```
+
+Decorator to time HTTP endpoints and record success/failure counts.
+
+Measures end-to-end handler execution time, records duration in milliseconds,
+and increments HTTP success/failed counters based on response status.

@@ -1,0 +1,144 @@
+---
+title: classifier
+description: API reference for codeweaver.semantic.classifier
+---
+
+# `codeweaver.semantic.classifier`
+
+Grammar-based semantic node classification using inherent tree-sitter structure.
+
+This module provides primary classification by leveraging the explicit semantic
+relationships encoded in node_types.json files:
+- Categories → Abstract groupings (was: Subtypes/Abstract types)
+- DirectConnections → Structural relationships with semantic Roles (was: Fields)
+- PositionalConnections → Ordered relationships without Roles (was: Children)
+- can_be_anywhere → Syntactic elements that can appear anywhere (was: Extra)
+
+## Class: `ClassificationMethod`
+
+Enumeration of classification methods.
+
+## Class: `EvidenceKind`
+
+Kinds of evidence used for classifying Things.
+
+An int-enum for easy comparison of evidence strength. Higher numbers indicate stronger evidence. The confidence score is estimated based on the combined strength of the evidence kinds used.
+
+### Method: `confidence`
+
+```python
+confidence()
+```
+
+Estimate confidence score based on the kinds of evidence used.
+
+Args:
+    kinds: List of EvidenceKind values used in classification.
+
+Returns:
+    Confidence score from 0.0 to 1.0
+
+### Method: `evidence_summary`
+
+```python
+evidence_summary()
+```
+
+Generate a human-readable summary of the evidence kinds used.
+
+Args:
+    kinds: List of EvidenceKind values used in classification.
+
+Returns:
+    Human-readable summary of the evidence kinds.
+
+## Class: `GrammarBasedClassifier`
+
+Primary classifier using grammar structure from node_types.json.
+
+### Method: `classify_thing`
+
+```python
+classify_thing()
+```
+
+Classify a thing using grammar structure.
+
+Classification pipeline (highest to lowest confidence):
+very high confidence:
+1. Known exceptions (e.g., comments)
+2. can_be_anywhere Things (mostly comments, but small number and all known)
+3. Token purpose classification (very high confidence)
+4. Multi-tier Thing classification for specific language-category pairs (e.g., Ruby primary, Rust declaration_statement)
+5. Category-based classification for other categories
+
+medium-high confidence:
+6. Direct connections analysis (medium confidence)
+
+lower confidence:
+7. Cross-language lookup (lowest confidence, fallback only) -- looks for same-named Things in other languages with high-confidence classifications. It generally works but because of language differences, confidence is lower. Can still produce high confidence results if multiple other languages agree on classification.
+
+Args:
+    thing_name: The Thing name (e.g., "function_definition")
+    language: The programming language
+
+Returns:
+    Classification result with confidence, or None if classification not possible
+
+## Class: `GrammarClassificationResult`
+
+Result of grammar-based classification.
+
+Attributes:
+    classification: Semantic classification assigned to the thing
+    rank: Semantic rank (importance level)
+    classification_method: Method used for classification
+    evidence: Kinds of evidence used for classification
+    evidence_summary: Human-readable explanation of classification reasoning
+    confidence: Confidence score (0.0-1.0)
+
+### Method: `evidence_summary`
+
+```python
+evidence_summary()
+```
+
+Human-readable summary of the evidence kinds used.
+
+### Method: `from_results`
+
+```python
+from_results()
+```
+
+Combine multiple classification results into a single result.
+
+Args:
+    results: List of GrammarClassificationResult instances to combine.
+
+Returns:
+    Combined GrammarClassificationResult with highest confidence, or None if no results.
+
+### Method: `is_confident`
+
+```python
+is_confident()
+```
+
+Whether the confidence level is above the threshold.
+
+## Function: `is_composite_thing`
+
+```python
+is_composite_thing()
+```
+
+Type guard to check if a Thing is a CompositeThing.
+
+## Function: `is_token`
+
+```python
+is_token()
+```
+
+Type guard to check if a Thing is a Token.

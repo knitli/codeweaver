@@ -1,0 +1,44 @@
+---
+title: state
+description: API reference for codeweaver.server.mcp.state
+---
+
+# `codeweaver.server.mcp.state`
+
+Defines the MCP server state object for HTTP deployments.
+
+## Class: `CwMcpHttpState`
+
+State object for MCP HTTP server deployments.
+
+### Method: `from_app`
+
+```python
+from_app()
+```
+
+Create state from app setup with the app and optional kwargs.
+
+### Method: `human_start_time`
+
+```python
+human_start_time()
+```
+
+Get the server start time in a human-readable format.
+
+### Method: `human_uptime`
+
+```python
+human_uptime()
+```
+
+Get the uptime of the server in a human-readable format.
+
+### Method: `uptime_seconds`
+
+```python
+uptime_seconds()
+```
+
+Get the uptime of the server in seconds.

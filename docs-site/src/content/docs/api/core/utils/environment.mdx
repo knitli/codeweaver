@@ -1,0 +1,129 @@
+---
+title: environment
+description: API reference for codeweaver.core.utils.environment
+---
+
+# `codeweaver.core.utils.environment`
+
+Utilities for detecting and determining the environment.
+
+## Function: `detect_root_package`
+
+```python
+detect_root_package()
+```
+
+Detect which package should be root based on what's installed.
+
+Priority (highest to lowest):
+1. code-weaver-server (full installation)
+2. code-weaver-engine (indexing/chunking only)
+3. code-weaver-providers (providers only)
+4. core (minimal - logging/telemetry only)
+
+Returns:
+    The package type that should serve as root settings
+
+## Function: `find_qdrant_instance`
+
+```python
+find_qdrant_instance()
+```
+
+Attempt to find the port of a local qdrant instance.
+
+## Function: `format_file_link`
+
+```python
+format_file_link()
+```
+
+Format a file link for IDEs that support it (VSCode, JetBrains).
+
+## Function: `get_codeweaver_config_paths`
+
+```python
+get_codeweaver_config_paths()
+```
+
+Get all possible CodeWeaver configuration file paths.
+
+## Function: `get_codeweaver_prefix`
+
+```python
+get_codeweaver_prefix()
+```
+
+Return the codeweaver terminal prefix.
+
+## Function: `get_possible_env_vars`
+
+```python
+get_possible_env_vars()
+```
+
+Get a tuple of any resolved environment variables for all providers.
+
+## Function: `get_terminal_width`
+
+```python
+get_terminal_width()
+```
+
+Get the terminal width.
+
+## Function: `in_ide`
+
+```python
+in_ide()
+```
+
+Detect if we are running inside an IDE.
+
+## Function: `is_codeweaver_config_path`
+
+```python
+is_codeweaver_config_path()
+```
+
+Check if the given path is a CodeWeaver configuration file path.
+
+## Function: `is_tty`
+
+```python
+is_tty()
+```
+
+Check if the output is a TTY in an interactive terminal.
+
+## Function: `qdrant_instance_live_at_port`
+
+```python
+qdrant_instance_live_at_port()
+```
+
+Check if a Qdrant instance is live at the given port.
+
+## Function: `settings_type_for_root_package`
+
+```python
+settings_type_for_root_package()
+```
+
+Get the settings type for the given root package.
+
+## Function: `we_are_in_jetbrains`
+
+```python
+we_are_in_jetbrains()
+```
+
+Detect if we are running inside a JetBrains IDE.
+
+## Function: `we_are_in_vscode`
+
+```python
+we_are_in_vscode()
+```
+
+Detect if we are running inside VSCode.

@@ -1,0 +1,195 @@
+---
+title: container
+description: API reference for codeweaver.core.di.container
+---
+
+# `codeweaver.core.di.container`
+
+Central dependency container for CodeWeaver.
+
+## Class: `Container`
+
+Dependency container for managing component lifecycles and resolution.
+
+Supports:
+- Factory and singleton registration
+- Recursive dependency resolution via Depends markers
+- Testing overrides
+- Async startup/shutdown hooks
+- Auto-discovery of providers via dependency_provider decorator
+
+### Method: `add_shutdown_hook`
+
+```python
+add_shutdown_hook()
+```
+
+Add a shutdown hook.
+
+### Method: `add_startup_hook`
+
+```python
+add_startup_hook()
+```
+
+Add a startup hook.
+
+### Method: `clear`
+
+```python
+clear()
+```
+
+Clear all registered dependencies and state.
+
+### Method: `clear_overrides`
+
+```python
+clear_overrides()
+```
+
+Clear all registered overrides.
+
+### Method: `clear_request_cache`
+
+```python
+clear_request_cache()
+```
+
+Clear the request-scoped dependency cache.
+
+Should be called at the end of each request to clean up request-scoped instances.
+
+### Method: `lifespan`
+
+```python
+lifespan()
+```
+
+Context manager for container lifecycle with cleanup support.
+
+Usage:
+    async with container.lifespan():
+        # Container ready with cleanup tracking
+        instance = await container.resolve(SomeType)
+    # All generators cleaned up
+
+### Method: `override`
+
+```python
+override()
+```
+
+Override a dependency, primarily for testing.
+
+Args:
+    interface: The type to override.
+    instance: The instance or factory to use instead.
+
+### Method: `register`
+
+```python
+register()
+```
+
+Register a dependency.
+
+Args:
+    interface: The type or interface to register.
+    factory: The factory function or class. If None, the interface itself is used.
+    singleton: Whether to cache the instance.
+    tags: Optional tags to categorize this provider.
+    scope: Optional scope (singleton, request, function). If not provided, inferred from singleton flag.
+
+### Method: `reset_state`
+
+```python
+reset_state()
+```
+
+Reset container state for testing, keeping auto-discovered providers.
+
+Clears singletons, overrides, hooks, and request cache, but preserves
+the factory registry and the providers_loaded flag to avoid
+expensive re-discovery cycles in unit tests.
+
+### Method: `resolve`
+
+```python
+resolve()
+```
+
+Resolve a dependency with circular dependency detection.
+
+Args:
+    interface: The type to resolve.
+    _resolution_stack: Internal parameter for tracking resolution chain.
+        DO NOT pass this manually - it's managed automatically.
+    tags: Optional tags to filter providers. If provided, resolves the provider
+          that has ALL specified tags.
+
+Returns:
+    The resolved instance.
+
+Raises:
+    CircularDependencyError: If a circular dependency is detected.
+
+### Method: `use_overrides`
+
+```python
+use_overrides()
+```
+
+Context manager to temporarily apply multiple overrides.
+
+Args:
+    overrides: A dictionary mapping interfaces to their override instances/factories.
+
+Yields:
+    The container instance with overrides applied.
+
+## Class: `ResolutionResult`
+
+Result of dependency resolution with error tracking.
+
+Used when collect_errors=True to aggregate multiple dependency
+resolution errors instead of failing fast on the first error.
+
+Attributes:
+    values: Successfully resolved parameter values by name
+    errors: List of dependency injection errors encountered
+
+## Function: `get_container`
+
+```python
+get_container()
+```
+
+Get or create the global default container.
+
+On first call, this will:
+1. Create a new Container instance
+2. Load providers from dependency_provider decorator registry (lazy, on first resolve)
+
+Returns:
+    The global container instance.
+
+## Function: `reset_container`
+
+```python
+reset_container()
+```
+
+Reset the global default container.
+
+## Function: `reset_container_state`
+
+```python
+reset_container_state()
+```
+
+Reset the global container state (singletons/overrides) for testing.
+
+Unlike `reset_container()`, this does not clear auto-discovered factories,
+making it much faster for test suites that need clean state but don't
+need to reload the entire provider ecosystem.

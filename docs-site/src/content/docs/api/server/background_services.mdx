@@ -1,0 +1,30 @@
+---
+title: background_services
+description: API reference for codeweaver.server.background_services
+---
+
+# `codeweaver.server.background_services`
+
+Initialize background services for the CodeWeaver server.
+
+## Function: `run_background_indexing`
+
+```python
+run_background_indexing()
+```
+
+Background task for indexing and file watching.
+
+Args:
+    state: Application state
+    progress_reporter: ProgressReporter instance for user-facing output
+    verbose: Whether to show verbose output
+    debug: Whether debug mode is enabled
+
+## Function: `start_watcher`
+
+```python
+start_watcher()
+```
+
+Start the file watcher as an asynchronous task.

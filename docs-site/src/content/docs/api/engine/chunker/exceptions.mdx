@@ -1,0 +1,105 @@
+---
+title: exceptions
+description: API reference for codeweaver.engine.chunker.exceptions
+---
+
+# `codeweaver.engine.chunker.exceptions`
+
+Exception hierarchy for the chunking system.
+
+This module defines a comprehensive exception hierarchy for handling various
+chunking failures. All exceptions inherit from ChunkingError which itself
+inherits from the unified CodeWeaverError base class.
+
+The exception hierarchy provides specific exceptions for different failure
+modes including parsing errors, size constraints, timeouts, and resource limits.
+
+## Class: `ASTDepthExceededError`
+
+Abstract syntax tree nesting exceeds safe depth limit.
+
+Raised when the AST contains deeply nested structures that may cause
+stack overflow or excessive memory usage during traversal. This limit
+protects against pathological input and ensures robust operation.
+
+Excessive AST depth typically indicates generated code, obfuscation,
+or unusual coding patterns that require special handling.
+
+## Class: `BinaryFileError`
+
+Binary or non-text content detected in file.
+
+Raised when the chunking system encounters binary data that cannot be
+processed as text. This prevents corruption and ensures only appropriate
+content enters the semantic search index.
+
+Binary files should be filtered during discovery, but this exception
+provides a safety net for edge cases.
+
+## Class: `ChunkLimitExceededError`
+
+File produced more chunks than the configured maximum.
+
+Raised when a single file generates an excessive number of chunks,
+potentially indicating overly aggressive chunking or pathological input.
+This limit prevents resource exhaustion and index bloat.
+
+Exceeding chunk limits typically suggests the file should be processed
+differently or excluded from semantic search.
+
+## Class: `ChunkingError`
+
+Base exception for all chunking operation failures.
+
+This exception serves as the root of the chunking exception hierarchy
+and should be caught when handling any chunking-related errors generically.
+
+Attributes:
+    message: Human-readable error description
+    details: Additional context about the failure
+    suggestions: Actionable guidance for resolving the error
+
+## Class: `ChunkingTimeoutError`
+
+Chunking operation exceeded the configured time limit.
+
+Raised when processing a file takes longer than the maximum allowed
+duration. This typically indicates pathological input, performance issues,
+or misconfigured timeout settings.
+
+The system enforces timeouts to prevent resource exhaustion and ensure
+responsive operation across large codebases.
+
+## Class: `FileTooLargeError`
+
+File exceeds maximum size limit for chunking.
+
+Raised when a file is too large to process safely within resource
+constraints. This prevents performance degradation and resource
+exhaustion from oversized files.
+
+Files exceeding the size limit should be excluded from indexing,
+split into smaller components, or the limit should be increased
+if appropriate for the use case.
+
+## Class: `OversizedChunkError`
+
+Chunk exceeds token limit after applying all reduction strategies.
+
+Raised when a code segment cannot be reduced below the maximum allowed
+token count even after applying aggressive chunking strategies. This
+typically indicates extremely dense or complex code that requires manual
+intervention or alternative processing approaches.
+
+The system has exhausted all automatic strategies including structural
+decomposition, overlap reduction, and content trimming.
+
+## Class: `ParseError`
+
+AST parsing failed for the provided source code.
+
+Raised when the parser cannot create an abstract syntax tree from the
+source file, typically due to syntax errors or unsupported language
+constructs. The system may fall back to alternative chunking strategies.
+
+Common causes include malformed code, encoding issues, or parser bugs.

@@ -1,0 +1,78 @@
+---
+title: dataclasses
+description: API reference for codeweaver.core.types.dataclasses
+---
+
+# `codeweaver.core.types.dataclasses`
+
+Dataclass types and serialization mixins.
+
+## Class: `BaseEnumData`
+
+A dataclass to hold enum member data.
+
+`BaseEnumData` provides a standard structure for enum member data, including name, value, aliases, and description. Subclasses can extend this dataclass to include additional fields as needed.
+
+`BaseEnumData` is intended to be used in conjunction with `BaseDataclassEnum` to create enums with rich metadata. See `codeweaver.core.types.enum.BaseDataclassEnum` for more details.
+
+For an implementation example, see `codeweaver.semanticBaseAgentTask` (the type) and `codeweaver.semanticAgentTask` (the enum).
+
+## Class: `DataclassSerializationMixin`
+
+A mixin class that provides serialization and deserialization methods for dataclasses using Pydantic's TypeAdapter.
+
+### Method: `dump_json`
+
+```python
+dump_json()
+```
+
+Serialize the session statistics to JSON bytes.
+
+### Method: `dump_python`
+
+```python
+dump_python()
+```
+
+Serialize the session statistics to a Python dictionary.
+
+### Method: `serialize_for_cli`
+
+```python
+serialize_for_cli()
+```
+
+Serialize the model for CLI output.
+
+### Method: `serialize_for_telemetry`
+
+```python
+serialize_for_telemetry()
+```
+
+Serialize the model for telemetry output, filtering sensitive keys.
+
+### Method: `validate_json`
+
+```python
+validate_json()
+```
+
+Deserialize the session statistics from JSON bytes.
+
+### Method: `validate_python`
+
+```python
+validate_python()
+```
+
+Deserialize the session statistics from a Python dictionary.
+
+## Class: `DeserializationKwargs`
+
+A TypedDict for TypeAdapter deserialization keyword arguments.
+
+## Class: `SerializationKwargs`
+
+A TypedDict for TypeAdapter serialization keyword arguments.

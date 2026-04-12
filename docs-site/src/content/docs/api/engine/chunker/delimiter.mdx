@@ -1,0 +1,67 @@
+---
+title: delimiter
+description: API reference for codeweaver.engine.chunker.delimiter
+---
+
+# `codeweaver.engine.chunker.delimiter`
+
+Delimiter-based code chunking implementation.
+
+Implements pattern-based chunking using delimiter pairs (e.g., braces, parentheses).
+Uses a three-phase algorithm: match detection, boundary extraction with nesting support,
+and priority-based overlap resolution.
+
+## Class: `DelimiterChunker`
+
+Pattern-based chunker using delimiter pairs.
+
+Extracts code chunks based on delimiter patterns (braces, parentheses, etc.)
+with support for nesting and priority-based overlap resolution.
+
+Algorithm:
+    Phase 1: Match Detection - Find all delimiter occurrences
+    Phase 2: Boundary Extraction - Match starts with ends, handle nesting
+    Phase 3: Priority Resolution - Keep highest-priority non-overlapping boundaries
+
+Attributes:
+    _delimiters: List of delimiter patterns for the target language
+    _language: Programming language being processed
+
+Example:
+    &gt;&gt;&gt; from codeweaver.engine.chunker.base import ChunkGovernor
+    &gt;&gt;&gt; governor = ChunkGovernor(chunk_limit=1000)
+    &gt;&gt;&gt; chunker = DelimiterChunker(governor, language="python")
+    &gt;&gt;&gt; chunks = chunker.chunk("def foo():\n    pass")
+
+### Method: `chunk`
+
+```python
+chunk()
+```
+
+Chunk content using delimiter patterns.
+
+Implements complete delimiter chunking with edge case handling and
+size constraint enforcement.
+
+Args:
+    content: Source code to chunk
+    file: Optional DiscoveredFile with metadata and source_id
+    context: Optional additional context
+
+Returns:
+    List of CodeChunk objects
+
+Raises:
+    BinaryFileError: If content contains binary data
+    ChunkLimitExceededError: If chunk count exceeds governor limit
+    OversizedChunkError: If individual chunks exceed token limit
+    ParseError: If delimiter matching fails
+
+## Class: `StringParseState`
+
+State for tracking string boundaries during parsing.
+
+Attributes:
+    in_string: Whether currently inside a string literal
+    delimiter: The string delimiter character ('"', "'", or '`'), or None if not in string

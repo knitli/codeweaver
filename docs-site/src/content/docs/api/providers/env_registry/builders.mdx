@@ -1,0 +1,116 @@
+---
+title: builders
+description: API reference for codeweaver.providers.env_registry.builders
+---
+
+# `codeweaver.providers.env_registry.builders`
+
+Composable builder functions for common provider patterns.
+
+These reduce boilerplate by providing templates for common configurations.
+Typical usage: 1-2 lines per provider instead of 50+ lines.
+
+## Function: `httpx_env_vars`
+
+```python
+httpx_env_vars()
+```
+
+Standard httpx environment variables used by most HTTP-based providers.
+
+Returns:
+    Frozenset of (key, EnvVarConfig) tuples for common HTTP settings
+
+Example:
+    &gt;&gt;&gt; base_vars = httpx_env_vars()
+    &gt;&gt;&gt; custom_vars = base_vars | frozenset([("custom", EnvVarConfig(...))])
+
+## Function: `multi_client_provider`
+
+```python
+multi_client_provider()
+```
+
+Build multi-client provider configuration (like Azure).
+
+Some providers (Azure, Heroku) support multiple underlying clients
+with different environment variables for each.
+
+Args:
+    provider_name: Provider name (e.g., "azure", "heroku")
+    configs: Tuple of configs for each client
+
+Returns:
+    Tuple of ProviderEnvConfig with updated provider names
+
+Example:
+    &gt;&gt;&gt; _azure_openai = ProviderEnvConfig(...)
+    &gt;&gt;&gt; _azure_cohere = ProviderEnvConfig(...)
+    &gt;&gt;&gt; AZURE = multi_client_provider("azure", [_azure_openai, _azure_cohere])
+
+## Function: `openai_compatible_provider`
+
+```python
+openai_compatible_provider()
+```
+
+Build configuration for OpenAI-compatible provider.
+
+This template covers ~15 providers that use the OpenAI SDK client
+with provider-specific API keys and base URLs.
+
+Args:
+    provider_name: Display name (e.g., "DeepSeek", "Fireworks")
+    api_key_env: Environment variable name for API key
+    base_url_env: Optional env var for base URL
+    default_url: Optional default base URL
+    additional_clients: Extra client names beyond "openai"
+    note: Optional note about the provider
+    extra_vars: Additional custom environment variables
+
+Returns:
+    Configured ProviderEnvConfig with OpenAI inheritance
+
+Example:
+    &gt;&gt;&gt; DEEPSEEK = openai_compatible_provider(
+    ...     "DeepSeek", api_key_env="DEEPSEEK_API_KEY"
+    ... )
+    &gt;&gt;&gt; GROQ = openai_compatible_provider(
+    ...     "Groq",
+    ...     api_key_env="GROQ_API_KEY",
+    ...     base_url_env="GROQ_BASE_URL",
+    ...     default_url="https://api.groq.com",
+    ...     additional_clients=("groq",),
+    ... )
+
+## Function: `simple_api_key_provider`
+
+```python
+simple_api_key_provider()
+```
+
+Build configuration for simple API key-based provider.
+
+For providers with their own SDK client (not OpenAI-compatible).
+
+Args:
+    provider_name: Display name (e.g., "Voyage", "Cohere")
+    client: Client SDK name (e.g., "voyage", "cohere")
+    api_key_env: Environment variable name for API key
+    base_url_env: Optional env var for base URL
+    additional_vars: Additional custom environment variables
+    note: Optional note about the provider
+
+Returns:
+    Configured ProviderEnvConfig
+
+Example:
+    &gt;&gt;&gt; VOYAGE = simple_api_key_provider(
+    ...     "Voyage", client="voyage", api_key_env="VOYAGE_API_KEY"
+    ... )
+    &gt;&gt;&gt; COHERE = simple_api_key_provider(
+    ...     "Cohere",
+    ...     client="cohere",
+    ...     api_key_env="COHERE_API_KEY",
+    ...     base_url_env="COHERE_BASE_URL",
+    ... )

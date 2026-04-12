@@ -1,0 +1,139 @@
+---
+title: embeddings
+description: API reference for codeweaver.core.types.embeddings
+---
+
+# `codeweaver.core.types.embeddings`
+
+Core embedding type definitions for CodeWeaver.
+
+## Class: `ChunkEmbeddings`
+
+Model representing the embeddings associated with a specific CodeChunk.
+
+Uses a dynamic dictionary to support arbitrary named embeddings (intents).
+Common keys include: "primary", "sparse", "backup", "summary", "ast".
+
+### Method: `add`
+
+```python
+add()
+```
+
+Add an EmbeddingBatchInfo to the ChunkEmbeddings.
+
+Args:
+    embedding_info: The embedding information to add (intent is extracted from this object).
+
+Returns:
+    ChunkEmbeddings: A new ChunkEmbeddings instance with the added embedding.
+
+Raises:
+    ValueError: If embedding already exists for this intent or chunk IDs don't match.
+
+### Method: `get_model_by_vector_intent`
+
+```python
+get_model_by_vector_intent()
+```
+
+Get the model name used for a specific embedding intent, if it exists.
+
+### Method: `update`
+
+```python
+update()
+```
+
+Update or replace an EmbeddingBatchInfo in the ChunkEmbeddings.
+
+Unlike `add()`, this method will replace existing embeddings of the same intent.
+This is useful for re-embedding scenarios where we want to update embeddings.
+
+Args:
+    embedding_info: The embedding information to update/replace (intent is extracted from this object).
+
+Returns:
+    ChunkEmbeddings: A new ChunkEmbeddings instance with the updated embedding.
+
+Raises:
+    ValueError: If chunk IDs don't match.
+
+## Class: `CodeWeaverSparseEmbedding`
+
+NamedTuple representing sparse embedding with indices and values.
+
+Sparse embeddings are represented as two parallel arrays:
+- indices: positions in the vocabulary that have non-zero values
+- values: weights/importance scores for those positions
+
+This format is used by SPLADE, SparseEncoder and similar models.
+
+### Method: `to_tuple`
+
+```python
+to_tuple()
+```
+
+Convert to a CodeWeaverSparseEmbedding with tuples for indices and values.
+
+## Class: `DataType`
+
+Enum representing the data type of embedding vectors.
+
+### Method: `cross_walk`
+
+```python
+cross_walk()
+```
+
+Get the corresponding data type string for crosswalks.
+
+## Class: `EmbeddingBatchInfo`
+
+BasedModel representing metadata about a CodeChunk's embedding within a batch.
+
+### Method: `create_dense`
+
+```python
+create_dense()
+```
+
+Create EmbeddingBatchInfo for dense embeddings.
+
+### Method: `create_sparse`
+
+```python
+create_sparse()
+```
+
+Create EmbeddingBatchInfo for sparse embeddings.
+
+Args:
+    batch_id: Unique identifier for the batch
+    batch_index: Index within the batch
+    chunk_id: Unique identifier for the chunk
+    model: Model name
+    embeddings: CodeWeaverSparseEmbedding with indices and values
+    intent: Intent/purpose of this embedding (default: "sparse")
+    dimension: Dimensionality of the embedding (always 0 for sparse)
+    dtype: Data type of the embedding values
+
+## Class: `EmbeddingKind`
+
+Enum representing the kind of embedding.
+
+## Class: `QueryResult`
+
+Multi-vector embedding result from an embedding query.
+
+Stores embeddings from multiple intents (primary, backup, sparse, etc.)
+in a dictionary keyed by intent name.
+
+### Method: `get`
+
+```python
+get()
+```
+
+Get embedding for an intent with optional default.

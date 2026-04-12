@@ -1,0 +1,69 @@
+---
+title: watch_filters
+description: API reference for codeweaver.engine.watcher.watch_filters
+---
+
+# `codeweaver.engine.watcher.watch_filters`
+
+File change filters based on file extensions.
+
+## Class: `DefaultExtensionFilter`
+
+Filter with a default excluded extension set augmented by provided ones.
+
+## Class: `DefaultFilter`
+
+A default filter that ignores common unwanted files and directories.
+
+## Class: `ExtensionFilter`
+
+Filter files by extension on top of the default directory/path ignores.
+
+## Class: `IgnoreFilter`
+
+A filter that uses rignore to exclude files based on .gitignore and other rules.
+
+`IgnoreFilter` can be initialized with either:
+- An `rignore.Walker` instance, which is a pre-configured walker that
+  applies ignore rules.
+- A `base_path` and `settings` dictionary to create a new `rignore.Walker`.
+
+The filter checks if a file should be included based on the rules defined
+in the walker. It caches results to avoid redundant checks for previously
+seen paths.
+
+### Method: `from_settings`
+
+```python
+from_settings()
+```
+
+Create an IgnoreFilter instance from settings (sync version).
+
+Note: This method cannot set inc_exc patterns asynchronously.
+Use from_settings_async() for proper async initialization, or
+manually configure the walker's inc_exc patterns after creation.
+
+Args:
+    project_path: The resolved project path dependency
+    index_settings: The resolved indexer settings dependency
+
+Returns:
+    Configured IgnoreFilter instance (may need async initialization)
+
+### Method: `from_settings_async`
+
+```python
+from_settings_async()
+```
+
+Create an IgnoreFilter instance from settings with full async initialization.
+
+This method properly awaits all async operations including inc_exc pattern setting.
+Recommended over from_settings() for production use.
+
+Args:
+    settings: Optional settings dictionary
+
+Returns:
+    Fully initialized IgnoreFilter instance

@@ -1,0 +1,63 @@
+---
+title: base
+description: API reference for codeweaver.providers.reranking.providers.base
+---
+
+# `codeweaver.providers.reranking.providers.base`
+
+Base class for reranking providers.
+
+## Class: `RerankingProvider`
+
+Base class for reranking providers.
+
+### Method: `from_json`
+
+```python
+from_json()
+```
+
+Create a RerankingProvider from JSON.
+
+### Method: `model_dump_json`
+
+```python
+model_dump_json()
+```
+
+Serialize the model to JSON, excluding certain fields.
+
+### Method: `rerank`
+
+```python
+rerank()
+```
+
+Rerank the given documents based on the query.
+
+### Method: `to_code_chunk`
+
+```python
+to_code_chunk()
+```
+
+Convenience wrapper around `CodeChunk.chunkify`.
+
+## Function: `default_reranking_input_transformer`
+
+```python
+default_reranking_input_transformer()
+```
+
+Default input transformer that converts documents to strings.
+
+## Function: `default_reranking_output_transformer`
+
+```python
+default_reranking_output_transformer()
+```
+
+Default output transformer that converts results and chunks to RerankingResult.
+
+This transformer handles the most common case where the results are a sequence of floats with
+the same length as the input chunks, and each float represents the score for the corresponding chunk

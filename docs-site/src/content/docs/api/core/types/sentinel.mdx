@@ -1,0 +1,35 @@
+---
+title: sentinel
+description: API reference for codeweaver.core.types.sentinel
+---
+
+# `codeweaver.core.types.sentinel`
+
+Defines a unique sentinel object for use as a default value in function arguments and other scenarios.
+
+## Class: `DontGenerateJsonSchema`
+
+GenerateJsonSchema implementation that disables JSON Schema generation.
+
+### Method: `generate`
+
+```python
+generate()
+```
+
+Disable JSON Schema generation by raising an error.
+
+## Class: `Missing`
+
+Sentinel for missing values.
+
+## Class: `Sentinel`
+
+Create a unique sentinel object.
+...
+
+## Class: `Unset`
+
+A sentinel value to indicate that a value is unset.
+Used as a default value in function arguments to distinguish between
+an explicit `None` value and an uninitialized parameter.

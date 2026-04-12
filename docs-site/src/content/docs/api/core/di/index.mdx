@@ -1,0 +1,81 @@
+---
+title: di
+description: API reference for codeweaver.core.di
+---
+
+# `codeweaver.core.di`
+
+Dependency Injection for CodeWeaver.
+
+Provides a FastAPI-inspired declarative injection system.
+
+## Registering Providers
+
+To register a provider function or class with the DI container, use the `@dependency_provider` decorator:
+
+```python "Registering a Provider Function"
+from codeweaver.core.di import dependency_provider
+
+
+@dependency_provider(ServiceProvider)
+def service_factory() -&gt; ServiceProvider:
+    return ServiceProvider()
+```
+
+```python "Registering a Provider Class (Self-Registration)"
+from codeweaver.core.di import dependency_provider
+
+
+@dependency_provider(scope="singleton")
+class ServiceProvider:
+    def __init__(self):
+        self.value = 42
+```
+
+The `@dependency_provider` decorator automatically registers your factory with the global DI container.
+No additional setup needed - just decorate and inject!
+
+## Creating a Type Alias for Dependency Injection
+
+Create a type alias for cleaner, more maintainable code:
+
+```python "Creating a Type Alias"
+from typing import TYPE_CHECKING, Annotated
+
+from codeweaver.core.di import INJECTED
+
+if TYPE_CHECKING:
+    from someplace import ServiceProvider
+
+# Simple type alias (relies on auto-resolution)
+type ServiceDep = ServiceProvider
+
+# Or with explicit Depends marker for custom behavior
+from codeweaver.core.di import depends
+
+type ServiceDepWithScope = Annotated[ServiceProvider, depends(scope="request")]
+```
+
+## Using Your Dependency in Functions
+
+Use the `INJECTED` sentinel to mark parameters for dependency injection:
+
+```python "Using Dependencies"
+from typing import TYPE_CHECKING
+from codeweaver.core.di import INJECTED
+
+if TYPE_CHECKING:
+    from someplace import ServiceProvider
+
+
+async def my_function(service: ServiceProvider = INJECTED) -&gt; None:
+    # service will be injected automatically by the DI container
+    # The type annotation tells the container what to inject
+    ...
+```
+
+The container automatically:
+1. Discovers all `@dependency_provider` registrations
+2. Resolves dependencies recursively
+3. Manages singleton/request/function scopes
+4. Handles async factories and generators

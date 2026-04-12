@@ -1,0 +1,125 @@
+---
+title: types
+description: API reference for codeweaver.semantic.types
+---
+
+# `codeweaver.semantic.types`
+
+Common internal types for semantic analysis.
+
+Overview:
+- Data transfer objects (DTOs) for parsing node types files. These are intermediate structures used during parsing and conversion before converting to CodeWeaver's internal representation (CompositeThing, Token, Category, Direct and Positional Connections).
+
+## Class: `ChildTypeDTO`
+
+NamedTuple for a child type object in the node types file.
+
+
+Note: This is an intermediate structure used during parsing and conversion. It is not part of the final internal representation.
+
+Attributes:
+    multiple: Whether multiple children of this type are allowed
+    required: Whether at least one child of this type is required
+    types: List of type objects for the allowed child types
+
+## Class: `ConnectionClass`
+
+Classification of connections between Things in a parse tree.
+
+Tree-Sitter mapping:
+- DIRECT -&gt; fields: Named semantic relationship **with a Role**
+- POSITIONAL -&gt; children: Ordered structural relationship without semantic naming
+
+## Class: `ConnectionConstraint`
+
+Flags for Connection constraints.
+
+### Method: `from_cardinality`
+
+```python
+from_cardinality()
+```
+
+Create ConnectionConstraint from cardinality tuple.
+
+## Class: `NodeTypeDTO`
+
+BasedModel for a single node type object in the node types file. This is the main structure we need to parse and convert into our internal representation. All subordinate structures (subtypes, fields, children) are represented using the SimpleNodeTypeDTO and ChildTypeDTO NamedTuples defined above.
+
+Attributes:
+    node: Name of the node type (alias for `type`)
+    named: Whether the node type is named (true) or anonymous (false)
+    root: Whether the node type is the root of the parse tree
+    fields: Mapping of field names to child type objects
+    children: Child type object for positional children
+    subtypes: List of subtype objects if this is an abstract node type
+    extra: Whether this node type can appear anywhere in the parse tree
+
+## Class: `SemanticMetadata`
+
+Metadata associated with the semantics of a code chunk.
+
+### Method: `from_node`
+
+```python
+from_node()
+```
+
+Create a SemanticMetadata instance from an AST node.
+
+### Method: `from_parent_meta`
+
+```python
+from_parent_meta()
+```
+
+Create a SemanticMetadata instance from a parent SemanticMetadata instance.
+
+### Method: `serialize_for_cli`
+
+```python
+serialize_for_cli()
+```
+
+Serialize the SemanticMetadata for CLI output.
+
+## Class: `SimpleNodeTypeDTO`
+
+TypedDict for a simple node type object in the node types file (objects with no attributes besides `type` and `named`). While these appear in the node-types file at the top level (all Tokens are of this form unless only 'extra' is present without fields [majority of extra cases, which are rare themselves]), they also appear nested within `subtypes`, `fields`, and `children`. We only use it for nested objects, not top-level ones.
+
+Note: This is an intermediate structure used during parsing and conversion. It is not part of the final internal representation.
+
+Attributes:
+    node: Name of the node type (alias for `type`)
+    named: Whether the node type is named (true) or anonymous (false)
+
+## Class: `ThingKind`
+
+Classification of Thing types in a parse tree. Things are concrete nodes, that is, what actually exists in the parse tree.
+
+Tree-Sitter mapping:
+- TOKEN -&gt; nodes with no fields/children (leaf nodes): Leaf Thing with no structural children
+- COMPOSITE -&gt; nodes with fields/children (non-leaf nodes): Non-leaf Thing with structural children
+
+A TOKEN represents keywords, identifiers, literals, and punctuation -- what you literally see in the source code. A COMPOSITE node represents complex structures like functions, classes, and expressions, which have direct and/or positional connections to child Things.
+
+## Class: `TokenPurpose`
+
+Classification of Token purpose or semantic use.
+
+- KEYWORD: keywords
+- OPERATOR: operators
+- IDENTIFIER: variable/function/type names
+- LITERAL: string/number/boolean literals
+- PUNCTUATION: whitespace, punctuation, formatting tokens
+- COMMENT: comments
+
+A Token can be classified by its purpose, indicating whether it carries semantic or structural meaning versus being mere formatting trivia. This classification helps in filtering Tokens during semantic analysis while preserving them for formatting purposes.
+
+### Method: `from_node_dto`
+
+```python
+from_node_dto()
+```
+
+Create TokenPurpose from NodeTypeDTO.

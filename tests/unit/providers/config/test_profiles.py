@@ -107,8 +107,13 @@ def test_recommended_profile_uses_constants_for_model_names():
     assert str(rerank_first.model_name) == RECOMMENDED_CLOUD_RERANKING_MODEL
 
 
-def test_testing_profile_uses_ultralight_constants(monkeypatch):
-    """Testing profile must use the ultralight model name constants."""
+def test_testing_profile_uses_ultralight_constants_fastembed_branch(monkeypatch):
+    """Testing profile must use fastembed's ultralight sparse model when HAS_FASTEMBED.
+
+    On Python 3.12/3.13 (fastembed available), the sparse embedder is
+    FastEmbed's `qdrant/bm25`. Dense is ST's Potion 8M and reranker is
+    fastembed's jina-reranker-v1-tiny-en.
+    """
     from codeweaver.core.constants import (
         ULTRALIGHT_EMBEDDING_MODEL,
         ULTRALIGHT_RERANKING_MODEL,
@@ -119,6 +124,7 @@ def test_testing_profile_uses_ultralight_constants(monkeypatch):
 
     pmod = _get_profiles_module(monkeypatch)
     monkeypatch.setattr(pmod, "HAS_ST", True)
+    monkeypatch.setattr(pmod, "HAS_FASTEMBED", True)
 
     has_fastembed = pmod.HAS_FASTEMBED
 
@@ -138,5 +144,42 @@ def test_testing_profile_uses_ultralight_constants(monkeypatch):
     reranking = result.get("reranking")
     assert reranking is not None
     rerank_first = reranking[0] if isinstance(reranking, tuple) else reranking
-    expected_reranking = ULTRALIGHT_RERANKING_MODEL if has_fastembed else ULTRALIGHT_ST_RERANKING_MODEL
-    assert str(rerank_first.model_name) == expected_reranking
+    assert str(rerank_first.model_name) == ULTRALIGHT_RERANKING_MODEL
+
+
+def test_testing_profile_uses_ultralight_constants_st_sparse_branch(monkeypatch):
+    """Testing profile falls back to ST SparseEncoder sparse model when !HAS_FASTEMBED.
+
+    On Python 3.14 (fastembed unavailable — py-rust-stemmers has no
+    cp314/cp314t wheels), the testing profile gates its sparse embedder
+    onto sentence-transformers' SparseEncoder with the lightweight
+    `ibm-granite/granite-embedding-30m-sparse` model. Every profile is
+    dense + sparse + reranking by design; 3.14 should not regress to
+    dense-only just because one local embedder library doesn't build.
+    """
+    from codeweaver.core.constants import (
+        ULTRALIGHT_EMBEDDING_MODEL,
+        ULTRALIGHT_RERANKING_MODEL,
+        ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL,
+    )
+
+    pmod = _get_profiles_module(monkeypatch)
+    monkeypatch.setattr(pmod, "HAS_ST", True)
+    monkeypatch.setattr(pmod, "HAS_FASTEMBED", False)
+
+    result = pmod._testing_profile()
+
+    embedding = result.get("embedding")
+    assert embedding is not None
+    emb_first = embedding[0] if isinstance(embedding, tuple) else embedding
+    assert str(emb_first.model_name) == ULTRALIGHT_EMBEDDING_MODEL
+
+    sparse = result.get("sparse_embedding")
+    assert sparse is not None
+    sparse_first = sparse[0] if isinstance(sparse, tuple) else sparse
+    assert str(sparse_first.model_name) == ULTRALIGHT_ST_SPARSE_EMBEDDING_MODEL
+
+    reranking = result.get("reranking")
+    assert reranking is not None
+    rerank_first = reranking[0] if isinstance(reranking, tuple) else reranking
+    assert str(rerank_first.model_name) == ULTRALIGHT_RERANKING_MODEL

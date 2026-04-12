@@ -1,0 +1,41 @@
+---
+title: failover
+description: API reference for codeweaver.engine.config.failover
+---
+
+# `codeweaver.engine.config.failover`
+
+Failover configuration settings for CodeWeaver.
+
+## Class: `FailoverSettings`
+
+Settings for vector store failover and service resilience.
+
+CodeWeaver's backup system is intelligent in that it only activates if you may need it. It is automatically disabled if:
+  - Your configured embedding provider is local.
+  - Your vector store provider is local.
+
+## Features
+
+- **Reranking**. Automatically injects a backup local reranking model, which is simply accessed at query time if the primary model is unavailable. This is *always* on.
+- **Backup Vectors**. If your embedding provider is remote, and your vector store is local, the system will add a backup vector to each stored point using the backup local model, ensuring that queries can still be served even if the primary embedding provider is unavailable. The system will automatically manage the synchronization of these backup vectors (it simply checks if all expected vectors are on all points and adds any missing ones).
+- **Write-Ahead Logging (WAL)**. If your embedding provider is remote, it uses write-ahead-logging (WAL) to store a local copy of the vectors each time it writes to the primary store. This uses Qdrant's built-in ability to use vectors stored in a directory using RocksDB. When the primary returns, the system will reconcile the local WAL with the primary store to ensure consistency.
+- **Resolves Asymmetric Models**. If your embedding model is capable of asymmetric retrieval (currently only `voyage-4` series models), the system will automatically switch from your primary to a locally compatible model (for voyage-4 series, `voyage-4-nano`). Since embeddings are compatible across these models, you can continue to retrieve and generate new embeddings without interruption, albeit at a slight loss of accuracy for generated embeddings assuming your primary is `voyage-4-large` (about 6 points on RTEB-Code from 86 to 80, which is still better than any other currently available alternative). The advantage here is that you don't need to generate and keep a third set of embeddings for the local model (the second being your sparse embeddings).
+
+## Class: `FailoverSettingsDict`
+
+TypedDict for failover settings.
+
+## Function: `get_default_failover_settings`
+
+```python
+get_default_failover_settings()
+```
+
+Get default failover settings (cached lazy initialization).
+
+This function lazily initializes default failover settings only when first
+accessed, avoiding the circular import issue from module-level instantiation.
+
+Returns:
+    Dictionary containing default failover settings.

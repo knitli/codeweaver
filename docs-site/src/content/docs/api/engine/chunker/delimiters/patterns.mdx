@@ -1,0 +1,113 @@
+---
+title: patterns
+description: API reference for codeweaver.engine.chunker.delimiters.patterns
+---
+
+# `codeweaver.engine.chunker.delimiters.patterns`
+
+Delimiter pattern definitions and expansion logic.
+
+This module provides a DSL for defining reusable delimiter patterns that can be
+expanded into concrete delimiter definitions. Patterns allow specifying multiple
+start/end combinations with shared semantic properties.
+
+Example:
+    &gt;&gt;&gt; function_pattern = DelimiterPattern(
+    ...     starts=["def", "function", "fn"],
+    ...     ends=[":", "&#123;", "=&gt;"],
+    ...     kind=DelimiterKind.FUNCTION,
+    ... )
+    &gt;&gt;&gt; delimiters = expand_pattern(function_pattern)
+    &gt;&gt;&gt; len(delimiters)
+    9  # 3 starts * 3 ends
+
+## Function: `expand_pattern`
+
+```python
+expand_pattern()
+```
+
+Expand a DelimiterPattern into concrete DelimiterDict entries.
+
+Generates all combinations of start/end delimiters specified in the pattern,
+with consistent semantic properties across all combinations.
+
+Args:
+    pattern: The delimiter pattern to expand
+
+Returns:
+    List of DelimiterDict entries, one per start/end combination
+
+Example:
+    &gt;&gt;&gt; pattern = DelimiterPattern(
+    ...     starts=["if", "while"], ends=[":", "then"], kind=DelimiterKind.CONDITIONAL
+    ... )
+    &gt;&gt;&gt; delims = expand_pattern(pattern)
+    &gt;&gt;&gt; len(delims)
+    4  # 2 starts * 2 ends
+    &gt;&gt;&gt; delims[0]["start"]
+    'if'
+    &gt;&gt;&gt; delims[0]["end"]
+    ':'
+
+## Function: `generate_latex_patterns`
+
+```python
+generate_latex_patterns()
+```
+
+Generate LaTeX delimiter patterns for given starts and ends.
+
+Args:
+    starts: List of LaTeX start commands
+    ends: List of LaTeX end commands
+    kind: DelimiterKind for the patterns
+
+Returns:
+    List of DelimiterPattern instances
+
+## Function: `kind_from_delimiter_tuple`
+
+```python
+kind_from_delimiter_tuple()
+```
+
+Infer DelimiterKind from delimiter strings using patterns.
+
+Matches the provided start/end strings against known patterns to determine
+the most specific DelimiterKind classification.
+
+Args:
+    start: Start delimiter string (optional if `delimiter` provided)
+    end: End delimiter string (optional if `delimiter` provided)
+    delimiter: tuple of (start, end) strings (optional if `start` and `end` provided)
+
+## Function: `matches_pattern`
+
+```python
+matches_pattern()
+```
+
+Test if delimiter matches a pattern.
+
+Case-insensitive matching of delimiter strings against pattern specifications.
+Useful for classifying unknown delimiters or validating delimiter definitions.
+
+Args:
+    start: Start delimiter string to test
+    end: End delimiter string to test
+    pattern: Pattern to match against
+
+Returns:
+    True if delimiter matches pattern, False otherwise
+
+Example:
+    &gt;&gt;&gt; pattern = DelimiterPattern(
+    ...     starts=["def", "function"], ends="ANY", kind=DelimiterKind.FUNCTION
+    ... )
+    &gt;&gt;&gt; matches_pattern("def", ":", pattern)
+    True
+    &gt;&gt;&gt; matches_pattern("DEF", "end", pattern)  # case-insensitive
+    True
+    &gt;&gt;&gt; matches_pattern("class", ":", pattern)
+    False

@@ -1,0 +1,39 @@
+---
+title: settings
+description: API reference for codeweaver.server.config.settings
+---
+
+# `codeweaver.server.config.settings`
+
+Unified configuration system for CodeWeaver.
+
+Provides a centralized settings system using pydantic-settings with
+clear precedence hierarchy and validation.
+
+## Class: `BaseFastMcpServerSettings`
+
+Base settings for FastMCP server configurations.
+
+### Method: `as_settings`
+
+```python
+as_settings()
+```
+
+Convert to FastMcpServerSettingsDict for use with FastMCP server.
+
+## Class: `CodeWeaverSettings`
+
+Main configuration model following pydantic-settings patterns.
+
+## Class: `CodeWeaverSettingsDict`
+
+TypedDict for CodeWeaverSettings serialization.
+
+## Class: `FastMcpHttpServerSettings`
+
+Settings for FastMCP HTTP server configurations.
+
+## Class: `FastMcpStdioServerSettings`
+
+Settings for FastMCP stdio server configurations.

@@ -1,0 +1,204 @@
+---
+title: enum
+description: API reference for codeweaver.core.types.enum
+---
+
+# `codeweaver.core.types.enum`
+
+Base enum classes for the CodeWeaver project.
+
+## Class: `AnonymityConversion`
+
+Enumeration of anonymity conversion methods for telemetry data.
+
+These methods define how telemetry data should be anonymized or aggregated
+to protect user privacy. Only applies to filtered fields.
+
+### Method: `filtered`
+
+```python
+filtered()
+```
+
+Process values according to the anonymity conversion method.
+
+## Class: `BaseDataclassEnum`
+
+A base enum class for enums with dataclass members. Does not come with its 'type' -- you must define that with `codeweaver.core.types.dataclasses.BaseEnumData` and subclass your implementation.
+
+## Usage
+
+Building a dataclass enum is a bit more involved than a standard enum. Steps:
+1. Create a dataclass. It should inherit from `codeweaver.core.types.dataclasses.BaseEnumData`.
+    - Note that `BaseEnumData` already includes `aliases`, and `description` fields, so you don't need to redefine those unless you want to customize them. `_name` and `_value` are required by `Enum` members, **you cannot use those names or their non-sunder versions (i.e. 'name')**. `_name` will be the name of the Enum member you assign in the class definition, and `_value` *is your dataclass instance*.
+    - It is already a dataclass and does not need a `@dataclass` decorator (which will break it).
+    - Suggestion: I find that it's easiest to define a dataclass-within-a-dataclass, where there is only a single top-level field that is either a typed dict, dataclass or named tuple. It makes constructing the dataclass enum members easier to read.
+2. Create your enum class, inheriting from `BaseDataclassEnum`.
+3. Define your enum members, assigning each to an instance of your dataclass.
+4. Use it.
+
+## Example
+
+```python
+from codeweaver.core import BaseEnumData, BaseDataclassEnum
+
+class ColorData(BaseEnumData):
+    hex_code: str
+    rgb: tuple[int, int, int]
+
+    # Because we are making a serializable dataclass with pydantic,
+    # we *must* define __init__ and set values before calling super().__init__()
+    def __init__(self, hex_code: str, rgb: tuple[int, int, int], *args: Any):
+        # use `object.__setattr__` to avoid pydantic/dataclass immutability issues
+        # it's a hack, but it works. We're not abusing it, just working around limitations.
+        object.__setattr__(self, "hex_code", hex_code)
+        object.__setattr__(self, "rgb", rgb)
+        # now call and validate
+        super().__init__(*args)
+
+class Color(ColorData, BaseDataclassEnum):
+    # Important: aliases and description are optional *positional* args after the required fields.
+    RED = ColorData(hex_code="#FF0000", rgb=(255, 0, 0), ("rojo", "rouge"), "A bright red color.")
+    GREEN = ColorData(hex_code="#00FF00", rgb=(0, 255, 0))
+    BLUE = ColorData(hex_code="#0000FF", rgb=(0, 0, 255))
+
+    # define methods/properties if you want
+    @property
+    def brightness(self) -&gt; float:
+        r, g, b = self.value.rgb
+        return (r + g + b) / (3 * 255)
+
+print(Color.RED.value.hex_code)  # Output: #FF0000
+print(Color.GREEN.variable)      # Output: green
+print(Color.BLUE.as_title)       # Output: Blue
+```
+
+### Method: `add_alias`
+
+```python
+add_alias()
+```
+
+Add an alias to the enum member.
+
+### Method: `add_member`
+
+```python
+add_member()
+```
+
+Dynamically add a new member to the enum.
+
+### Method: `from_string`
+
+```python
+from_string()
+```
+
+Convert a string to the corresponding enum member.
+
+### Method: `get_aliases`
+
+```python
+get_aliases()
+```
+
+Return a mapping of aliases to enum members.
+
+### Method: `members`
+
+```python
+members()
+```
+
+Return all members of the enum as a tuple.
+
+### Method: `values`
+
+```python
+values()
+```
+
+Return all enum member values as a tuple.
+
+## Class: `BaseEnum`
+
+An enum class that provides common functionality for all enums in the CodeWeaver project. Enum members must be unique and either all strings or all integers.
+
+`add_enum_member` allows us to dynamically add members, such as for plugin systems.
+
+BaseEnum provides convenience methods for converting between strings and enum members, checking membership, and retrieving members and members' values, and adding new members dynamically.
+
+### Method: `add_alias`
+
+```python
+add_alias()
+```
+
+Add an alias to the enum member.
+
+### Method: `add_member`
+
+```python
+add_member()
+```
+
+Dynamically add a new member to the enum.
+
+### Method: `aliases`
+
+```python
+aliases()
+```
+
+Provides a way to identify alternate names for a member, used in string conversion and identification.
+
+### Method: `from_string`
+
+```python
+from_string()
+```
+
+Convert a string to the corresponding enum member. Flexibly handles different cases, dashes vs underscores, and some common variations.
+
+`from_string` assumes that it's usually getting valid input, so it tries to find a match in several ways before giving up and raising a `ValueError`. We're taking a "people are messy" approach here to make it easier to work with user settings. There are probably some unknown edge cases that could cause problems, such as when two members have very similar names, but we can address those as they arise (for example, if 'JAVA' didn't match on its value or name for some reason (won't happen), then the heuristic here could assign it to "JAVASCRIPT" as a last resort).
+
+### Method: `is_member`
+
+```python
+is_member()
+```
+
+Check if a value is a member of the enum.
+
+### Method: `members`
+
+```python
+members()
+```
+
+Return all members of the enum as a tuple.
+
+### Method: `members_to_values`
+
+```python
+members_to_values()
+```
+
+Return a dictionary mapping member names to their values.
+
+### Method: `serialize_for_cli`
+
+```python
+serialize_for_cli()
+```
+
+Serialize the enum member for CLI display.
+
+### Method: `values`
+
+```python
+values()
+```
+
+Return all enum member names as a tuple.

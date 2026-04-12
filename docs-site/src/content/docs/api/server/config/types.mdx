@@ -1,0 +1,72 @@
+---
+title: types
+description: API reference for codeweaver.server.config.types
+---
+
+# `codeweaver.server.config.types`
+
+Supporting types for CodeWeaver settings and configuration.
+
+This module primarily consists of a series of TypedDict classes that define the structure of various configuration options for CodeWeaver, including logging settings, middleware settings, provider settings, and more.
+Most of these settings are optional, with sensible defaults provided where applicable.
+
+Some of these also represent serialized versions of the pydantic settings models, to provide clear typing and validation for configuration files and environment variables in their serialized forms.
+
+## Class: `CodeWeaverMCPConfigDict`
+
+TypedDict for CodeWeaverMCPConfig serialization.
+
+## Class: `EndpointSettingsDict`
+
+Defines enable/disable settings for various CodeWeaver HTTP endpoints.
+
+Health and metrics are always enabled because they are used internally for monitoring and diagnostics (CodeWeaver is actually multiple servers which sometimes need to check in with each other).
+
+## Class: `FastMcpHttpRunArgs`
+
+Arguments for running FastMCP over HTTP.
+
+## Class: `FastMcpServerSettingsDict`
+
+TypedDict for FastMCP server settings.
+
+Not intended to be used directly; used for internal type checking and validation.
+
+Other notes: FastMCP seems to be moving towards using direct run arguments, particularly for server transport settings (like host/port). It seems like everytime we bump versions a new setting is deprecated.
+
+## Class: `MCPConfigDict`
+
+TypedDict for MCPConfig serialization.
+
+## Class: `StdioCodeWeaverConfigDict`
+
+TypedDict for StdioCodeWeaverConfig serialization.
+
+## Class: `UvicornServerSettings`
+
+Uvicorn server settings. Besides the port, these are all defaults for uvicorn.
+
+We expose them so you can configure them for advanced deployments inside your codeweaver.toml (or yaml or json).
+
+### Method: `codeweaver_management_defaults`
+
+```python
+codeweaver_management_defaults()
+```
+
+Get default Uvicorn settings for CodeWeaver Management Server.
+
+### Method: `codeweaver_server_mcp`
+
+```python
+codeweaver_server_mcp()
+```
+
+Get default Uvicorn settings for CodeWeaver MCP Server.
+
+## Class: `UvicornServerSettingsDict`
+
+TypedDict for Uvicorn server settings.
+
+Not intended to be used directly; used for internal type checking and validation.
+We're all adults here, so it's here if you want it.

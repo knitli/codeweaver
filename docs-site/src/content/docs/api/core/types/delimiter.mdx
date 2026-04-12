@@ -1,0 +1,60 @@
+---
+title: delimiter
+description: API reference for codeweaver.core.types.delimiter
+---
+
+# `codeweaver.core.types.delimiter`
+
+Delimiter related types moved to core to break circular dependencies.
+
+## Class: `DelimiterDict`
+
+A dictionary representation of a delimiter pattern.
+
+## Class: `DelimiterKind`
+
+Delimiter metadata that provide semantic information on the resulting chunk.
+
+### Method: `infer_inline_strategy`
+
+```python
+infer_inline_strategy()
+```
+
+Infer the line strategy based on the delimiter kind.
+
+### Method: `infer_nestable`
+
+```python
+infer_nestable()
+```
+
+Infer whether the delimiter kind is nestable.
+
+## Class: `DelimiterPattern`
+
+A pattern for matching delimiters in code.
+
+### Method: `format`
+
+```python
+format()
+```
+
+Format the given text using the delimiter's formatter, if one is defined.
+
+## Class: `LanguageFamily`
+
+Major language family classifications based on syntax patterns.
+
+### Method: `from_known_language`
+
+```python
+from_known_language()
+```
+
+Get the language family from a known programming language.
+
+## Class: `LineStrategy`
+
+A strategy for how to handle lines when chunking.

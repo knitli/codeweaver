@@ -1,0 +1,224 @@
+---
+title: language
+description: API reference for codeweaver.core.language
+---
+
+# `codeweaver.core.language`
+
+Classes and functions for handling languages and their configuration files in the CodeWeaver project.
+
+## Class: `ConfigLanguage`
+
+Enum representing common configuration languages.
+
+### Method: `all_extensions`
+
+```python
+all_extensions()
+```
+
+Returns all file extensions for all configuration languages.
+
+### Method: `from_extension`
+
+```python
+from_extension()
+```
+
+Returns the ConfigLanguage associated with the given file extension.
+
+## Class: `LanguageConfigFile`
+
+Represents a language configuration file with its name, path, and language type.
+
+### Method: `exists`
+
+```python
+exists()
+```
+
+Checks if the configuration file exists at the specified path.
+
+## Class: `RepoConventions`
+
+A TypedDict representing common repository conventions for a language.
+
+## Class: `SemanticSearchLanguage`
+
+Enum representing supported languages for semantic (AST) search.
+
+Note: This is the list of built-in languages supported by ast-grep. Ast-grep supports dynamic languages using pre-compiled tree-sitter grammars. We haven't added support for those yet.
+
+### Method: `all_config_paths`
+
+```python
+all_config_paths()
+```
+
+Returns all configuration file paths for all languages.
+
+### Method: `all_extensions`
+
+```python
+all_extensions()
+```
+
+Returns all file extensions for all languages.
+
+### Method: `code_extensions`
+
+```python
+code_extensions()
+```
+
+Returns all file extensions associated with programming languages (excluding configuration languages).
+
+### Method: `config_language_exts`
+
+```python
+config_language_exts()
+```
+
+Returns all file extensions associated with the configuration languages.
+
+### Method: `config_languages`
+
+```python
+config_languages()
+```
+
+Returns all SemanticSearchLanguages that are also configuration languages.
+
+### Method: `config_pairs`
+
+```python
+config_pairs()
+```
+
+Returns a tuple mapping of all config file paths to their corresponding LanguageConfigFile.
+
+### Method: `ext_pairs`
+
+```python
+ext_pairs()
+```
+
+Returns a frozenset of tuples containing file extensions and their corresponding SemanticSearchLanguage.
+
+### Method: `extension_map`
+
+```python
+extension_map()
+```
+
+Returns a mapping of file extensions to their corresponding SemanticSearchLanguage.
+This is used to quickly look up the language based on file extension.
+
+### Method: `filename_pairs`
+
+```python
+filename_pairs()
+```
+
+Returns a frozenset of tuples containing file names and their corresponding SemanticSearchLanguage.
+
+### Method: `from_extension`
+
+```python
+from_extension()
+```
+
+Returns the SemanticSearchLanguage associated with the given file extension.
+
+### Method: `injection_languages`
+
+```python
+injection_languages()
+```
+
+Returns supported languages that commonly contain embedded code snippets from other languages.
+
+### Method: `lang_from_ext`
+
+```python
+lang_from_ext()
+```
+
+Returns the SemanticSearchLanguage for a given file extension.
+
+Args:
+    ext: The file extension to look up.
+
+Returns:
+    The corresponding SemanticSearchLanguage, or None if not found.
+
+## Function: `find_config_paths`
+
+```python
+find_config_paths()
+```
+
+Finds all configuration files in the project root directory.
+
+Returns:
+    A tuple of Path objects representing the configuration files, or None if no config files are found.
+
+## Function: `get_ext_lang_pairs_generator`
+
+```python
+get_ext_lang_pairs_generator()
+```
+
+Helper to lazily get ext lang pairs.
+
+## Function: `has_semantic_extension`
+
+```python
+has_semantic_extension()
+```
+
+Check if the given extension is a semantic search language.
+
+## Function: `is_semantic_config_ext`
+
+```python
+is_semantic_config_ext()
+```
+
+Check if the given extension is a semantic config file.
+
+## Function: `language_from_config_file`
+
+```python
+language_from_config_file()
+```
+
+Returns the SemanticSearchLanguage for a given configuration file path.
+
+Args:
+    config_file: The path to the configuration file.
+
+Returns:
+    The corresponding SemanticSearchLanguage, or None if not found.
+
+## Function: `language_from_path`
+
+```python
+language_from_path()
+```
+
+Returns the SemanticSearchLanguage for a given file path based on its extension.
+
+Args:
+    file_path: The path to the file.
+
+## Function: `languages_present_from_configs`
+
+```python
+languages_present_from_configs()
+```
+
+Returns a tuple of SemanticSearchLanguage for all languages present in the configuration files.
+
+Returns:
+    A tuple of SemanticSearchLanguage objects.

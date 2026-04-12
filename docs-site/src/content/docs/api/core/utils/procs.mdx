@@ -1,0 +1,107 @@
+---
+title: procs
+description: API reference for codeweaver.core.utils.procs
+---
+
+# `codeweaver.core.utils.procs`
+
+Multiprocessing and process utilities.
+
+## Function: `asyncio_or_uvloop`
+
+```python
+asyncio_or_uvloop()
+```
+
+Set uvloop as the event loop policy if available and appropriate.
+
+## Function: `effective_cpu_count`
+
+```python
+effective_cpu_count()
+```
+
+Get the effective number of CPUs available, considering cgroup limits.
+
+Returns:
+    Effective number of CPUs as a positive integer
+
+## Function: `get_cpu_count`
+
+```python
+get_cpu_count()
+```
+
+Get the number of CPUs available on the system.
+
+NOTE: For most use cases, use `effective_cpu_count` instead to account for cgroup and other resource limits.
+
+Returns:
+    Number of CPUs as a positive integer
+
+## Function: `get_optimal_workers`
+
+```python
+get_optimal_workers()
+```
+
+Get optimal number of worker threads/processes for a task type.
+
+Args:
+    task_type: Type of task - "cpu" for CPU-bound, "io" for I/O-bound
+
+Returns:
+    Recommended number of workers
+
+## Function: `low_priority`
+
+```python
+low_priority()
+```
+
+Context manager to run code at low process priority.
+
+Lowers the process priority (nice value on Unix, below-normal on Windows)
+for resource-intensive operations like embedding generation. This prevents
+the indexing process from starving other system processes.
+
+Priority is automatically restored when exiting the context.
+
+Example:
+    with low_priority():
+        await embed_all_chunks(chunks)
+
+Yields:
+    None
+
+## Function: `python_version`
+
+```python
+python_version()
+```
+
+Get the current Python version tuple.
+
+Returns:
+    Python version tuple
+
+## Function: `very_low_priority`
+
+```python
+very_low_priority()
+```
+
+Context manager to run code at very low process priority.
+
+Sets the absolute lowest priority (nice 19 on Unix, IDLE_PRIORITY_CLASS on Windows)
+for background operations like backup syncing that should never interfere with
+normal system operation.
+
+Priority is automatically restored when exiting the context.
+
+Example:
+    with very_low_priority():
+        await sync_to_backup_store(chunks)
+
+Yields:
+    None
