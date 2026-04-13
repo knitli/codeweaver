@@ -21,7 +21,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 [![License][badge_license]][link_license]
 [![Release][badge_release]][link_release]
 [![MCP Compatible][badge_mcp]][link_mcp]
-[![codecov][codecov]
+[![codecov](https://codecov.io/github/knitli/codeweaver/graph/badge.svg?token=EO3DQVHVVH)](https://codecov.io/github/knitli/codeweaver)
 
 [Documentation][nav_docs] •
 [Installation][nav_install] •
