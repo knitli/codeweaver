@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import os
@@ -1216,8 +1217,6 @@ async def indexed_test_project(known_test_codebase, clean_container, actual_vect
     # On Python 3.12, model loading or embedding generation can hang in
     # native code; without this guard the fixture would block forever
     # since pytest timeout_func_only previously excluded fixtures.
-    import asyncio
-
     try:
         await asyncio.wait_for(indexer.index_project(force_reindex=True), timeout=300)
     except TimeoutError:

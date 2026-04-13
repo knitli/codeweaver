@@ -60,7 +60,7 @@ ast-grep = "latest"
 python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 uv = "latest"
 "pipx:exportify" = "latest"
-hk = "latest"
+hk = "1.38.0"
 pkl = "0.31.1"
 
 # Quick note for those unfamiliar with mise:
