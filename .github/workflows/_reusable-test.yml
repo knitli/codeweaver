@@ -202,16 +202,19 @@ jobs:
           MISE_PYTHON_VERSION: ${{ steps.setup-mise.outputs.MISE_PYTHON_VERSION }}
           TEST_MARKERS: ${{ inputs.test-markers }}
         run: |
-          # Use `signal` timeout method in CI so SIGALRM can interrupt
-          # blocking C code (ONNX runtime inference, model loading).
-          # The default `thread` method can't kill stuck native code.
-          # Combined with timeout_func_only=false in pyproject.toml,
-          # this ensures fixture hangs (e.g. indexed_test_project) are
-          # caught and reported instead of running until job timeout.
+          # On Linux/macOS, use `signal` timeout method so SIGALRM can
+          # interrupt blocking C code (ONNX runtime, model loading).
+          # On Windows, `signal` is not supported by pytest-timeout —
+          # fall back to the default `thread` method from pyproject.toml.
+          TIMEOUT_ARGS=""
+          if [[ "$RUNNER_OS" != "Windows" ]]; then
+            TIMEOUT_ARGS="--timeout-method=signal"
+          fi
+
           if [[ "${TEST_MARKERS}" == *"real_providers"* ]]; then
-            mise run test-cov -m "${TEST_MARKERS}" --timeout=900 --timeout-method=signal
+            mise run test-cov -m "${TEST_MARKERS}" --timeout=900 ${TIMEOUT_ARGS}
           else
-            mise run test-cov -m "${TEST_MARKERS}" --timeout-method=signal
+            mise run test-cov -m "${TEST_MARKERS}" ${TIMEOUT_ARGS}
           fi
       - name: Upload coverage to Codecov
         if: ${{ inputs.upload-coverage && matrix.python-version == '3.12' && !inputs.benchmark-tests }}
