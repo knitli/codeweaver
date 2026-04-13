@@ -1212,7 +1212,19 @@ async def indexed_test_project(known_test_codebase, clean_container, actual_vect
     # Ensure it's using the correct project path
     indexer._project_path = project_path
 
-    await indexer.index_project(force_reindex=True)
+    # Use asyncio.wait_for to prevent indefinite hangs during indexing.
+    # On Python 3.12, model loading or embedding generation can hang in
+    # native code; without this guard the fixture would block forever
+    # since pytest timeout_func_only previously excluded fixtures.
+    import asyncio
+
+    try:
+        await asyncio.wait_for(indexer.index_project(force_reindex=True), timeout=300)
+    except TimeoutError:
+        pytest.fail(
+            "indexed_test_project fixture timed out after 300s during index_project(). "
+            "This typically indicates model loading or embedding generation hung in native code."
+        )
 
     yield project_path
 

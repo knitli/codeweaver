@@ -71,6 +71,7 @@ jobs:
   test:
     name: Test Python ${{ matrix.python-version }}${{ matrix.experimental && ' (experimental)' || '' }}
     runs-on: ${{ inputs.runner-version }}
+    timeout-minutes: 20
     continue-on-error: ${{ matrix.experimental || false }}
     outputs:
       benchmark-available: ${{ steps.benchmark-compare.outputs.benchmark-available }}
@@ -201,17 +202,16 @@ jobs:
           MISE_PYTHON_VERSION: ${{ steps.setup-mise.outputs.MISE_PYTHON_VERSION }}
           TEST_MARKERS: ${{ inputs.test-markers }}
         run: |
-          # Real-provider tests: bump timeout to 15min per test and switch
-          # the timeout method to `signal` so SIGALRM can interrupt
-          # blocking C code (ONNX runtime inference). The default `thread`
-          # method in pyproject.toml can't kill stuck native code, so a
-          # genuinely hung embedding call would run until the 6h GHA
-          # job limit. `signal` has asyncio interaction caveats but
-          # they're acceptable for the integration suite.
+          # Use `signal` timeout method in CI so SIGALRM can interrupt
+          # blocking C code (ONNX runtime inference, model loading).
+          # The default `thread` method can't kill stuck native code.
+          # Combined with timeout_func_only=false in pyproject.toml,
+          # this ensures fixture hangs (e.g. indexed_test_project) are
+          # caught and reported instead of running until job timeout.
           if [[ "${TEST_MARKERS}" == *"real_providers"* ]]; then
             mise run test-cov -m "${TEST_MARKERS}" --timeout=900 --timeout-method=signal
           else
-            mise run test-cov -m "${TEST_MARKERS}"
+            mise run test-cov -m "${TEST_MARKERS}" --timeout-method=signal
           fi
       - name: Upload coverage to Codecov
         if: ${{ inputs.upload-coverage && matrix.python-version == '3.12' && !inputs.benchmark-tests }}
