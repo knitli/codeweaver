@@ -673,8 +673,12 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 timeout = "600"
 timeout_method = "thread"
-# Override timeout for specific markers
-timeout_func_only = true  # Only apply timeout to test functions, not setup/teardown
+# Apply timeout to entire test lifecycle (setup + call + teardown) so that
+# fixture hangs (e.g. model loading, indexing) are caught instead of running
+# until the GHA job limit.  Previously `timeout_func_only = true` left
+# fixtures uncovered, causing Python 3.12 CI to hang indefinitely in the
+# `indexed_test_project` fixture during `index_project()`.
+timeout_func_only = false
 
 [tool.ty.environment]
 python-version = "3.12"

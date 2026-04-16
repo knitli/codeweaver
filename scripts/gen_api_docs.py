@@ -54,7 +54,16 @@ EXCLUDE_PATTERNS: list[str] = [
     "codeweaver.cli.*.*",
     "codeweaver.data.*",
     "codeweaver.semantic.data.*",
-    "",
+]
+
+FORCE_INCLUDE_PATTERNS: list[str] = [
+    # If any module matches both EXCLUDE_PATTERNS and FORCE_INCLUDE_PATTERNS,
+    # it will be included. This is for modules that are private but still
+    # worth documenting, or that would otherwise be excluded by an overly
+    # broad pattern.
+    "codeweaver.server.agent_api.search.__init__",
+    "codeweaver.providers.embedding.capabilities.base",
+    "codeweaver.providers.reranking.capabilities.base",
 ]
 
 
@@ -185,7 +194,7 @@ def _generate_module_docs(loader: GriffeLoader, mod_name: str, output_path: Path
 
 def _is_excluded(dotted_name: str) -> bool:
     """Return True if `dotted_name` matches any `EXCLUDE_PATTERNS` glob."""
-    return any(fnmatch.fnmatchcase(dotted_name, pat) for pat in EXCLUDE_PATTERNS)
+    return any(fnmatch.fnmatchcase(dotted_name, pat) for pat in EXCLUDE_PATTERNS) and not any(fnmatch.fnmatchcase(dotted_name, pat) for pat in FORCE_INCLUDE_PATTERNS)
 
 
 def _iter_modules(src_path: Path) -> Iterator[tuple[str, Path]]:
