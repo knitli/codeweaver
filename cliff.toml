@@ -24,47 +24,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # - date: Commit date
 # - commits: List of commits for this version
 body = """
-{% if version -%}
-    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
-{% else -%}
-    ## [Unreleased]
-{% endif -%}
+{%- if version %}
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{%- else %}
+## [Unreleased]
+{%- endif %}
 {% for group, commits in commits | group_by(attribute="group") %}
-    ### {{ group | striptags | trim | upper_first }}
-    {%- for commit in commits -%}
-        {%- if commit.message is starting_with("SQUASH | ") -%}
-            {# Handle squash merge format: "SQUASH | description | #123" #}
-            {%- set_global parts = commit.message | split(pat=" | ") -%}
-            {%- set_global pr_desc = parts | nth(n=1) | trim -%}
-            {%- set_global pr_num = parts | nth(n=2) | replace(from="#", to="") | trim -%}
-            {%- if pr_num is matching("^[0-9]+$") -%}
-    - {{ pr_desc }} ([#{{ pr_num }}](https://github.com/knitli/codeweaver/pull/{{ pr_num }}))
-            {%- else -%}
-    - {{ pr_desc }}
-            {%- endif -%}
-        {%- elif commit.message is starting_with("Merge pull request") -%}
-            {# Handle regular merge format: "Merge pull request #123 from org/branch | Description" #}
-            {%- set_global pr_num = commit.message | replace(from="Merge pull request #", to="") | split(pat=" ") | first | trim -%}
-            {%- if commit.message is containing(" | ") -%}
-                {%- set_global parts = commit.message | split(pat=" | ") -%}
-                {%- if parts | length >= 2 -%}
-                    {%- set_global pr_desc = parts | slice(start=1) | join(sep=" | ") | trim -%}
-                {%- else -%}
-                    {%- set_global pr_desc = "No description" -%}
-                {%- endif -%}
-            {%- endif %}
-            {%- if pr_num is matching("^[0-9]+$") -%}
-    - {{ pr_desc }} ([#{{ pr_num }}](https://github.com/knitli/codeweaver/pull/{{ pr_num }}))
-            {%- else -%}
-    - {{ pr_desc }}
-            {%- endif -%}
-        {%- else %}
-    - {{ commit.message | upper_first }}
-        {%- endif -%}
-        {%- if commit.breaking %}
-      - **BREAKING**: {{ commit.breaking_description }}
-        {%- endif -%}
-    {% endfor %}
+### {{ group | striptags | trim | upper_first }}
+{% for commit in commits -%}
+{%- if commit.message is starting_with("SQUASH | ") -%}
+{# Handle squash merge format: "SQUASH | description | #123" #}
+{%- set_global parts = commit.message | split(pat=" | ") -%}
+{%- set_global pr_desc = parts | nth(n=1) | trim -%}
+{%- set_global pr_num = parts | nth(n=2) | replace(from="#", to="") | trim -%}
+{%- if pr_num is matching("^[0-9]+$") %}
+- {{ pr_desc }} ([#{{ pr_num }}](https://github.com/knitli/codeweaver/pull/{{ pr_num }}))
+{%- else %}
+- {{ pr_desc }}
+{%- endif -%}
+{%- elif commit.message is starting_with("Merge pull request") -%}
+{# Handle regular merge format: "Merge pull request #123 from org/branch | Description" #}
+{%- set_global pr_num = commit.message | replace(from="Merge pull request #", to="") | split(pat=" ") | first | trim -%}
+{%- if commit.message is containing(" | ") -%}
+{%- set_global parts = commit.message | split(pat=" | ") -%}
+{%- if parts | length >= 2 -%}
+{%- set_global pr_desc = parts | slice(start=1) | join(sep=" | ") | trim -%}
+{%- else -%}
+{%- set_global pr_desc = "No description" -%}
+{%- endif -%}
+{%- endif -%}
+{%- if pr_num is matching("^[0-9]+$") %}
+- {{ pr_desc }} ([#{{ pr_num }}](https://github.com/knitli/codeweaver/pull/{{ pr_num }}))
+{%- else %}
+- {{ pr_desc }}
+{%- endif -%}
+{%- else %}
+- {{ commit.message | upper_first }}
+{%- endif -%}
+{%- if commit.breaking %}
+  - **BREAKING**: {{ commit.breaking_description }}
+{%- endif %}
+{%- endfor %}
 {% endfor %}
 """
 # Template for the changelog footer
@@ -88,9 +88,17 @@ filter_unconventional = false
 split_commits = false
 # Preprocessors for both merge commits and squash merges
 commit_preprocessors = [
+  # 0. Strip multi-line commit bodies — keep only the subject line.
+  # git-cliff applies preprocessors to the full message, and regexes below
+  # use `$` which in Rust regex means end-of-string by default. Stripping
+  # the body first ensures `$` matches the end of the subject line.
+  { pattern = '\n[\s\S]*', replace = "" },
   # 1. Extract PR description from merge commits and append to subject
-  # Input: "Merge pull request #123 from org/branch\n\nPR Description"
+  # Input: "Merge pull request #123 from org/branch"
   # Output: "Merge pull request #123 from org/branch | PR Description"
+  # (body already stripped, so this only fires for single-line merge commits
+  # that had the description appended by a previous preprocessor run —
+  # kept for backwards compatibility)
   { pattern = 'Merge pull request (#[0-9]+) from ([^\n]+)\n+([\s\S]+)', replace = "Merge pull request ${1} from ${2} | ${3}" },
   # 2. Mark squash merge commits for easier template detection
   # Input: "feat: some feature (#123)"
@@ -119,6 +127,18 @@ commit_parsers = [
   { message = "^SQUASH \\| chore", group = "Maintenance" },
   { message = "^SQUASH \\| revert", group = "Reverts" },
   { message = "^SQUASH \\|", group = "Other Changes" },
+  # === Direct Conventional Commits (no PR number) ===
+  # Fallback for commits pushed directly to main without a PR
+  { message = "^feat", group = "Features" },
+  { message = "^fix", group = "Bug Fixes" },
+  { message = "^docs", group = "Documentation" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Refactoring" },
+  { message = "^test", group = "Testing" },
+  { message = "^build", group = "Build System" },
+  { message = "^ci", group = "CI/CD" },
+  { message = "^chore", group = "Maintenance" },
+  { message = "^revert", group = "Reverts" },
   # === Regular Merge Commit Parsers (branch-based) ===
   # Features - check branch name patterns
   { message = "^Merge pull request #[0-9]+ from .*/feat", group = "Features" },
