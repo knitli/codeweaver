@@ -6,8 +6,8 @@
       "name": "@knitli/codeweaver-docs",
       "dependencies": {
         "@astrojs/starlight": "^0.38.3",
-        "@knitli/astro-docs-template": "^0.5.2",
-        "@knitli/docs-components": "^1.4.5",
+        "@knitli/astro-docs-template": "^0.5.3",
+        "@knitli/docs-components": "^1.4.6",
       },
       "devDependencies": {
         "@astrojs/check": "latest",
@@ -282,7 +282,7 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.9", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.0.3", "@jridgewell/sourcemap-codec": "^1.4.10" } }, "sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ=="],
 
-    "@knitli/astro-docs-template": ["@knitli/astro-docs-template@0.5.2", "", { "dependencies": { "@astrojs/check": "^0.9.6", "@astrojs/cloudflare": "^13.1.8", "@astrojs/compiler-rs": "^0.1.6", "@astrojs/markdoc": "^1.0.0", "@astrojs/mdx": "^5.0.3", "@astrojs/sitemap": "^3.7.2", "@astrojs/starlight": "^0.38.3", "@biomejs/biome": "^2.4.2", "@knitli/docs-components": "*", "@knitli/tsconfig": "0.2.4", "@nuasite/llm-enhancements": "^0.23.0", "@types/bun": "^1.3.4", "@types/mdast": "^4.0.4", "@types/node": "^24.12.2", "astro": "^6.1.5", "astro-cloudflare-pages-headers": "^1.7.7", "astro-d2": "^0.10.0", "astro-favicons": "3.1.6", "bun": "^1.3.11", "lightningcss": "^1.30.2", "postcss": "8.5.6", "postcss-nesting": "^14.0.0", "rehype-external-links": "^3.0.0", "sharp": "^0.34.5", "starlight-announcement": ">=0.1.1", "starlight-changelogs": " >=0.1.0", "starlight-heading-badges": ">=0.6.1", "starlight-links-validator": ">=0.1.0", "starlight-llms-txt": ">=0.8.0", "starlight-page-actions": ">=0.1.0", "starlight-plugin-icons": ">=0.1.0", "starlight-scroll-to-top": ">=0.4.0", "starlight-sidebar-topics": ">=0.7.1", "starlight-tags": ">=0.4.0", "svgo": "^4.0.0", "unist-util-visit": "^5.1.0", "vite": "^7.3.2", "vite-tsconfig-paths": "6.1.1" }, "bin": { "knitli-docs": "src/cli.ts" } }, "sha512-DxvUBdx1XMKMZwEhopFM2SArPgsgDd3t9Nu4+j56x/iXbcacfF84vOSWMCClLjzh00oq+ylrPurOkkg4jDDxsw=="],
+    "@knitli/astro-docs-template": ["@knitli/astro-docs-template@0.5.3", "", { "dependencies": { "@astrojs/check": "^0.9.6", "@astrojs/cloudflare": "^13.1.8", "@astrojs/compiler-rs": "^0.1.6", "@astrojs/markdoc": "^1.0.0", "@astrojs/mdx": "^5.0.3", "@astrojs/sitemap": "^3.7.2", "@astrojs/starlight": "^0.38.3", "@biomejs/biome": "^2.4.2", "@knitli/docs-components": "*", "@knitli/tsconfig": "0.2.4", "@nuasite/llm-enhancements": "^0.23.0", "@types/bun": "^1.3.4", "@types/mdast": "^4.0.4", "@types/node": "^24.12.2", "astro": "^6.1.5", "astro-cloudflare-pages-headers": "^1.7.7", "astro-d2": "^0.10.0", "astro-favicons": "3.1.6", "bun": "^1.3.11", "lightningcss": "^1.30.2", "postcss": "8.5.6", "postcss-nesting": "^14.0.0", "rehype-external-links": "^3.0.0", "sharp": "^0.34.5", "starlight-announcement": ">=0.1.1", "starlight-changelogs": " >=0.1.0", "starlight-heading-badges": ">=0.6.1", "starlight-links-validator": ">=0.1.0", "starlight-llms-txt": ">=0.8.0", "starlight-page-actions": ">=0.1.0", "starlight-plugin-icons": ">=0.1.0", "starlight-scroll-to-top": ">=0.4.0", "starlight-sidebar-topics": ">=0.7.1", "starlight-tags": ">=0.4.0", "svgo": "^4.0.0", "unist-util-visit": "^5.1.0", "vite": "^7.3.2", "vite-tsconfig-paths": "6.1.1" }, "bin": { "knitli-docs": "src/cli.ts" } }, "sha512-xe+TwrWAD7swwiVUhvoNEDMf/KTppXN79Y8zB/z7Mht7IpUD6KNgaggYmcGvXBgAfrfSB0flxelwTod2cJQgOQ=="],
 
     "@knitli/docs-components": ["@knitli/docs-components@1.5.1", "", { "dependencies": { "astro": "^6.1.5", "astro-contributors": "^0.8.0", "astro-seo-meta": "^6.0.0" }, "peerDependencies": { "@astrojs/starlight": "^0.38.3" } }, "sha512-N2NqYSasRZx08Ikscnk9tVBXYrMiWVmuJUJC+mFoeyZHe6pDGbMk2cOOc42LsPR5M1ykEn8JcB4gSa+1qEGoKg=="],
 

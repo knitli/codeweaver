@@ -47,6 +47,14 @@ EXCLUDE_PATTERNS: list[str] = [
     "codeweaver.testing.*",
     "codeweaver.*.tests",
     "codeweaver.*.tests.*",
+    # modules that aren't particularly useful to document
+    "codeweaver.providers.embedding.capabilities.*",
+    "codeweaver.providers.reranking.capabilities.*",
+    "codeweaver.cli.*",
+    "codeweaver.cli.*.*",
+    "codeweaver.data.*",
+    "codeweaver.semantic.data.*",
+    "",
 ]
 
 

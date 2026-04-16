@@ -16,8 +16,8 @@
   },
   "dependencies": {
     "@astrojs/starlight": "^0.38.3",
-    "@knitli/astro-docs-template": "^0.5.2",
-    "@knitli/docs-components": "^1.4.5"
+    "@knitli/astro-docs-template": "^0.5.3",
+    "@knitli/docs-components": "^1.4.6"
   },
   "devDependencies": {
     "@astrojs/check": "latest",
