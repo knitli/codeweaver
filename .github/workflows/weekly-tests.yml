@@ -219,7 +219,6 @@ jobs:
           macos_result: ${{ needs.weekly-comprehensive-macos.result }}
           benchmark_result: ${{ needs.weekly-benchmarks.result }}
           coverage_result: ${{ needs.weekly-coverage-report.result }}
-          smoke_result: ${{ needs.weekly-install-smoke.result }}
         run: |
           echo "Linux Tests: ${linux_result}"
           echo "Install-Profile Smoke Tests: ${smoke_result}"
