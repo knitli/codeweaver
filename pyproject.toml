@@ -1010,7 +1010,7 @@ boto3-types = { path = "./typings/boto3_types/__init__.pyi" }
 vcs = "git"
 style = "pep440"
 highest-tag = true
-bump = true
+bump = false
 dirty = false  # Disabled .dirty suffix to maintain PEP 440 compliance
 # tag-branch = "main"  # Commented out to allow building on feature branches
 commit-prefix = "g"
