@@ -21,6 +21,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 [![License][badge_license]][link_license]
 [![Release][badge_release]][link_release]
 [![MCP Compatible][badge_mcp]][link_mcp]
+[![codecov](https://codecov.io/github/knitli/codeweaver/graph/badge.svg?token=EO3DQVHVVH)](https://codecov.io/github/knitli/codeweaver)
 
 [Documentation][nav_docs] •
 [Installation][nav_install] •
@@ -181,6 +182,7 @@ AI agents face **too much irrelevant context**, causing token waste, missed patt
 [arch_find_code]: <src/codeweaver/agent_api/find_code/ARCHITECTURE.md> "find_code Architecture"
 [architecture]: <ARCHITECTURE.md> "Overall Architecture"
 [bashandbone]: <https://github.com/bashandbone> "Adam Poulemanos' GitHub Profile"
+[codecov]: <https://codecov.io/gh/knitli/codeweaver/graph/badge.svg?token=EO3DQVHVVH> "Code Coverage"
 [competitive_analysis]: <src/codeweaver/docs/comparison.md> "See how CodeWeaver stacks up"
 [changelog]: <https://github.com/knitli/codeweaver/blob/main/CHANGELOG.md> "Changelog"
 [cla]: <CONTRIBUTORS_LICENSE_AGREEMENT.md> "Contributor License Agreement"

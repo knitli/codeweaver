@@ -154,6 +154,7 @@ jobs:
 
       - name: Download models for real provider tests
         env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
           PY_VERSION: ${{ matrix.python-version }}
         run: |
           # Pre-warms the exact models the `_testing_profile` pins in
