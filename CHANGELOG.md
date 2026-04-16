@@ -1,6 +1,5 @@
 <!--
-SPDX-FileCopyrightText: 2025 Knitli Inc.
-SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+SPDX-FileCopyrightText: 2026 Knitli Inc.
 
 SPDX-License-Identifier: MIT OR Apache-2.0
 -->
@@ -9,11 +8,9 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 Here is what we've been working on!
 
->[!NOTE]
->The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
->and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-<!-- git-cliff prepends new release sections above this marker. Do not move or delete. -->
 <!-- BEGIN-CURATED-HISTORY -->
 
 ## [0.1.1] - 2026-04-07
