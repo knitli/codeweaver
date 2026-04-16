@@ -97,7 +97,7 @@ jobs:
         # Skipped on prereleases to keep CHANGELOG.md focused on stable releases.
         if: ${{ !(contains(steps.version.outputs.version, 'a') || contains(steps.version.outputs.version, 'b') || contains(steps.version.outputs.version, 'rc')) }}
         run: |
-          git-cliff --tag "${{ steps.version.outputs.tag }}" --prepend CHANGELOG.md
+          git-cliff -u --tag "${{ steps.version.outputs.tag }}" --prepend CHANGELOG.md
           if git diff --quiet -- CHANGELOG.md; then
             echo "CHANGELOG.md already up to date"
           else
