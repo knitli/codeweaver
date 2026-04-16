@@ -56,9 +56,7 @@ RUN mkdir -p src/codeweaver && \
 RUN uv build --wheel --all-packages --out-dir /tmp/wheels
 
 # Install the pre-built wheels and their PyPI dependencies
-# hadolint ignore=DL3013
-RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    python -m pip install --no-cache-dir /tmp/wheels/*.whl
+RUN uv pip install --system --no-cache /tmp/wheels/*.whl
 
 # NOW copy source code (frequent changes don't trigger dependency reinstall)
 COPY src/ src/
@@ -66,7 +64,7 @@ COPY src/ src/
 # Rebuild root package with actual source code (workspace members already have
 # real source from the packages/ COPY above) and reinstall without re-resolving deps
 RUN uv build --wheel --out-dir /tmp/wheels-final && \
-    python -m pip install --no-cache-dir --no-deps --force-reinstall /tmp/wheels-final/*.whl
+    uv pip install --system --no-cache --no-deps --reinstall /tmp/wheels-final/*.whl
 
 # =============================================================================
 # Stage 2: Runtime - Minimal production image
