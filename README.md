@@ -52,7 +52,7 @@ With CodeWeaver:
 
 > CodeWeaver is no longer in alpha!
 > 
-> **Early Release (0.x)**: CodeWeaver is in active development. APIs may change between minor versions. [Use it, break it, help shape it][issues].
+> **Early Release (0.x)**: CodeWeaver is in active development. APIs may change between minor versions. It's very well-tested but still in 'it works on my machine' territory. [Use it, break it, help shape it][issues].
 
 ---
 
