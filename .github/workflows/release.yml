@@ -51,6 +51,11 @@ jobs:
       python-version: "3.12"
       upload-artifacts: true
       clean-build: true
+      # Pin checkout to the tag so uv-dynamic-versioning derives a clean
+      # version (e.g. 0.1.2) instead of a post-release dev suffix.
+      # For workflow_dispatch the user supplies the tag; for tag pushes
+      # github.ref is already refs/tags/vX.Y.Z.
+      ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', github.event.inputs.tag) || github.ref }}
     secrets: inherit
   github-release:
     name: Create GitHub Release
@@ -95,16 +100,29 @@ jobs:
         # section above existing content. The curated v0.1.0 history (and any
         # later manual edits) below the BEGIN-CURATED-HISTORY marker is preserved.
         # Skipped on prereleases to keep CHANGELOG.md focused on stable releases.
+        #
+        # Uses an explicit commit range (like the release notes step) because
+        # `-u` alone finds no unreleased commits when the tag already exists.
         if: ${{ !(contains(steps.version.outputs.version, 'a') || contains(steps.version.outputs.version, 'b') || contains(steps.version.outputs.version, 'rc')) }}
         run: |
-          git-cliff -u --tag "${{ steps.version.outputs.tag }}" --prepend CHANGELOG.md
+          CURRENT_TAG="${{ steps.version.outputs.tag }}"
+          PREVIOUS_TAG="$(git tag --sort=-version:refname \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+([ab]|rc|-alpha|-beta)?[0-9]*(\.[0-9]+)?$' \
+            | head -2 | tail -1 || echo "")"
+
+          if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$CURRENT_TAG" ]; then
+            git-cliff -u --tag "$CURRENT_TAG" "$PREVIOUS_TAG..$CURRENT_TAG" --prepend CHANGELOG.md
+          else
+            git-cliff -u --tag "$CURRENT_TAG" --prepend CHANGELOG.md
+          fi
+
           if git diff --quiet -- CHANGELOG.md; then
             echo "CHANGELOG.md already up to date"
           else
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add CHANGELOG.md
-            git commit -m "docs(changelog): prepend ${{ steps.version.outputs.tag }} [skip ci]"
+            git commit -m "docs(changelog): prepend $CURRENT_TAG [skip ci]"
             # Push to default branch; tag pushes are detached so target main explicitly
             git push origin HEAD:main
           fi
