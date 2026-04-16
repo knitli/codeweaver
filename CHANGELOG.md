@@ -5,62 +5,6 @@ Here is what we've been working on!
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.2] - 2026-04-16
-
-### Bug Fixes
-
-- fix: prevent Python 3.12 CI hang by excluding real_providers tests and hardening timeouts ([#337](https://github.com/knitli/codeweaver/pull/337))
-- fix: use time.monotonic() in ResourceGovernor to prevent Python 3.12 CI hang ([#336](https://github.com/knitli/codeweaver/pull/336))
-- fix(ci): remove redundant post-pytest coverage commands causing all CI runs to fail ([#334](https://github.com/knitli/codeweaver/pull/334))
-- fix(tests): address nightly test failures ([#332](https://github.com/knitli/codeweaver/pull/332))
-- fix: test-cov mise task silently drops CLI args; profile test wrong on 3.14 ([#331](https://github.com/knitli/codeweaver/pull/331))
-- fix: restore PR #302 fixes reverted by PR #319's stale main merge ([#326](https://github.com/knitli/codeweaver/pull/326))
-- fix: configure workspace members for uv-dynamic-versioning and update Dockerfile to use uv build ([#325](https://github.com/knitli/codeweaver/pull/325))
-- fix: ensure non-destructive changelog generation
-- fix(ci): prevent Claude workflow from triggering on bot reviews; add agent identification ([#323](https://github.com/knitli/codeweaver/pull/323))
-- fix(tests): add per-Python-version thresholds for chunker benchmarks ([#317](https://github.com/knitli/codeweaver/pull/317))
-- fix(providers): resolve Exa service card lateimport name mismatch ([#316](https://github.com/knitli/codeweaver/pull/316))
-- fix(di): restore lenient sync settings init and fix mise task hygiene ([#314](https://github.com/knitli/codeweaver/pull/314))
-- fix(tests): reorder decorators to ensure skip_ci marker applies to parametrized tests ([#315](https://github.com/knitli/codeweaver/pull/315))
-- fix: add coverage combine step for parallel coverage reporting ([#309](https://github.com/knitli/codeweaver/pull/309))
-- fix(providers): guard EmbedByTypeResponse import with TYPE_CHECKING ([#305](https://github.com/knitli/codeweaver/pull/305))
-- fix: handle UNSET sentinel correctly in ProviderSettings initialization ([#301](https://github.com/knitli/codeweaver/pull/301))
-
-### CI/CD
-
-- ci(smoke): add install-profile smoke matrix + nightly/weekly integration ([#320](https://github.com/knitli/codeweaver/pull/320))
-
-### Documentation
-
-- docs: launch CodeWeaver docs site with mirrored API reference ([#330](https://github.com/knitli/codeweaver/pull/330))
-
-### Features
-
-- feat: integrate hatch-fancy-pypi-readme for better pypi readme resolution (fix broken links)
-
-### Maintenance
-
-- chore(claude-plugin): Removed the CodeWeaver Claude Code plugin from the repo. The plugin is now part of the [Knitli Agent Toolshed](https://github.com/knitli/toolshed). You can add it with `/plugin marketplace add knitli/toolshed` and then `/plugin install codeweaver`
-- chore: re-establish REUSE compliance
-
-### Performance
-
-- Improve delimiter chunking performance and governor checks for Python 3.13 CI ([#335](https://github.com/knitli/codeweaver/pull/335))
-- Optimize text parsing using walrus operator ([#333](https://github.com/knitli/codeweaver/pull/333))
-- Optimize task generation ([#327](https://github.com/knitli/codeweaver/pull/327))
-- Optimize extension matching in language_from_path ([#318](https://github.com/knitli/codeweaver/pull/318))
-- Remove redundant lru_cache from _get_lang_patterns ([#324](https://github.com/knitli/codeweaver/pull/324))
-
-### Testing
-
-- Fix OSError caplog test: deterministic capture, precise assertions, REUSE compliance ([#319](https://github.com/knitli/codeweaver/pull/319))
-- Add testing for core language detection and configurations ([#322](https://github.com/knitli/codeweaver/pull/322))
-- test: cover UnicodeEncodeError in DelimiterChunker ([#321](https://github.com/knitli/codeweaver/pull/321))
-
-### Refactoring
-
-- refactor(deps): single-source dep management via uv-dynamic-versioning hook + install-smoke foundation ([#302](https://github.com/knitli/codeweaver/pull/302))
-
 <!-- BEGIN-CURATED-HISTORY -->
 
 ## [0.1.1] - 2026-04-07
