@@ -91,4 +91,4 @@ Now that CodeWeaver is running, you can:
 - **Search manually:** Use `cw search "your query"` to test the results.
 - **Connect an Agent:** Add CodeWeaver to your `.mcp.json` to give Claude or other agents exquisite context.
 
-For a deeper dive into how to customize your setup, see the [Configuration Architecture](./configuration.md) guide.
+For a deeper dive into how to customize your setup, see the [Configuration Architecture](./configuration/) guide.

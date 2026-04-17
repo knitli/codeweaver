@@ -41,7 +41,7 @@ function fixPrerenderEntryPlugin(): Plugin {
       const outDir: string = env.config?.build?.outDir;
       if (!outDir) return;
 
-      const astroDir = join(root, "dist", "_astro");
+      const astroDir = join(root, "dist", "codeweaver", "_astro");
       if (!existsSync(astroDir)) return;
 
       const copyRecursive = (srcDir: string, destDir: string) => {
@@ -162,6 +162,8 @@ const configOptions: DocsTemplateOptions = {
 };
 
 const config = await createConfig(configOptions);
+
+config.outDir = "./dist/codeweaver";
 
 // Workaround: Remove cloudflare adapter for build. Astro 6 + @astrojs/cloudflare
 // has unfixed vite 6 environment build bugs (withastro/astro#15650).

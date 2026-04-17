@@ -1,19 +1,4 @@
 {
-  "name": "@knitli/codeweaver-docs",
-  "version": "0.0.1",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "astro": "bunx astro",
-    "prebuild": "bunx wrangler types; bunx astro sync",
-    "build": "bunx astro build",
-    "deploy": "bun run build && bunx wrangler deploy",
-    "dev": "bunx astro dev",
-    "postinstall": "node scripts/patch-astro-prerender.mjs",
-    "prepare": "test -f ./node_modules/bun/install.js && node ./node_modules/bun/install.js || true",
-    "preview": "bunx astro preview",
-    "wrangler": "bunx wrangler"
-  },
   "dependencies": {
     "@astrojs/starlight": "^0.38.3",
     "@knitli/astro-docs-template": "^0.5.3",
@@ -22,11 +7,27 @@
   "devDependencies": {
     "@astrojs/check": "latest",
     "@knitli/tsconfig": "^0.3.0",
-    "@types/node": "latest",
+    "@types/node": "^25.6.0",
     "typescript": "latest",
     "wrangler": "latest"
   },
+  "name": "@knitli/codeweaver-docs",
+  "private": true,
+  "scripts": {
+    "astro": "bunx astro",
+    "build": "bunx astro build",
+    "clean": "rm -rf dist",
+    "deploy": "bun run build && bunx wrangler deploy -c ./wrangler.jsonc",
+    "dev": "bunx astro dev",
+    "postinstall": "node scripts/patch-astro-prerender.mjs",
+    "prebuild": "bun run clean && bunx wrangler types; bunx astro sync",
+    "prepare": "test -f ./node_modules/bun/install.js && node ./node_modules/bun/install.js || true",
+    "preview": "bunx astro preview",
+    "wrangler": "bunx wrangler"
+  },
   "trustedDependencies": [
     "bun"
-  ]
+  ],
+  "type": "module",
+  "version": "0.0.1"
 }
