@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv -s
+#!/usr/bin/env -S uv run --script
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
@@ -61,7 +61,10 @@ FORCE_INCLUDE_PATTERNS: list[str] = [
     # it will be included. This is for modules that are private but still
     # worth documenting, or that would otherwise be excluded by an overly
     # broad pattern.
-    "codeweaver.server.agent_api.search.__init__",
+    #
+    # NOTE: For __init__.py files, use the package name WITHOUT .__init__
+    # suffix, since _iter_modules strips __init__ from dotted names.
+    "codeweaver.server.agent_api.search",
     "codeweaver.providers.embedding.capabilities.base",
     "codeweaver.providers.reranking.capabilities.base",
 ]
