@@ -89,7 +89,8 @@ class Container[T]:
 
         Parses the type string into an AST, validates that it contains only safe
         constructs (names, attributes, subscripts, unions, calls), and evaluates
-        it in a restricted environment with a minimal set of builtins.
+        it in a restricted environment with a minimal set of builtins using a
+        custom AST evaluator.
 
         Args:
             type_str: The string representation of a type.
@@ -104,49 +105,6 @@ class Container[T]:
         except SyntaxError:
             return None
 
-        class TypeValidator(ast.NodeVisitor):
-            def generic_visit(self, node: ast.AST) -> None:
-                # Allowed nodes for type annotations, including support for:
-                # - Generics: List[int], dict[str, Any] (Subscript, Name, Attribute)
-                # - Unions: int | str (BinOp, BitOr)
-                # - Annotated: Annotated[int, Depends(...)] (Call, keyword, Tuple, List)
-                # - Literals: Literal["foo"] (Constant)
-                if not isinstance(
-                    node,
-                    (
-                        ast.Expression,
-                        ast.Name,
-                        ast.Attribute,
-                        ast.Subscript,
-                        ast.Constant,
-                        ast.BinOp,
-                        ast.BitOr,
-                        ast.Load,
-                        ast.Tuple,
-                        ast.List,
-                        ast.Call,
-                        ast.keyword,
-                    ),
-                ):
-                    raise TypeError(f"Forbidden AST node in type string: {type(node).__name__}")
-
-                # Block dunder access to prevent escaping the restricted environment
-                if isinstance(node, ast.Name) and node.id.startswith("__"):
-                    raise TypeError(f"Forbidden dunder name: {node.id}")
-                if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
-                    raise TypeError(f"Forbidden dunder attribute: {node.attr}")
-
-                super().generic_visit(node)
-
-        try:
-            TypeValidator().visit(tree)
-        except TypeError:
-            return None
-
-        # Restricted eval: only allow basic builtin types to be resolved
-        # even if they are not in the module's globals.
-        # Note: `type` is intentionally excluded — it is not needed for type annotation
-        # resolution, and allowing it as a callable would increase the attack surface.
         safe_builtins = {
             "int": int,
             "float": float,
@@ -161,8 +119,64 @@ class Container[T]:
             "bytes": bytes,
         }
 
-        code = compile(tree, "<string>", "eval")
-        return eval(code, {"__builtins__": safe_builtins}, globalns)  # noqa: S307
+        def _eval_node(node: ast.AST) -> Any:
+            if isinstance(node, ast.Expression):
+                return _eval_node(node.body)
+            elif isinstance(node, ast.Name):
+                if node.id.startswith("__"):
+                    raise ValueError(f"Forbidden dunder name: {node.id}")
+                if node.id in safe_builtins:
+                    return safe_builtins[node.id]
+                if node.id in globalns:
+                    return globalns[node.id]
+
+                # Check for string literal resolution via DI factories as a last resort
+                for factory_type in getattr(self, "_factories", []):
+                    # We have to import _get_name to get the name, or just use __name__
+                    if getattr(factory_type, "__name__", "") == node.id:
+                        return factory_type
+
+                # Fallback for typing ForwardRef style behaviour:
+                from typing import ForwardRef
+                return ForwardRef(node.id)
+            elif isinstance(node, ast.Attribute):
+                if node.attr.startswith("__"):
+                    raise ValueError(f"Forbidden dunder attribute: {node.attr}")
+                value = _eval_node(node.value)
+                return getattr(value, node.attr)
+            elif isinstance(node, ast.Subscript):
+                value = _eval_node(node.value)
+                slice_val = _eval_node(node.slice)
+
+                try:
+                    return value[slice_val]
+                except TypeError:
+                    from typing import ForwardRef
+                    if isinstance(value, ForwardRef) or isinstance(slice_val, ForwardRef) or (isinstance(slice_val, tuple) and any(isinstance(x, ForwardRef) for x in slice_val)):
+                        return ForwardRef(f"{getattr(value, '__name__', str(value))}[{slice_val}]")
+                    raise
+            elif isinstance(node, ast.Tuple):
+                return tuple(_eval_node(elt) for elt in node.elts)
+            elif isinstance(node, ast.List):
+                return list(_eval_node(elt) for elt in node.elts)
+            elif isinstance(node, ast.Constant):
+                return node.value
+            elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+                left = _eval_node(node.left)
+                right = _eval_node(node.right)
+                return left | right
+            elif isinstance(node, ast.Call):
+                func = _eval_node(node.func)
+                args = [_eval_node(arg) for arg in node.args]
+                kwargs = {kw.arg: _eval_node(kw.value) for kw in node.keywords if kw.arg}
+                return func(*args, **kwargs)
+            else:
+                raise TypeError(f"Forbidden AST node in type string: {type(node).__name__}")
+
+        try:
+            return _eval_node(tree)
+        except Exception:
+            return None
 
     @staticmethod
     def _unwrap_annotated(annotation: Any) -> Any:
