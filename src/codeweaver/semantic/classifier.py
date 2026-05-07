@@ -360,6 +360,17 @@ class GrammarBasedClassifier:
         """Initialize grammar-based classifier."""
         # Build Category name → SemanticClass mapping
         self._classification_map = self._build_category_to_semantic_map
+        # Pre-compute classification methods tuple for iteration performance optimization
+        # ⚡ Bolt: Use a pre-computed tuple literal to avoid list allocation overhead in hot loop
+        self._classification_methods = (
+            self._classify_known_exceptions,
+            self._classify_by_can_be_anywhere,
+            self._classify_from_token_purpose,
+            self._classify_multi_tier_things,
+            self._classify_from_category,
+            self._classify_from_direct_connections,
+            self._classify_by_cross_language_lookup,
+        )
 
     def _classify_by_can_be_anywhere(
         self, thing: CompositeThing | Token, language: SemanticSearchLanguage
@@ -844,15 +855,7 @@ class GrammarBasedClassifier:
                 adjustment=100,
             )
         results: list[GrammarClassificationResult] = []
-        for method in [
-            self._classify_known_exceptions,
-            self._classify_by_can_be_anywhere,
-            self._classify_from_token_purpose,
-            self._classify_multi_tier_things,
-            self._classify_from_category,
-            self._classify_from_direct_connections,
-            self._classify_by_cross_language_lookup,
-        ]:
+        for method in self._classification_methods:
             if classification := method(thing, language):
                 # Check if it's a tuple but NOT a GrammarClassificationResult (which is a NamedTuple, hence a tuple)
                 if not isinstance(classification, GrammarClassificationResult):
