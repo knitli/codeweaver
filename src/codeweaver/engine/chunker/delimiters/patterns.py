@@ -100,13 +100,18 @@ def matches_pattern(start: str, end: str, pattern: DelimiterPattern) -> bool:
         >>> matches_pattern("class", ":", pattern)
         False
     """
-    # Case-insensitive start matching
-    start_match = start.lower() in (s.lower() for s in pattern.starts)
+    # Performance Optimization: Cache lowercased start/end values and replace generator expressions
+    # with inline `any()` equality checks and early returns to eliminate generator allocation overhead.
+    start_lower = start.lower()
+    start_match = any(start_lower == s.lower() for s in pattern.starts)
+    if not start_match:
+        return False
 
-    # Handle "ANY" end wildcard or specific end matching
-    end_match = True if pattern.ends == "ANY" else end.lower() in (e.lower() for e in pattern.ends)
+    if pattern.ends == "ANY":
+        return True
 
-    return start_match and end_match
+    end_lower = end.lower()
+    return any(end_lower == e.lower() for e in pattern.ends)
 
 
 # Core patterns extracted from inference methods
@@ -648,14 +653,13 @@ def kind_from_delimiter_tuple(
         start, end = delimiter
     if start is None or end is None:
         raise ValueError("Both start and end must be provided")
-    return next(
-        (
-            pattern.kind
-            for pattern in ALL_PATTERNS
-            if (start, end) == (pattern.starts, pattern.ends)
-        ),
-        DelimiterKind.UNKNOWN,
-    )
+
+    # Performance Optimization: Iterate using a standard `for` loop instead of a
+    # generator expression with `next()` to eliminate generator allocation overhead.
+    for pattern in ALL_PATTERNS:
+        if pattern.starts == start and pattern.ends == end:
+            return pattern.kind
+    return DelimiterKind.UNKNOWN
 
 
 __all__ = (
