@@ -136,6 +136,14 @@ class Container[T]:
                 if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
                     raise TypeError(f"Forbidden dunder attribute: {node.attr}")
 
+                # Restrict function calls to a safe whitelist to prevent arbitrary code execution
+                if isinstance(node, ast.Call):
+                    allowed_funcs = {"Depends", "depends", "Field", "PrivateAttr"}
+                    if not isinstance(node.func, ast.Name):
+                        raise TypeError(f"Forbidden call: function must be a simple name, got {type(node.func).__name__}")
+                    if node.func.id not in allowed_funcs:
+                        raise TypeError(f"Forbidden call: only {', '.join(allowed_funcs)} are allowed, got {node.func.id}")
+
                 super().generic_visit(node)
 
         try:
