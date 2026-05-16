@@ -64,7 +64,7 @@ services:
       # Profile determines providers and models:
       #   - recommended: Voyage AI (requires VOYAGE_API_KEY)
       #   - quickstart: FastEmbed/Sentence Transformers (free, local)
-      #   - backup: Lightest local models + in-memory vectors
+      #   - testing: Lightest local models + in-memory vectors
       - CODEWEAVER_PROFILE=${CODEWEAVER_PROFILE:-quickstart}
       # Vector store deployment type
       - CODEWEAVER_VECTOR_DEPLOYMENT=${VECTOR_DEPLOYMENT:-local}

@@ -647,5 +647,4 @@ docker run --rm codeweaver:local codeweaver --version
 ## See Also
 
 - [Main README](README.md) - Project overview and features
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Technical architecture
-- [API Documentation](docs/) - Detailed API reference
+- [API Reference](https://docs.knitli.com/codeweaver/api/) - Generated API documentation

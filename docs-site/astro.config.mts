@@ -140,6 +140,7 @@ const configOptions: DocsTemplateOptions = {
     {
       label: 'Guides',
       items: [
+        { label: 'Running in Docker', slug: 'guides/docker' },
         { label: 'Configuration', slug: 'guides/configuration' },
         { label: 'Choosing a Profile', slug: 'guides/profiles' },
         { label: 'Resilience & Fallbacks', slug: 'guides/resilience' },
@@ -156,6 +157,7 @@ const configOptions: DocsTemplateOptions = {
           collapsed: true,
           autogenerate: { directory: 'api', collapsed: true },
         },
+        { label: 'Changelog', link: '/changelog/' },
       ],
     },
   ] as unknown as DocsTemplateOptions['sidebarConfig'],

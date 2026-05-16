@@ -68,8 +68,6 @@ With CodeWeaver:
 | **Reliability** | **Resilient** (Automatic Local Fallback) | Fails on API Timeout |
 | **Token Usage** | **Optimized** (60–80% Reduction) | Wasted on Noise |
 
-📊 [See detailed competitive analysis →][competitive_analysis]
-
 ---
 
 ## 🚀 Getting Started
@@ -95,7 +93,7 @@ cw start
 > - `recommended`: High-precision search (Voyage AI + Qdrant)
 > - `quickstart`: 100% local, private, and free (FastEmbed + Local Qdrant)
 >
-> **Want full offline?** See the [Local-Only Guide][nav_docs].
+> **Want full offline?** See the [Local-Only Guide][local_only_guide].
 
 🐳 **Prefer Docker?** [See Docker setup guide →][docker_guide]
 
@@ -180,15 +178,13 @@ AI agents face **too much irrelevant context**, causing token waste, missed patt
 
 [api_find_code]: <src/codeweaver/agent_api/find_code/README.md> "find_code API Documentation"
 [arch_find_code]: <src/codeweaver/agent_api/find_code/ARCHITECTURE.md> "find_code Architecture"
-[architecture]: <ARCHITECTURE.md> "Overall Architecture"
 [bashandbone]: <https://github.com/bashandbone> "Adam Poulemanos' GitHub Profile"
 [codecov]: <https://codecov.io/gh/knitli/codeweaver/graph/badge.svg?token=EO3DQVHVVH> "Code Coverage"
-[competitive_analysis]: <src/codeweaver/docs/comparison.md> "See how CodeWeaver stacks up"
 [changelog]: <https://github.com/knitli/codeweaver/blob/main/CHANGELOG.md> "Changelog"
 [cla]: <CONTRIBUTORS_LICENSE_AGREEMENT.md> "Contributor License Agreement"
 [cli_guide]: <docs/CLI.md> "Command Line Reference"
 [config_schema]: <schema/codeweaver.schema.json> "The CodeWeaver Config Schema"
-[docker_guide]: <DOCKER.md> "Docker Setup Guide"
+[docker_guide]: <https://docs.knitli.com/codeweaver/guides/docker/> "Docker Setup Guide"
 [docker_notes]: <docs/docker/DOCKER_BUILD_NOTES.md> "Docker Build Notes"
 [enhancement_label]: <https://github.com/knitli/codeweaver/labels/enhancement> "Enhancement Issues"
 [issues]: <https://github.com/knitli/codeweaver/issues> "Report an Issue"
@@ -202,15 +198,15 @@ AI agents face **too much irrelevant context**, causing token waste, missed patt
 [link_python]: <https://www.python.org/downloads/> "Python Downloads"
 [link_release]: <https://github.com/knitli/codeweaver/releases> "CodeWeaver Releases"
 [mcp]: <https://modelcontextprotocol.io> "Learn About the Model Context Protocol"
+[local_only_guide]: <https://docs.knitli.com/codeweaver/guides/local-only/> "Local-Only Operation Guide"
 [nav_contributing]: <#-contributing> "Contributing Section"
-[nav_docs]: <#-documentation> "Documentation Section"
+[nav_docs]: <https://docs.knitli.com/codeweaver/> "CodeWeaver Documentation"
 [nav_comparison]: <#-quick_reference_matrix> "How CodeWeaver Compares"
 [nav_features]: <#-features> "Features Section"
 [nav_how_it_works]: <#-how-it-works> "How It Works Section"
 [nav_install]: <#-getting-started> "Installation Section"
 [nav_top]: <#codeweaver> "Back to Top"
 [privacy_policy]: <PRIVACY_POLICY.md> "Privacy Policy"
-[product_decisions]: <PRODUCT.md> "Product Decisions"
 [providers_list]: <overrides/partials/providers.md> "Full Provider List"
 [qdrant]: <https://qdrant.tech> "Qdrant Website"
 [repo]: <https://github.com/knitli/codeweaver> "CodeWeaver Repository"
@@ -221,5 +217,5 @@ AI agents face **too much irrelevant context**, causing token waste, missed patt
 [telemetry_readme]: <src/codeweaver/common/telemetry/README.md> "Telemetry README"
 [uv_tool]: <https://astral.sh/uv> "uv Package Manager"
 [voyage_ai]: <http://voyage.ai> "Voyage AI Website"
-[why_codeweaver]: <docs/WHY.md> "Why CodeWeaver"
+[why_codeweaver]: <https://docs.knitli.com/codeweaver/why/> "Why CodeWeaver"
 [wiki_ast]: <https://en.wikipedia.org/wiki/Abstract_syntax_tree> "About Abstract Syntax Trees"

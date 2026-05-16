@@ -27,7 +27,8 @@ mkdir -p "$CONFIG_DIR"
 # Configuration Generation
 # =============================================================================
 
-generate_config() {
+generate_config()
+                  {
     echo "Generating CodeWeaver configuration..."
     echo "  Profile: $PROFILE"
     echo "  Vector deployment: $VECTOR_DEPLOYMENT"
@@ -46,10 +47,10 @@ generate_config() {
     # Post-process: Override Qdrant URL for Docker networking (local deployment)
     if [ "$VECTOR_DEPLOYMENT" = "local" ]; then
         QDRANT_URL="${CODEWEAVER_QDRANT_URL:-http://qdrant:6333}"
-        if command -v sed >/dev/null 2>&1; then
+        if command -v sed > /dev/null 2>&1; then
             # Update Qdrant URL to use Docker network hostname
-            sed -i "s|url = \"http://localhost:6333\"|url = \"$QDRANT_URL\"|g" "$CONFIG_FILE" 2>/dev/null || true
-            sed -i "s|url = \"http://127.0.0.1:6333\"|url = \"$QDRANT_URL\"|g" "$CONFIG_FILE" 2>/dev/null || true
+            sed -i "s|url = \"http://localhost:6333\"|url = \"$QDRANT_URL\"|g" "$CONFIG_FILE" 2> /dev/null || true
+            sed -i "s|url = \"http://127.0.0.1:6333\"|url = \"$QDRANT_URL\"|g" "$CONFIG_FILE" 2> /dev/null || true
         fi
     fi
 
@@ -79,7 +80,8 @@ fi
 # =============================================================================
 
 # Normalize provider name to lowercase
-normalize_provider() {
+normalize_provider()
+                     {
     if [ -n "$1" ]; then
         printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
     else
@@ -88,12 +90,13 @@ normalize_provider() {
 }
 
 # Check if profile requires API keys
-validate_api_keys() {
+validate_api_keys()
+                    {
     case "$PROFILE" in
         recommended)
             # Recommended profile uses Voyage AI
             if [ -z "${VOYAGE_API_KEY:-}" ]; then
-                cat >&2 <<'EOF'
+                cat >&2 << 'EOF'
 ╔════════════════════════════════════════════════════════════════════════════╗
 ║  CodeWeaver - API Key Required                                              ║
 ╠════════════════════════════════════════════════════════════════════════════╣
@@ -109,15 +112,15 @@ validate_api_keys() {
 ║  2. Use 'quickstart' profile (free, local models):                          ║
 ║     docker run -e CODEWEAVER_PROFILE=quickstart knitli/codeweaver:latest    ║
 ║                                                                              ║
-║  3. Use 'backup' profile (lightest local models, in-memory vectors):        ║
-║     docker run -e CODEWEAVER_PROFILE=backup knitli/codeweaver:latest        ║
+║  3. Use 'testing' profile (lightest local models, in-memory vectors):       ║
+║     docker run -e CODEWEAVER_PROFILE=testing knitli/codeweaver:latest       ║
 ║                                                                              ║
 ╚════════════════════════════════════════════════════════════════════════════╝
 EOF
                 exit 78  # EX_CONFIG
             fi
             ;;
-        quickstart|backup)
+        quickstart | testing)
             # These profiles use local models - no API keys required
             echo "Using '$PROFILE' profile with local models (no API keys required)"
             ;;
