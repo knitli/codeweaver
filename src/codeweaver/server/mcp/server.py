@@ -168,22 +168,6 @@ def setup_runargs(
     )
 
 
-def _attempt_import(mw: str) -> type[McpMiddleware] | None:
-    """Attempt to import a middleware class from a string."""
-    from importlib import import_module
-
-    try:
-        imported = import_module(mw.rsplit(".", 1)[0])
-        imported = getattr(imported, mw.rsplit(".", 1)[1])
-        if isinstance(imported, type) and issubclass(imported, McpMiddleware):
-            return imported
-    except (ImportError, AttributeError):
-        logging.getLogger("codeweaver.server.mcp.server").warning(
-            "Failed to import middleware class '%s'", mw
-        )
-    return None
-
-
 def setup_middleware(
     middleware: Container[type[McpMiddleware]],
     middleware_settings: MiddlewareOptions | DictView[MiddlewareOptions],
