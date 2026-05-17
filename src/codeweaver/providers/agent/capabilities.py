@@ -44,6 +44,9 @@ def _parse_model_name(name: str) -> tuple[str, str]:
 
 
 def _attempt_to_get_profile(provider: str, full_name: str) -> AgentModelCapabilities | None:
+    # Security: Validate the provider against a known whitelist before using it in a dynamic import
+    if provider not in PYDANTIC_AI_MODEL_CAPABILITIES_PROVIDERS:
+        return None
     with contextlib.suppress(ImportError):
         module = importlib.import_module(f"pydantic_ai.profiles.{provider}")
         if profile_getter := getattr(module, f"{provider}_model_profile", None):
@@ -58,6 +61,9 @@ def get_agent_model_capabilities() -> dict[KnownAgentModelName, AgentModelCapabi
     profiles: dict[KnownAgentModelName, AgentModelCapabilities] = {}
     for name in model_names:
         provider, _model = _parse_model_name(name)
+        # Security: Validate the provider against a known whitelist before using it in a dynamic import
+        if provider not in PYDANTIC_AI_MODEL_CAPABILITIES_PROVIDERS:
+            continue
         try:
             profile = None
             module = importlib.import_module(f"pydantic_ai.profiles.{provider}")
