@@ -25,3 +25,6 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 ## 2025-04-12 - Walrus Operator Optimization
 **Learning:** Using the walrus operator inside a list comprehension to avoid redundant execution of string methods (like `.strip()`) is an effective and safe micro-optimization. The result of the assignment inside the list comprehension will intentionally leak into the scope of the caller function, but this standard Python behavior does not cause naming conflicts in non-recursive or non-global scopes.
 **Action:** Always favor using the walrus operator `:=` in list comprehensions or conditionals when identical string manipulations (e.g., `.strip()`) or expensive evaluation calls appear repeatedly within the identical expression branch.
+## 2026-04-14 - Replace Generator Expressions with For Loops in Linear Lookups
+**Learning:** In Python performance optimization, replacing a generator expression wrapped in `next()` (e.g., `next((x for x in iterable if condition), default)`) with a standard `for` loop that uses an early `return` can significantly speed up linear lookups by eliminating generator frame allocation overhead.
+**Action:** Replace `next((...))` generator patterns with explicit `for` loops and early returns in hot paths or linear lookups. Suppress linting rules like `SIM110` using `noqa` when necessary to maintain this optimization.
