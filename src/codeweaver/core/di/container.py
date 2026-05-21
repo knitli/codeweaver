@@ -138,6 +138,17 @@ class Container[T]:
 
                 super().generic_visit(node)
 
+            def visit_Call(self, node: ast.Call) -> None:
+                # Restrict ast.Call nodes to a specific whitelist to prevent Arbitrary Code Execution (ACE)
+                # vulnerabilities during dynamic type string evaluation using restricted eval.
+                if not (
+                    isinstance(node.func, ast.Name)
+                    and node.func.id in {"Depends", "Field", "depends", "PrivateAttr"}
+                ):
+                    func_name = getattr(node.func, "id", type(node.func).__name__)
+                    raise TypeError(f"Forbidden function call in type string: {func_name}")
+                self.generic_visit(node)
+
         try:
             TypeValidator().visit(tree)
         except TypeError:
