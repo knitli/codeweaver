@@ -130,6 +130,14 @@ class Container[T]:
                 ):
                     raise TypeError(f"Forbidden AST node in type string: {type(node).__name__}")
 
+                # Restrict Arbitrary Code Execution (ACE) via type hints by strictly whitelisting ast.Call
+                if isinstance(node, ast.Call):
+                    if isinstance(node.func, ast.Name):
+                        if node.func.id not in {"Depends", "depends", "Field", "PrivateAttr", "Tag"}:
+                            raise TypeError(f"Forbidden call in type string: {node.func.id}")
+                    else:
+                        raise TypeError("Forbidden call in type string: only simple names are allowed")
+
                 # Block dunder access to prevent escaping the restricted environment
                 if isinstance(node, ast.Name) and node.id.startswith("__"):
                     raise TypeError(f"Forbidden dunder name: {node.id}")
