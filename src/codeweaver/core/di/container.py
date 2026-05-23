@@ -111,7 +111,13 @@ class Container[T]:
                 # - Unions: int | str (BinOp, BitOr)
                 # - Annotated: Annotated[int, Depends(...)] (Call, keyword, Tuple, List)
                 # - Literals: Literal["foo"] (Constant)
-                if not isinstance(
+                if isinstance(node, ast.Call):
+                    # Restricting arbitrary function calls during type evaluation prevents ACE vulnerabilities
+                    if not isinstance(node.func, ast.Name) or node.func.id not in {"Depends", "depends", "Field", "PrivateAttr", "Tag"}:
+                        raise TypeError(f"Forbidden function call in type string: {node.func.id if isinstance(node.func, ast.Name) else type(node.func).__name__}")
+                elif isinstance(node, ast.keyword):
+                    pass
+                elif not isinstance(
                     node,
                     (
                         ast.Expression,
@@ -124,8 +130,6 @@ class Container[T]:
                         ast.Load,
                         ast.Tuple,
                         ast.List,
-                        ast.Call,
-                        ast.keyword,
                     ),
                 ):
                     raise TypeError(f"Forbidden AST node in type string: {type(node).__name__}")
