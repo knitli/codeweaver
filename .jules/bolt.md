@@ -13,7 +13,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # 2026-03-29 -  Consider Readability and Possible Environment Limitations
 **Learning** While some patterns are hypothetically faster, they may not improve performance in i/o bound contexts. Examples include embedding/reranking requests and database operations where the dominant limiting factors are i/o constraints.
-**Action** Don't recommend changes that reduce readability or diverge from Python idioms for no or marginal gains in performance. 
+**Action** Don't recommend changes that reduce readability or diverge from Python idioms for no or marginal gains in performance.
 
 ## 2026-04-01 - Fast generation of line pos lengths in Chunker with itertools
 **Learning:** itertools.accumulate(map(len, lines)) is significantly faster (~2-3x) than using a generator expression like (line_offsets[-1] + len(line) for line in lines) because it pushes the entire loop down to C level instead of creating generator overhead for each element.
@@ -25,3 +25,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 ## 2025-04-12 - Walrus Operator Optimization
 **Learning:** Using the walrus operator inside a list comprehension to avoid redundant execution of string methods (like `.strip()`) is an effective and safe micro-optimization. The result of the assignment inside the list comprehension will intentionally leak into the scope of the caller function, but this standard Python behavior does not cause naming conflicts in non-recursive or non-global scopes.
 **Action:** Always favor using the walrus operator `:=` in list comprehensions or conditionals when identical string manipulations (e.g., `.strip()`) or expensive evaluation calls appear repeatedly within the identical expression branch.
+
+## 2024-05-18 - Avoid O(N²) nested loops with generator comprehensions in list building
+**Learning:** In list comprehensions or extending lists (e.g. `extend(...)`), using a generator comprehension like `next((... for x in y if ...))` inside the loop over `N` elements creates an $O(N^2)$ algorithmic complexity if `y` also has `N` elements. This happened in `default_reranking_output_transformer` where `batch_rank` was calculated.
+**Action:** Always precompute a hash map (dictionary lookup) for mapping values outside the loop to change the complexity from $O(N^2)$ to $O(N)$, especially in hot paths like reranking output processing.
