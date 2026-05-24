@@ -130,6 +130,16 @@ class Container[T]:
                 ):
                     raise TypeError(f"Forbidden AST node in type string: {type(node).__name__}")
 
+                if isinstance(node, ast.Call):
+                    # Prevent arbitrary code execution by strictly whitelisting allowed callables.
+                    # Security concern: Without this whitelist, any function in the module's global
+                    # namespace could be executed during the subsequent eval() of the AST tree.
+                    if not isinstance(node.func, ast.Name):
+                        raise TypeError("Only direct function calls are allowed in type strings.")
+                    allowed_funcs = {"Depends", "depends", "Field", "PrivateAttr", "Tag"}
+                    if node.func.id not in allowed_funcs:
+                        raise TypeError(f"Forbidden function call in type string: {node.func.id}")
+
                 # Block dunder access to prevent escaping the restricted environment
                 if isinstance(node, ast.Name) and node.id.startswith("__"):
                     raise TypeError(f"Forbidden dunder name: {node.id}")
