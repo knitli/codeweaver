@@ -957,15 +957,11 @@ class SemanticSearchLanguage(str, BaseEnum):
         Returns:
             The corresponding SemanticSearchLanguage, or None if not found.
         """
-        return next(
-            (
-                lang
-                for lang in cls
-                if lang.extensions
-                if next((extension for extension in lang.extensions if ext == extension), None)
-            ),
-            None,
-        )
+        # Standard for loop eliminates generator frame allocation overhead and significantly speeds up lookup
+        for lang in cls:
+            if lang.extensions and ext in lang.extensions:
+                return lang
+        return None
 
     @computed_field
     @property
