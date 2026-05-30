@@ -247,7 +247,11 @@ class ExtLangPair(NamedTuple):
         """Check if the extension is a documentation file."""
         from codeweaver.core.file_extensions import DOC_FILES_EXTENSIONS
 
-        return next((True for doc_ext in DOC_FILES_EXTENSIONS if doc_ext.ext == self.ext), False)
+        # Optimization: A standard for loop with an early return avoids generator frame allocation overhead
+        for doc_ext in DOC_FILES_EXTENSIONS:  # noqa: SIM110
+            if doc_ext.ext == self.ext:
+                return True
+        return False
 
     @property
     def is_code(self) -> bool:
@@ -259,7 +263,11 @@ class ExtLangPair(NamedTuple):
         """Check if the extension is a data file."""
         from codeweaver.core.file_extensions import DATA_FILES_EXTENSIONS
 
-        return next((True for data_ext in DATA_FILES_EXTENSIONS if data_ext.ext == self.ext), False)
+        # Optimization: A standard for loop with an early return avoids generator frame allocation overhead
+        for data_ext in DATA_FILES_EXTENSIONS:  # noqa: SIM110
+            if data_ext.ext == self.ext:
+                return True
+        return False
 
     @property
     def as_source(self) -> ChunkSource:
