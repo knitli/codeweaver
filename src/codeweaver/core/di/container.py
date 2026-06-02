@@ -84,7 +84,7 @@ class Container[T]:
         self._request_cache: dict[Any, Any] = {}  # Keys can be types or callables
         self._providers_loaded: bool = False  # Track if auto-discovery has run
 
-    def _safe_eval_type(self, type_str: str, globalns: dict[str, Any]) -> Any | None:
+    def _safe_eval_type(self, type_str: str, globalns: dict[str, Any]) -> Any | None:  # noqa: C901
         """Safely evaluate a type string using AST validation.
 
         Parses the type string into an AST, validates that it contains only safe
@@ -135,6 +135,30 @@ class Container[T]:
                     raise TypeError(f"Forbidden dunder name: {node.id}")
                 if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
                     raise TypeError(f"Forbidden dunder attribute: {node.attr}")
+
+                # Security: Restrict arbitrary function execution in evaluate
+                if isinstance(node, ast.Call):
+                    func_name = None
+                    if isinstance(node.func, ast.Name):
+                        func_name = node.func.id
+                    elif isinstance(node.func, ast.Attribute):
+                        func_name = node.func.attr
+
+                    allowed_funcs = {
+                        "Depends",
+                        "depends",
+                        "Field",
+                        "PrivateAttr",
+                        "Tag",
+                        "Parameter",
+                        "AfterValidator",
+                        "BeforeValidator",
+                        "Discriminator",
+                        "GetPydanticSchema",
+                        "uuid7",
+                    }
+                    if func_name not in allowed_funcs:
+                        raise TypeError(f"Arbitrary function calls are forbidden: {func_name}")
 
                 super().generic_visit(node)
 
