@@ -13,7 +13,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # 2026-03-29 -  Consider Readability and Possible Environment Limitations
 **Learning** While some patterns are hypothetically faster, they may not improve performance in i/o bound contexts. Examples include embedding/reranking requests and database operations where the dominant limiting factors are i/o constraints.
-**Action** Don't recommend changes that reduce readability or diverge from Python idioms for no or marginal gains in performance. 
+**Action** Don't recommend changes that reduce readability or diverge from Python idioms for no or marginal gains in performance.
 
 ## 2026-04-01 - Fast generation of line pos lengths in Chunker with itertools
 **Learning:** itertools.accumulate(map(len, lines)) is significantly faster (~2-3x) than using a generator expression like (line_offsets[-1] + len(line) for line in lines) because it pushes the entire loop down to C level instead of creating generator overhead for each element.
@@ -25,3 +25,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 ## 2025-04-12 - Walrus Operator Optimization
 **Learning:** Using the walrus operator inside a list comprehension to avoid redundant execution of string methods (like `.strip()`) is an effective and safe micro-optimization. The result of the assignment inside the list comprehension will intentionally leak into the scope of the caller function, but this standard Python behavior does not cause naming conflicts in non-recursive or non-global scopes.
 **Action:** Always favor using the walrus operator `:=` in list comprehensions or conditionals when identical string manipulations (e.g., `.strip()`) or expensive evaluation calls appear repeatedly within the identical expression branch.
+
+## 2025-05-15 - Avoiding Generator Comprehensions for Dictionary Value Lookups
+**Learning:** Using `next((v for content in dict.values() for k, v in content.items() if k == target), default)` inside dictionary lookups introduces severe performance regressions in hot paths. This pattern converts a fast $O(1)$ direct key lookup into an $O(N^2)$ algorithmic complexity because it must generate frames and iterate over items, bypassing the hash map advantages.
+**Action:** Replace dictionary generator comprehensions with simple `for` loops that use an early return/yield and a direct `in` check (`if target in content: return content[target]`), which is drastically faster and avoids generator overhead.
