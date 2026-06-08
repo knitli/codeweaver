@@ -136,6 +136,31 @@ class Container[T]:
                 if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
                     raise TypeError(f"Forbidden dunder attribute: {node.attr}")
 
+                # Restricting generic ast.Call nodes prevents arbitrary code execution vulnerabilities
+                # by only permitting safe, expected callables.
+                if isinstance(node, ast.Call):
+                    # Check if the callable is one of the explicitly allowed functions
+                    is_allowed = False
+                    if (isinstance(node.func, ast.Name) and node.func.id in {
+                        "Depends",
+                        "depends",
+                        "Field",
+                        "PrivateAttr",
+                        "Tag",
+                        "Parameter",
+                    }) or (isinstance(node.func, ast.Attribute) and node.func.attr in {
+                        "Depends",
+                        "depends",
+                        "Field",
+                        "PrivateAttr",
+                        "Tag",
+                        "Parameter",
+                    }):
+                        is_allowed = True
+
+                    if not is_allowed:
+                        raise TypeError("Forbidden function call in type string.")
+
                 super().generic_visit(node)
 
         try:
