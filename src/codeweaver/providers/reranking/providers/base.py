@@ -91,10 +91,12 @@ def default_reranking_output_transformer(
     mapped_scores = sorted(
         ((i, score) for i, score in enumerate(results)), key=lambda x: x[1], reverse=True
     )
+    # ⚡ Bolt: Pre-computed hash map for O(1) rank lookups, reducing algorithm from O(N^2) to O(N)
+    rank_map = {idx: j + 1 for j, (idx, _) in enumerate(mapped_scores)}
     processed_results.extend(
         RerankingResult(
             original_index=i,
-            batch_rank=next((j + 1 for j, (idx, _) in enumerate(mapped_scores) if idx == i), -1),
+            batch_rank=rank_map.get(i, -1),
             score=score,
             chunk=chunk,
         )
