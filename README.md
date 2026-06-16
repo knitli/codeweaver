@@ -5,6 +5,19 @@ SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 SPDX-License-Identifier: MIT OR Apache-2.0
 -->
 
+> [!WARNING]
+> 
+> ## CodeWeaver is no longer maintained
+>
+> We're really proud of CodeWeaver and think it's pretty awesome, but we can't maintain it anymore.
+>
+> We're focused on [something else](https://marque.tools).
+> 
+> CodeWeaver is (was?) a sophisticated, smart, code search tool with wide provider support.
+> and it's still licensed under your choice of MIT or Apache-2.0.
+> 
+> So please, **fork it and build something great!**
+
 <div align="center">
 
 <picture>
