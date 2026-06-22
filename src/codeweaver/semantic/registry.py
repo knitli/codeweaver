@@ -344,17 +344,13 @@ class ThingRegistry:
         """Get DirectConnections by their source Thing name across all languages."""
         if language:
             yield from self.direct_connections[language].get(source, [])
-        yield from (
-            next(
-                (
-                    conns
-                    for content in self._direct_connections.values()
-                    for con_name, conns in content.items()
-                    if con_name == source
-                ),
-                [],
-            )
-        )
+            return
+
+        # Optimization: Early return via direct lookup avoids O(N^2) generator overhead
+        for content in self._direct_connections.values():
+            if source in content:
+                yield from content[source]
+                break
 
     def _get_positional_connections_by_source(
         self, source: ThingNameT, *, language: SemanticSearchLanguage | None = None
@@ -362,15 +358,12 @@ class ThingRegistry:
         """Get PositionalConnectionss by their source Thing name across all languages."""
         if language:
             return self.positional_connections[language].get(source)
-        return next(
-            (
-                conn
-                for content in self._positional_connections.values()
-                for con_name, conn in content.items()
-                if con_name == source
-            ),
-            None,
-        )
+
+        # Optimization: Early return via direct lookup avoids O(N^2) generator overhead
+        for content in self._positional_connections.values():
+            if source in content:
+                return content[source]
+        return None
 
     def get_positional_connections_by_source(
         self, source: ThingNameT, *, language: SemanticSearchLanguage | None = None
