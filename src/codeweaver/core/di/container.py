@@ -84,7 +84,7 @@ class Container[T]:
         self._request_cache: dict[Any, Any] = {}  # Keys can be types or callables
         self._providers_loaded: bool = False  # Track if auto-discovery has run
 
-    def _safe_eval_type(self, type_str: str, globalns: dict[str, Any]) -> Any | None:
+    def _safe_eval_type(self, type_str: str, globalns: dict[str, Any]) -> Any | None:  # noqa: C901
         """Safely evaluate a type string using AST validation.
 
         Parses the type string into an AST, validates that it contains only safe
@@ -135,6 +135,20 @@ class Container[T]:
                     raise TypeError(f"Forbidden dunder name: {node.id}")
                 if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
                     raise TypeError(f"Forbidden dunder attribute: {node.attr}")
+
+                # Restrict ast.Call to a strict whitelist to prevent Arbitrary Code Execution (ACE).
+                # Allowing generic ast.Call permits execution of any callable in the module's
+                # global namespace during eval(), introducing a critical ACE vulnerability.
+                if isinstance(node, ast.Call):
+                    if isinstance(node.func, ast.Name):
+                        func_name = node.func.id
+                    elif isinstance(node.func, ast.Attribute):
+                        func_name = node.func.attr
+                    else:
+                        raise TypeError("Forbidden call representation in type string")
+
+                    if func_name not in {"Depends", "depends", "Field", "PrivateAttr", "Tag"}:
+                        raise TypeError(f"Forbidden callable in type string: {func_name}")
 
                 super().generic_visit(node)
 
