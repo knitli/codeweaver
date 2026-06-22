@@ -136,6 +136,26 @@ class Container[T]:
                 if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
                     raise TypeError(f"Forbidden dunder attribute: {node.attr}")
 
+                # 🛡️ Sentinel Security Fix: Whitelist ast.Call functions
+                # Allowing generic ast.Call nodes could lead to Arbitrary Code Execution (ACE)
+                # during eval() as it permits running any callable in the global namespace.
+                # We strictly limit ast.Call usage to known safe functions used in annotations.
+                if isinstance(node, ast.Call) and (
+                    not isinstance(node.func, ast.Name)
+                    or node.func.id
+                    not in {
+                        "Depends",
+                        "depends",
+                        "Field",
+                        "PrivateAttr",
+                        "Tag",
+                    }
+                ):
+                    func_name = (
+                        node.func.id if isinstance(node.func, ast.Name) else str(type(node.func))
+                    )
+                    raise TypeError(f"Forbidden function call in type string: {func_name}")
+
                 super().generic_visit(node)
 
         try:
