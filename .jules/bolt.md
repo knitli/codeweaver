@@ -25,3 +25,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 ## 2025-04-12 - Walrus Operator Optimization
 **Learning:** Using the walrus operator inside a list comprehension to avoid redundant execution of string methods (like `.strip()`) is an effective and safe micro-optimization. The result of the assignment inside the list comprehension will intentionally leak into the scope of the caller function, but this standard Python behavior does not cause naming conflicts in non-recursive or non-global scopes.
 **Action:** Always favor using the walrus operator `:=` in list comprehensions or conditionals when identical string manipulations (e.g., `.strip()`) or expensive evaluation calls appear repeatedly within the identical expression branch.
+
+## 2026-04-14 - Pre-computing Bound Method Collections in Hot Loops
+**Learning:** Constructing a collection of bound methods (e.g., `[self.method_a, self.method_b]`) inside a frequently called function incurs dual overhead: the allocation of the collection itself (like a list or tuple) and the creation of new bound method objects on every execution. This can negatively impact performance in tight loops or classification engines.
+**Action:** When a static collection of instance methods needs to be repeatedly iterated over, pre-compute and store it as a tuple attribute during the class's `__init__` (e.g., `self._methods = (self.a, self.b)`). This avoids both allocation overhead and repeated bound method creation.
