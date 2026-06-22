@@ -129,7 +129,10 @@ class ConfigLanguage(BaseEnum):
         """
         ext = ext.lower() if ext.startswith(".") else ext
         if ext in cls.all_extensions():
-            return next((language for language in cls if ext in language.extensions), None)
+            # Optimization: A standard for loop with an early return avoids generator frame allocation overhead
+            for language in cls:
+                if ext in language.extensions:
+                    return language
         return None
 
     @property

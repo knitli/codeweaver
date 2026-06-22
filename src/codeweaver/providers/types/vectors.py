@@ -315,7 +315,11 @@ class VectorSet(BasedModel):
         Returns:
             Matching VectorConfig or None
         """
-        return next((v for v in self.vectors.values() if v.name == name), None)
+        # Optimization: A standard for loop with an early return avoids generator frame allocation overhead
+        for v in self.vectors.values():
+            if v.name == name:
+                return v
+        return None
 
     def by_key(self, key: str) -> VectorConfig | None:
         """Get vector by its logical dict key.
