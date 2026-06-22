@@ -136,6 +136,12 @@ class Container[T]:
                 if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
                     raise TypeError(f"Forbidden dunder attribute: {node.attr}")
 
+                # Security: Restrict calls to prevent arbitrary code execution during type evaluation
+                if isinstance(node, ast.Call) and (
+                    not isinstance(node.func, ast.Name) or node.func.id != "Depends"
+                ):
+                    raise TypeError("Forbidden call type: only Depends() is allowed")
+
                 super().generic_visit(node)
 
         try:
