@@ -4,3 +4,7 @@
 **Vulnerability:** Found an unused `_attempt_import` function in `src/codeweaver/server/mcp/server.py` that dynamically imports a module directly from unvalidated configuration (`import_module(mw.rsplit(".", 1)[0])`), leading to potential arbitrary code execution.
 **Learning:** Functions that perform dynamic imports should not be left around in the codebase if they are unused, especially if they are designed to take unvalidated strings as input.
 **Prevention:** Avoid dynamic imports based on configuration or inputs without strict whitelisting. Use tools like `semgrep` with python security rules to actively catch these patterns.
+## 2026-04-21 - Unvalidated dynamic import vulnerability removed
+**Vulnerability:** Found dynamic import logic (`importlib.import_module(f"pydantic_ai.profiles.{provider}")`) in `src/codeweaver/providers/agent/capabilities.py` that accepted potentially unvalidated `provider` strings from parsed inputs.
+**Learning:** Passing unvalidated inputs directly to `importlib.import_module` can lead to unintended execution paths or potential arbitrary code execution.
+**Prevention:** Always validate external or dynamically parsed inputs against a strict whitelist of expected/safe values before using them to import modules.
