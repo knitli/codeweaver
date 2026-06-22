@@ -136,6 +136,13 @@ class Container[T]:
                 if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
                     raise TypeError(f"Forbidden dunder attribute: {node.attr}")
 
+                # Security: Restrict callable nodes in `eval` to prevent Arbitrary Code Execution (ACE)
+                if isinstance(node, ast.Call):
+                    if not isinstance(node.func, ast.Name):
+                        raise TypeError("Only direct function calls are allowed in type annotations")
+                    if node.func.id not in {"Depends", "depends", "Field", "PrivateAttr", "Tag"}:
+                        raise TypeError(f"Forbidden function call in type annotation: {node.func.id}")
+
                 super().generic_visit(node)
 
         try:
