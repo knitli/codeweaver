@@ -129,7 +129,10 @@ class ConfigLanguage(BaseEnum):
         """
         ext = ext.lower() if ext.startswith(".") else ext
         if ext in cls.all_extensions():
-            return next((language for language in cls if ext in language.extensions), None)
+            # Optimization: Loop with early return is significantly faster than next() generator comprehension
+            for language in cls:
+                if ext in language.extensions:
+                    return language
         return None
 
     @property
@@ -957,15 +960,13 @@ class SemanticSearchLanguage(str, BaseEnum):
         Returns:
             The corresponding SemanticSearchLanguage, or None if not found.
         """
-        return next(
-            (
-                lang
-                for lang in cls
-                if lang.extensions
-                if next((extension for extension in lang.extensions if ext == extension), None)
-            ),
-            None,
-        )
+        # Optimization: Loop with early return is significantly faster than next() generator comprehension
+        for lang in cls:
+            if lang.extensions:
+                for extension in lang.extensions:
+                    if ext == extension:
+                        return lang
+        return None
 
     @computed_field
     @property

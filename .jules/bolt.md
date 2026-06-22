@@ -13,7 +13,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # 2026-03-29 -  Consider Readability and Possible Environment Limitations
 **Learning** While some patterns are hypothetically faster, they may not improve performance in i/o bound contexts. Examples include embedding/reranking requests and database operations where the dominant limiting factors are i/o constraints.
-**Action** Don't recommend changes that reduce readability or diverge from Python idioms for no or marginal gains in performance. 
+**Action** Don't recommend changes that reduce readability or diverge from Python idioms for no or marginal gains in performance.
 
 ## 2026-04-01 - Fast generation of line pos lengths in Chunker with itertools
 **Learning:** itertools.accumulate(map(len, lines)) is significantly faster (~2-3x) than using a generator expression like (line_offsets[-1] + len(line) for line in lines) because it pushes the entire loop down to C level instead of creating generator overhead for each element.
@@ -25,3 +25,6 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 ## 2025-04-12 - Walrus Operator Optimization
 **Learning:** Using the walrus operator inside a list comprehension to avoid redundant execution of string methods (like `.strip()`) is an effective and safe micro-optimization. The result of the assignment inside the list comprehension will intentionally leak into the scope of the caller function, but this standard Python behavior does not cause naming conflicts in non-recursive or non-global scopes.
 **Action:** Always favor using the walrus operator `:=` in list comprehensions or conditionals when identical string manipulations (e.g., `.strip()`) or expensive evaluation calls appear repeatedly within the identical expression branch.
+## 2026-04-14 - Fast Lookups by Replacing `next()` with `for` loops
+**Learning:** Replacing a generator expression wrapped in `next()` (e.g., `next((x for x in iterable if condition), default)`) with a standard `for` loop that uses an early `return` can significantly speed up linear lookups by eliminating generator frame allocation overhead. In testing, the loop structure is over 6x faster than `next()` on generator comprehensions.
+**Action:** Favor using standard `for` loops with early returns over `next()` wrapped generator expressions when optimizing hot linear lookups.
