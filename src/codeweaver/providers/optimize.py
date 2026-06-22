@@ -51,7 +51,9 @@ def _nvidia_smi_device_ids() -> list[int]:
             text=True,
             timeout=2.0,
         )
-        return [int(line.strip()) for line in out.splitlines() if line.strip().isdigit()]
+        # Optimization: Use walrus operator to avoid calling .strip() twice per line
+        # Expected Impact: Minor reduction in redundant string allocations and operations
+        return [int(stripped) for line in out.splitlines() if (stripped := line.strip()).isdigit()]
     return []
 
 
