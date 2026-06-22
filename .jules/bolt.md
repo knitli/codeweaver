@@ -25,3 +25,6 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 ## 2025-04-12 - Walrus Operator Optimization
 **Learning:** Using the walrus operator inside a list comprehension to avoid redundant execution of string methods (like `.strip()`) is an effective and safe micro-optimization. The result of the assignment inside the list comprehension will intentionally leak into the scope of the caller function, but this standard Python behavior does not cause naming conflicts in non-recursive or non-global scopes.
 **Action:** Always favor using the walrus operator `:=` in list comprehensions or conditionals when identical string manipulations (e.g., `.strip()`) or expensive evaluation calls appear repeatedly within the identical expression branch.
+## 2025-05-08 - String Optimization
+**Learning:** Redundant evaluations of `.strip()` in list comprehensions and generators cause unnecessary allocation and processing. Since Python 3.8, the walrus operator (`:=`) allows the evaluation of variables inline, preventing duplicate processing overhead.
+**Action:** Use the walrus operator (`:=`) to capture the result of string manipulation like `.strip()` in comprehensions if that exact modified string needs to be accessed again in the conditional or expression logic.
