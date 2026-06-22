@@ -130,6 +130,24 @@ class Container[T]:
                 ):
                     raise TypeError(f"Forbidden AST node in type string: {type(node).__name__}")
 
+                # 🛡️ Sentinel: Prevent Arbitrary Code Execution (ACE)
+                # Allowing generic ast.Call nodes permits execution of any callable
+                # in the module's global namespace via eval() below. We strictly
+                # whitelist required functions to eliminate this critical ACE vulnerability.
+                if isinstance(node, ast.Call) and (
+                    not isinstance(node.func, ast.Name)
+                    or node.func.id
+                    not in {
+                        "Depends",
+                        "depends",
+                        "Field",
+                        "PrivateAttr",
+                        "Tag",
+                    }
+                ):
+                    func_name = getattr(node.func, "id", "unknown")
+                    raise TypeError(f"Forbidden function call in type string: {func_name}")
+
                 # Block dunder access to prevent escaping the restricted environment
                 if isinstance(node, ast.Name) and node.id.startswith("__"):
                     raise TypeError(f"Forbidden dunder name: {node.id}")
